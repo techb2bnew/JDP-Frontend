@@ -1,0 +1,23 @@
+# Icon Assets Directory
+
+Place SVG icons and icon files here.
+
+## Recommended Usage:
+- Use Lucide React for most icons (already included)
+- Place custom SVG icons in this directory
+- Name files descriptively: `arrow-right.svg`, `user-profile.svg`
+
+## Example Custom Icon Usage:
+
+```tsx
+// For SVG icons, you can import them directly
+import CustomIcon from '@/public/assets/icons/custom-icon.svg'
+
+// Or use as regular images
+<Image 
+  src="/assets/icons/custom-icon.svg" 
+  alt="Custom Icon"
+  width={24}
+  height={24}
+/>
+```
