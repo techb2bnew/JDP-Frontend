@@ -1,5 +1,5 @@
 import svgPaths from "./svg-efhiucnisz";
-import imgImage from "figma:asset/ceb687065410f538ad2b9566241cd69236d85bcb.png";
+// import imgImage from "figma:asset/ceb687065410f538ad2b9566241cd69236d85bcb.png";
 // import img4541 from "figma:asset/a3e40afe539df138ee43712dc0bf65b14d1b7224.png";
 
 function Menu() {

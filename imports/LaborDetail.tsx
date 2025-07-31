@@ -1,7 +1,7 @@
 import svgPaths from "./svg-xomszpnl4f";
-import imgImage from "figma:asset/ceb687065410f538ad2b9566241cd69236d85bcb.png";
+// import imgImage from "figma:asset/ceb687065410f538ad2b9566241cd69236d85bcb.png";
 // import img4541 from "figma:asset/a3e40afe539df138ee43712dc0bf65b14d1b7224.png";
-import imgRectangle42194 from "figma:asset/ac11385e9f91cb8372abb5d512fe600f1a492129.png";
+// import imgRectangle42194 from "figma:asset/ac11385e9f91cb8372abb5d512fe600f1a492129.png";
 
 function Menu() {
   return (
@@ -1212,7 +1212,7 @@ export default function LaborDetail() {
       </div>
       <div
         className="absolute bg-center bg-cover bg-no-repeat left-[882px] rounded-[13px] size-[187px] top-[583px]"
-        style={{ backgroundImage: `url('${imgRectangle42194}')` }}
+        
       />
     </div>
   );

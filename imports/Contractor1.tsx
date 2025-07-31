@@ -1,7 +1,7 @@
 import svgPaths from "./svg-nyds3vwrvz";
-import imgImage from "figma:asset/78434944002354bad48d5cfc533a12ff4990eed2.png";
-import imgImage1 from "figma:asset/4c4bfca98b5ca77eb625df56ff4f01b138f7792f.png";
-import imgLogo11111 from "figma:asset/23399e3d538cdd16afc216a9532c4a03c5475895.png";
+// import imgImage from "figma:asset/78434944002354bad48d5cfc533a12ff4990eed2.png";
+// import imgImage1 from "figma:asset/4c4bfca98b5ca77eb625df56ff4f01b138f7792f.png";
+// import imgLogo11111 from "figma:asset/23399e3d538cdd16afc216a9532c4a03c5475895.png";
 
 interface CaratProps {
   direction?: "back" | "forward";
@@ -2617,7 +2617,7 @@ export default function Contractor1() {
       <div
         className="absolute bg-center bg-cover bg-no-repeat h-[33.697px] left-[30px] top-[19px] w-[90px]"
         data-name="logo_1111 1"
-        style={{ backgroundImage: `url('${imgLogo11111}')` }}
+         
       />
       <Frame1171275926 />
       <Frame1171275927 />
