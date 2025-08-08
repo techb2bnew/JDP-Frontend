@@ -21,9 +21,7 @@ import {
   Bell
 } from "lucide-react"
 import { cn } from "../../lib/utils"
-import { LogoutConfirmationDialog } from "../LogoutConfirmationDialog"
-import Logo from '../../public/assets/logos/logo-jdp.png' 
-import Image from "next/image"
+import { LogoutConfirmationDialog } from "../LogoutConfirmationDialog" 
 interface SidebarProps {
   currentPath: string
   onLogout: () => void
@@ -165,7 +163,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
         <div className="p-5 border-b border-sidebar-border bg-gradient-to-r from-sidebar to-sidebar-accent/20">
           <div className="flex items-center justify-center space-x-3"> 
             <div className="text-center">
-            <Image src={Logo} alt="logo" className='w-[140px] ' />
+            <img src='/assets/logos/logo-jdp.png' alt="logo" className='w-[140px] ' />
               <p className="font-semibold text-md pt-3">JDP Electrical Services</p>
              </div>
           </div>
