@@ -3,13 +3,13 @@
 import { Bell, User, Search, Sun, Moon, Settings } from "lucide-react"
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-  DropdownMenuLabel 
+  DropdownMenuLabel
 } from "../ui/dropdown-menu"
 import { Badge } from "../ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar"
@@ -17,7 +17,19 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/
 import { useState } from "react"
 import { NotificationPopup } from "../NotificationPopup"
 import { useTheme } from "../../contexts/ThemeContext"
-
+import {
+  Plus,
+  Filter,
+  Calendar,
+  MapPin,
+  Clock,
+  DollarSign,
+  FileText,
+  Users,
+  Briefcase,
+  CheckSquare
+} from 'lucide-react'
+import Link from "next/link"
 interface HeaderProps {
   currentPath: string
   onLogout: () => void
@@ -25,11 +37,11 @@ interface HeaderProps {
   onProfileClick: () => void
 }
 
-export function Header({ 
-  currentPath, 
-  onLogout, 
-  onNotificationViewAll, 
-  onProfileClick 
+export function Header({
+  currentPath,
+  onLogout,
+  onNotificationViewAll,
+  onProfileClick
 }: HeaderProps) {
   const [showNotifications, setShowNotifications] = useState(false)
   const { theme, toggleTheme, isLoading } = useTheme()
@@ -37,14 +49,15 @@ export function Header({
   const getPageTitle = (path: string): string => {
     const titles: Record<string, string> = {
       "/dashboard": "Dashboard",
-      "/analytics": "Analytics", 
+      "/analytics": "Analytics",
       "/products": "Products",
       "/orders": "Orders",
-      "/invoices": "Invoices",
+      "/invoices": "Invoices & Billing",
       "/customers": "Customers",
       "/jobs": "Job Management",
       "/tracking": "Live Tracking",
       "/contractors": "Contractor Listing",
+      "/configuration": "Configuration",
       "/staff": "Staff Management",
       "/notifications": "Notifications",
       "/profile": "Profile",
@@ -66,7 +79,7 @@ export function Header({
       unread: true
     },
     {
-      id: "2", 
+      id: "2",
       title: "Payment Confirmed",
       message: "Payment of $1,250 has been confirmed for Invoice #INV-001",
       time: "15 minutes ago",
@@ -77,7 +90,7 @@ export function Header({
       id: "3",
       title: "Low Stock Alert",
       message: "Product 'Steel Beams' is running low in inventory",
-      time: "1 hour ago", 
+      time: "1 hour ago",
       type: "inventory" as const,
       unread: false
     },
@@ -95,26 +108,40 @@ export function Header({
 
   return (
     <TooltipProvider>
-      <header className="bg-card border-b border-border px-6 py-4 animate-fade-in shadow-sm">
+      <header className="bg-card border-b px-6 py-4 animate-fade-in shadow-sm">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-2xl font-medium text-foreground">
+          <div className="flex items-center space-x-4 gap-3 w-[70%]">
+            <h1 className="text-2xl font-medium text-foreground w-[25%]">
               {getPageTitle(currentPath)}
             </h1>
-          </div>
 
-          <div className="flex items-center space-x-3">
             {/* Search */}
-            <div className="relative hidden md:block">
+            <div className="relative hidden md:block w-[35%]">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search..."
-                className="w-64 pl-9 transition-all duration-200 focus:w-80 bg-input-background border-border"
+                className=" pl-9 transition-all duration-200 focus:w-80 bg-[#f8f8f8]"
               />
             </div>
+            <Link href={'/jobs'}
+              className="flex items-center w-[120px] p-2 justify-center border rounded gap-2"
+            >
+              <Briefcase className="h-4 w-4" />
+              View Jobs
+            </Link>
+            <Button
+              className="bg-[#00A1FF] hover:bg-[#0090e6] gap-2 text-[#fff]"
+            >
+              <Plus className="h-4 w-4" />
+              Create New Estimate
+            </Button>
+          </div>
+
+          <div className="flex items-center space-x-3">
+
 
             {/* Theme Toggle */}
-            <Tooltip>
+            {/* <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
@@ -135,7 +162,7 @@ export function Header({
               <TooltipContent>
                 <p>Switch to {theme === 'light' ? 'dark' : 'light'} mode</p>
               </TooltipContent>
-            </Tooltip>
+            </Tooltip> */}
 
             {/* Notifications */}
             <div className="relative">
@@ -149,8 +176,8 @@ export function Header({
                   >
                     <Bell className="h-4 w-4" />
                     {unreadCount > 0 && (
-                      <Badge 
-                        variant="destructive" 
+                      <Badge
+                        variant="destructive"
                         className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs notification-badge animate-bounce-in"
                       >
                         {unreadCount > 9 ? '9+' : unreadCount}
@@ -188,8 +215,8 @@ export function Header({
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent 
-                align="end" 
+              <DropdownMenuContent
+                align="end"
                 className="w-64 animate-scale-in"
                 sideOffset={5}
               >
@@ -217,7 +244,7 @@ export function Header({
                   <span>Settings</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   onClick={onLogout}
                   className="logout-button cursor-pointer"
                 >

@@ -25,7 +25,7 @@ export function LogoutConfirmationDialog({
 }: LogoutConfirmationDialogProps) {
   return (
     <AlertDialog open={isOpen} onOpenChange={onClose}>
-      <AlertDialogContent className="animate-scale-in max-w-md">
+      <AlertDialogContent className="animate-scale-in bg-white max-w-md">
         <AlertDialogHeader className="text-center">
           <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
             <LogOut className="h-6 w-6 text-red-600 dark:text-red-400" />

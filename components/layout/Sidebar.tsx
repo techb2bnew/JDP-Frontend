@@ -17,11 +17,13 @@ import {
   ChevronDown,
   ChevronRight,
   LogOut,
+  Settings2,
   Bell
 } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { LogoutConfirmationDialog } from "../LogoutConfirmationDialog"
-
+import Logo from '../../public/assets/logos/logo-jdp.png' 
+import Image from "next/image"
 interface SidebarProps {
   currentPath: string
   onLogout: () => void
@@ -63,7 +65,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
     },
     {
       id: "invoices",
-      name: "Invoices",
+      name: "Invoices & Billing",
       icon: FileText,
       href: "/invoices",
       description: "View and generate billing documents"
@@ -109,29 +111,36 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       icon: Bell,
       href: "/notifications",
       description: "Manage and view system alerts and messages"
+    },
+    {
+      id: "configuration",
+      name: "Configuration",
+      icon: Settings,
+      href: "/configuration",
+      description: "Configure system-wide settings for pricing and rates"
     }
   ]
 
-  const profileSubItems = [
-    {
-      id: "staff-profile",
-      name: "Staff Profile",
-      href: "/profiles/staff",
-      description: "Manage staff member profiles"
-    },
-    {
-      id: "lead-labour-profile", 
-      name: "Lead Labour Profile",
-      href: "/profiles/lead-labour",
-      description: "Manage lead labour profiles"
-    },
-    {
-      id: "labour-profile",
-      name: "Labour Profile", 
-      href: "/profiles/labour",
-      description: "Manage labour profiles"
-    }
-  ]
+  // const profileSubItems = [
+  //   {
+  //     id: "staff-profile",
+  //     name: "Staff Profile",
+  //     href: "/profiles/staff",
+  //     description: "Manage staff member profiles"
+  //   },
+  //   {
+  //     id: "lead-labour-profile", 
+  //     name: "Lead Labour Profile",
+  //     href: "/profiles/lead-labour",
+  //     description: "Manage lead labour profiles"
+  //   },
+  //   {
+  //     id: "labour-profile",
+  //     name: "Labour Profile", 
+  //     href: "/profiles/labour",
+  //     description: "Manage labour profiles"
+  //   }
+  // ]
 
   const handleLogoutClick = () => {
     setShowLogoutDialog(true)
@@ -153,15 +162,12 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
   return (
     <>
       <aside className="w-64 bg-sidebar border-r border-sidebar-border flex flex-col animate-fade-in shadow-sm">
-        <div className="p-6 border-b border-sidebar-border bg-gradient-to-r from-sidebar to-sidebar-accent/20">
-          <div className="flex items-center space-x-3">
-            <div className="h-10 w-10 bg-gradient-to-br from-primary to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
-              <span className="text-primary-foreground font-bold text-sm">JDP</span>
-            </div>
-            <div>
-              <span className="font-semibold text-sidebar-foreground text-lg">JDP</span>
-              <p className="text-xs text-muted-foreground">Admin Dashboard</p>
-            </div>
+        <div className="p-5 border-b border-sidebar-border bg-gradient-to-r from-sidebar to-sidebar-accent/20">
+          <div className="flex items-center justify-center space-x-3"> 
+            <div className="text-center">
+            <Image src={Logo} alt="logo" className='w-[140px] ' />
+              <p className="font-semibold text-md pt-3">JDP Electrical Services</p>
+             </div>
           </div>
         </div>
 
@@ -191,7 +197,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
           })}
 
           {/* Profiles Section */}
-          <div className="pt-2">
+          {/* <div className="pt-2">
             <Button
               variant="ghost"
               size="sm"
@@ -238,10 +244,20 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
                 })}
               </div>
             )}
-          </div>
+          </div> */}
         </nav>
 
         <div className="p-4 border-t border-sidebar-border bg-sidebar-accent/10">
+          {/* <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleLogoutClick}
+            className="w-full justify-start text-left logout-button h-10"
+          >
+            <Settings className="mr-3 h-4 w-4" />
+            <span className="font-medium">Configuration</span>
+          </Button> */}
+
           <Button
             variant="ghost"
             size="sm"

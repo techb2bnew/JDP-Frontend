@@ -6,6 +6,7 @@ import { Card } from "./ui/card"
 import { Badge } from "./ui/badge"
 import { ScrollArea } from "./ui/scroll-area"
 import { Separator } from "./ui/separator"
+import { useRouter } from 'next/navigation';
 
 interface Notification {
   id: string
@@ -42,6 +43,7 @@ export function NotificationPopup({
         return <AlertTriangle className={`${iconProps} text-muted-foreground`} />
     }
   }
+  const router = useRouter();
 
   const getNotificationBadgeColor = (type: Notification["type"]) => {
     switch (type) {
@@ -59,6 +61,11 @@ export function NotificationPopup({
   }
 
   const unreadCount = notifications.filter(n => n.unread).length
+
+
+  const handleViewInvoice = () => { 
+    router.push(`/invoiceDetail?id=INV-001`);
+  }
 
   return (
     <Card className="absolute right-0 top-12 w-96 max-w-[calc(100vw-2rem)] z-50 shadow-xl border-border animate-scale-in bg-card bg-white overflow-auto">
@@ -94,7 +101,7 @@ export function NotificationPopup({
           ) : (
             <div className="space-y-1">
               {notifications.map((notification, index) => (
-                <div key={notification.id}>
+                <div key={notification.id} onClick={() => handleViewInvoice()}>
                   <div
                     className={`p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-accent/50 group ${
                       notification.unread 

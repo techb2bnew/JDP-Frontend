@@ -7,27 +7,39 @@ import { Input } from './ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog'
-import { 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs' // Tabs components import karein
+import {
   Plus,
   Search,
   Download,
   Send,
   Eye,
-  Edit,
   Trash2,
   Receipt,
   DollarSign,
   CheckCircle,
   AlertCircle,
   Printer,
-  Mail
+  Mail,
+  Clock, // Timesheets ke liye icon
+  GitCompare, // Invoice Comparison ke liye icon
+  CheckSquare // Approvals ke liye icon
 } from 'lucide-react'
 import { Invoice } from '../types/invoice'
-import { invoicesData, customersData, jobsData } from '../data/invoiceData' 
+import { invoicesData, customersData, jobsData } from '../data/invoiceData'
 import { InvoiceTemplate } from './invoices/InvoiceTemplate'
 import { NewInvoiceDialog } from './invoices/NewInvoiceDialog'
+import { useRouter } from 'next/navigation';
+import { TimesheetsPage } from './TimesheetsPage';
+import { InvoiceComparisonPage } from './InvoiceComparisonPage';
+import { ApprovalsPage } from './ApprovalsPage';
+// Placeholder components dusre tabs ke liye
+// const TimesheetsPage = () => <div className="text-center p-10"><h2 className="text-2xl font-semibold">Timesheets Management</h2><p>Timesheets ka content yahan aayega.</p></div>
+// const InvoiceComparisonPage = () => <div className="text-center p-10"><h2 className="text-2xl font-semibold">Invoice Comparison</h2><p>Invoice Comparison ka content yahan aayega.</p></div>
+// const ApprovalsPage = () => <div className="text-center p-10"><h2 className="text-2xl font-semibold">Approvals</h2><p>Approvals ka content yahan aayega.</p></div>
 
 export function InvoicesPage() {
+  const [activeTab, setActiveTab] = useState('invoices');
   const [invoices, setInvoices] = useState<Invoice[]>(invoicesData)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -35,27 +47,24 @@ export function InvoicesPage() {
   const [showNewInvoiceDialog, setShowNewInvoiceDialog] = useState(false)
   const [showInvoiceDetailDialog, setShowInvoiceDetailDialog] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
+  const router = useRouter();
 
   const filteredInvoices = invoices.filter(invoice => {
     const matchesSearch = invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          invoice.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          invoice.jobTitle.toLowerCase().includes(searchTerm.toLowerCase())
-    
     const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter
     const matchesType = typeFilter === 'all' || invoice.type === typeFilter
-    
     return matchesSearch && matchesStatus && matchesType
   })
 
   const handleSaveInvoice = (newInvoiceData: Partial<Invoice>) => {
-    const subtotal = 
+    const subtotal =
       (newInvoiceData.items?.reduce((sum, item) => sum + item.total, 0) || 0) +
       (newInvoiceData.labor?.reduce((sum, labor) => sum + labor.total, 0) || 0) +
       (newInvoiceData.additionalCosts?.reduce((sum, cost) => sum + cost.amount, 0) || 0)
-    
     const taxAmount = subtotal * (newInvoiceData.taxRate || 0)
     const totalAmount = subtotal + taxAmount
-    
     const invoice: Invoice = {
       ...newInvoiceData as Invoice,
       id: `INV-${Date.now()}`,
@@ -69,17 +78,16 @@ export function InvoicesPage() {
       createdBy: 'Admin User',
       createdAt: new Date().toISOString()
     }
-    
     setInvoices(prev => [invoice, ...prev])
   }
 
   const handleViewInvoice = (invoice: Invoice) => {
-    setSelectedInvoice(invoice)
-    setShowInvoiceDetailDialog(true)
+    localStorage.setItem('selectedInvoice', JSON.stringify(invoice));
+    router.push(`/invoiceDetail?id=${invoice.id}`);
   }
 
   const handleSendInvoice = (invoiceId: string) => {
-    setInvoices(prev => prev.map(inv => 
+    setInvoices(prev => prev.map(inv =>
       inv.id === invoiceId ? { ...inv, status: 'sent' as const } : inv
     ))
   }
@@ -88,27 +96,26 @@ export function InvoicesPage() {
     setInvoices(prev => prev.filter(inv => inv.id !== invoiceId))
   }
 
-  const handlePrintInvoice = () => {
-    window.print()
-  }
+  const handlePrintInvoice = () => { window.print() }
+  const handleDownloadInvoice = () => { console.log('Downloading invoice as PDF...') }
+  const handleEmailInvoice = () => { console.log('Sending invoice via email...') }
 
-  const handleDownloadInvoice = () => {
-    console.log('Downloading invoice as PDF...')
-  }
-
-  const handleEmailInvoice = () => {
-    console.log('Sending invoice via email...')
-  }
+  const tabItems = [
+    { id: 'invoices', label: 'Invoices', icon: Receipt },
+    { id: 'timesheets', label: 'Timesheets', icon: Clock },
+    { id: 'invoice-comparison', label: 'Invoice Comparison', icon: GitCompare },
+    { id: 'approvals', label: 'Approvals', icon: CheckSquare, notification: 2 },
+  ]
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Invoices</h1>
-          <p className="text-muted-foreground">Manage and track all project invoices</p>
+          <h1 className="text-2xl font-semibold text-foreground">Invoices & Billing</h1>
+          <p className="text-muted-foreground">Manage invoices, track timesheets, compare estimates, and handle approvals</p>
         </div>
-        <Button 
+        <Button
           onClick={() => setShowNewInvoiceDialog(true)}
           className="bg-primary hover:bg-primary/90"
         >
@@ -117,162 +124,198 @@ export function InvoicesPage() {
         </Button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Invoices</p>
-                <p className="text-2xl font-semibold">{invoices.length}</p>
-              </div>
-              <Receipt className="h-8 w-8 text-muted-foreground" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Billed</p>
-                <p className="text-2xl font-semibold text-primary">
-                  {/* {formatCurrency(invoices.reduce((sum, inv) => sum + inv.totalAmount, 0))} */}
-                </p>
-              </div>
-              <DollarSign className="h-8 w-8 text-primary" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Paid Invoices</p>
-                <p className="text-2xl font-semibold text-green-600">{invoices.filter(inv => inv.status === 'paid').length}</p>
-              </div>
-              <CheckCircle className="h-8 w-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Pending</p>
-                <p className="text-2xl font-semibold text-orange-600">{invoices.filter(inv => inv.status === 'sent' || inv.status === 'overdue').length}</p>
-              </div>
-              <AlertCircle className="h-8 w-8 text-orange-600" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Tabs Navigation */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-4 bg-gray-100 p-1 h-auto">
+          {tabItems.map((item) => {
+            const Icon = item.icon
+            return (
+              <TabsTrigger
+                key={item.id}
+                value={item.id}
+                className="flex items-center justify-center gap-2 text-muted-foreground data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm rounded-md px-3 py-2"
+              >
+                <Icon className="h-5 w-5" />
+                <span className="font-medium">{item.label}</span>
+                {item.notification && (
+                  <span className="bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                    {item.notification}
+                  </span>
+                )}
+              </TabsTrigger>
+            )
+          })}
+        </TabsList>
 
-      {/* Filters and Search */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Invoice Management</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-4">
-            <div className="flex-1 min-w-64">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                <Input
-                  placeholder="Search by invoice #, customer, or job..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+        {/* Invoices Tab Content */}
+        <TabsContent value="invoices" className="mt-6">
+          <div className="space-y-6">
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <Card>
+                <CardContent className="p-6 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Invoices</p>
+                    <p className="text-2xl font-semibold">{invoices.length}</p>
+                  </div>
+                  <div className="p-3 bg-blue-100 rounded-lg">
+                    <Receipt className="h-6 w-6 text-blue-600" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Billed</p>
+                    <p className="text-2xl font-semibold text-primary">$4,480.92</p>
+                  </div>
+                   <div className="p-3 bg-green-100 rounded-lg">
+                    <DollarSign className="h-6 w-6 text-green-600" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Paid Invoices</p>
+                    <p className="text-2xl font-semibold text-green-600">{invoices.filter(inv => inv.status === 'paid').length}</p>
+                  </div>
+                  <div className="p-3 bg-green-100 rounded-lg">
+                    <CheckCircle className="h-6 w-6 text-green-600" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Pending</p>
+                    <p className="text-2xl font-semibold text-orange-600">{invoices.filter(inv => inv.status === 'sent' || inv.status === 'overdue').length}</p>
+                  </div>
+                  <div className="p-3 bg-orange-100 rounded-lg">
+                    <AlertCircle className="h-6 w-6 text-orange-600" />
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="sent">Sent</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="proposed">Proposed</SelectItem>
-                <SelectItem value="roughen">Roughen</SelectItem>
-                <SelectItem value="progressive">Progressive</SelectItem>
-                <SelectItem value="final">Final</SelectItem>
-              </SelectContent>
-            </Select>
+
+            {/* Filters and Search */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Invoice Management</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex-1 min-w-[300px]">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                      <Input
+                        placeholder="Search by invoice #, customer, or job..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-4">
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-auto min-w-[150px]">
+                        <SelectValue placeholder="All Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="draft">Draft</SelectItem>
+                        <SelectItem value="sent">Sent</SelectItem>
+                        <SelectItem value="paid">Paid</SelectItem>
+                        <SelectItem value="overdue">Overdue</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={typeFilter} onValueChange={setTypeFilter}>
+                      <SelectTrigger className="w-auto min-w-[150px]">
+                        <SelectValue placeholder="All Types" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="proposed">Proposed</SelectItem>
+                        <SelectItem value="roughen">Roughen</SelectItem>
+                        <SelectItem value="progressive">Progressive</SelectItem>
+                        <SelectItem value="final">Final</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Invoices Table */}
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader className="bg-gray-50">
+                      <TableRow>
+                        <TableHead>Invoice #</TableHead>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Job</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Issue Date</TableHead>
+                        <TableHead>Due Date</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredInvoices.map((invoice) => (
+                        <TableRow key={invoice.id}>
+                          <TableCell className="font-mono">{invoice.invoiceNumber}</TableCell>
+                          <TableCell>{invoice.customerName}</TableCell>
+                          <TableCell className="max-w-48 truncate">{invoice.jobTitle}</TableCell>
+                          <TableCell>{invoice.type}</TableCell>
+                          <TableCell>{new Date(invoice.createdAt).toLocaleDateString()}</TableCell>
+                          <TableCell>{new Date(invoice.dueDate).toLocaleDateString()}</TableCell>
+                          <TableCell className="font-medium">${invoice.totalAmount.toFixed(2)}</TableCell>
+                          <TableCell>
+                             <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
+                                invoice.status === 'sent' ? 'bg-blue-100 text-blue-800' :
+                                invoice.status === 'overdue' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                              {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-end gap-2">
+                              <Button variant="outline" size="icon" onClick={() => handleViewInvoice(invoice)}>
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button variant="outline" size="icon" onClick={() => handleDownloadInvoice()}>
+                                <Download className="w-4 h-4" />
+                              </Button>
+                              <Button variant="outline" size="icon" onClick={() => handleDeleteInvoice(invoice.id)}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
           </div>
+        </TabsContent>
 
-          {/* Invoices Table */}
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Invoice #</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Job</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Issue Date</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredInvoices.map((invoice) => (
-                  <TableRow key={invoice.id}>
-                    <TableCell className="font-mono">{invoice.invoiceNumber}</TableCell>
-                    <TableCell>{invoice.customerName}</TableCell>
-                    <TableCell className="max-w-48 truncate">{invoice.jobTitle}</TableCell>
-                    <TableCell>sdf</TableCell>
-                    <TableCell>435</TableCell>
-                    <TableCell>435</TableCell>
-                    <TableCell className="font-medium">43543</TableCell>
-                    <TableCell>paid</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleViewInvoice(invoice)}>
-                          <Eye className="w-3 h-3" />
-                        </Button>
-                        {invoice.status === 'draft' && (
-                          <Button variant="outline" size="sm" onClick={() => handleSendInvoice(invoice.id)}>
-                            <Send className="w-3 h-3" />
-                          </Button>
-                        )}
-                        <Button variant="outline" size="sm" onClick={() => handleDownloadInvoice()}>
-                          <Download className="w-3 h-3" />
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleDeleteInvoice(invoice.id)}>
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+        {/* Other Tabs Content */}
+        <TabsContent value="timesheets"><TimesheetsPage /></TabsContent>
+        <TabsContent value="invoice-comparison"><InvoiceComparisonPage /></TabsContent>
+        <TabsContent value="approvals"><ApprovalsPage /></TabsContent>
+      </Tabs>
 
-      {/* New Invoice Dialog */}
-      <NewInvoiceDialog 
+      {/* Dialogs */}
+      <NewInvoiceDialog
         open={showNewInvoiceDialog}
         onOpenChange={setShowNewInvoiceDialog}
         onSave={handleSaveInvoice}
       />
-
-      {/* Invoice Detail Dialog */}
       <Dialog open={showInvoiceDetailDialog} onOpenChange={setShowInvoiceDetailDialog}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-auto">
           <DialogHeader>
@@ -284,22 +327,11 @@ export function InvoicesPage() {
               Invoice details for {selectedInvoice?.invoiceNumber}
             </DialogDescription>
           </DialogHeader>
-          
           {selectedInvoice && <InvoiceTemplate invoice={selectedInvoice} />}
-          
           <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={handlePrintInvoice}>
-              <Printer className="h-4 w-4 mr-2" />
-              Print
-            </Button>
-            <Button variant="outline" onClick={handleDownloadInvoice}>
-              <Download className="h-4 w-4 mr-2" />
-              Download PDF
-            </Button>
-            <Button onClick={handleEmailInvoice} className="bg-primary hover:bg-primary/90">
-              <Mail className="h-4 w-4 mr-2" />
-              Send to Customer
-            </Button>
+            <Button variant="outline" onClick={handlePrintInvoice}><Printer className="h-4 w-4 mr-2" />Print</Button>
+            <Button variant="outline" onClick={handleDownloadInvoice}><Download className="h-4 w-4 mr-2" />Download PDF</Button>
+            <Button onClick={handleEmailInvoice} className="bg-primary hover:bg-primary/90"><Mail className="h-4 w-4 mr-2" />Send to Customer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

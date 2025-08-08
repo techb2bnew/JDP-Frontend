@@ -21,11 +21,11 @@ export function AuthPageClient() {
         
         if (response.ok) {
           const { authenticated } = await response.json()
-          console.log(isAuthenticated, 'isAuthenticatedisAuthenticated');
+          // console.log(isAuthenticated, 'isAuthenticatedisAuthenticated');
           
           if (authenticated) {
             setIsAuthenticated(true)
-          console.log(authenticated, 'authtruetrue');
+          // console.log(authenticated, 'authtruetrue');
 
             router.push('/dashboard')
             return
@@ -43,7 +43,7 @@ export function AuthPageClient() {
 
   const handleAuthSuccess = async () => {
     setIsAuthenticated(true)
-    alert(isAuthenticated)
+    // alert(isAuthenticated)
     // Check for redirect URL
     const response = await fetch('/api/auth/redirect-url', {
       credentials: 'include',

@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { MapPin, Clock, Users, Activity, Search, Filter, Eye, Edit, Play, Pause, CheckCircle, AlertCircle, Circle, User, UserCheck, X, ExternalLink } from "lucide-react"
 import { Progress } from "./ui/progress"
 import { Separator } from "./ui/separator"
-
+import { MapDisplay } from './MapDisplay';
+import { MapFilterType } from '../types/map'; 
 // Enhanced mock data for jobs with lead and labour assignments
 const mockJobs = [
   {
@@ -34,7 +35,7 @@ const mockJobs = [
     materials: ["Kitchen Cabinets", "Granite Countertop", "Sink", "Faucet"]
   },
   {
-    id: "JOB-002", 
+    id: "JOB-002",
     name: "Bathroom Plumbing",
     assignedLead: "Robert Davis",
     assignedLabour: ["Carlos Martinez"],
@@ -105,7 +106,7 @@ const mockLaborers = [
   },
   {
     id: "LAB-002",
-    name: "Mike Johnson", 
+    name: "Mike Johnson",
     currentJob: "JOB-001",
     jobName: "Kitchen Renovation",
     location: { lat: 40.7128, lng: -74.0060, address: "123 Main St, New York, NY" },
@@ -143,7 +144,7 @@ const mockLaborers = [
     id: "LAB-005",
     name: "Carlos Rodriguez",
     currentJob: "JOB-003",
-    jobName: "Electrical Wiring", 
+    jobName: "Electrical Wiring",
     location: { lat: 40.7831, lng: -73.9712, address: "789 Pine St, New York, NY" },
     status: "Completed",
     hoursWorked: "8h 00m",
@@ -238,7 +239,7 @@ const JobDetailsModal = ({ job, onViewCompleteJob }: { job: any, onViewCompleteJ
           Job ID: {job.id} • Customer: {job.customer}
         </DialogDescription>
       </DialogHeader>
-      
+
       <div className="space-y-6">
         {/* Status and Progress */}
         <div className="grid grid-cols-3 gap-4">
@@ -283,7 +284,7 @@ const JobDetailsModal = ({ job, onViewCompleteJob }: { job: any, onViewCompleteJ
               </div>
             </div>
           </div>
-          
+
           <div className="space-y-3">
             <h4 className="font-medium flex items-center gap-2">
               <MapPin className="w-4 h-4" />
@@ -377,17 +378,16 @@ export function LiveTrackingPage() {
   const [activeTab, setActiveTab] = useState("jobs")
   const [jobStatusFilter, setJobStatusFilter] = useState("all")
   const [laborStatusFilter, setLaborStatusFilter] = useState("all")
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedMapFilter, setSelectedMapFilter] = useState("all")
+  const [searchTerm, setSearchTerm] = useState("") 
   const [selectedJob, setSelectedJob] = useState<any>(null)
   const [showJobModal, setShowJobModal] = useState(false)
-
+  const [selectedMapFilter, setSelectedMapFilter] = useState<MapFilterType>("all");
   // Filter jobs based on status and search
   const filteredJobs = mockJobs.filter(job => {
     const matchesStatus = jobStatusFilter === "all" || job.status === jobStatusFilter
     const matchesSearch = job.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         job.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         job.customer.toLowerCase().includes(searchTerm.toLowerCase())
+      job.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      job.customer.toLowerCase().includes(searchTerm.toLowerCase())
     return matchesStatus && matchesSearch
   })
 
@@ -395,8 +395,8 @@ export function LiveTrackingPage() {
   const filteredLaborers = mockLaborers.filter(laborer => {
     const matchesStatus = laborStatusFilter === "all" || laborer.status === laborStatusFilter
     const matchesSearch = laborer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         laborer.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (laborer.jobName && laborer.jobName.toLowerCase().includes(searchTerm.toLowerCase()))
+      laborer.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (laborer.jobName && laborer.jobName.toLowerCase().includes(searchTerm.toLowerCase()))
     return matchesStatus && matchesSearch
   })
 
@@ -454,22 +454,22 @@ export function LiveTrackingPage() {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger 
-            value="jobs" 
+          <TabsTrigger
+            value="jobs"
             className={`flex items-center gap-2 ${activeTab === "jobs" ? "bg-primary text-primary-foreground" : ""}`}
           >
             <Activity className="w-4 h-4" />
             Job Tracking
           </TabsTrigger>
-          <TabsTrigger 
-            value="labor" 
+          <TabsTrigger
+            value="labor"
             className={`flex items-center gap-2 ${activeTab === "labor" ? "bg-primary text-primary-foreground" : ""}`}
           >
             <Users className="w-4 h-4" />
             Labor Tracking
           </TabsTrigger>
-          <TabsTrigger 
-            value="map" 
+          <TabsTrigger
+            value="map"
             className={`flex items-center gap-2 ${activeTab === "map" ? "bg-primary text-primary-foreground" : ""}`}
           >
             <MapPin className="w-4 h-4" />
@@ -543,7 +543,7 @@ export function LiveTrackingPage() {
                               <span className="text-sm font-medium">{job.assignedLead}</span>
                             </div>
                           </div>
-                          
+
                           {/* Assigned Labour */}
                           <div className="space-y-1">
                             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Assigned Labour</label>
@@ -750,7 +750,7 @@ export function LiveTrackingPage() {
                   Live Map Tracking
                 </CardTitle>
                 <div className="flex items-center gap-3">
-                  <Select value={selectedMapFilter} onValueChange={setSelectedMapFilter}>
+                  <Select value={selectedMapFilter}  >
                     <SelectTrigger className={`w-48 ${selectedMapFilter !== "all" ? "bg-primary text-primary-foreground" : ""}`}>
                       <Filter className="w-4 h-4 mr-2" />
                       <SelectValue placeholder="Filter Map View" />
@@ -769,83 +769,12 @@ export function LiveTrackingPage() {
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 {/* Map Display */}
                 <div className="lg:col-span-3">
-                  <div className="bg-muted rounded-lg h-96 relative overflow-hidden">
-                    {/* Mock Map Background */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-blue-100">
-                      <div className="absolute inset-0 opacity-20" style={{
-                        backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2300A1FF' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-                      }}>
-                      </div>
-                    </div>
-
-                    {/* Map Pins for Jobs */}
-                    {(selectedMapFilter === "all" || selectedMapFilter === "jobs") && 
-                      filteredJobs.map((job, index) => (
-                        <div
-                          key={job.id}
-                          className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer group"
-                          style={{
-                            left: `${25 + (index * 20)}%`,
-                            top: `${30 + (index * 15)}%`
-                          }}
-                        >
-                          <div 
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-white shadow-lg"
-                            style={{ backgroundColor: getMapPinColor(job.status) }}
-                          >
-                            <Activity className="w-4 h-4" />
-                          </div>
-                          {/* Tooltip */}
-                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <div className="bg-white rounded-lg shadow-lg p-3 text-sm whitespace-nowrap border">
-                              <p className="font-medium">{job.name}</p>
-                              <p className="text-muted-foreground">{job.id}</p>
-                              <p className="text-xs mt-1">{job.location.address}</p>
-                              <StatusBadge status={job.status} />
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    }
-
-                    {/* Map Pins for Laborers */}
-                    {(selectedMapFilter === "all" || selectedMapFilter === "laborers") && 
-                      filteredLaborers.map((laborer, index) => (
-                        <div
-                          key={laborer.id}
-                          className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer group"
-                          style={{
-                            left: `${60 + (index * 15)}%`,
-                            top: `${20 + (index * 12)}%`
-                          }}
-                        >
-                          <div 
-                            className="w-6 h-6 rounded-full flex items-center justify-center text-white shadow-lg border-2 border-white"
-                            style={{ backgroundColor: getMapPinColor(laborer.status) }}
-                          >
-                            <Users className="w-3 h-3" />
-                          </div>
-                          {/* Tooltip */}
-                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <div className="bg-white rounded-lg shadow-lg p-3 text-sm whitespace-nowrap border">
-                              <p className="font-medium">{laborer.name}</p>
-                              <p className="text-muted-foreground">{laborer.specialty}</p>
-                              {laborer.currentJob && <p className="text-xs">{laborer.jobName}</p>}
-                              <StatusBadge status={laborer.status} />
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    }
-
-                    {/* Map Controls */}
-                    <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-2">
-                      <div className="flex flex-col gap-2">
-                        <Button variant="outline" size="sm">+</Button>
-                        <Button variant="outline" size="sm">-</Button>
-                      </div>
-                    </div>
-                  </div>
+                  <MapDisplay
+                    jobs={filteredJobs}
+                    laborers={filteredLaborers}
+                    selectedMapFilter={selectedMapFilter}
+                  />
+                  
                 </div>
 
                 {/* Legend and Summary */}
