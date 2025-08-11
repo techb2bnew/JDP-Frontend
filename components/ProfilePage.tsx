@@ -430,7 +430,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
                 <div className="flex gap-3 pt-4 border-t border-gray-200">
                   <Button 
                     onClick={handleProfileUpdate}
-                    className="bg-primary hover:bg-primary/90"
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
                   >
                     <Save className="h-4 w-4 mr-2" />
                     Save Changes
@@ -614,7 +614,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
                 <div className="flex gap-3 pt-4 border-t border-gray-200">
                   <Button 
                     onClick={handlePasswordChange}
-                    className="bg-primary hover:bg-primary/90"
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
                     disabled={passwordStrength.score < 3 || passwordData.newPassword !== passwordData.confirmPassword}
                   >
                     <Lock className="h-4 w-4 mr-2" />

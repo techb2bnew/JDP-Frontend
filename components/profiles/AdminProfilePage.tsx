@@ -143,13 +143,13 @@ export function AdminProfilePage() {
                 <X className="w-4 h-4 mr-2" />
                 Cancel
               </Button>
-              <Button onClick={handleSave} className="bg-primary hover:bg-primary/90">
+              <Button onClick={handleSave} className="bg-primary text-primary-foreground hover:bg-primary/90">
                 <Save className="w-4 h-4 mr-2" />
                 Save Changes
               </Button>
             </>
           ) : (
-            <Button onClick={handleEdit} className="bg-primary hover:bg-primary/90">
+            <Button onClick={handleEdit} className="bg-primary text-primary-foreground hover:bg-primary/90">
               <Edit className="w-4 h-4 mr-2" />
               Edit Profile
             </Button>
@@ -407,7 +407,7 @@ export function AdminProfilePage() {
               <div className="flex justify-end">
                 <Button 
                   onClick={handlePasswordSubmit}
-                  className="bg-primary hover:bg-primary/90"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
                   disabled={!passwordData.oldPassword || !passwordData.newPassword || !passwordData.confirmPassword}
                 >
                   Update Password
@@ -509,7 +509,7 @@ export function AdminProfilePage() {
               
               {profilePicturePreview && (
                 <div className="flex justify-end">
-                  <Button onClick={handleSave} className="bg-primary hover:bg-primary/90">
+                  <Button onClick={handleSave} className="bg-primary text-primary-foreground hover:bg-primary/90">
                     <Save className="w-4 h-4 mr-2" />
                     Save Picture
                   </Button>

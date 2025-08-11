@@ -501,7 +501,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave }: NewInvoiceDialo
                 Next
               </Button>
             ) : (
-              <Button onClick={handleSave} className="bg-primary hover:bg-primary/90">
+              <Button onClick={handleSave} className="bg-primary text-primary-foreground hover:bg-primary/90">
                 Save Invoice
               </Button>
             )}

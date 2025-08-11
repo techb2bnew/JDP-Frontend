@@ -185,7 +185,7 @@ const handleEmail = async () => {
               <Download className="h-4 w-4 mr-2" />
               {isGeneratingPdf ? 'Generating...' : 'Download PDF'}
             </Button>
-            <Button onClick={handleEmail} className="bg-primary hover:bg-primary/90">
+            <Button onClick={handleEmail} className="bg-primary text-primary-foreground hover:bg-primary/90">
               <Mail className="h-4 w-4 mr-2" />
               Send to Customer
             </Button>

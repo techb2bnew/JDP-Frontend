@@ -373,7 +373,7 @@ export function JobManagementPage() {
           </Button>
           <Button 
             onClick={handleCreateJob}
-            className="bg-[#00A1FF] hover:bg-[#0090e6] gap-2"
+            className="bg-primary text-primary-foreground hover:bg-[#0090e6] gap-2"
           >
             <Plus className="h-4 w-4" />
             Add Job

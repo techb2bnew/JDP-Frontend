@@ -143,7 +143,7 @@ export function InvoiceComparisonPage() {
             </CardContent>
             <div className="bg-slate-50 px-6 py-3 flex justify-end items-center gap-3">
               <Button variant="ghost" size="sm"><Eye className="mr-2 h-4 w-4" /> View Details</Button>
-              <Button className="bg-primary hover:bg-primary/90"><CheckCircle className="mr-2 h-4 w-4" /> Approval</Button>
+              <Button className="bg-primary text-primary-foreground hover:bg-primary/90"><CheckCircle className="mr-2 h-4 w-4" /> Approval</Button>
             </div>
           </Card>
         ))}

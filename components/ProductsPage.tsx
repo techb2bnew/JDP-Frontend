@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -13,12 +13,12 @@ import { Label } from './ui/label'
 import { Textarea } from './ui/textarea'
 import { Checkbox } from './ui/checkbox'
 import { Separator } from './ui/separator'
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Edit, 
-  Trash2, 
+import {
+  Plus,
+  Search,
+  Filter,
+  Edit,
+  Trash2,
   Eye,
   Download,
   Upload,
@@ -32,10 +32,46 @@ import {
   Save,
   MapPin,
   Phone,
-  User
+  User,
+  BoxIcon,
+  TagIcon,
+  ListIcon,
+  TruckIcon,
+  FileTextIcon,
+  BarcodeIcon,
+  DollarSignIcon,
+  PercentIcon,
+  CalculatorIcon,
+  PackageIcon,
+  PackageOpenIcon,
+  RulerIcon,
+  Tag,
+  Users,
+  TriangleAlert,
+  DollarSign
 } from 'lucide-react'
-import { Product, Branch, ProductFormData, ProductAction, FilterStatus } from '../types/product'
+import { Product, Branch } from '../types/product'
 
+interface ProductFormData {
+  name: string;
+  supplier: string;
+  category: string;
+  description: string;
+  supplierSku: string;
+  jdpSku: string;
+  supplierCostPrice: number;
+  markupPercentage: number;
+  markupAmount: number;
+  jdpPrice: number;
+  profitMargin: number;
+  stockQuantity: number;
+  unit: string;
+  branchIds: string[];
+  status: 'active' | 'inactive' | 'draft';
+}
+
+type ProductAction = 'add' | 'edit' | 'view' | 'delete';
+type FilterStatus = 'all' | 'active' | 'inactive' | 'draft';
 // Mock data
 const branchesData: Branch[] = [
   {
@@ -184,7 +220,11 @@ const productsData: Product[] = [
     supplier: 'ProTools Inc'
   }
 ]
-
+const suppliersData = [
+  { id: 'SUP-001', name: 'ElectriCorp Supply' },
+  { id: 'SUP-002', name: 'SafeBreaker Inc' },
+  { id: 'SUP-003', name: 'CopperWire Solutions' }
+];
 const categoriesData = ['Electrical', 'Construction Materials', 'Tools', 'Plumbing', 'Hardware']
 
 export function ProductsPage() {
@@ -197,42 +237,71 @@ export function ProductsPage() {
   const [currentAction, setCurrentAction] = useState<ProductAction>('add')
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [productToDelete, setProductToDelete] = useState<Product | null>(null)
+  const [showAddSupplierModal, setShowAddSupplierModal] = useState(false);
   const [formData, setFormData] = useState<ProductFormData>({
     name: '',
+    supplier: '',
     category: '',
-    ptrPrice: 0,
-    stock: 0,
-    status: 'draft',
-    branchIds: [],
     description: '',
-    sku: ''
+    supplierSku: '',
+    jdpSku: '',
+    supplierCostPrice: 0,
+    markupPercentage: 40,
+    markupAmount: 0,
+    jdpPrice: 0,
+    profitMargin: 28.6,
+    stockQuantity: 0,
+    unit: 'piece',
+    branchIds: [],
+    status: 'draft'
   })
+  // Auto-generate JDP SKU when supplier SKU changes
+  useEffect(() => {
+    if (formData.supplierSku) {
+      const generatedJdpSku = `JDP-${formData.supplierSku.split('-').slice(1).join('-')}`;
+      setFormData(prev => ({ ...prev, jdpSku: generatedJdpSku }));
+    }
+  }, [formData.supplierSku]);
+
+  // Calculate pricing when cost or markup changes
+  useEffect(() => {
+    const markupAmount = formData.supplierCostPrice * (formData.markupPercentage / 100);
+    const jdpPrice = formData.supplierCostPrice + markupAmount;
+    const profitMargin = (markupAmount / jdpPrice) * 100;
+
+    setFormData(prev => ({
+      ...prev,
+      markupAmount,
+      jdpPrice,
+      profitMargin: parseFloat(profitMargin.toFixed(1))
+    }));
+  }, [formData.supplierCostPrice, formData.markupPercentage]);
 
   // Filter products
   const filteredProducts = productsData.filter(product => {
-    const matchesSearch = 
+    const matchesSearch =
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (product.sku && product.sku.toLowerCase().includes(searchTerm.toLowerCase()))
-    
+
     const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory
     const matchesStatus = selectedStatus === 'all' || product.status === selectedStatus
-    
-    const matchesBranches = selectedBranches.length === 0 || 
+
+    const matchesBranches = selectedBranches.length === 0 ||
       product.branches.some(branch => selectedBranches.includes(branch.id))
-    
+
     return matchesSearch && matchesCategory && matchesStatus && matchesBranches
   })
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': 
+      case 'active':
         return 'bg-green-100 text-green-800 border-green-200'
-      case 'inactive': 
+      case 'inactive':
         return 'bg-red-100 text-red-800 border-red-200'
-      case 'draft': 
+      case 'draft':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      default: 
+      default:
         return 'bg-gray-100 text-gray-800 border-gray-200'
     }
   }
@@ -247,40 +316,54 @@ export function ProductsPage() {
   }
 
   const handleAction = (action: ProductAction, product?: Product) => {
-    setCurrentAction(action)
-    setSelectedProduct(product || null)
-    
+    setCurrentAction(action);
+    setSelectedProduct(product || null);
+
     if (action === 'delete' && product) {
-      setProductToDelete(product)
-      setShowDeleteAlert(true)
+      setProductToDelete(product);
+      setShowDeleteAlert(true);
     } else if (action === 'view' && product) {
-      setShowProductModal(true)
+      setShowProductModal(true);
     } else if (action === 'edit' && product) {
       setFormData({
         name: product.name,
+        supplier: product.supplier || '',
         category: product.category,
-        ptrPrice: product.ptrPrice,
-        stock: product.stock,
-        status: product.status,
-        branchIds: product.branches.map(b => b.id),
         description: product.description || '',
-        sku: product.sku || ''
-      })
-      setShowProductModal(true)
+        supplierSku: product.sku || '',
+        jdpSku: product.sku ? `JDP-${product.sku.split('-').slice(1).join('-')}` : '',
+        supplierCostPrice: product.ptrPrice,
+        markupPercentage: 40,
+        markupAmount: product.ptrPrice * 0.4,
+        jdpPrice: product.ptrPrice * 1.4,
+        profitMargin: 28.6,
+        stockQuantity: product.stock,
+        unit: 'piece',
+        branchIds: product.branches.map(b => b.id),
+        status: product.status
+      });
+      setShowProductModal(true);
     } else if (action === 'add') {
       setFormData({
         name: '',
+        supplier: '',
         category: '',
-        ptrPrice: 0,
-        stock: 0,
-        status: 'draft',
-        branchIds: [],
         description: '',
-        sku: ''
-      })
-      setShowProductModal(true)
+        supplierSku: '',
+        jdpSku: '',
+        supplierCostPrice: 0,
+        markupPercentage: 40,
+        markupAmount: 0,
+        jdpPrice: 0,
+        profitMargin: 28.6,
+        stockQuantity: 0,
+        unit: 'piece',
+        branchIds: [],
+        status: 'draft'
+      });
+      setShowProductModal(true);
     }
-  }
+  };
 
   const handleBranchToggle = (branchId: string, checked: boolean) => {
     if (checked) {
@@ -315,13 +398,20 @@ export function ProductsPage() {
   const resetForm = () => {
     setFormData({
       name: '',
+      supplier: '',
       category: '',
-      ptrPrice: 0,
-      stock: 0,
-      status: 'draft',
-      branchIds: [],
       description: '',
-      sku: ''
+      supplierSku: '',
+      jdpSku: '',
+      supplierCostPrice: 0,
+      markupPercentage: 40,
+      markupAmount: 0,
+      jdpPrice: 0,
+      profitMargin: 28.6,
+      stockQuantity: 0,
+      unit: 'piece',
+      branchIds: [],
+      status: 'draft'
     })
     setSelectedProduct(null)
     setCurrentAction('add')
@@ -365,7 +455,7 @@ export function ProductsPage() {
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Products Management</h1>
-          <p className="text-muted-foreground">Manage your product inventory across all branches</p>
+          <p className="text-muted-foreground">Manage your electrical products catalog with dual SKU and pricing system</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleImport}>
@@ -376,7 +466,7 @@ export function ProductsPage() {
             <Download className="h-4 w-4 mr-2" />
             Export Products
           </Button>
-          <Button onClick={() => handleAction('add')} className="bg-primary hover:bg-primary/90">
+          <Button onClick={() => handleAction('add')} className="bg-primary text-primary-foreground hover:bg-primary/90">
             <Plus className="h-4 w-4 mr-2" />
             Add Product
           </Button>
@@ -392,18 +482,18 @@ export function ProductsPage() {
                 <CardTitle className="text-sm font-medium text-muted-foreground">Total Products</CardTitle>
                 <div className="text-2xl font-semibold text-foreground">{totalProducts}</div>
               </div>
-              <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                <Package className="w-5 h-5 text-primary" />
-              </div>
+               <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                <Package className="w-5 h-5 text-black-600" />
+              </div> 
             </div>
           </CardHeader>
         </Card>
-        
+
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-sm font-medium text-muted-foreground">Active</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Active Products</CardTitle>
                 <div className="text-2xl font-semibold text-green-600">{activeProducts}</div>
               </div>
               <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
@@ -412,30 +502,30 @@ export function ProductsPage() {
             </div>
           </CardHeader>
         </Card>
-        
+
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-sm font-medium text-muted-foreground">Inactive</CardTitle>
-                <div className="text-2xl font-semibold text-red-600">{inactiveProducts}</div>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Low Stock Items</CardTitle>
+                <div className="text-2xl font-semibold text-yellow-600">{inactiveProducts}</div>
               </div>
-              <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                <AlertCircle className="w-5 h-5 text-red-600" />
+              <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <TriangleAlert className="w-5 h-5 text-yellow-600" />
               </div>
             </div>
           </CardHeader>
         </Card>
-        
+
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-sm font-medium text-muted-foreground">Draft</CardTitle>
-                <div className="text-2xl font-semibold text-yellow-600">{draftProducts}</div>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Inventory Value</CardTitle>
+                <div className="text-2xl font-semibold text-gray-600">${draftProducts}</div>
               </div>
-              <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <Clock className="w-5 h-5 text-yellow-600" />
+              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-gray-600" />
               </div>
             </div>
           </CardHeader>
@@ -457,8 +547,11 @@ export function ProductsPage() {
                   className="pl-10"
                 />
               </div>
-              
-              {/* Category Filter */}
+            </div>
+
+
+            {/* Category Filter */}
+            <div className='flex flex-wrap gap-2'>
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger className="w-[160px]">
                   <Filter className="h-4 w-4 mr-2" />
@@ -487,9 +580,8 @@ export function ProductsPage() {
                 </SelectContent>
               </Select>
             </div>
-            
             {/* Branch Filter */}
-            <div className="flex gap-2">
+            {/* <div className="flex gap-2">
               <div className="flex flex-wrap gap-2">
                 {branchesData.map((branch) => (
                   <div key={branch.id} className="flex items-center space-x-2">
@@ -504,23 +596,23 @@ export function ProductsPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </div> */}
           </div>
         </CardHeader>
-        
+
         <CardContent>
           <div className="border rounded-lg overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Product Name</TableHead>
-                  <TableHead>Product ID</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>PTR Price</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Supplier SKU</TableHead>
+                  <TableHead>	JDP SKU</TableHead>
+                  <TableHead>Supplier Price</TableHead>
+                  <TableHead>Markup</TableHead>
+                  <TableHead>JDP Price</TableHead>
                   <TableHead>Stock</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Branch Name</TableHead>
-                  <TableHead>Branch Address</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -529,11 +621,11 @@ export function ProductsPage() {
                   <TableRow key={product.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <img
+                        {/* <img
                           src={product.image}
                           alt={product.name}
                           className="w-8 h-8 rounded object-cover"
-                        />
+                        /> */}
                         <div>
                           <div className="font-medium">{product.name}</div>
                           {product.sku && (
@@ -543,10 +635,35 @@ export function ProductsPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="font-medium font-mono">{product.id}</div>
+                       <div className='flex gap-3 items-center'>
+                          <Building  className='w-4 h-4 text-blue-500'/>
+                      <div className='bg-[#75a7eb17] text-blue-500 p-[5px] rounded w-auto'>
+                        {product.sku}
+                      </div>
+                      </div> 
                     </TableCell>
-                    <TableCell>{product.category}</TableCell>
+                    <TableCell>
+                      <div className='flex gap-3 items-center'>
+                          <Tag className='w-4 h-4 text-gray-500'/>
+                      <div className='bg-gray-100 text-black-500 p-[5px] rounded w-auto'>
+                        {product.id}
+                      </div>
+                      </div>
+                      </TableCell>
                     <TableCell className="font-medium">{formatCurrency(product.ptrPrice)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span>{product.stock}</span>
+                        {product.minStockLevel && product.stock <= product.minStockLevel && (
+                          <Badge className="bg-orange-100 text-orange-800 border-orange-200 text-xs">
+                            Low
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+
+                    <TableCell className="font-medium">{formatCurrency(product.ptrPrice)}</TableCell>
+
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span>{product.stock}</span>
@@ -562,26 +679,6 @@ export function ProductsPage() {
                         {getStatusIcon(product.status)}
                         {product.status.charAt(0).toUpperCase() + product.status.slice(1)}
                       </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        {product.branches.map((branch, index) => (
-                          <div key={branch.id} className="text-sm">
-                            {index > 0 && <span className="text-muted-foreground">, </span>}
-                            {branch.name}
-                          </div>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        {product.branches.map((branch, index) => (
-                          <div key={branch.id} className="text-sm text-muted-foreground">
-                            {index > 0 && <span>, </span>}
-                            {branch.address}, {branch.city}, {branch.state}
-                          </div>
-                        ))}
-                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
@@ -606,213 +703,317 @@ export function ProductsPage() {
 
       {/* Product Modal (Add/Edit/View) */}
       <Dialog open={showProductModal} onOpenChange={setShowProductModal}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-auto">
+        <DialogContent className="max-w-2xl sm:max-w-[700px] max-h-[90vh] overflow-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Package className="h-5 w-5 text-primary" />
-              {currentAction === 'add' ? 'Add New Product' : 
-               currentAction === 'edit' ? 'Edit Product' : 
-               'Product Details'}
+              {currentAction === 'add' ? 'Add New Product' :
+                currentAction === 'edit' ? 'Edit Product' :
+                  'Product Details'}
             </DialogTitle>
             <DialogDescription>
               {currentAction === 'add' ? 'Create a new product in your inventory' :
-               currentAction === 'edit' ? 'Update product information' :
-               'View complete product details'}
+                currentAction === 'edit' ? 'Update product information' :
+                  'View complete product details'}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-6">
             {currentAction === 'view' && selectedProduct ? (
-              // View Mode
-              <div className="space-y-6">
-                <div className="flex items-center gap-4">
-                  {selectedProduct.image && (
-                    <img
-                      src={selectedProduct.image}
-                      alt={selectedProduct.name}
-                      className="w-16 h-16 rounded-lg object-cover"
-                    />
-                  )}
-                  <div>
-                    <h3 className="text-xl font-semibold">{selectedProduct.name}</h3>
-                    <p className="text-muted-foreground">{selectedProduct.id}</p>
-                    <Badge className={getStatusColor(selectedProduct.status)}>
-                      {selectedProduct.status.charAt(0).toUpperCase() + selectedProduct.status.slice(1)}
-                    </Badge>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm text-muted-foreground">Category</Label>
-                    <p>{selectedProduct.category}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm text-muted-foreground">PTR Price</Label>
-                    <p className="font-medium">{formatCurrency(selectedProduct.ptrPrice)}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm text-muted-foreground">Stock</Label>
-                    <p>{selectedProduct.stock} Units</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm text-muted-foreground">SKU</Label>
-                    <p className="font-mono">{selectedProduct.sku || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm text-muted-foreground">Created Date</Label>
-                    <p>{formatDate(selectedProduct.createdDate)}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm text-muted-foreground">Last Updated</Label>
-                    <p>{formatDate(selectedProduct.lastUpdated)}</p>
-                  </div>
-                </div>
-
-                {selectedProduct.description && (
-                  <div>
-                    <Label className="text-sm text-muted-foreground">Description</Label>
-                    <p className="mt-1">{selectedProduct.description}</p>
-                  </div>
-                )}
-
-                <div>
-                  <Label className="text-sm text-muted-foreground">Branches</Label>
-                  <div className="mt-2 space-y-3">
-                    {selectedProduct.branches.map((branch) => (
-                      <Card key={branch.id} className="p-3">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <Building className="h-4 w-4 text-primary" />
-                            <span className="font-medium">{branch.name}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <MapPin className="h-3 w-3" />
-                            <span>{branch.address}, {branch.city}, {branch.state} {branch.zipCode}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Phone className="h-3 w-3" />
-                            <span>{branch.phone}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <User className="h-3 w-3" />
-                            <span>Manager: {branch.manager}</span>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              // View Mode (keep your existing view code)
+              <div>View mode content</div>
             ) : (
-              // Add/Edit Mode
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <Label htmlFor="name">Product Name</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder="Enter product name"
-                    />
+              // Add/Edit Mode - redesigned to match the image
+              <div className="space-y-6">
+                {/* Basic Information Section */}
+                <div className="rounded-lg">
+                  <div className="flex items-center gap-2 border-b pb-2 mb-4">
+                    <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
+                      <BoxIcon className="h-4 w-4" />
+                    </div>
+                    <h3 className="font-semibold">Basic Information</h3>
                   </div>
-                  
-                  <div>
-                    <Label htmlFor="category">Category</Label>
-                    <Select value={formData.category} onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categoriesData.map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {category}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="sku">SKU (Optional)</Label>
-                    <Input
-                      id="sku"
-                      value={formData.sku}
-                      onChange={(e) => setFormData(prev => ({ ...prev, sku: e.target.value }))}
-                      placeholder="Product SKU"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="price">PTR Price</Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      step="0.01"
-                      value={formData.ptrPrice}
-                      onChange={(e) => setFormData(prev => ({ ...prev, ptrPrice: parseFloat(e.target.value) || 0 }))}
-                      placeholder="0.00"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="stock">Stock Quantity</Label>
-                    <Input
-                      id="stock"
-                      type="number"
-                      value={formData.stock}
-                      onChange={(e) => setFormData(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="status">Status</Label>
-                    <Select value={formData.status} onValueChange={(value: 'active' | 'inactive' | 'draft') => setFormData(prev => ({ ...prev, status: value }))}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="inactive">Inactive</SelectItem>
-                        <SelectItem value="draft">Draft</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div>
-                  <Label>Description (Optional)</Label>
-                  <Textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Product description..."
-                    rows={3}
-                  />
-                </div>
-
-                <div>
-                  <Label>Branch Assignment</Label>
-                  <div className="mt-2 space-y-2">
-                    {branchesData.map((branch) => (
-                      <div key={branch.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`form-${branch.id}`}
-                          checked={formData.branchIds.includes(branch.id)}
-                          onCheckedChange={(checked) => handleFormBranchToggle(branch.id, checked as boolean)}
-                        />
-                        <Label htmlFor={`form-${branch.id}`} className="text-sm cursor-pointer">
-                          {branch.name} - {branch.address}
-                        </Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="name" className="flex items-center gap-1 mb-2">
+                        {/* <TagIcon className="h-4 w-4 text-blue-500" /> */}
+                        Product Name *
+                      </Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="Enter product name"
+                        className="mt-1"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="category" className="flex items-center gap-1 mb-2">
+                        {/* <ListIcon className="h-4 w-4 text-blue-500" /> */}
+                        Category *
+                      </Label>
+                      <Select
+                        value={formData.category}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                        required
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categoriesData.map((category) => (
+                            <SelectItem key={category} value={category}>
+                              {category}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="supplier" className="flex items-center gap-1 mb-2">
+                        {/* <TruckIcon className="h-4 w-4 text-blue-500" /> */}
+                        Supplier *
+                      </Label>
+                      <div className="flex gap-2">
+                        <Select
+                          value={formData.supplier}
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, supplier: value }))}
+                          required
+                        >
+                          <SelectTrigger className="mt-1">
+                            <SelectValue placeholder="Select supplier" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {suppliersData.map((supplier) => (
+                              <SelectItem key={supplier.id} value={supplier.id}>
+                                {supplier.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="mt-1"
+                          onClick={() => setShowAddSupplierModal(true)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
                       </div>
-                    ))}
+                    </div>
+                    <div>
+                      <Label htmlFor="description" className="flex items-center gap-1 mb-2">
+                        {/* <FileTextIcon className="h-4 w-4 text-blue-500" /> */}
+                        Description
+                      </Label>
+                      <Input
+                        id="description"
+                        value={formData.description}
+                        onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                        placeholder="Product description" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* SKU Information Section */}
+                <div className="rounded-lg">
+                  <div className="flex items-center gap-2 border-b pb-2 mb-4">
+                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <BarcodeIcon className="h-4 w-4 text-blue-500" />
+                    </div>
+                    <h3 className="font-semibold">SKU Information</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="supplierSku" className="flex items-center gap-1 mb-2">
+                        {/* <BarcodeIcon className="h-4 w-4 text-blue-500" /> */}
+                        Supplier SKU *
+                      </Label>
+                      <Input
+                        id="supplierSku"
+                        value={formData.supplierSku}
+                        onChange={(e) => setFormData(prev => ({ ...prev, supplierSku: e.target.value }))}
+                        placeholder="SL-XXX-XXX-B81"
+                        className="mt-1"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="jdpSku" className="flex items-center gap-1 mb-2">
+                        {/* <Tag className="h-4 w-4 text-blue-500" /> */}
+                        JDP SKU
+                      </Label>
+                      <Input
+                        id="jdpSku"
+                        value={formData.jdpSku}
+                        readOnly
+                        placeholder="JDP-XXX-XXX-B81 (auto-gen)"
+                        className="mt-1 bg-gray-100"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pricing Information Section */}
+                <div className="rounded-lg">
+                  <div className="flex items-center gap-2 border-b pb-2 mb-4">
+                    <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                      <DollarSignIcon className="h-4 w-4 text-green-500" />
+                    </div>
+                    <h3 className="font-semibold">Pricing Information</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="supplierCostPrice" className="flex items-center gap-1">
+                        {/* <DollarSignIcon className="h-4 w-4 text-blue-500" /> */}
+                        Supplier Cost Price *
+                      </Label>
+                      <div className="relative mt-2">
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span>
+                        <Input
+                          id="supplierCostPrice"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={formData.supplierCostPrice}
+                          onChange={(e) => setFormData(prev => ({ ...prev, supplierCostPrice: parseFloat(e.target.value) || 0 }))}
+                          placeholder="0.00"
+                          className="pl-8"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="markupPercentage" className="flex items-center gap-1">
+                        {/* <PercentIcon className="h-4 w-4 text-blue-500" /> */}
+                        Markup Percentage *
+                      </Label>
+                      <div className="relative mt-2">
+                        <span className="absolute right-3 top-1/2 transform -translate-y-1/2">%</span>
+                        <Input
+                          id="markupPercentage"
+                          type="number"
+                          step="1"
+                          min="0"
+                          value={formData.markupPercentage}
+                          onChange={(e) => setFormData(prev => ({ ...prev, markupPercentage: parseInt(e.target.value) || 0 }))}
+                          placeholder="40"
+                          className="pr-8"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Calculated Pricing Section */}
+                <div>
+                  <div className="flex items-center gap-3 border-b pb-2 mb-4">
+                    <div className="w-8 h-8 bg-purple-100 rounded-md flex items-center justify-center">
+                      <svg className="w-4 h-4 text-purple-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                        <line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" />
+                        <line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-900">Calculated Pricing</h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-[#fff7ed] border border-[#fed7aa] rounded-xl p-5 flex flex-col items-center text-center min-h-[120px] justify-center">
+                      <div className="w-10 h-10 bg-[#fed7aa] rounded-lg flex items-center justify-center mb-3">
+                        <svg className="w-5 h-5 text-[#ea580c]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M3 3v18h18" />
+                          <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" />
+                        </svg>
+                      </div>
+                      <div className="text-xs font-medium text-[#ea580c] mb-1">Markup Amount</div>
+                      <div className="text-xl font-bold text-[#ea580c]">${formData.markupAmount.toFixed(2)}</div>
+                    </div>
+
+                    <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-5 flex flex-col items-center text-center min-h-[120px] justify-center">
+                      <div className="w-10 h-10 bg-[#e2e8f0] rounded-lg flex items-center justify-center mb-3">
+                        <svg className="w-5 h-5 text-[#64748b]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                          <line x1="9" y1="9" x2="15" y2="15" />
+                          <line x1="15" y1="9" x2="9" y2="15" />
+                        </svg>
+                      </div>
+                      <div className="text-xs font-medium text-gray-500 mb-1">JDP Price</div>
+                      <div className="text-xl font-bold text-gray-900">${formData.jdpPrice.toFixed(2)}</div>
+                    </div>
+
+                    <div className="bg-[#f0fdf4] border border-[#bbf7d0] rounded-xl p-5 flex flex-col items-center text-center min-h-[120px] justify-center">
+                      <div className="w-10 h-10 bg-[#bbf7d0] rounded-lg flex items-center justify-center mb-3">
+                        <svg className="w-5 h-5 text-[#16a34a]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                          <circle cx="9" cy="7" r="4" />
+                          <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                        </svg>
+                      </div>
+                      <div className="text-xs font-medium text-[#16a34a] mb-1">Profit Margin</div>
+                      <div className="text-xl font-bold text-[#16a34a]">{formData.profitMargin}%</div>
+                    </div>
+                  </div>
+                </div>
+
+
+
+                {/* Inventory Details Section */}
+                <div className="rounded-lg">
+                  <div className="flex items-center gap-2 border-b pb-2 mb-4">
+                    <div className="w-8 h-8 bg-[#fff7ed] rounded-lg flex items-center justify-center">
+                      <PackageIcon className="h-4 w-4 text-[#ea580c]" />
+                    </div>
+                    <h3 className="font-semibold">Inventory Details</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="stockQuantity" className="flex items-center gap-1 mb-2">
+                        {/* <PackageOpenIcon className="h-4 w-4 text-blue-500" /> */}
+                        Stock Quantity
+                      </Label>
+                      <Input
+                        id="stockQuantity"
+                        type="number"
+                        min="0"
+                        value={formData.stockQuantity}
+                        onChange={(e) => setFormData(prev => ({ ...prev, stockQuantity: parseInt(e.target.value) || 0 }))}
+                        placeholder="0"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="unit" className="flex items-center gap-1 mb-2">
+                        {/* <RulerIcon className="h-4 w-4 text-blue-500" /> */}
+                        Unit
+                      </Label>
+                      <Select
+                        value={formData.unit}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, unit: value }))}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Select unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="piece">piece</SelectItem>
+                          <SelectItem value="roll">roll</SelectItem>
+                          <SelectItem value="box">box</SelectItem>
+                          <SelectItem value="pack">pack</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
               </div>
             )}
           </div>
-          
+
           <DialogFooter>
             {currentAction === 'view' ? (
               <div className="flex gap-2">
@@ -831,7 +1032,7 @@ export function ProductsPage() {
                   <X className="h-4 w-4 mr-2" />
                   Cancel
                 </Button>
-                <Button onClick={handleSaveProduct} className="bg-primary hover:bg-primary/90">
+                <Button onClick={handleSaveProduct} className="bg-primary text-primary-foreground hover:bg-primary/90">
                   <Save className="h-4 w-4 mr-2" />
                   Save Product
                 </Button>
@@ -840,7 +1041,58 @@ export function ProductsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Add Supplier Modal */}
+      <Dialog open={showAddSupplierModal} onOpenChange={setShowAddSupplierModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Add New Supplier
+            </DialogTitle>
+            <DialogDescription>
+              Add a new supplier to your database
+            </DialogDescription>
+          </DialogHeader>
 
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="supplierName">Supplier Name *</Label>
+              <Input
+                id="supplierName"
+                placeholder="Enter supplier name"
+                className="mt-2"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="contactNumber">Contact Number *</Label>
+              <Input
+                id="contactNumber"
+                placeholder="+1 555-0123"
+                className="mt-2"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="email">Email Address *</Label>
+              <Input
+                id="email"
+                placeholder="supplier@email.com"
+                className="mt-2"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddSupplierModal(false)}>
+              Cancel
+            </Button>
+            <Button type="submit">
+              Add Supplier
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Delete Confirmation */}
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
         <AlertDialogContent>

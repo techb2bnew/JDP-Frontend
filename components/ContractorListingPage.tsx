@@ -1798,7 +1798,7 @@ export function ContractorListingPage() {
               <Download className="h-4 w-4 mr-2" />
               Download PDF
             </Button>
-            <Button onClick={handleSendInvoice} className="bg-primary hover:bg-primary/90">
+            <Button onClick={handleSendInvoice} className="bg-primary text-primary-foreground hover:bg-primary/90">
               <Mail className="h-4 w-4 mr-2" />
               Send to Customer
             </Button>

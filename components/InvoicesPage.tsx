@@ -117,7 +117,7 @@ export function InvoicesPage() {
         </div>
         <Button
           onClick={() => setShowNewInvoiceDialog(true)}
-          className="bg-primary hover:bg-primary/90"
+          className="bg-primary text-primary-foreground hover:bg-primary/90"
         >
           <Plus className="w-4 h-4 mr-2" />
           Add New Invoice
@@ -331,7 +331,7 @@ export function InvoicesPage() {
           <DialogFooter className="flex gap-2">
             <Button variant="outline" onClick={handlePrintInvoice}><Printer className="h-4 w-4 mr-2" />Print</Button>
             <Button variant="outline" onClick={handleDownloadInvoice}><Download className="h-4 w-4 mr-2" />Download PDF</Button>
-            <Button onClick={handleEmailInvoice} className="bg-primary hover:bg-primary/90"><Mail className="h-4 w-4 mr-2" />Send to Customer</Button>
+            <Button onClick={handleEmailInvoice} className="bg-primary text-primary-foreground hover:bg-primary/90"><Mail className="h-4 w-4 mr-2" />Send to Customer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -654,7 +654,7 @@ export function OrdersPage() {
 
       {/* Invoice Modal */}
       <Dialog open={showInvoiceModal} onOpenChange={setShowInvoiceModal}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+        <DialogContent className="sm:max-w-[700px] max-w-[700px] max-h-[90vh] overflow-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="h-5 w-5 text-primary" />
@@ -862,7 +862,7 @@ export function OrdersPage() {
               <Download className="h-4 w-4 mr-2" />
               Download PDF
             </Button>
-            <Button onClick={handleEmailInvoice} className="bg-primary hover:bg-primary/90">
+            <Button onClick={handleEmailInvoice} className="bg-primary text-primary-foreground hover:bg-primary/90">
               <Mail className="h-4 w-4 mr-2" />
               Email Invoice
             </Button>
