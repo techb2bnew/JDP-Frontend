@@ -308,7 +308,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               <Send className="h-4 w-4" />
               Send Invoice
             </Button>
-            <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
+            <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => setIsEditing(true)}>
               <Edit className="h-4 w-4" />
               Edit Job
             </Button>
@@ -1082,7 +1082,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
             {/* Divider */}
             <div className="border-t border-gray-200 my-4"></div>
             <div className="flex flex-wrap justify-end gap-2">
-              <Button variant="outline" className="gap-2">
+              <Button variant="outline" className="gap-2" onClick={() => setShowInvoiceModal(false)}>
                 <X className="h-4 w-4" />
                 Close
               </Button>
