@@ -6,13 +6,34 @@ import { Input } from './ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Badge } from './ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
-import { 
-  Search, 
+import {
+  Search,
   UserPlus,
   Mail,
   Phone,
-  MapPin
-} from 'lucide-react'
+  MapPin,
+  Briefcase,
+  CalendarDays,
+  Eye,
+  Download,
+  Trash2,
+  Edit,
+  Users,
+  UserCheck,
+  UserRoundX,
+  ArrowUpAZ
+} from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Textarea } from './ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 
 const customers = [
   {
@@ -25,6 +46,7 @@ const customers = [
     totalSpent: 1299.99,
     joinDate: '2023-06-15',
     status: 'active',
+    company: 'abc',
     avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face'
   },
   {
@@ -37,6 +59,7 @@ const customers = [
     totalSpent: 599.50,
     joinDate: '2023-08-22',
     status: 'active',
+    company: 'abc',
     avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=40&h=40&fit=crop&crop=face'
   },
   {
@@ -49,6 +72,7 @@ const customers = [
     totalSpent: 2199.99,
     joinDate: '2023-03-10',
     status: 'vip',
+    company: 'abc',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=40&h=40&fit=crop&crop=face'
   },
   {
@@ -61,6 +85,7 @@ const customers = [
     totalSpent: 299.99,
     joinDate: '2024-01-05',
     status: 'active',
+    company: 'abc',
     avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=40&h=40&fit=crop&crop=face'
   },
   {
@@ -73,6 +98,7 @@ const customers = [
     totalSpent: 0,
     joinDate: '2024-12-01',
     status: 'inactive',
+    company: 'abc',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=40&h=40&fit=crop&crop=face'
   },
 ]
@@ -92,8 +118,17 @@ const getInitials = (name: string) => {
 
 export function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState('')
-
-  const filteredCustomers = customers.filter(customer => 
+  const [showAddCustomerModal, setShowAddCustomerModal] = useState(false)
+  const [editingCustomer, setEditingCustomer] = useState<any>(null);
+  const [customerFormData, setCustomerFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    contactPerson: '',
+    address: '',
+    company: ''
+  })
+  const filteredCustomers = customers.filter(customer =>
     customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     customer.email.toLowerCase().includes(searchTerm.toLowerCase())
   )
@@ -102,56 +137,70 @@ export function CustomersPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-start">
         <div>
-          <h1>Customers</h1>
-          <p className="text-muted-foreground">Manage your customer relationships and data.</p>
+          <h1 className="text-2xl font-medium text-[#2b2b2b]">Customer Management</h1>
+          <p className="text-muted-foreground">Manage and track all customer relationships and service history</p>
         </div>
-        <Button>
-          <UserPlus className="h-4 w-4 mr-2" />
-          Add Customer
-        </Button>
+        <div className='flex gap-2'>
+          <Button variant="outline">
+            <Download className="h-4 w-4 mr-2" />
+            Export Customers
+          </Button>
+          <Button className='text-white' onClick={() => setShowAddCustomerModal(true)}>
+            <UserPlus className="h-4 w-4 mr-2" />
+            Add Customer
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className='bg-blue-100 border border-blue-300'>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              <div className="flex gap-2 items-center text-blue-500">
+                <Users />
+                Total Customers
+              </div>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{customers.length}</div>
+            <p className='text-blue-500'>All registered customers</p>
           </CardContent>
         </Card>
-        
-        <Card>
+
+        <Card className='bg-green-50 border border-green-300'>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Active</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {customers.filter(c => c.status === 'active').length}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">VIP Customers</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600">
-              {customers.filter(c => c.status === 'vip').length}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Avg. Order Value</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              <div className="flex gap-2 items-center text-green-500">
+                <UserCheck />
+                Active Customers
+              </div>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ${(customers.reduce((sum, c) => sum + c.totalSpent, 0) / customers.filter(c => c.orders > 0).length || 0).toFixed(2)}
+              {customers.filter(c => c.status === 'active').length}
             </div>
+            <p className='text-green-600'>28.6% of total</p>
+
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">
+              <div className="flex gap-2 items-center">
+                <UserRoundX />
+                Inactive Customers
+              </div>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {customers.filter(c => c.status === 'vip').length}
+            </div>
+            <p>28.6% of total</p>
+
           </CardContent>
         </Card>
       </div>
@@ -171,9 +220,34 @@ export function CustomersPage() {
                 />
               </div>
             </div>
+            <div className="flex gap-4">
+              <Select value=''>
+                <SelectTrigger className="w-auto min-w-[150px]">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="draft">Active</SelectItem>
+                  <SelectItem value="sent">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value=''>
+                <SelectTrigger className="w-auto min-w-[150px]">
+                  <SelectValue placeholder="Sort By Name" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Sort By Name</SelectItem>
+                  <SelectItem value="proposed">Sort By Total Jobs</SelectItem>
+                  <SelectItem value="roughen">Sort By Join Date</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="icon" className='w-[70px]'>
+                <ArrowUpAZ className="w-4 h-4" /> A-Z
+              </Button>
+            </div>
           </div>
         </CardHeader>
-        
+
         <CardContent>
           <Table>
             <TableHeader>
@@ -181,10 +255,11 @@ export function CustomersPage() {
                 <TableHead>Customer</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Location</TableHead>
-                <TableHead>Orders</TableHead>
+                <TableHead>Total Jobs</TableHead>
                 <TableHead>Total Spent</TableHead>
                 <TableHead>Join Date</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -199,6 +274,7 @@ export function CustomersPage() {
                       <div>
                         <p className="font-medium">{customer.name}</p>
                         <p className="text-sm text-muted-foreground">{customer.id}</p>
+                        <p className="text-xs text-muted-foreground">Contact: John Smith</p>
                       </div>
                     </div>
                   </TableCell>
@@ -220,13 +296,47 @@ export function CustomersPage() {
                       {customer.location}
                     </div>
                   </TableCell>
-                  <TableCell>{customer.orders}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Briefcase className='w-4 h-4' /> {customer.orders}
+
+                    </div>
+                  </TableCell>
                   <TableCell className="font-medium">${customer.totalSpent}</TableCell>
-                  <TableCell>{customer.joinDate}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className='w-4 h-4' />
+                      {customer.joinDate}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <Badge className={getStatusColor(customer.status)}>
                       {customer.status.toUpperCase()}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="icon">
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button variant="outline" size="icon" onClick={() => {
+                        setEditingCustomer(customer);
+                        setCustomerFormData({
+                          name: customer.name,
+                          email: customer.email,
+                          phone: customer.phone,
+                          contactPerson: "John Smith",
+                          address: customer.location,
+                          company: customer.company || ""
+                        });
+                        setShowAddCustomerModal(true);
+                      }}>
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button variant="outline" size="icon">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -234,6 +344,157 @@ export function CustomersPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog open={showAddCustomerModal} onOpenChange={(open) => {
+        if (!open) {
+          setEditingCustomer(null);
+          setCustomerFormData({
+            name: '',
+            email: '',
+            phone: '',
+            contactPerson: '',
+            address: '',
+            company: ''
+          });
+        }
+        setShowAddCustomerModal(open);
+      }}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>
+              {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingCustomer ? 'Update customer profile' : 'Create a new customer profile for service management'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Customer/Company Name */}
+            <div className='grid grid-cols-2 gap-2'>
+              <div>
+                <Label className="mb-2" htmlFor="name">Customer/Company Name *</Label>
+                <Input
+                  id="name"
+                  value={customerFormData.name}
+                  onChange={(e) => setCustomerFormData({ ...customerFormData, name: e.target.value })}
+                  placeholder="Enter customer name"
+                  className="mt-1"
+                  required
+                />
+              </div>
+
+              {/* Email */}
+              <div>
+                <Label className="mb-2" htmlFor="email">Email Address *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={customerFormData.email}
+                  onChange={(e) => setCustomerFormData({ ...customerFormData, email: e.target.value })}
+                  placeholder="Enter email address"
+                  className="mt-1"
+                  required
+                />
+              </div>
+            </div>
+            <div className='grid grid-cols-2 gap-2'>
+
+              {/* Phone */}
+              <div>
+                <Label className="mb-2" htmlFor="phone">Phone Number</Label>
+                <Input
+                  id="phone"
+                  value={customerFormData.phone}
+                  onChange={(e) => setCustomerFormData({ ...customerFormData, phone: e.target.value })}
+                  placeholder="Enter phone number"
+                  className="mt-1"
+                />
+              </div>
+
+              {/* Contact Person */}
+              <div>
+                <Label className="mb-2" htmlFor="contact">Contact Person</Label>
+                <Input
+                  id="contact"
+                  value={customerFormData.contactPerson}
+                  onChange={(e) => setCustomerFormData({ ...customerFormData, contactPerson: e.target.value })}
+                  placeholder="Enter contact person name"
+                  className="mt-1"
+                />
+              </div>
+            </div>
+
+            {/* Address */}
+            <div>
+              <Label className="mb-2" htmlFor="address">Address</Label>
+              <Textarea
+                id="address"
+                value={customerFormData.address}
+                onChange={(e) => setCustomerFormData({ ...customerFormData, address: e.target.value })}
+                placeholder="Enter full address"
+                className="mt-1"
+              ></Textarea>
+            </div>
+
+            {/* Company */}
+            <div>
+              <Label className="mb-2" htmlFor="company">Company</Label>
+              <Input
+                id="company"
+                value={customerFormData.company}
+                onChange={(e) => setCustomerFormData({ ...customerFormData, company: e.target.value })}
+                placeholder="Enter company name"
+                className="mt-1"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowAddCustomerModal(false);
+                setEditingCustomer(null);
+                setCustomerFormData({
+                  name: '',
+                  email: '',
+                  phone: '',
+                  contactPerson: '',
+                  address: '',
+                  company: ''
+                });
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="text-white"
+              onClick={() => {
+                if (editingCustomer) {
+                  console.log('Updated customer:', customerFormData);
+                  // Add your update logic here
+                } else {
+                  console.log('New customer:', customerFormData);
+                  // Add your create logic here
+                }
+                setShowAddCustomerModal(false);
+                setEditingCustomer(null);
+                setCustomerFormData({
+                  name: '',
+                  email: '',
+                  phone: '',
+                  contactPerson: '',
+                  address: '',
+                  company: ''
+                });
+              }}
+            >
+              {editingCustomer ? 'Update Customer' : 'Add Customer'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
