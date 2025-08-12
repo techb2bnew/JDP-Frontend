@@ -677,7 +677,7 @@ export function NotificationsPage() {
               key={page}
               variant={currentPage === page ? "default" : "outline"}
               onClick={() => setCurrentPage(page)}
-              className={currentPage === page ? "bg-[#00A1FF] hover:bg-[#0090e6]" : ""}
+              className={currentPage === page ? "bg-primary text-white hover:bg-[#0090e6]" : ""}
             >
               {page}
             </Button>

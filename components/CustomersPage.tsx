@@ -128,10 +128,90 @@ export function CustomersPage() {
     address: '',
     company: ''
   })
-  const filteredCustomers = customers.filter(customer =>
-    customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.email.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+ 
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const handleExportCustomers = () => {
+    // Prepare CSV headers
+    const headers = [
+      'Customer ID',
+      'Name',
+      'Email',
+      'Phone',
+      'Location',
+      'Company',
+      'Contact Person',
+      'Total Orders',
+      'Total Spent ($)',
+      'Join Date',
+      'Status'
+    ];
+
+    // Prepare CSV rows
+    const rows = customers.map(customer => [
+      customer.id,
+      customer.name,
+      customer.email,
+      customer.phone,
+      customer.location,
+      customer.company,
+      'John Smith', // Contact person (hardcoded in your data)
+      customer.orders,
+      customer.totalSpent,
+      customer.joinDate,
+      customer.status.toUpperCase()
+    ]);
+
+    // Convert to CSV string
+    let csvContent = headers.join(',') + '\n';
+    rows.forEach(row => {
+      csvContent += row.map(field => `"${field}"`).join(',') + '\n';
+    });
+
+    // Create download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'customers_export.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const filteredCustomers = customers
+    .filter(customer => {
+      // Search filter
+      const matchesSearch =
+        customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        customer.email.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Status filter
+      const matchesStatus =
+        statusFilter === 'all' ||
+        customer.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      // Sorting logic
+      if (sortBy === 'name') {
+        return sortOrder === 'asc'
+          ? a.name.localeCompare(b.name)
+          : b.name.localeCompare(a.name);
+      } else if (sortBy === 'orders') {
+        return sortOrder === 'asc'
+          ? a.orders - b.orders
+          : b.orders - a.orders;
+      } else if (sortBy === 'joinDate') {
+        return sortOrder === 'asc'
+          ? new Date(a.joinDate).getTime() - new Date(b.joinDate).getTime()
+          : new Date(b.joinDate).getTime() - new Date(a.joinDate).getTime();
+      }
+      return 0;
+    });
 
   return (
     <div className="space-y-6">
@@ -141,7 +221,7 @@ export function CustomersPage() {
           <p className="text-muted-foreground">Manage and track all customer relationships and service history</p>
         </div>
         <div className='flex gap-2'>
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportCustomers}>
             <Download className="h-4 w-4 mr-2" />
             Export Customers
           </Button>
@@ -221,28 +301,35 @@ export function CustomersPage() {
               </div>
             </div>
             <div className="flex gap-4">
-              <Select value=''>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-auto min-w-[150px]">
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="draft">Active</SelectItem>
-                  <SelectItem value="sent">Inactive</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="vip">VIP</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value=''>
+              <Select value={sortBy} onValueChange={setSortBy}>
                 <SelectTrigger className="w-auto min-w-[150px]">
                   <SelectValue placeholder="Sort By Name" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Sort By Name</SelectItem>
-                  <SelectItem value="proposed">Sort By Total Jobs</SelectItem>
-                  <SelectItem value="roughen">Sort By Join Date</SelectItem>
+                  <SelectItem value="name">Sort By Name</SelectItem>
+                  <SelectItem value="orders">Sort By Total Jobs</SelectItem>
+                  <SelectItem value="joinDate">Sort By Join Date</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="icon" className='w-[70px]'>
-                <ArrowUpAZ className="w-4 h-4" /> A-Z
+              <Button
+                variant="outline"
+                size="icon"
+                className='w-[70px]'
+                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              >
+                <ArrowUpAZ className="w-4 h-4" />
+                {sortOrder === 'asc' ? 'A-Z' : 'Z-A'}
               </Button>
             </div>
           </div>

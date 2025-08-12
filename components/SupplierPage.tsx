@@ -358,6 +358,61 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
     }
   }
 
+  function convertSuppliersToCSV(data: Supplier[]) {
+  const headers = [
+    'Supplier ID',
+    'Company Name',
+    'Contact Person',
+    'Email',
+    'Phone',
+    'Address',
+    'Category',
+    'Products',
+    'Payment Terms',
+    'Rating',
+    'Status',
+    'Contract Start',
+    'Contract End',
+    'Total Orders',
+    'Notes'
+  ].join(',');
+
+  const rows = data.map(supplier => [
+    supplier.supplierId,
+    supplier.companyName,
+    supplier.contactPerson,
+    supplier.email,
+    supplier.phone,
+    supplier.address,
+    supplier.category,
+    supplier.products.join('; '),
+    supplier.paymentTerms,
+    supplier.rating,
+    supplier.status,
+    supplier.contractStart,
+    supplier.contractEnd,
+    supplier.totalOrders,
+    supplier.notes || ''
+  ].map(field => `"${field?.toString().replace(/"/g, '""')}"`).join(','));
+
+  return [headers, ...rows].join('\n');
+}
+
+function downloadCSV(data: Supplier[], filename: string) {
+  const csv = convertSuppliersToCSV(data);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.visibility = 'hidden';
+  
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
   const renderForm = () => (
     <div className="grid grid-cols-2 gap-4 py-4 max-h-96 overflow-y-auto">
       <div className="space-y-2">
@@ -531,13 +586,16 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
             <Upload className="h-4 w-4" />
             Import
           </Button>
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => {
+    downloadCSV(filteredSuppliers, `suppliers-export-${new Date().toISOString().split('T')[0]}.csv`);
+    toast.success('CSV export started');
+  }}>
             <Download className="h-4 w-4" />
             Export
           </Button>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-[#00A1FF] hover:bg-[#0090e6] gap-2">
+              <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2">
                 <Plus className="h-4 w-4" />
                 Add Supplier
               </Button>
@@ -551,7 +609,7 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
                 <Button variant="outline" onClick={() => {setIsCreateDialogOpen(false); resetForm();}}>
                   Cancel
                 </Button>
-                <Button onClick={handleCreate} className="bg-[#00A1FF] hover:bg-[#0090e6]">
+                <Button onClick={handleCreate} className="bg-primary text-white hover:bg-[#0090e6]">
                   Create Supplier
                 </Button>
               </div>
@@ -628,7 +686,7 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
       </div>
 
       {/* Filters and Search */}
-      <Card className="bg-white shadow-sm border-0">
+      <Card className="bg-white shadow-md border-0">
         <CardContent className="p-6">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4 flex-1">
@@ -763,7 +821,7 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
               key={page}
               variant={currentPage === page ? "default" : "outline"}
               onClick={() => setCurrentPage(page)}
-              className={currentPage === page ? "bg-[#00A1FF] hover:bg-[#0090e6]" : ""}
+              className={currentPage === page ? "bg-primary text-white hover:bg-[#0090e6]" : ""}
             >
               {page}
             </Button>
@@ -790,7 +848,7 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
             <Button variant="outline" onClick={() => {setIsEditDialogOpen(false); resetForm();}}>
               Cancel
             </Button>
-            <Button onClick={handleUpdate} className="bg-[#00A1FF] hover:bg-[#0090e6]">
+            <Button onClick={handleUpdate} className="bg-primary text-white hover:bg-[#0090e6]">
               Update Supplier
             </Button>
           </div>

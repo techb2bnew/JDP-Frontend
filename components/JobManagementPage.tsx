@@ -614,7 +614,7 @@ export function JobManagementPage() {
               }
             </p>
             {(!searchTerm && filterType === 'all' && filterStatus === 'all' && filterLabor === 'all' && filterPriority === 'all') && (
-              <Button onClick={handleCreateJob} className="bg-[#00A1FF] hover:bg-[#0090e6] gap-2">
+              <Button onClick={handleCreateJob} className="bg-primary text-white hover:bg-[#0090e6] gap-2">
                 <Plus className="h-4 w-4" />
                 Create First Job
               </Button>
@@ -639,7 +639,7 @@ export function JobManagementPage() {
               key={page}
               variant={currentPage === page ? "default" : "outline"}
               onClick={() => setCurrentPage(page)}
-              className={currentPage === page ? "bg-[#00A1FF] hover:bg-[#0090e6]" : ""}
+              className={currentPage === page ? "bg-primary text-white hover:bg-[#0090e6]" : ""}
             >
               {page}
             </Button>

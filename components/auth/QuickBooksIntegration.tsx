@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
 // import imgIntuitQuickBooksLogoSvg2 from "figma:asset/484a089cb028470777f5818c5d8f1decabe921dd.png"
 import { CheckCircle, ArrowRight, Shield, Zap, BarChart3 } from 'lucide-react'
+import { AuthStep } from '../AuthFlow'
 
 interface QuickBooksIntegrationProps {
   onComplete: () => void
@@ -153,7 +154,7 @@ export function QuickBooksIntegration({ onComplete, onSkip }: QuickBooksIntegrat
                     <Button
                       onClick={handleConnect}
                       disabled={isConnecting}
-                      className="w-full h-12 bg-[#00a1ff] hover:bg-[#0090e6] text-white"
+                      className="w-full h-12 bg-primary text-white hover:bg-[#0090e6] text-white"
                     >
                       {isConnecting ? 'Connecting...' : 'Connect QuickBooks'}
                     </Button>
@@ -199,7 +200,7 @@ export function QuickBooksIntegration({ onComplete, onSkip }: QuickBooksIntegrat
                   </div>
                   <Button
                     onClick={handleComplete}
-                    className="w-full h-12 bg-[#00a1ff] hover:bg-[#0090e6] text-white"
+                    className="w-full h-12 bg-primary text-white hover:bg-[#0090e6] text-white"
                   >
                     Continue
                   </Button>

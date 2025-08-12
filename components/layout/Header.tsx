@@ -130,7 +130,7 @@ export function Header({
               View Jobs
             </Link>
             <Button
-              className="bg-[#00A1FF] hover:bg-[#0090e6] gap-2 text-[#fff]"
+              className="bg-primary text-white hover:bg-[#0090e6] gap-2 text-[#fff]"
             >
               <Plus className="h-4 w-4" />
               Create New Estimate

@@ -94,16 +94,16 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
       </div>
       
       {/* Dark left section */}
-      <div className="absolute bg-[#111c2d] h-full w-[546px] left-0 top-0" />
+      <div className="absolute bg-[#111c2d] h-full w-[50%] left-0 top-0" />
       
       {/* White right section */}
-      <div className="absolute bg-white h-full w-[894px] right-0 top-0" />
+      <div className="absolute bg-white h-full w-[50%] right-0 top-0" />
       
       {/* Left content */}
       <div className="absolute left-[72px] top-1/2 transform -translate-y-1/2">
         <div className="mb-8">
           <img 
-            src="/assets/logos/jdp-logo.png" 
+            src="/assets/logos/logo-jdp.png" 
             alt="JDP Logo" 
             className="w-[168px] h-[63px] object-contain opacity-99"
           />
@@ -239,7 +239,7 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
           <Button
             onClick={handleSignIn}
             disabled={isLoading}
-            className="w-full h-[50px] bg-[#00a1ff] hover:bg-[#0090e6] text-white rounded-full text-[18px] font-medium"
+            className="w-full h-[50px] bg-primary text-white hover:bg-[#0090e6] text-white rounded-full text-[18px] font-medium"
           >
             {isLoading ? 'Signing in...' : 'Sign in'}
           </Button>

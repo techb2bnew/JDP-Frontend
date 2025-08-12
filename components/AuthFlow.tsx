@@ -10,12 +10,12 @@ import { ForgotPasswordScreen } from './auth/ForgotPasswordScreen'
 import { NewPasswordScreen } from './auth/NewPasswordScreen'
 import { QuickBooksIntegration } from './auth/QuickBooksIntegration'
 
-export type AuthStep = 
-  | 'login' 
-  | 'signup' 
-  | 'otp' 
-  | 'forgot-password' 
-  | 'new-password' 
+export type AuthStep =
+  | 'login'
+  | 'signup'
+  | 'otp'
+  | 'forgot-password'
+  | 'new-password'
   | 'quickbooks'
 
 interface AuthFlowProps {
@@ -45,9 +45,9 @@ export function AuthFlow({ onAuthSuccess }: AuthFlowProps) {
     }
 
     const mockToken = 'mock-jwt-token'
-    
+
     dispatch(loginSuccess({ user: mockUser, token: mockToken }))
-    
+
     if (onAuthSuccess) {
       onAuthSuccess(isNewUser)
     }
@@ -84,20 +84,19 @@ export function AuthFlow({ onAuthSuccess }: AuthFlowProps) {
       )
     case 'new-password':
       return (
-        // <NewPasswordScreen
-        //   email={email}
-        //   onStepChange={handleStepChange}
-        //   onAuthSuccess={handleAuthSuccess}
-        // />
-        <></>
+        <NewPasswordScreen
+          email={email}
+          onStepChange={handleStepChange}
+          onAuthSuccess={handleAuthSuccess}
+        />
+
       )
     case 'quickbooks':
       return (
-        // <QuickBooksIntegration
-        //   onStepChange={handleStepChange}
-        //   onAuthSuccess={handleAuthSuccess}
-        // />
-        <></>
+        <QuickBooksIntegration
+          onComplete={() => handleAuthSuccess()}
+          onSkip={() => handleStepChange('login')}
+        />
       )
     default:
       return (

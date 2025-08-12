@@ -33,10 +33,67 @@ import { useRouter } from 'next/navigation';
 import { TimesheetsPage } from './TimesheetsPage';
 import { InvoiceComparisonPage } from './InvoiceComparisonPage';
 import { ApprovalsPage } from './ApprovalsPage';
-// Placeholder components dusre tabs ke liye
-// const TimesheetsPage = () => <div className="text-center p-10"><h2 className="text-2xl font-semibold">Timesheets Management</h2><p>Timesheets ka content yahan aayega.</p></div>
-// const InvoiceComparisonPage = () => <div className="text-center p-10"><h2 className="text-2xl font-semibold">Invoice Comparison</h2><p>Invoice Comparison ka content yahan aayega.</p></div>
-// const ApprovalsPage = () => <div className="text-center p-10"><h2 className="text-2xl font-semibold">Approvals</h2><p>Approvals ka content yahan aayega.</p></div>
+interface Job {
+  id: string
+  title: string
+  type: 'service-based' | 'contract-based'
+  status: 'pending' | 'in-progress' | 'completed' | 'cancelled'
+  assignedLabor: string[]
+  contractor?: string
+  customer: string
+  description: string
+  createdDate: string
+  dueDate: string
+  estimatedHours?: number
+  actualHours?: number
+  estimatedCost?: number
+  actualCost?: number
+  materials?: string[]
+  location: string
+  priority: 'low' | 'medium' | 'high'
+  billingStatus?: 'pending' | 'invoiced' | 'paid'
+}
+
+const mockJobs: Job[] = [
+  {
+    id: 'JOB-2025-001',
+    title: 'Electrical Panel Installation',
+    type: 'service-based',
+    status: 'in-progress',
+    assignedLabor: ['John Smith', 'David Wilson'],
+    contractor: 'Elite Electrical Services',
+    customer: 'ABC Corporation',
+    description: 'Install new electrical panel and upgrade wiring system',
+    createdDate: '2025-01-15',
+    dueDate: '2025-01-30',
+    estimatedHours: 40,
+    actualHours: 25,
+    estimatedCost: 5000,
+    actualCost: 3200,
+    materials: ['Electrical Panel', 'Copper Wire', 'Circuit Breakers'],
+    location: '123 Business Ave, New York',
+    priority: 'high',
+    billingStatus: 'pending'
+  },
+  {
+    id: 'JOB-2025-002',
+    title: 'Office Lighting Maintenance',
+    type: 'contract-based',
+    status: 'pending',
+    assignedLabor: ['Sarah Johnson'],
+    contractor: 'Bright Solutions Ltd',
+    customer: 'XYZ Office Complex',
+    description: 'Monthly maintenance of office lighting systems',
+    createdDate: '2025-01-18',
+    dueDate: '2025-02-15',
+    estimatedHours: 16,
+    estimatedCost: 1200,
+    materials: ['LED Bulbs', 'Ballasts'],
+    location: '456 Corporate Blvd, New York',
+    priority: 'medium',
+    billingStatus: 'pending'
+  }
+]
 
 export function InvoicesPage() {
   const [activeTab, setActiveTab] = useState('invoices');
@@ -44,6 +101,7 @@ export function InvoicesPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
+  const [pendingApprovalCount, setPendingApprovalCount] = useState(2)
   const [showNewInvoiceDialog, setShowNewInvoiceDialog] = useState(false)
   const [showInvoiceDetailDialog, setShowInvoiceDetailDialog] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
@@ -51,8 +109,8 @@ export function InvoicesPage() {
 
   const filteredInvoices = invoices.filter(invoice => {
     const matchesSearch = invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         invoice.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         invoice.jobTitle.toLowerCase().includes(searchTerm.toLowerCase())
+      invoice.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      invoice.jobTitle.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter
     const matchesType = typeFilter === 'all' || invoice.type === typeFilter
     return matchesSearch && matchesStatus && matchesType
@@ -95,7 +153,12 @@ export function InvoicesPage() {
   const handleDeleteInvoice = (invoiceId: string) => {
     setInvoices(prev => prev.filter(inv => inv.id !== invoiceId))
   }
-
+  const handleBackToInvoices = () => {
+    setActiveTab('invoices')
+  }
+  const handleApprovalCountChange = (count: number) => {
+    setPendingApprovalCount(count)
+  }
   const handlePrintInvoice = () => { window.print() }
   const handleDownloadInvoice = () => { console.log('Downloading invoice as PDF...') }
   const handleEmailInvoice = () => { console.log('Sending invoice via email...') }
@@ -169,7 +232,7 @@ export function InvoicesPage() {
                     <p className="text-sm text-muted-foreground">Total Billed</p>
                     <p className="text-2xl font-semibold text-primary">$4,480.92</p>
                   </div>
-                   <div className="p-3 bg-green-100 rounded-lg">
+                  <div className="p-3 bg-green-100 rounded-lg">
                     <DollarSign className="h-6 w-6 text-green-600" />
                   </div>
                 </CardContent>
@@ -272,11 +335,10 @@ export function InvoicesPage() {
                           <TableCell>{new Date(invoice.dueDate).toLocaleDateString()}</TableCell>
                           <TableCell className="font-medium">${invoice.totalAmount.toFixed(2)}</TableCell>
                           <TableCell>
-                             <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
                                 invoice.status === 'sent' ? 'bg-blue-100 text-blue-800' :
-                                invoice.status === 'overdue' ? 'bg-red-100 text-red-800' :
-                                'bg-gray-100 text-gray-800'
+                                  invoice.status === 'overdue' ? 'bg-red-100 text-red-800' :
+                                    'bg-gray-100 text-gray-800'
                               }`}>
                               {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
                             </span>
@@ -306,8 +368,15 @@ export function InvoicesPage() {
 
         {/* Other Tabs Content */}
         <TabsContent value="timesheets"><TimesheetsPage /></TabsContent>
-        <TabsContent value="invoice-comparison"><InvoiceComparisonPage /></TabsContent>
-        <TabsContent value="approvals"><ApprovalsPage /></TabsContent>
+        <TabsContent value="invoice-comparison"><InvoiceComparisonPage
+          onBack={handleBackToInvoices}
+          jobs={mockJobs} /></TabsContent>
+        <TabsContent value="approvals">
+          <ApprovalsPage
+            onBack={handleBackToInvoices}
+            jobs={mockJobs}
+            onApprovalCountChange={handleApprovalCountChange}
+          /></TabsContent>
       </Tabs>
 
       {/* Dialogs */}

@@ -1014,7 +1014,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
         {currentStep < 5 ? (
           <Button
             onClick={handleNext}
-            className="bg-[#00A1FF] hover:bg-[#0090e6] gap-2"
+            className="bg-primary text-white hover:bg-[#0090e6] gap-2"
           >
             Next
             <ArrowRight className="h-4 w-4" />

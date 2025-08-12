@@ -93,7 +93,7 @@ export function UserDetailsPage({ userId, onBack }: UserDetailsPageProps) {
             <Download className="h-4 w-4" />
             Export
           </Button>
-          <Button className="bg-[#00A1FF] hover:bg-[#0090e6] gap-2">
+          <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2">
             <Edit className="h-4 w-4" />
             Edit Details
           </Button>

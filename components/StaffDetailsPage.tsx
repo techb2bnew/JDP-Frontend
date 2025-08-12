@@ -276,7 +276,7 @@ export function StaffDetailsPage({ staffId, onBack }: StaffDetailsPageProps) {
             Back to Staff List
           </Button>
         </div>
-        <Button onClick={handleEdit} className="gap-2 bg-[#00A1FF] hover:bg-[#0090e6]">
+        <Button onClick={handleEdit} className="gap-2 bg-primary text-white hover:bg-[#0090e6]">
           <Edit className="h-4 w-4" />
           Edit Staff
         </Button>
@@ -622,7 +622,7 @@ export function StaffDetailsPage({ staffId, onBack }: StaffDetailsPageProps) {
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSave} className="bg-[#00A1FF] hover:bg-[#0090e6]">
+            <Button onClick={handleSave} className="bg-primary text-white hover:bg-[#0090e6]">
               Save Changes
             </Button>
           </div>

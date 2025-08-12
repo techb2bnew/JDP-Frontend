@@ -275,6 +275,51 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
     })
   }
 
+  const handleExportStaff = () => {
+  // Prepare CSV headers
+  const headers = [
+    'Staff ID',
+    'Name',
+    'Email',
+    'Phone',
+    'Address',
+    'Position',
+    'Department',
+    'Date of Joining',
+    'Status'
+  ];
+
+  // Prepare CSV rows
+  const rows = staff.map(member => [
+    member.id,
+    member.name,
+    member.email,
+    member.phone,
+    member.address,
+    member.position,
+    member.department,
+    member.dateOfJoining,
+    member.status.toUpperCase()
+  ]);
+
+  // Convert to CSV string
+  let csvContent = headers.join(',') + '\n';
+  rows.forEach(row => {
+    csvContent += row.map(field => `"${field}"`).join(',') + '\n';
+  });
+
+  // Create download link
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', 'staff_export.csv');
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -288,13 +333,13 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
             <Upload className="h-4 w-4" />
             Import
           </Button>
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2" onClick={handleExportStaff}>
             <Download className="h-4 w-4" />
             Export
           </Button>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-[#00A1FF] hover:bg-[#0090e6] gap-2">
+              <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2">
                 <Plus className="h-4 w-4" />
                 Add Staff
               </Button>
@@ -397,7 +442,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
                 <Button variant="outline" onClick={() => {setIsCreateDialogOpen(false); resetForm();}}>
                   Cancel
                 </Button>
-                <Button onClick={handleCreate} className="bg-[#00A1FF] hover:bg-[#0090e6]">
+                <Button onClick={handleCreate} className="bg-primary text-white hover:bg-[#0090e6]">
                   Create Staff
                 </Button>
               </div>
@@ -524,7 +569,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
               key={page}
               variant={currentPage === page ? "default" : "outline"}
               onClick={() => setCurrentPage(page)}
-              className={currentPage === page ? "bg-[#00A1FF] hover:bg-[#0090e6]" : ""}
+              className={currentPage === page ? "bg-primary text-white hover:bg-[#0090e6]" : ""}
             >
               {page}
             </Button>
@@ -640,7 +685,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
             <Button variant="outline" onClick={() => {setIsEditDialogOpen(false); resetForm();}}>
               Cancel
             </Button>
-            <Button onClick={handleUpdate} className="bg-[#00A1FF] hover:bg-[#0090e6]">
+            <Button onClick={handleUpdate} className="bg-primary text-white hover:bg-[#0090e6]">
               Update Staff
             </Button>
           </div>

@@ -6,11 +6,12 @@ import { AuthStep } from '../AuthFlow'
 import { EyeOff } from 'lucide-react'
 
 interface NewPasswordScreenProps {
+  email: string
   onStepChange: (step: AuthStep) => void
   onAuthSuccess: (isNewUser?: boolean) => void
 }
 
-export function NewPasswordScreen({ onStepChange, onAuthSuccess }: NewPasswordScreenProps) {
+export function NewPasswordScreen({ email, onStepChange, onAuthSuccess }: NewPasswordScreenProps) {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -67,19 +68,19 @@ export function NewPasswordScreen({ onStepChange, onAuthSuccess }: NewPasswordSc
       </div>
       
       {/* Dark left section */}
-      <div className="absolute bg-[#111c2d] h-full w-[546px] left-0 top-0" />
+      <div className="absolute bg-[#111c2d] h-full w-[50%] left-0 top-0" />
       
       {/* White right section */}
-      <div className="absolute bg-white h-full w-[894px] right-0 top-0" />
+      <div className="absolute bg-white h-full w-[50%] right-0 top-0" />
       
       {/* Left content */}
       <div className="absolute left-[72px] top-1/2 transform -translate-y-1/2">
         <div className="mb-8">
-          {/* <img 
-            src={img4541} 
+         <img 
+            src="/assets/logos/logo-jdp.png" 
             alt="JDP Logo" 
             className="w-[168px] h-[63px] object-contain opacity-99"
-          /> */}
+          />
         </div>
         <div className="text-white">
           <h1 className="text-[32px] font-extrabold mb-4">Welcome to JDP</h1>
@@ -166,7 +167,7 @@ export function NewPasswordScreen({ onStepChange, onAuthSuccess }: NewPasswordSc
           <Button
             onClick={handleSave}
             disabled={isLoading || !newPassword.trim() || !confirmPassword.trim()}
-            className="w-full h-[50px] bg-[#00a1ff] hover:bg-[#0090e6] text-white rounded-full text-[18px] font-medium"
+            className="w-full h-[50px] bg-primary text-white hover:bg-[#0090e6] text-white rounded-full text-[18px] font-medium"
           >
             {isLoading ? 'Saving...' : 'Save'}
           </Button>

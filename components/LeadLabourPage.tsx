@@ -491,6 +491,69 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     </div>
   )
 
+  const exportToCSV = () => {
+  // CSV header
+  const headers = [
+    "ID",
+    "Lead Labour ID",
+    "Name",
+    "Email",
+    "Phone",
+    "DOB",
+    "Address",
+    "Department",
+    "Date of Joining",
+    "Specialization",
+    "Experience",
+    "Certifications",
+    "Hourly Rate",
+    "Availability",
+    "Jobs Completed",
+    "Last Assignment",
+    "Skills",
+    "Emergency Contact"
+  ];
+
+  // CSV rows
+  const rows = leadLabours.map(labour => [
+    labour.id,
+    labour.leadLabourId,
+    labour.name,
+    labour.email,
+    labour.phone,
+    labour.dob,
+    labour.address,
+    labour.department,
+    labour.dateOfJoining,
+    labour.specialization,
+    labour.experience,
+    labour.certifications.join(", "),
+    labour.hourlyRate,
+    labour.availability,
+    labour.jobsCompleted,
+    labour.lastAssignment,
+    labour.skills.join(", "),
+    labour.emergencyContact
+  ]);
+
+  // Combine headers and rows
+  const csvContent = [
+    headers.join(","),
+    ...rows.map(row => row.map(field => `"${field}"`).join(","))
+  ].join("\n");
+
+  // Create download link
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `lead_labour_${new Date().toISOString().slice(0, 10)}.csv`);
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
   const renderForm = () => (
     <div className="max-h-96 overflow-y-auto space-y-6">
       {/* Personal Details Section */}
@@ -684,13 +747,13 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
             <Upload className="h-4 w-4" />
             Import
           </Button>
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2" onClick={exportToCSV}>
             <Download className="h-4 w-4" />
             Export
           </Button>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-[#00A1FF] hover:bg-[#0090e6] gap-2">
+              <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2">
                 <Plus className="h-4 w-4" />
                 Add Lead Labour
               </Button>
@@ -704,7 +767,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
                 <Button variant="outline" onClick={() => {setIsCreateDialogOpen(false); resetForm();}}>
                   Cancel
                 </Button>
-                <Button onClick={handleCreate} className="bg-[#00A1FF] hover:bg-[#0090e6]">
+                <Button onClick={handleCreate} className="bg-primary text-white hover:bg-[#0090e6]">
                   Submit
                 </Button>
               </div>
@@ -912,7 +975,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
               key={page}
               variant={currentPage === page ? "default" : "outline"}
               onClick={() => setCurrentPage(page)}
-              className={currentPage === page ? "bg-[#00A1FF] hover:bg-[#0090e6]" : ""}
+              className={currentPage === page ? "bg-primary text-white hover:bg-[#0090e6]" : ""}
             >
               {page}
             </Button>
@@ -930,7 +993,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh]">
+        <DialogContent className="max-w-4xl sm:max-w-[700px] max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Edit Lead Labour</DialogTitle>
           </DialogHeader>
@@ -939,7 +1002,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
             <Button variant="outline" onClick={() => {setIsEditDialogOpen(false); resetForm();}}>
               Cancel
             </Button>
-            <Button onClick={handleUpdate} className="bg-[#00A1FF] hover:bg-[#0090e6]">
+            <Button onClick={handleUpdate} className="bg-primary text-white hover:bg-[#0090e6]">
               Update Lead Labour
             </Button>
           </div>

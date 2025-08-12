@@ -1677,7 +1677,7 @@ export function ContractorListingPage() {
                   <Download className="h-4 w-4" />
                   Export Report
                 </Button>
-                <Button className="bg-primary hover:bg-primary/90 gap-2">
+                <Button className="bg-primary text-white hover:bg-primary/90 gap-2">
                   <Send className="h-4 w-4" />
                   Generate Invoice
                 </Button>
@@ -1770,7 +1770,7 @@ export function ContractorListingPage() {
 
       {/* Invoice Modal */}
       <Dialog open={showInvoiceModal} onOpenChange={setShowInvoiceModal}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-auto">
+        <DialogContent className="max-w-6xl sm:max-w-[700px] max-h-[90vh] overflow-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="h-5 w-5 text-primary" />

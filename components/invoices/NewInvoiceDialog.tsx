@@ -158,12 +158,12 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave }: NewInvoiceDialo
 
         <Tabs value={`step-${currentStep}`} className="w-full">
           <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="step-1" onClick={() => setCurrentStep(1)}>Basic Info</TabsTrigger>
-            <TabsTrigger value="step-2" onClick={() => setCurrentStep(2)}>Items</TabsTrigger>
-            <TabsTrigger value="step-3" onClick={() => setCurrentStep(3)}>Labor</TabsTrigger>
-            <TabsTrigger value="step-4" onClick={() => setCurrentStep(4)}>Additional</TabsTrigger>
-            <TabsTrigger value="step-5" onClick={() => setCurrentStep(5)}>Review</TabsTrigger>
-            <TabsTrigger value="step-6" onClick={() => setCurrentStep(6)}>Notes</TabsTrigger>
+            <TabsTrigger className={`${currentStep === 1 ? 'bg-primary text-white' : ''}`} value="step-1" onClick={() => setCurrentStep(1)}>Basic Info</TabsTrigger>
+            <TabsTrigger className={`${currentStep === 2 ? 'bg-primary text-white' : ''}`} value="step-2" onClick={() => setCurrentStep(2)}>Items</TabsTrigger>
+            <TabsTrigger className={`${currentStep === 3 ? 'bg-primary text-white' : ''}`} value="step-3" onClick={() => setCurrentStep(3)}>Labor</TabsTrigger>
+            <TabsTrigger className={`${currentStep === 4 ? 'bg-primary text-white' : ''}`} value="step-4" onClick={() => setCurrentStep(4)}>Additional</TabsTrigger>
+            <TabsTrigger className={`${currentStep === 5 ? 'bg-primary text-white' : ''}`} value="step-5" onClick={() => setCurrentStep(5)}>Review</TabsTrigger>
+            <TabsTrigger className={`${currentStep === 6 ? 'bg-primary text-white' : ''}`} value="step-6" onClick={() => setCurrentStep(6)}>Notes</TabsTrigger>
           </TabsList>
 
           <TabsContent value="step-1" className="space-y-4">
@@ -262,7 +262,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave }: NewInvoiceDialo
               {newInvoice.items?.map((item, index) => (
                 <Card key={item.id}>
                   <CardContent className="p-4">
-                    <div className="grid grid-cols-5 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label>SKU</Label>
                         <Input 
@@ -324,7 +324,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave }: NewInvoiceDialo
               {newInvoice.labor?.map((labor, index) => (
                 <Card key={labor.id}>
                   <CardContent className="p-4">
-                    <div className="grid grid-cols-5 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label>Labor Name</Label>
                         <Input 
@@ -497,7 +497,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave }: NewInvoiceDialo
           </div>
           <div className="flex gap-2">
             {currentStep < 6 ? (
-              <Button onClick={() => setCurrentStep(prev => prev + 1)}>
+              <Button className='bg-primary text-white' onClick={() => setCurrentStep(prev => prev + 1)}>
                 Next
               </Button>
             ) : (

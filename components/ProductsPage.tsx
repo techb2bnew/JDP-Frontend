@@ -417,10 +417,66 @@ export function ProductsPage() {
     setCurrentAction('add')
   }
 
-  const handleExport = () => {
-    console.log('Exporting products...')
-    // Implementation for export functionality
-  }
+ const handleExport = () => {
+  // Prepare CSV headers
+  const headers = [
+    'ID',
+    'Name',
+    'Category',
+    'Supplier',
+    'Supplier SKU',
+    'JDP SKU',
+    'Supplier Cost Price',
+    'Markup Percentage',
+    'Markup Amount',
+    'JDP Price',
+    'Profit Margin',
+    'Stock Quantity',
+    'Status',
+    'Branches',
+    'Description',
+    'Created Date',
+    'Last Updated'
+  ];
+
+  // Prepare CSV rows
+  const rows = productsData.map(product => [
+    product.id,
+    product.name,
+    product.category,
+    product.supplier,
+    product.sku || '',
+    product.id, // Using product ID as JDP SKU in this example
+    product.ptrPrice,
+    '40%', // Default markup percentage
+    (product.ptrPrice * 0.4).toFixed(2), // Markup amount
+    (product.ptrPrice * 1.4).toFixed(2), // JDP price
+    '28.6%', // Default profit margin
+    product.stock,
+    product.status,
+    product.branches.map(b => b.name).join(', '),
+    product.description || '',
+    product.createdDate,
+    product.lastUpdated
+  ]);
+
+  // Convert to CSV string
+  let csvContent = headers.join(',') + '\n';
+  rows.forEach(row => {
+    csvContent += row.map(field => `"${field}"`).join(',') + '\n';
+  });
+
+  // Create download link
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', 'products_export.csv');
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
 
   const handleImport = () => {
     console.log('Importing products...')

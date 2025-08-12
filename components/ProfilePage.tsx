@@ -217,7 +217,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
         <div className="lg:col-span-2 space-y-6">
           {/* Personal Information Card */}
           <Card className="bg-white shadow-sm border border-gray-200">
-            <CardHeader className="flex flex-row items-center justify-between border-b border-gray-200">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-gray-200 pb-3">
               <CardTitle className="flex items-center gap-2">
                 <User className="h-5 w-5 text-primary" />
                 Personal Information
@@ -448,7 +448,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
 
           {/* Password Change Card */}
           <Card className="bg-white shadow-sm border border-gray-200">
-            <CardHeader className="flex flex-row items-center justify-between border-b border-gray-200">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-gray-200 pb-3">
               <CardTitle className="flex items-center gap-2">
                 <Lock className="h-5 w-5 text-primary" />
                 Security & Password

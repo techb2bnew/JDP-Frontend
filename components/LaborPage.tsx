@@ -344,6 +344,61 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
     }
   }
 
+  function convertToCSV(data: Labor[]) {
+  const headers = [
+    'Labor ID',
+    'Name',
+    'Email',
+    'Phone',
+    'Address',
+    'Trade',
+    'Experience',
+    'Hourly Rate',
+    'Availability',
+    'Jobs Completed',
+    'Date of Joining',
+    'Supervisor',
+    'Certifications',
+    'Skills',
+    'Notes'
+  ].join(',');
+
+  const rows = data.map(labor => [
+    labor.laborId,
+    labor.name,
+    labor.email,
+    labor.phone,
+    labor.address,
+    labor.trade,
+    labor.experience,
+    labor.hourlyRate,
+    labor.availability,
+    labor.jobsCompleted,
+    labor.dateOfJoining,
+    labor.supervisor,
+    labor.certifications.join('; '),
+    labor.skills.join('; '),
+    labor.notes || ''
+  ].map(field => `"${field?.toString().replace(/"/g, '""')}"`).join(','));
+
+  return [headers, ...rows].join('\n');
+}
+
+function downloadCSV(data: Labor[], filename: string) {
+  const csv = convertToCSV(data);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.visibility = 'hidden';
+  
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
   const renderForm = () => (
     <div className="grid grid-cols-2 gap-4 py-4 max-h-96 overflow-y-auto">
       <div className="space-y-2">
@@ -519,13 +574,13 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
             <Upload className="h-4 w-4" />
             Import
           </Button>
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => downloadCSV(filteredLaborers, `labor-export-${new Date().toISOString().split('T')[0]}.csv`)}>
             <Download className="h-4 w-4" />
             Export
           </Button>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-[#00A1FF] hover:bg-[#0090e6] gap-2">
+              <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2">
                 <Plus className="h-4 w-4" />
                 Add Labor Worker
               </Button>
@@ -539,7 +594,7 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
                 <Button variant="outline" onClick={() => {setIsCreateDialogOpen(false); resetForm();}}>
                   Cancel
                 </Button>
-                <Button onClick={handleCreate} className="bg-[#00A1FF] hover:bg-[#0090e6]">
+                <Button onClick={handleCreate} className="bg-primary text-white hover:bg-[#0090e6]">
                   Create Labor Worker
                 </Button>
               </div>
@@ -747,7 +802,7 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
               key={page}
               variant={currentPage === page ? "default" : "outline"}
               onClick={() => setCurrentPage(page)}
-              className={currentPage === page ? "bg-[#00A1FF] hover:bg-[#0090e6]" : ""}
+              className={currentPage === page ? "bg-primary text-white hover:bg-[#0090e6]" : ""}
             >
               {page}
             </Button>
@@ -774,7 +829,7 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
             <Button variant="outline" onClick={() => {setIsEditDialogOpen(false); resetForm();}}>
               Cancel
             </Button>
-            <Button onClick={handleUpdate} className="bg-[#00A1FF] hover:bg-[#0090e6]">
+            <Button onClick={handleUpdate} className="bg-primary text-white hover:bg-[#0090e6]">
               Update Labor Worker
             </Button>
           </div>

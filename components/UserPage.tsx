@@ -12,12 +12,12 @@ import { Textarea } from './ui/textarea'
 import { Checkbox } from './ui/checkbox'
 import { ActionButtonsPopup } from './ActionButtonsPopup'
 import { toast } from 'sonner'
-import { 
-  Plus, 
-  Search, 
-  MoreVertical, 
-  Edit, 
-  Trash2, 
+import {
+  Plus,
+  Search,
+  MoreVertical,
+  Edit,
+  Trash2,
   Eye,
   Upload,
   Download,
@@ -234,13 +234,13 @@ export function UserPage({ onViewDetails }: UserPageProps) {
   const filteredUsers = users.filter(user => {
     const fullName = `${user.firstName} ${user.lastName}`.toLowerCase()
     const matchesSearch = fullName.includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.phone.includes(searchTerm) ||
-                         user.userId.includes(searchTerm)
-    
+      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.phone.includes(searchTerm) ||
+      user.userId.includes(searchTerm)
+
     const matchesRole = filterRole === 'all' || user.role === filterRole
     const matchesStatus = filterStatus === 'all' || user.status === filterStatus
-    
+
     return matchesSearch && matchesRole && matchesStatus
   })
 
@@ -296,12 +296,12 @@ export function UserPage({ onViewDetails }: UserPageProps) {
       return
     }
 
-    setUsers(users.map(user => 
-      user.id === editingUser.id 
+    setUsers(users.map(user =>
+      user.id === editingUser.id
         ? { ...user, ...formData }
         : user
     ))
-    
+
     setIsEditDialogOpen(false)
     setEditingUser(null)
     resetForm()
@@ -343,11 +343,60 @@ export function UserPage({ onViewDetails }: UserPageProps) {
   }
 
   const formatPermissionName = (permission: string) => {
-    return permission.split('_').map(word => 
+    return permission.split('_').map(word =>
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ')
   }
+  function convertUsersToCSV(data: SystemUser[]) {
+    const headers = [
+      'User ID',
+      'First Name',
+      'Last Name',
+      'Email',
+      'Phone',
+      'Address',
+      'Role',
+      'Department',
+      'Status',
+      'Last Login',
+      'Date Created',
+      'Permissions',
+      'Notes'
+    ].join(',');
 
+    const rows = data.map(user => [
+      user.userId,
+      user.firstName,
+      user.lastName,
+      user.email,
+      user.phone,
+      user.address,
+      user.role,
+      user.department,
+      user.status,
+      user.lastLogin,
+      user.dateCreated,
+      user.permissions.join('; '),
+      user.notes || ''
+    ].map(field => `"${field?.toString().replace(/"/g, '""')}"`).join(','));
+
+    return [headers, ...rows].join('\n');
+  }
+
+  function downloadCSV(data: SystemUser[], filename: string) {
+    const csv = convertUsersToCSV(data);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
   const renderForm = () => (
     <div className="grid grid-cols-2 gap-4 py-4 max-h-96 overflow-y-auto">
       <div className="space-y-2">
@@ -355,7 +404,7 @@ export function UserPage({ onViewDetails }: UserPageProps) {
         <Input
           id="firstName"
           value={formData.firstName}
-          onChange={(e) => setFormData({...formData, firstName: e.target.value})}
+          onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
           placeholder="Enter first name"
         />
       </div>
@@ -364,7 +413,7 @@ export function UserPage({ onViewDetails }: UserPageProps) {
         <Input
           id="lastName"
           value={formData.lastName}
-          onChange={(e) => setFormData({...formData, lastName: e.target.value})}
+          onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
           placeholder="Enter last name"
         />
       </div>
@@ -374,7 +423,7 @@ export function UserPage({ onViewDetails }: UserPageProps) {
           id="email"
           type="email"
           value={formData.email}
-          onChange={(e) => setFormData({...formData, email: e.target.value})}
+          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
           placeholder="Enter email address"
         />
       </div>
@@ -392,13 +441,13 @@ export function UserPage({ onViewDetails }: UserPageProps) {
         <Input
           id="phone"
           value={formData.phone}
-          onChange={(e) => setFormData({...formData, phone: e.target.value})}
+          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
           placeholder="Enter phone number"
         />
       </div>
       <div className="space-y-2">
         <Label htmlFor="role">Role *</Label>
-        <Select value={formData.role} onValueChange={(value) => setFormData({...formData, role: value})}>
+        <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
           <SelectTrigger>
             <SelectValue placeholder="Select role" />
           </SelectTrigger>
@@ -411,7 +460,7 @@ export function UserPage({ onViewDetails }: UserPageProps) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="department">Department</Label>
-        <Select value={formData.department} onValueChange={(value) => setFormData({...formData, department: value})}>
+        <Select value={formData.department} onValueChange={(value) => setFormData({ ...formData, department: value })}>
           <SelectTrigger>
             <SelectValue placeholder="Select department" />
           </SelectTrigger>
@@ -424,7 +473,7 @@ export function UserPage({ onViewDetails }: UserPageProps) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="status">Status</Label>
-        <Select value={formData.status} onValueChange={(value: 'active' | 'inactive' | 'suspended' | 'pending') => setFormData({...formData, status: value})}>
+        <Select value={formData.status} onValueChange={(value: 'active' | 'inactive' | 'suspended' | 'pending') => setFormData({ ...formData, status: value })}>
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
@@ -441,11 +490,11 @@ export function UserPage({ onViewDetails }: UserPageProps) {
         <Input
           id="address"
           value={formData.address}
-          onChange={(e) => setFormData({...formData, address: e.target.value})}
+          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
           placeholder="Enter full address"
         />
       </div>
-      
+
       <div className="col-span-2 space-y-2">
         <Label>Permissions</Label>
         <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto border rounded p-2">
@@ -469,7 +518,7 @@ export function UserPage({ onViewDetails }: UserPageProps) {
         <Textarea
           id="notes"
           value={formData.notes}
-          onChange={(e) => setFormData({...formData, notes: e.target.value})}
+          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
           placeholder="Additional notes..."
           rows={3}
         />
@@ -484,19 +533,22 @@ export function UserPage({ onViewDetails }: UserPageProps) {
           <h2 className="text-xl font-medium text-[#2b2b2b]">User Management</h2>
           <p className="text-sm text-[#2b2b2b]/60 mt-1">Manage system users and their access permissions.</p>
         </div>
-        
+
         <div className="flex items-center gap-3">
           <Button variant="outline" className="gap-2">
             <Upload className="h-4 w-4" />
             Import
           </Button>
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => {
+            downloadCSV(filteredUsers, `users-export-${new Date().toISOString().split('T')[0]}.csv`);
+            toast.success('CSV export started');
+          }}>
             <Download className="h-4 w-4" />
             Export
           </Button>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-[#00A1FF] hover:bg-[#0090e6] gap-2">
+              <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2">
                 <Plus className="h-4 w-4" />
                 Add User
               </Button>
@@ -507,10 +559,10 @@ export function UserPage({ onViewDetails }: UserPageProps) {
               </DialogHeader>
               {renderForm()}
               <div className="flex justify-end gap-3 mt-6">
-                <Button variant="outline" onClick={() => {setIsCreateDialogOpen(false); resetForm();}}>
+                <Button variant="outline" onClick={() => { setIsCreateDialogOpen(false); resetForm(); }}>
                   Cancel
                 </Button>
-                <Button onClick={handleCreate} className="bg-[#00A1FF] hover:bg-[#0090e6]">
+                <Button onClick={handleCreate} className="bg-primary text-white hover:bg-[#0090e6]">
                   Create User
                 </Button>
               </div>
@@ -536,7 +588,7 @@ export function UserPage({ onViewDetails }: UserPageProps) {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-white shadow-sm border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -552,7 +604,7 @@ export function UserPage({ onViewDetails }: UserPageProps) {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-white shadow-sm border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -568,7 +620,7 @@ export function UserPage({ onViewDetails }: UserPageProps) {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-white shadow-sm border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -600,7 +652,7 @@ export function UserPage({ onViewDetails }: UserPageProps) {
                   className="pl-10"
                 />
               </div>
-              
+
               <Select value={filterRole} onValueChange={setFilterRole}>
                 <SelectTrigger className="w-56">
                   <SelectValue placeholder="Filter by Role" />
@@ -626,7 +678,7 @@ export function UserPage({ onViewDetails }: UserPageProps) {
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <span>Total: {filteredUsers.length}</span>
             </div>
@@ -704,18 +756,18 @@ export function UserPage({ onViewDetails }: UserPageProps) {
           >
             Previous
           </Button>
-          
+
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
             <Button
               key={page}
               variant={currentPage === page ? "default" : "outline"}
               onClick={() => setCurrentPage(page)}
-              className={currentPage === page ? "bg-[#00A1FF] hover:bg-[#0090e6]" : ""}
+              className={currentPage === page ? "bg-primary text-white hover:bg-[#0090e6]" : ""}
             >
               {page}
             </Button>
           ))}
-          
+
           <Button
             variant="outline"
             onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
@@ -734,10 +786,10 @@ export function UserPage({ onViewDetails }: UserPageProps) {
           </DialogHeader>
           {renderForm()}
           <div className="flex justify-end gap-3 mt-6">
-            <Button variant="outline" onClick={() => {setIsEditDialogOpen(false); resetForm();}}>
+            <Button variant="outline" onClick={() => { setIsEditDialogOpen(false); resetForm(); }}>
               Cancel
             </Button>
-            <Button onClick={handleUpdate} className="bg-[#00A1FF] hover:bg-[#0090e6]">
+            <Button onClick={handleUpdate} className="bg-primary text-white hover:bg-[#0090e6]">
               Update User
             </Button>
           </div>
