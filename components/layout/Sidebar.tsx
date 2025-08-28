@@ -116,6 +116,13 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       icon: Settings,
       href: "/configuration",
       description: "Configure system-wide settings for pricing and rates"
+    },
+    {
+      id: "role",
+      name: "Role & Permission",
+      icon: Settings,
+      href: "/role",
+      description: "Role & Permission"
     }
   ]
 

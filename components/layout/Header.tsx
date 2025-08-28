@@ -58,6 +58,7 @@ export function Header({
       "/tracking": "Live Tracking",
       "/contractors": "Contractor Listing",
       "/configuration": "Configuration",
+      "/role": "Role & Permission",
       "/staff": "Staff Management",
       "/notifications": "Notifications",
       "/profile": "Profile",
