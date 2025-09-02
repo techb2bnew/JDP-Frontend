@@ -388,7 +388,7 @@ export function NotificationsPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -402,7 +402,7 @@ export function NotificationsPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -416,7 +416,7 @@ export function NotificationsPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -432,7 +432,7 @@ export function NotificationsPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -448,7 +448,7 @@ export function NotificationsPage() {
       </div>
 
       {/* Filters */}
-      <Card className="bg-white shadow-sm border-0">
+      <Card className="bg-white shadow-md border-0">
         <CardContent className="p-6">
           <div className="flex items-center gap-4 flex-wrap">
             <div className="relative flex-1 min-w-64">
@@ -512,43 +512,43 @@ export function NotificationsPage() {
       </Card>
 
       {/* Category Tabs */}
-      <Card className="bg-white shadow-sm border-0">
+      <Card className="bg-white shadow-md border-0">
         <CardContent className="p-0">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="w-full justify-start rounded-none border-b bg-transparent h-auto p-0">
               <TabsTrigger 
                 value="all" 
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#00A1FF] data-[state=active]:bg-transparent"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#00A1FF] data-[state=active]:bg-primary"
               >
                 All ({totalCount})
               </TabsTrigger>
               <TabsTrigger 
                 value="job-management"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#00A1FF] data-[state=active]:bg-transparent"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#00A1FF] data-[state=active]:bg-primary"
               >
                 Job Management ({categoryCount['job-management']})
               </TabsTrigger>
               <TabsTrigger 
                 value="invoicing"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#00A1FF] data-[state=active]:bg-transparent"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#00A1FF] data-[state=active]:bg-primary"
               >
                 Invoicing ({categoryCount.invoicing})
               </TabsTrigger>
               <TabsTrigger 
                 value="materials"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#00A1FF] data-[state=active]:bg-transparent"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#00A1FF] data-[state=active]:bg-primary"
               >
                 Materials ({categoryCount.materials})
               </TabsTrigger>
               <TabsTrigger 
                 value="timesheets"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#00A1FF] data-[state=active]:bg-transparent"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#00A1FF] data-[state=active]:bg-primary"
               >
                 Timesheets ({categoryCount.timesheets})
               </TabsTrigger>
               <TabsTrigger 
                 value="system"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#00A1FF] data-[state=active]:bg-transparent"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#00A1FF] data-[state=active]:bg-primary"
               >
                 System ({categoryCount.system})
               </TabsTrigger>
@@ -558,7 +558,7 @@ export function NotificationsPage() {
       </Card>
 
       {/* Notifications List */}
-      <Card className="bg-white shadow-sm border-0">
+      <Card className="bg-white shadow-md border-0">
         <CardContent className="p-0">
           {paginatedNotifications.length === 0 ? (
             <div className="p-12 text-center">

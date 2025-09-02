@@ -82,7 +82,7 @@ export function EnhancedLeadLabourDetailsPage({ leadLabourId, onBack }: Enhanced
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          <Card className="bg-white shadow-sm border-0">
+          <Card className="bg-white shadow-md border-0">
             <CardContent className="p-8 space-y-8">
               {/* Personal Detail Section */}
               <div>
@@ -205,7 +205,7 @@ export function EnhancedLeadLabourDetailsPage({ leadLabourId, onBack }: Enhanced
         </TabsContent>
 
         <TabsContent value="timesheet">
-          <Card className="bg-white shadow-sm border-0">
+          <Card className="bg-white shadow-md border-0">
             <CardHeader>
               <CardTitle>Timesheet Entries</CardTitle>
             </CardHeader>
@@ -216,7 +216,7 @@ export function EnhancedLeadLabourDetailsPage({ leadLabourId, onBack }: Enhanced
         </TabsContent>
 
         <TabsContent value="jobs">
-          <Card className="bg-white shadow-sm border-0">
+          <Card className="bg-white shadow-md border-0">
             <CardHeader>
               <CardTitle>Job Assignments</CardTitle>
             </CardHeader>
@@ -227,7 +227,7 @@ export function EnhancedLeadLabourDetailsPage({ leadLabourId, onBack }: Enhanced
         </TabsContent>
 
         <TabsContent value="total-time">
-          <Card className="bg-white shadow-sm border-0">
+          <Card className="bg-white shadow-md border-0">
             <CardHeader>
               <CardTitle>Total Time Summary</CardTitle>
             </CardHeader>

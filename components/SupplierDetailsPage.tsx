@@ -56,7 +56,7 @@ export function SupplierDetailsPage({ supplierId, onBack }: SupplierDetailsPageP
       </div>
 
       {/* Main Content */}
-      <Card className="bg-white shadow-sm border-0">
+      <Card className="bg-white shadow-md border-0">
         <CardContent className="p-8 space-y-8">
           {/* Business Details Section */}
           <div>

@@ -287,7 +287,7 @@ export function StaffDetailsPage({ staffId, onBack }: StaffDetailsPageProps) {
         {/* Main Information */}
         <div className="lg:col-span-2 space-y-6">
           {/* Personal Information Card */}
-          <Card className="bg-white shadow-sm border-0">
+          <Card className="bg-white shadow-md border-0">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <User className="h-5 w-5 text-[#00A1FF]" />
@@ -353,7 +353,7 @@ export function StaffDetailsPage({ staffId, onBack }: StaffDetailsPageProps) {
           </Card>
 
           {/* Job Information Card */}
-          <Card className="bg-white shadow-sm border-0">
+          <Card className="bg-white shadow-md border-0">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Briefcase className="h-5 w-5 text-[#00A1FF]" />
@@ -419,7 +419,7 @@ export function StaffDetailsPage({ staffId, onBack }: StaffDetailsPageProps) {
 
           {/* Additional Notes */}
           {staff.notes && (
-            <Card className="bg-white shadow-sm border-0">
+            <Card className="bg-white shadow-md border-0">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <FileText className="h-5 w-5 text-[#00A1FF]" />
@@ -435,7 +435,7 @@ export function StaffDetailsPage({ staffId, onBack }: StaffDetailsPageProps) {
 
         {/* Summary Card */}
         <div className="space-y-6">
-          <Card className="bg-white shadow-sm border-0">
+          <Card className="bg-white shadow-md border-0">
             <CardHeader>
               <CardTitle className="text-lg">Quick Summary</CardTitle>
             </CardHeader>

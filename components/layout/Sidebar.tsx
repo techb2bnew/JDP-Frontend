@@ -99,7 +99,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
     {
       id: "staff",
       name: "Staff Management",
-      icon: Settings,
+      icon: Users,
       href: "/staff",
       description: "Administer staff accounts and permissions"
     },
@@ -120,7 +120,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
     {
       id: "role",
       name: "Role & Permission",
-      icon: Settings,
+      icon: Users,
       href: "/role",
       description: "Role & Permission"
     }

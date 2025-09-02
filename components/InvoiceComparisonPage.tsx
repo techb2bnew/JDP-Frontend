@@ -442,7 +442,7 @@ export function InvoiceComparisonPage({ onBack }: InvoiceComparisonProps) {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -456,7 +456,7 @@ export function InvoiceComparisonPage({ onBack }: InvoiceComparisonProps) {
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -472,7 +472,7 @@ export function InvoiceComparisonPage({ onBack }: InvoiceComparisonProps) {
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -488,7 +488,7 @@ export function InvoiceComparisonPage({ onBack }: InvoiceComparisonProps) {
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -506,7 +506,7 @@ export function InvoiceComparisonPage({ onBack }: InvoiceComparisonProps) {
       </div>
 
       {/* Comparison List */}
-      <Card className="bg-white shadow-sm border-0">
+      <Card className="bg-white shadow-md border-0">
         <CardHeader>
           <CardTitle>Invoice Approvals</CardTitle>
         </CardHeader>

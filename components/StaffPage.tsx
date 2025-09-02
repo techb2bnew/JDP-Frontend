@@ -452,7 +452,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       </div>
 
       {/* Filters and Search */}
-      <Card className="bg-white shadow-sm border-0">
+      <Card className="bg-white shadow-md border-0">
         <CardContent className="p-6">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4 flex-1">
@@ -499,7 +499,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       </Card>
 
       {/* Staff Table */}
-      <Card className="bg-white shadow-sm border-0">
+      <Card className="bg-white shadow-md border-0">
         <CardContent className="p-0">
           <Table>
             <TableHeader>

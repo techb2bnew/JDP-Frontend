@@ -26,11 +26,15 @@ export function AuthFlow({ onAuthSuccess }: AuthFlowProps) {
   const dispatch = useAppDispatch()
   const [currentStep, setCurrentStep] = useState<AuthStep>('login')
   const [email, setEmail] = useState<string>('')
+  const [role, setRole] = useState<string>('')
 
-  const handleStepChange = (step: AuthStep, userEmail?: string) => {
+  const handleStepChange = (step: AuthStep, userEmail?: string, userRole?: string) => {
     setCurrentStep(step)
     if (userEmail) {
       setEmail(userEmail)
+    }
+    if (userRole) {
+      setRole(userRole)
     }
   }
 
@@ -72,6 +76,7 @@ export function AuthFlow({ onAuthSuccess }: AuthFlowProps) {
       return (
         <OTPScreen
           email={email}
+          role={role}
           onStepChange={handleStepChange}
           onAuthSuccess={handleAuthSuccess}
         />

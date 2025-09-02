@@ -167,7 +167,7 @@ export function InvoiceComparison({ onBack }: InvoiceComparisonProps) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-[#00A1FF]" />
@@ -183,7 +183,7 @@ export function InvoiceComparison({ onBack }: InvoiceComparisonProps) {
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-[#00A1FF]" />
@@ -200,7 +200,7 @@ export function InvoiceComparison({ onBack }: InvoiceComparisonProps) {
         </Card>
       </div>
 
-      <Card className="bg-white shadow-sm border-0">
+      <Card className="bg-white shadow-md border-0">
         <CardHeader>
           <CardTitle>Item Comparison</CardTitle>
         </CardHeader>

@@ -4,6 +4,9 @@ import { Input } from '../ui/input'
 import { AuthStep } from '../AuthFlow'
 import svgPaths from '../../imports/svg-gg40su13b1'
 import { toast } from 'sonner'
+import { useAppDispatch } from '../../redux/hooks'
+import { loginSuccess } from '../../redux/slices/authSlice'
+import { useRouter } from 'next/navigation'
 
 interface LoginScreenProps {
   onStepChange: (step: AuthStep, email?: string) => void
@@ -20,6 +23,8 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
   const [password, setPassword] = useState<string>('')
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [errors, setErrors] = useState<FormErrors>({})
+  const dispatch = useAppDispatch()
+  const router = useRouter()
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {}
@@ -54,18 +59,41 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
       });
 
       if (response.ok) {
-        toast.success('Logged in successfully');
-        onAuthSuccess(true);
-        localStorage.setItem('isAuthenticated', 'true')
+        const data = await response.json()
         
+        if (data.success && data.token) {
+          // Store authentication data in localStorage
+          const authData = {
+            user: data.user,
+            token: data.token,
+            expires: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
+          }
+          
+          localStorage.setItem('jdp_auth', JSON.stringify(authData))
+          
+          // Dispatch login success action
+          dispatch(loginSuccess({
+            user: data.user,
+            token: data.token
+          }))
+          
+          toast.success('Logged in successfully')
+          onAuthSuccess(true)
+          
+          // Redirect to dashboard
+          router.push('/dashboard')
+        } else {
+          toast.error(data.message || 'Login failed')
+        }
       } else {
-        const errorData = await response.json();
-        toast.error(errorData.message || 'Login failed');
+        const errorData = await response.json()
+        toast.error(errorData.message || 'Login failed')
       }
     } catch (error) {
-      toast.error('Network error occurred');
+      console.error('Login error:', error)
+      toast.error('Network error occurred. Please try again.')
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
   }
 

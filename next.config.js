@@ -10,8 +10,10 @@ const nextConfig = {
       '@reduxjs/toolkit',
       'react-redux'
     ],
-    typedRoutes: false,
   },
+  
+  // Typed routes configuration (moved from experimental in Next.js 15)
+  typedRoutes: false,
   
   // Compiler optimizations
   compiler: {

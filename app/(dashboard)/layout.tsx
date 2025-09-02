@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import { useAppDispatch } from '../../redux/hooks'
+import { logout } from '../../redux/slices/authSlice'
+import { clearAuthData } from '../../utils/auth'
 import { Sidebar } from '../../components/layout/Sidebar'
 import { Header } from '../../components/layout/Header'
 
@@ -14,6 +17,7 @@ export default function DashboardLayout({
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
   const pathname = usePathname()
+  const dispatch = useAppDispatch()
 
   useEffect(() => {
     const authStatus = localStorage.getItem('isAuthenticated')
@@ -25,9 +29,17 @@ export default function DashboardLayout({
     setIsLoading(false)
   }, [router])
 
-  const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated')
+  const handleLogout = async () => {
+    // Clear all authentication data using utility function
+    await clearAuthData()
+    
+    // Dispatch logout action to clear Redux state
+    dispatch(logout())
+    
+    // Update local state
     setIsAuthenticated(false)
+    
+    // Redirect to login page
     router.push('/')
   }
 

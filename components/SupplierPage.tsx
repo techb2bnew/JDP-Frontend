@@ -620,7 +620,7 @@ function downloadCSV(data: Supplier[], filename: string) {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-green-100 rounded-lg">
@@ -636,7 +636,7 @@ function downloadCSV(data: Supplier[], filename: string) {
           </CardContent>
         </Card>
         
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-yellow-100 rounded-lg">
@@ -652,7 +652,7 @@ function downloadCSV(data: Supplier[], filename: string) {
           </CardContent>
         </Card>
         
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-[#E6F6FF] rounded-lg">
@@ -668,7 +668,7 @@ function downloadCSV(data: Supplier[], filename: string) {
           </CardContent>
         </Card>
         
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-100 rounded-lg">
@@ -734,7 +734,7 @@ function downloadCSV(data: Supplier[], filename: string) {
       </Card>
 
       {/* Supplier Table */}
-      <Card className="bg-white shadow-sm border-0">
+      <Card className="bg-white shadow-md border-0">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -839,7 +839,7 @@ function downloadCSV(data: Supplier[], filename: string) {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh]">
+        <DialogContent className="max-w-6xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Edit Supplier</DialogTitle>
           </DialogHeader>

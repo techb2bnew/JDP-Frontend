@@ -187,7 +187,7 @@ export function TimesheetManagement({ onBack, jobs }: TimesheetManagementProps) 
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -201,7 +201,7 @@ export function TimesheetManagement({ onBack, jobs }: TimesheetManagementProps) 
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -217,7 +217,7 @@ export function TimesheetManagement({ onBack, jobs }: TimesheetManagementProps) 
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -233,7 +233,7 @@ export function TimesheetManagement({ onBack, jobs }: TimesheetManagementProps) 
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -251,7 +251,7 @@ export function TimesheetManagement({ onBack, jobs }: TimesheetManagementProps) 
       </div>
 
       {/* Filters */}
-      <Card className="bg-white shadow-sm border-0">
+      <Card className="bg-white shadow-md border-0">
         <CardContent className="p-6">
           <div className="flex items-center gap-4 flex-wrap">
             <div className="relative flex-1 min-w-64">
@@ -297,7 +297,7 @@ export function TimesheetManagement({ onBack, jobs }: TimesheetManagementProps) 
       </Card>
 
       {/* Timesheets Table */}
-      <Card className="bg-white shadow-sm border-0">
+      <Card className="bg-white shadow-md border-0">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -362,7 +362,7 @@ export function TimesheetManagement({ onBack, jobs }: TimesheetManagementProps) 
 
       {/* Empty State */}
       {filteredTimesheets.length === 0 && (
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-12 text-center">
             <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-[#2b2b2b] mb-2">No timesheets found</h3>

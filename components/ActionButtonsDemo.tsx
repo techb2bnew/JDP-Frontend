@@ -149,7 +149,7 @@ export function ActionButtonsDemo() {
         </p>
       </div>
 
-      <Card className="bg-white shadow-sm border-0">
+      <Card className="bg-white shadow-md border-0">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -210,7 +210,7 @@ export function ActionButtonsDemo() {
       </Card>
 
       {users.length === 0 && (
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-8 text-center">
             <p className="text-gray-500">No users found. All users have been deleted.</p>
           </CardContent>

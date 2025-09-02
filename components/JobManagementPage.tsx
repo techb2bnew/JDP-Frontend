@@ -383,7 +383,7 @@ export function JobManagementPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -397,7 +397,7 @@ export function JobManagementPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -413,7 +413,7 @@ export function JobManagementPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -429,7 +429,7 @@ export function JobManagementPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -447,7 +447,7 @@ export function JobManagementPage() {
       </div>
 
       {/* Filters */}
-      <Card className="bg-white shadow-sm border-0">
+      <Card className="bg-white shadow-md border-0">
         <CardContent className="p-6">
           <div className="flex items-center gap-4 flex-wrap">
             <div className="relative flex-1 min-w-64">
@@ -519,7 +519,7 @@ export function JobManagementPage() {
       {/* Jobs Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {paginatedJobs.map((job) => (
-          <Card key={job.id} className="bg-white shadow-sm border-0 hover:shadow-md transition-shadow">
+          <Card key={job.id} className="bg-white shadow-md border-0 hover:shadow-md transition-shadow">
             <CardHeader className="pb-4">
               <div className="flex items-start justify-between">
                 <div className="space-y-2">
@@ -603,7 +603,7 @@ export function JobManagementPage() {
 
       {/* Empty State */}
       {filteredJobs.length === 0 && (
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-12 text-center">
             <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-[#2b2b2b] mb-2">No jobs found</h3>

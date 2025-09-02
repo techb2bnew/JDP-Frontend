@@ -22,19 +22,20 @@ export function AuthGuard({ children }: AuthGuardProps) {
     const checkAuth = () => {
       if (typeof window !== 'undefined') {
         const savedAuth = localStorage.getItem('jdp_auth')
-        alert(savedAuth)
         if (savedAuth) {
           try {
             const authData = JSON.parse(savedAuth)
-            if (authData.user && authData.expires > Date.now()) {
+            if (authData.user && authData.token && authData.expires > Date.now()) {
               dispatch(loginSuccess({
                 user: authData.user,
                 token: authData.token
               }))
               return
             }
+            // Clear expired or invalid auth data
             localStorage.removeItem('jdp_auth')
           } catch (error) {
+            console.error('Error parsing auth data:', error)
             localStorage.removeItem('jdp_auth')
           }
         }
@@ -45,28 +46,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
   }, [dispatch])
 
   const handleAuthSuccess = (isNewUser?: boolean) => {
-    const mockToken = 'mock_jwt_token_here'
-    const mockUser = {
-      id: '1',
-      email: 'admin@jdp.com',
-      name: 'Admin User',
-      role: 'admin' as const,
-    }
-    alert('asdasdllllllllllllll')
-    dispatch(loginSuccess({
-      user: mockUser,
-      token: mockToken
-    }))
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('jdp_auth', JSON.stringify({
-        user: mockUser,
-        token: mockToken,
-        expires: Date.now() + (24 * 60 * 60 * 1000)
-      }))
-    }
-
-    router.push('/dashboard')
+    // This function will be called by the AuthFlow component
+    // The actual authentication logic is now handled in LoginScreen
+    // This is just a callback to notify the parent component
+    console.log('Authentication successful', { isNewUser })
   }
 
   if (isLoading) {

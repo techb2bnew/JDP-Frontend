@@ -54,7 +54,7 @@ export function LaborDetailsPage({ laborId, onBack }: LaborDetailsPageProps) {
       </div>
 
       {/* Main Content */}
-      <Card className="bg-white shadow-sm border-0">
+      <Card className="bg-white shadow-md border-0">
         <CardContent className="p-8 space-y-8">
           {/* Personal Detail Section */}
           <div>

@@ -1,18 +1,23 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '../ui/button'
 import { AuthStep } from '../AuthFlow'
+import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
+import { apiClient } from '../../utils/api'
 // import img4541 from "figma:asset/a3e40afe539df138ee43712dc0bf65b14d1b7224.png"
 
 interface OTPScreenProps {
   email: string
+  role?: string
   onStepChange: (step: AuthStep) => void
   onAuthSuccess: (isNewUser?: boolean) => void
 }
 
-export function OTPScreen({ email, onStepChange, onAuthSuccess }: OTPScreenProps) {
+export function OTPScreen({ email, role, onStepChange, onAuthSuccess }: OTPScreenProps) {
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [isLoading, setIsLoading] = useState(false)
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
+  const router = useRouter()
 
   const handleOtpChange = (index: number, value: string) => {
     if (value.length > 1) return
@@ -33,21 +38,42 @@ export function OTPScreen({ email, onStepChange, onAuthSuccess }: OTPScreenProps
     }
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const otpString = otp.join('')
     if (otpString.length !== 6) return
     
     setIsLoading(true)
-    setTimeout(() => {
-      setIsLoading(false)
+    
+    try {
+      // Call the signup API using the utility function
+      const data = await apiClient.signup(
+        email,
+        role || 'Staff', // Default to Staff if no role provided
+        otpString
+      )
+      
+      toast.success(data.message || 'Registration successful!')
+      
       // For signup flow, mark as new user
       onAuthSuccess(true)
-    }, 1000)
+      
+      // Redirect to login page after successful registration
+      setTimeout(() => {
+        router.push('/login')
+      }, 1500)
+      
+    } catch (error) {
+      console.error('Registration error:', error)
+      toast.error(error instanceof Error ? error.message : 'Registration failed. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleResend = () => {
     // Simulate resend OTP
     console.log('Resending OTP to:', email)
+    toast.info('OTP resent successfully')
   }
 
   return (
@@ -94,6 +120,11 @@ export function OTPScreen({ email, onStepChange, onAuthSuccess }: OTPScreenProps
             OTP verification is required to proceed, enter the code sent to your
             registered phone/Email now.
           </p>
+          {role && (
+            <p className="text-[14px] text-gray-600 mt-2">
+              Registering as: <span className="font-medium text-[#00a1ff]">{role}</span>
+            </p>
+          )}
         </div>
         
         <div className="space-y-6">
@@ -102,7 +133,9 @@ export function OTPScreen({ email, onStepChange, onAuthSuccess }: OTPScreenProps
             {otp.map((digit, index) => (
               <input
                 key={index}
-                // ref={(el) => (inputRefs.current[index] = el)}
+                ref={(el) => {
+                  inputRefs.current[index] = el
+                }}
                 type="text"
                 value={digit}
                 onChange={(e) => handleOtpChange(index, e.target.value)}

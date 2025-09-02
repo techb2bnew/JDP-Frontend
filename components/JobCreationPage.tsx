@@ -319,7 +319,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
   )
 
   const renderStep1 = () => (
-    <Card className="bg-white shadow-sm border-0">
+    <Card className="bg-white shadow-md border-0">
       <CardHeader>
         <CardTitle className="text-center">Select Job Type</CardTitle>
       </CardHeader>
@@ -378,7 +378,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
   )
 
   const renderStep2 = () => (
-    <Card className="bg-white shadow-sm border-0">
+    <Card className="bg-white shadow-md border-0">
       <CardHeader>
         <CardTitle>Job Details</CardTitle>
       </CardHeader>
@@ -596,7 +596,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
   )
 
   const renderStep3 = () => (
-    <Card className="bg-white shadow-sm border-0">
+    <Card className="bg-white shadow-md border-0">
       <CardHeader>
         <CardTitle>Resources & Scheduling</CardTitle>
       </CardHeader>
@@ -747,7 +747,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
   )
 
   const renderStep4 = () => (
-    <Card className="bg-white shadow-sm border-0">
+    <Card className="bg-white shadow-md border-0">
       <CardHeader>
         <CardTitle>Materials (Optional)</CardTitle>
       </CardHeader>
@@ -795,7 +795,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
   )
 
   const renderStep5 = () => (
-    <Card className="bg-white shadow-sm border-0">
+    <Card className="bg-white shadow-md border-0">
       <CardHeader>
         <CardTitle>Review Job Details</CardTitle>
       </CardHeader>

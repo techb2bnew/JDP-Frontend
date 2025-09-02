@@ -262,7 +262,7 @@ export function LeadLabourDetailsPage({ leadLabourId, onBack }: LeadLabourDetail
 
         <TabsContent value="overview" className="space-y-6">
           {/* Personal Details Card */}
-          <Card className="bg-white shadow-sm border-0">
+          <Card className="bg-white shadow-md border-0">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <span>Personal Detail</span>
@@ -331,7 +331,7 @@ export function LeadLabourDetailsPage({ leadLabourId, onBack }: LeadLabourDetail
           </Card>
 
           {/* Document Upload Card */}
-          <Card className="bg-white shadow-sm border-0">
+          <Card className="bg-white shadow-md border-0">
             <CardHeader>
               <CardTitle>Document Upload</CardTitle>
             </CardHeader>
@@ -380,7 +380,7 @@ export function LeadLabourDetailsPage({ leadLabourId, onBack }: LeadLabourDetail
           </Card>
 
           {/* Permissions Card */}
-          <Card className="bg-white shadow-sm border-0">
+          <Card className="bg-white shadow-md border-0">
             <CardHeader>
               <CardTitle>Permission</CardTitle>
             </CardHeader>
@@ -411,7 +411,7 @@ export function LeadLabourDetailsPage({ leadLabourId, onBack }: LeadLabourDetail
 
         <TabsContent value="timesheet" className="space-y-6">
           {/* Timesheet Filters */}
-          <Card className="bg-white shadow-sm border-0">
+          <Card className="bg-white shadow-md border-0">
             <CardContent className="p-6">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
@@ -442,7 +442,7 @@ export function LeadLabourDetailsPage({ leadLabourId, onBack }: LeadLabourDetail
           </Card>
 
           {/* Timesheet Table */}
-          <Card className="bg-white shadow-sm border-0">
+          <Card className="bg-white shadow-md border-0">
             <CardHeader>
               <CardTitle>Timesheet Entries</CardTitle>
             </CardHeader>
@@ -479,7 +479,7 @@ export function LeadLabourDetailsPage({ leadLabourId, onBack }: LeadLabourDetail
 
         <TabsContent value="jobs" className="space-y-6">
           {/* Jobs Filters */}
-          <Card className="bg-white shadow-sm border-0">
+          <Card className="bg-white shadow-md border-0">
             <CardContent className="p-6">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
@@ -511,7 +511,7 @@ export function LeadLabourDetailsPage({ leadLabourId, onBack }: LeadLabourDetail
           </Card>
 
           {/* Jobs Table */}
-          <Card className="bg-white shadow-sm border-0">
+          <Card className="bg-white shadow-md border-0">
             <CardHeader>
               <CardTitle>Job Assignments</CardTitle>
             </CardHeader>
@@ -551,7 +551,7 @@ export function LeadLabourDetailsPage({ leadLabourId, onBack }: LeadLabourDetail
         <TabsContent value="total-time" className="space-y-6">
           {/* Time Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="bg-white shadow-sm border-0">
+            <Card className="bg-white shadow-md border-0">
               <CardContent className="p-6">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-blue-100 rounded-lg">
@@ -565,7 +565,7 @@ export function LeadLabourDetailsPage({ leadLabourId, onBack }: LeadLabourDetail
               </CardContent>
             </Card>
             
-            <Card className="bg-white shadow-sm border-0">
+            <Card className="bg-white shadow-md border-0">
               <CardContent className="p-6">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-green-100 rounded-lg">
@@ -579,7 +579,7 @@ export function LeadLabourDetailsPage({ leadLabourId, onBack }: LeadLabourDetail
               </CardContent>
             </Card>
             
-            <Card className="bg-white shadow-sm border-0">
+            <Card className="bg-white shadow-md border-0">
               <CardContent className="p-6">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-[#E6F6FF] rounded-lg">
@@ -595,7 +595,7 @@ export function LeadLabourDetailsPage({ leadLabourId, onBack }: LeadLabourDetail
           </div>
 
           {/* Detailed Time Breakdown */}
-          <Card className="bg-white shadow-sm border-0">
+          <Card className="bg-white shadow-md border-0">
             <CardHeader>
               <CardTitle>Time Breakdown by Job</CardTitle>
             </CardHeader>

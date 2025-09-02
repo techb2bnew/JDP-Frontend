@@ -669,7 +669,7 @@ export function BlueSheetApprovalDialog({
                   <div className="space-y-8">
                     <h3 className="text-2xl font-medium text-[#2b2b2b]">BlueSheet Overview</h3>
                     
-                    <Card className="bg-white shadow-sm border-0">
+                    <Card className="bg-white shadow-md border-0">
                       <CardHeader className="pb-4">
                         <CardTitle className="text-lg">Material Request Summary</CardTitle>
                       </CardHeader>
@@ -1004,7 +1004,7 @@ export function BlueSheetApprovalDialog({
                   </div>
 
                   {/* Enhanced Detailed Comparison Table */}
-                  <Card className="bg-white shadow-sm border-0">
+                  <Card className="bg-white shadow-md border-0">
                     <CardHeader>
                       <CardTitle className="text-xl flex items-center gap-3">
                         <AlertTriangle className="h-6 w-6 text-[#00A1FF]" />
@@ -1153,7 +1153,7 @@ export function BlueSheetApprovalDialog({
                   </div>
 
                   {/* Enhanced Final Review Summary */}
-                  <Card className="bg-white shadow-sm border-0">
+                  <Card className="bg-white shadow-md border-0">
                     <CardHeader>
                       <CardTitle className="text-xl">Comprehensive Review Summary</CardTitle>
                     </CardHeader>

@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Separator } from './ui/separator'
 import { Calendar } from './ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
+
 import { 
   Search, 
   Filter, 
@@ -321,7 +322,7 @@ const ordersData: Order[] = [
 export function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('all')
-  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({})
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined })
   const [sortBy, setSortBy] = useState('all')
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
@@ -556,8 +557,8 @@ export function OrdersPage() {
                     initialFocus
                     mode="range"
                     defaultMonth={dateRange.from}
-                    // selected={dateRange}
-                    // onSelect={setDateRange}
+                    selected={dateRange as any}
+                    onSelect={(range: any) => setDateRange(range)}
                     numberOfMonths={2}
                   />
                 </PopoverContent>

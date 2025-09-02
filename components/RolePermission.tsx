@@ -1,313 +1,151 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Button } from './ui/button'
+import { 
+  Edit,
+  Trash2,
+  Eye, 
+} from 'lucide-react'
+interface Permission {
+  module: string;
+  action: string;
+  allowed: boolean;
+}
 
 interface Role {
   id: string;
-  name: string;
-  type: string;
-  permissions: PermissionMatrix;
+  roleName: string;
+  roleType: string;
+  description: string;
+  permissions: Permission[];
   createdAt: string;
   updatedAt: string;
-}
-
-interface PermissionMatrix {
-  // Permission Summary (System-Controlled)
-  viewAllJobs: boolean;
-  createEditDeleteJobs: boolean;
-  assignTasksToLabor: boolean;
-  submitTimeMaterials: boolean;
-  generateSendInvoices: boolean;
-  uploadSupplierMaterialSheet: boolean;
-  viewFinancialReports: boolean;
-  
-  // JOB-Roles & Permissions
-  createJob: boolean;
-  editJobDetails: boolean;
-  assignContractor: boolean;
-  receiveAssignmentNotification: boolean;
-  viewAssignedJob: boolean;
-  modifyJobTypeBilling: boolean;
-  
-  // Invoice Permissions
-  canCreateInvoices: boolean;
-  accessToInvoices: string; // "Full access", "Limited access", "No access", etc.
-  
-  // Invoice Actions by Role
-  createInvoice: boolean;
-  editInvoiceBeforeFinalizing: boolean;
-  approveFinalizeInvoice: boolean;
-  sendInvoiceToClient: boolean;
-  viewAllInvoices: boolean;
-  markInvoiceAsPaid: boolean;
-  viewInvoicePDF: boolean;
 }
 
 const RolePermission: React.FC = () => {
   const [roles, setRoles] = useState<Role[]>([
     {
       id: '1',
-      name: 'Admin',
-      type: 'System',
-      permissions: {
-        // Permission Summary
-        viewAllJobs: true,
-        createEditDeleteJobs: true,
-        assignTasksToLabor: true,
-        submitTimeMaterials: false,
-        generateSendInvoices: true,
-        uploadSupplierMaterialSheet: true,
-        viewFinancialReports: true,
-        
-        // Job Permissions
-        createJob: true,
-        editJobDetails: true,
-        assignContractor: true,
-        receiveAssignmentNotification: true,
-        viewAssignedJob: true,
-        modifyJobTypeBilling: true,
-        
-        // Invoice Permissions
-        canCreateInvoices: true,
-        accessToInvoices: 'Full access (all invoices, markup, import/export)',
-        
-        // Invoice Actions
-        createInvoice: true,
-        editInvoiceBeforeFinalizing: true,
-        approveFinalizeInvoice: true,
-        sendInvoiceToClient: true,
-        viewAllInvoices: true,
-        markInvoiceAsPaid: true,
-        viewInvoicePDF: true,
-      },
+      roleName: 'Admin',
+      roleType: 'Internal',
+      description: 'Full system administrator with all permissions',
+      permissions: [
+        { module: 'dashboard', action: 'view', allowed: true },
+        { module: 'jobs', action: 'view', allowed: true },
+        { module: 'jobs', action: 'create', allowed: true },
+        { module: 'jobs', action: 'edit', allowed: true },
+        { module: 'jobs', action: 'delete', allowed: true },
+        { module: 'jobs', action: 'assign', allowed: true },
+        { module: 'products', action: 'view', allowed: true },
+        { module: 'products', action: 'create', allowed: true },
+        { module: 'products', action: 'edit', allowed: true },
+        { module: 'products', action: 'delete', allowed: true },
+        { module: 'products', action: 'upload', allowed: true },
+        { module: 'invoices', action: 'view', allowed: true },
+        { module: 'invoices', action: 'create', allowed: true },
+        { module: 'invoices', action: 'edit', allowed: true },
+        { module: 'invoices', action: 'delete', allowed: true },
+        { module: 'invoices', action: 'export', allowed: true },
+        { module: 'customers', action: 'view', allowed: true },
+        { module: 'customers', action: 'create', allowed: true },
+        { module: 'customers', action: 'edit', allowed: true },
+        { module: 'customers', action: 'delete', allowed: true },
+        { module: 'suppliers', action: 'view', allowed: true },
+        { module: 'suppliers', action: 'create', allowed: true },
+        { module: 'suppliers', action: 'edit', allowed: true },
+        { module: 'suppliers', action: 'delete', allowed: true },
+        { module: 'reports', action: 'view', allowed: true },
+        { module: 'reports', action: 'create', allowed: false },
+        { module: 'reports', action: 'edit', allowed: false },
+        { module: 'reports', action: 'delete', allowed: false },
+        { module: 'settings', action: 'view', allowed: true },
+        { module: 'settings', action: 'edit', allowed: true },
+        { module: 'settings', action: 'manage_users', allowed: true },
+        { module: 'settings', action: 'manage_roles', allowed: true },
+        { module: 'labour', action: 'view', allowed: true },
+        { module: 'labour', action: 'create', allowed: true },
+        { module: 'labour', action: 'edit', allowed: true },
+        { module: 'labour', action: 'delete', allowed: true },
+        { module: 'lead_labour', action: 'view', allowed: true },
+        { module: 'lead_labour', action: 'create', allowed: true },
+        { module: 'lead_labour', action: 'edit', allowed: true },
+        { module: 'lead_labour', action: 'delete', allowed: true },
+        { module: 'notification', action: 'view', allowed: true },
+        { module: 'notification', action: 'create', allowed: true },
+        { module: 'notification', action: 'edit', allowed: true },
+        { module: 'notification', action: 'delete', allowed: true },
+        { module: 'staff', action: 'view', allowed: true },
+        { module: 'staff', action: 'create', allowed: true },
+        { module: 'staff', action: 'edit', allowed: true },
+        { module: 'staff', action: 'delete', allowed: true },
+        { module: 'orders', action: 'view', allowed: true },
+        { module: 'orders', action: 'create', allowed: true },
+        { module: 'orders', action: 'edit', allowed: true },
+        { module: 'orders', action: 'delete', allowed: true },
+      ],
       createdAt: '2024-01-01',
       updatedAt: '2024-01-01'
     },
     {
       id: '2',
-      name: 'Staff',
-      type: 'System',
-      permissions: {
-        // Permission Summary
-        viewAllJobs: true,
-        createEditDeleteJobs: true, // No delete
-        assignTasksToLabor: true,
-        submitTimeMaterials: false,
-        generateSendInvoices: true,
-        uploadSupplierMaterialSheet: false,
-        viewFinancialReports: true, // Spending only
-        
-        // Job Permissions
-        createJob: true,
-        editJobDetails: true,
-        assignContractor: true,
-        receiveAssignmentNotification: true,
-        viewAssignedJob: true,
-        modifyJobTypeBilling: true,
-        
-        // Invoice Permissions
-        canCreateInvoices: true,
-        accessToInvoices: 'Full access (no profit reports)',
-        
-        // Invoice Actions
-        createInvoice: true,
-        editInvoiceBeforeFinalizing: true,
-        approveFinalizeInvoice: true,
-        sendInvoiceToClient: true,
-        viewAllInvoices: true,
-        markInvoiceAsPaid: true,
-        viewInvoicePDF: true,
-      },
-      createdAt: '2024-01-01',
-      updatedAt: '2024-01-01'
-    },
-    {
-      id: '3',
-      name: 'Lead Labor',
-      type: 'System',
-      permissions: {
-        // Permission Summary
-        viewAllJobs: true, // Assigned only
-        createEditDeleteJobs: false,
-        assignTasksToLabor: true, // Sub-Labors only
-        submitTimeMaterials: false,
-        generateSendInvoices: false,
-        uploadSupplierMaterialSheet: false,
-        viewFinancialReports: false,
-        
-        // Job Permissions
-        createJob: false,
-        editJobDetails: false,
-        assignContractor: false,
-        receiveAssignmentNotification: true, // App
-        viewAssignedJob: true,
-        modifyJobTypeBilling: true,
-        
-        // Invoice Permissions
-        canCreateInvoices: false,
-        accessToInvoices: 'View own job invoices (limited)',
-        
-        // Invoice Actions
-        createInvoice: false,
-        editInvoiceBeforeFinalizing: false,
-        approveFinalizeInvoice: false,
-        sendInvoiceToClient: false,
-        viewAllInvoices: false,
-        markInvoiceAsPaid: false,
-        viewInvoicePDF: true, // if permission granted (job only)
-      },
-      createdAt: '2024-01-01',
-      updatedAt: '2024-01-01'
-    },
-    {
-      id: '4',
-      name: 'Labor',
-      type: 'System',
-      permissions: {
-        // Permission Summary
-        viewAllJobs: true, // Assigned only
-        createEditDeleteJobs: false,
-        assignTasksToLabor: false,
-        submitTimeMaterials: true,
-        generateSendInvoices: false,
-        uploadSupplierMaterialSheet: false,
-        viewFinancialReports: false,
-        
-        // Job Permissions
-        createJob: false,
-        editJobDetails: false,
-        assignContractor: false,
-        receiveAssignmentNotification: true, // App
-        viewAssignedJob: true,
-        modifyJobTypeBilling: false,
-        
-        // Invoice Permissions
-        canCreateInvoices: false,
-        accessToInvoices: 'No access',
-        
-        // Invoice Actions
-        createInvoice: false,
-        editInvoiceBeforeFinalizing: false,
-        approveFinalizeInvoice: false,
-        sendInvoiceToClient: false,
-        viewAllInvoices: false,
-        markInvoiceAsPaid: false,
-        viewInvoicePDF: true, // if permission granted (job only)
-      },
-      createdAt: '2024-01-01',
-      updatedAt: '2024-01-01'
-    },
-    {
-      id: '5',
-      name: 'Contractor',
-      type: 'System',
-      permissions: {
-        // Permission Summary
-        viewAllJobs: true, // Email only
-        createEditDeleteJobs: false,
-        assignTasksToLabor: false,
-        submitTimeMaterials: false,
-        generateSendInvoices: true, // Receive only
-        uploadSupplierMaterialSheet: false,
-        viewFinancialReports: false,
-        
-        // Job Permissions
-        createJob: false,
-        editJobDetails: false,
-        assignContractor: false,
-        receiveAssignmentNotification: true, // Email
-        viewAssignedJob: false,
-        modifyJobTypeBilling: false,
-        
-        // Invoice Permissions
-        canCreateInvoices: false,
-        accessToInvoices: 'Receives invoices via email',
-        
-        // Invoice Actions
-        createInvoice: false,
-        editInvoiceBeforeFinalizing: false,
-        approveFinalizeInvoice: false,
-        sendInvoiceToClient: false,
-        viewAllInvoices: true, // own jobs
-        markInvoiceAsPaid: false,
-        viewInvoicePDF: true,
-      },
-      createdAt: '2024-01-01',
-      updatedAt: '2024-01-01'
-    },
-    {
-      id: '6',
-      name: 'Supplier',
-      type: 'System',
-      permissions: {
-        // Permission Summary
-        viewAllJobs: false,
-        createEditDeleteJobs: false,
-        assignTasksToLabor: false,
-        submitTimeMaterials: false,
-        generateSendInvoices: false,
-        uploadSupplierMaterialSheet: true, // Indirect
-        viewFinancialReports: false,
-        
-        // Job Permissions
-        createJob: false,
-        editJobDetails: false,
-        assignContractor: false,
-        receiveAssignmentNotification: false,
-        viewAssignedJob: false,
-        modifyJobTypeBilling: false,
-        
-        // Invoice Permissions
-        canCreateInvoices: false,
-        accessToInvoices: 'No access',
-        
-        // Invoice Actions
-        createInvoice: false,
-        editInvoiceBeforeFinalizing: false,
-        approveFinalizeInvoice: false,
-        sendInvoiceToClient: false,
-        viewAllInvoices: false,
-        markInvoiceAsPaid: false,
-        viewInvoicePDF: false,
-      },
-      createdAt: '2024-01-01',
-      updatedAt: '2024-01-01'
-    },
-    {
-      id: '7',
-      name: 'Customer',
-      type: 'System',
-      permissions: {
-        // Permission Summary
-        viewAllJobs: false,
-        createEditDeleteJobs: false,
-        assignTasksToLabor: false,
-        submitTimeMaterials: false,
-        generateSendInvoices: true, // Receive only
-        uploadSupplierMaterialSheet: false,
-        viewFinancialReports: false,
-        
-        // Job Permissions
-        createJob: false,
-        editJobDetails: false,
-        assignContractor: false,
-        receiveAssignmentNotification: false,
-        viewAssignedJob: false,
-        modifyJobTypeBilling: false,
-        
-        // Invoice Permissions
-        canCreateInvoices: false,
-        accessToInvoices: 'Receives final invoice only',
-        
-        // Invoice Actions
-        createInvoice: false,
-        editInvoiceBeforeFinalizing: false,
-        approveFinalizeInvoice: false,
-        sendInvoiceToClient: false,
-        viewAllInvoices: false,
-        markInvoiceAsPaid: false,
-        viewInvoicePDF: false,
-      },
+      roleName: 'Staff',
+      roleType: 'Internal',
+      description: 'Staff member with limited permissions',
+      permissions: [
+        { module: 'dashboard', action: 'view', allowed: true },
+        { module: 'jobs', action: 'view', allowed: true },
+        { module: 'jobs', action: 'create', allowed: true },
+        { module: 'jobs', action: 'edit', allowed: true },
+        { module: 'jobs', action: 'delete', allowed: false },
+        { module: 'jobs', action: 'assign', allowed: true },
+        { module: 'products', action: 'view', allowed: true },
+        { module: 'products', action: 'create', allowed: true },
+        { module: 'products', action: 'edit', allowed: true },
+        { module: 'products', action: 'delete', allowed: false },
+        { module: 'products', action: 'upload', allowed: true },
+        { module: 'invoices', action: 'view', allowed: true },
+        { module: 'invoices', action: 'create', allowed: true },
+        { module: 'invoices', action: 'edit', allowed: true },
+        { module: 'invoices', action: 'delete', allowed: false },
+        { module: 'invoices', action: 'export', allowed: true },
+        { module: 'customers', action: 'view', allowed: true },
+        { module: 'customers', action: 'create', allowed: true },
+        { module: 'customers', action: 'edit', allowed: true },
+        { module: 'customers', action: 'delete', allowed: false },
+        { module: 'suppliers', action: 'view', allowed: true },
+        { module: 'suppliers', action: 'create', allowed: false },
+        { module: 'suppliers', action: 'edit', allowed: false },
+        { module: 'suppliers', action: 'delete', allowed: false },
+        { module: 'reports', action: 'view', allowed: true },
+        { module: 'reports', action: 'create', allowed: false },
+        { module: 'reports', action: 'edit', allowed: false },
+        { module: 'reports', action: 'delete', allowed: false },
+        { module: 'settings', action: 'view', allowed: true },
+        { module: 'settings', action: 'edit', allowed: false },
+        { module: 'settings', action: 'manage_users', allowed: false },
+        { module: 'settings', action: 'manage_roles', allowed: false },
+        { module: 'labour', action: 'view', allowed: true },
+        { module: 'labour', action: 'create', allowed: true },
+        { module: 'labour', action: 'edit', allowed: true },
+        { module: 'labour', action: 'delete', allowed: false },
+        { module: 'lead_labour', action: 'view', allowed: true },
+        { module: 'lead_labour', action: 'create', allowed: false },
+        { module: 'lead_labour', action: 'edit', allowed: false },
+        { module: 'lead_labour', action: 'delete', allowed: false },
+        { module: 'notification', action: 'view', allowed: true },
+        { module: 'notification', action: 'create', allowed: true },
+        { module: 'notification', action: 'edit', allowed: false },
+        { module: 'notification', action: 'delete', allowed: false },
+        { module: 'staff', action: 'view', allowed: true },
+        { module: 'staff', action: 'create', allowed: false },
+        { module: 'staff', action: 'edit', allowed: false },
+        { module: 'staff', action: 'delete', allowed: false },
+        { module: 'orders', action: 'view', allowed: true },
+        { module: 'orders', action: 'create', allowed: true },
+        { module: 'orders', action: 'edit', allowed: true },
+        { module: 'orders', action: 'delete', allowed: false },
+      ],
       createdAt: '2024-01-01',
       updatedAt: '2024-01-01'
     }
@@ -316,135 +154,519 @@ const RolePermission: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [formData, setFormData] = useState({
-    name: '',
-    type: ''
+    roleName: '',
+    roleType: '',
+    description: ''
   });
-  const [permissions, setPermissions] = useState<PermissionMatrix>({
-    // Permission Summary
-    viewAllJobs: false,
-    createEditDeleteJobs: false,
-    assignTasksToLabor: false,
-    submitTimeMaterials: false,
-    generateSendInvoices: false,
-    uploadSupplierMaterialSheet: false,
-    viewFinancialReports: false,
-    
-    // Job Permissions
-    createJob: false,
-    editJobDetails: false,
-    assignContractor: false,
-    receiveAssignmentNotification: false,
-    viewAssignedJob: false,
-    modifyJobTypeBilling: false,
-    
-    // Invoice Permissions
-    canCreateInvoices: false,
-    accessToInvoices: 'No access',
-    
-    // Invoice Actions
-    createInvoice: false,
-    editInvoiceBeforeFinalizing: false,
-    approveFinalizeInvoice: false,
-    sendInvoiceToClient: false,
-    viewAllInvoices: false,
-    markInvoiceAsPaid: false,
-    viewInvoicePDF: false,
+
+  const [errors, setErrors] = useState({
+    roleName: '',
+    roleType: ''
   });
+
+  // State to track permissions for new roles
+  const [newRolePermissions, setNewRolePermissions] = useState<Permission[]>([]);
+
+  const modules = [
+    'dashboard',
+    'jobs',
+    'products',
+    'orders',
+    'invoices',
+    'customers',
+    'suppliers',
+    'reports',
+    'staff',
+    'labour',
+    'lead_labour',
+    'notification',
+    'settings'
+  ];
+
+  const actions = ['view', 'create', 'edit', 'delete'];
+
+  // Special actions for specific modules
+  const specialActions: { [key: string]: string[] } = {
+    'dashboard': ['view'],
+    'jobs': ['view', 'create', 'edit', 'delete', 'assign'],
+    'products': ['view', 'create', 'edit', 'delete', 'upload'],
+    'orders': ['view', 'create', 'edit', 'delete'],
+    'invoices': ['view', 'create', 'edit', 'delete', 'export'],
+    'reports': ['view', 'create', 'edit', 'delete'],
+    'settings': ['view', 'create', 'edit', 'delete']
+  };
+
+  const getActionsForModule = (module: string): string[] => {
+    return specialActions[module] || actions;
+  };
+
+  const getPermissionValue = (module: string, action: string, permissions: Permission[]): boolean => {
+    if (!permissions || permissions.length === 0) return false;
+    const permission = permissions.find(p => p.module === module && p.action === action);
+    return permission ? permission.allowed : false;
+  };
 
   const handleAddRole = () => {
     setShowAddForm(true);
     setEditingRole(null);
-    setFormData({ name: '', type: '' });
-    setPermissions({
-      // Permission Summary
-      viewAllJobs: false,
-      createEditDeleteJobs: false,
-      assignTasksToLabor: false,
-      submitTimeMaterials: false,
-      generateSendInvoices: false,
-      uploadSupplierMaterialSheet: false,
-      viewFinancialReports: false,
-      
-      // Job Permissions
-      createJob: false,
-      editJobDetails: false,
-      assignContractor: false,
-      receiveAssignmentNotification: false,
-      viewAssignedJob: false,
-      modifyJobTypeBilling: false,
-      
-      // Invoice Permissions
-      canCreateInvoices: false,
-      accessToInvoices: 'No access',
-      
-      // Invoice Actions
-      createInvoice: false,
-      editInvoiceBeforeFinalizing: false,
-      approveFinalizeInvoice: false,
-      sendInvoiceToClient: false,
-      viewAllInvoices: false,
-      markInvoiceAsPaid: false,
-      viewInvoicePDF: false,
+    setFormData({ roleName: '', roleType: '', description: '' });
+
+    // Initialize permissions for new role
+    const initialPermissions: Permission[] = [];
+    modules.forEach(module => {
+      getActionsForModule(module).forEach(action => {
+        initialPermissions.push({ module, action, allowed: false });
+      });
     });
+    setNewRolePermissions(initialPermissions);
   };
 
   const handleEditRole = (role: Role) => {
     setEditingRole(role);
     setShowAddForm(true);
-    setFormData({ name: role.name, type: role.type });
-    setPermissions(role.permissions);
+    setFormData({
+      roleName: role.roleName,
+      roleType: role.roleType,
+      description: role.description
+    });
+    setNewRolePermissions([]); // Clear new role permissions when editing
   };
 
   const handleDeleteRole = (roleId: string) => {
-    if (window.confirm('Are you sure you want to delete this role?')) {
+    // Find the role to get its name for the confirmation message
+    const roleToDelete = roles.find(role => role.id === roleId);
+    const roleName = roleToDelete?.roleName || 'this role';
+    
+    // Create custom confirmation popup
+    const confirmDelete = () => {
+      // Remove the popup
+      const popup = document.getElementById('delete-confirmation-popup');
+      if (popup) {
+        popup.remove();
+      }
+      
+      // Delete the role
       setRoles(roles.filter(role => role.id !== roleId));
+    };
+    
+    const cancelDelete = () => {
+      // Remove the popup
+      const popup = document.getElementById('delete-confirmation-popup');
+      if (popup) {
+        popup.remove();
+      }
+    };
+    
+    // Create and show the popup
+    const popup = document.createElement('div');
+    popup.id = 'delete-confirmation-popup';
+    popup.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    popup.innerHTML = `
+      <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+        <div class="flex items-center mb-4">
+          <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+            <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+        </div>
+        <div class="text-center">
+          <h3 class="text-lg font-medium text-gray-900 mb-2">Delete Role</h3>
+          <p class="text-sm text-gray-500 mb-6">
+            Are you sure you want to delete <span class="font-semibold text-gray-900">${roleName}</span>? 
+            This action cannot be undone.
+          </p>
+          <div class="flex space-x-3 justify-center">
+            <button 
+              id="cancel-delete-btn"
+              class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
+            >
+              No, Cancel
+            </button>
+            <button 
+              id="confirm-delete-btn"
+              class="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+            >
+              Yes, Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Add event listeners
+    document.body.appendChild(popup);
+    
+    // Add event listeners after the element is in the DOM
+    setTimeout(() => {
+      const confirmBtn = document.getElementById('confirm-delete-btn');
+      const cancelBtn = document.getElementById('cancel-delete-btn');
+      
+      if (confirmBtn) {
+        confirmBtn.addEventListener('click', confirmDelete);
+      }
+      
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', cancelDelete);
+      }
+      
+      // Close popup when clicking outside
+      popup.addEventListener('click', (e) => {
+        if (e.target === popup) {
+          cancelDelete();
+        }
+      });
+    }, 0);
+  };
+
+  const handlePermissionChange = (module: string, action: string, allowed: boolean) => {
+    if (editingRole) {
+      // Update existing role permissions
+      setRoles(prevRoles => {
+        return prevRoles.map(role => {
+          if (role.id === editingRole.id) {
+            // Check if permission already exists
+            const existingPermission = role.permissions.find(p =>
+              p.module === module && p.action === action
+            );
+
+            let updatedPermissions;
+            if (existingPermission) {
+              // Update existing permission
+              updatedPermissions = role.permissions.map(p =>
+                p.module === module && p.action === action
+                  ? { ...p, allowed }
+                  : p
+              );
+            } else {
+              // Add new permission
+              updatedPermissions = [...role.permissions, { module, action, allowed }];
+            }
+
+            return { ...role, permissions: updatedPermissions };
+          }
+          return role;
+        });
+      });
+
+      // Also update the editingRole state to reflect changes immediately
+      setEditingRole(prev => {
+        if (!prev) return prev;
+
+        const existingPermission = prev.permissions.find(p =>
+          p.module === module && p.action === action
+        );
+
+        let updatedPermissions;
+        if (existingPermission) {
+          updatedPermissions = prev.permissions.map(p =>
+            p.module === module && p.action === action
+              ? { ...p, allowed }
+              : p
+          );
+        } else {
+          updatedPermissions = [...prev.permissions, { module, action, allowed }];
+        }
+
+        return { ...prev, permissions: updatedPermissions };
+      });
+    } else {
+      // Update new role permissions
+      setNewRolePermissions(prev => {
+        const existing = prev.find(p => p.module === module && p.action === action);
+        if (existing) {
+          return prev.map(p =>
+            p.module === module && p.action === action
+              ? { ...p, allowed }
+              : p
+          );
+        } else {
+          return [...prev, { module, action, allowed }];
+        }
+      });
     }
   };
 
-  const handlePermissionChange = (permissionKey: keyof PermissionMatrix, value: boolean | string) => {
-    setPermissions(prev => ({
-      ...prev,
-      [permissionKey]: value
-    }));
+    // Handle selecting all checkboxes for a specific action
+  const handleSelectAll = (action: string, checked: boolean) => {
+    if (editingRole) {
+      // Update existing role permissions
+      setRoles(prevRoles => {
+        return prevRoles.map(role => {
+          if (role.id === editingRole.id) {
+            let updatedPermissions = [...role.permissions];
+            
+            // Update existing permissions for this action
+            updatedPermissions = updatedPermissions.map(p => 
+              p.action === action ? { ...p, allowed: checked } : p
+            );
+            
+            // Add missing permissions for this action if they don't exist
+            modules.forEach(module => {
+              const moduleActions = getActionsForModule(module);
+              if (moduleActions.includes(action)) {
+                const existingPermission = updatedPermissions.find(p => 
+                  p.module === module && p.action === action
+                );
+                if (!existingPermission) {
+                  updatedPermissions.push({ module, action, allowed: checked });
+                }
+              }
+            });
+            
+            return { ...role, permissions: updatedPermissions };
+          }
+          return role;
+        });
+      });
+      
+      // Also update the editingRole state
+      setEditingRole(prev => {
+        if (!prev) return prev;
+        let updatedPermissions = [...prev.permissions];
+        
+        // Update existing permissions for this action
+        updatedPermissions = updatedPermissions.map(p => 
+          p.action === action ? { ...p, allowed: checked } : p
+        );
+        
+        // Add missing permissions for this action if they don't exist
+        modules.forEach(module => {
+          const moduleActions = getActionsForModule(module);
+          if (moduleActions.includes(action)) {
+            const existingPermission = updatedPermissions.find(p => 
+              p.module === module && p.action === action
+            );
+            if (!existingPermission) {
+              updatedPermissions.push({ module, action, allowed: checked });
+            }
+          }
+        });
+        
+        return { ...prev, permissions: updatedPermissions };
+      });
+    } else {
+      // Update new role permissions
+      setNewRolePermissions(prev => {
+        let updated = [...prev];
+        
+        // Update existing permissions for this action
+        updated = updated.map(p => 
+          p.action === action ? { ...p, allowed: checked } : p
+        );
+        
+        // Add missing permissions for this action if they don't exist
+        modules.forEach(module => {
+          const moduleActions = getActionsForModule(module);
+          if (moduleActions.includes(action)) {
+            const existingPermission = updated.find(p => 
+              p.module === module && p.action === action
+            );
+            if (!existingPermission) {
+              updated.push({ module, action, allowed: checked });
+            }
+          }
+        });
+        
+        return updated;
+      });
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+    // Handle selecting all special action checkboxes
+  const handleSelectAllSpecial = (checked: boolean) => {
+    if (editingRole) {
+      // Update existing role permissions for special actions
+      setRoles(prevRoles => {
+        return prevRoles.map(role => {
+          if (role.id === editingRole.id) {
+            let updatedPermissions = [...role.permissions];
+            
+            // Update existing special action permissions
+            updatedPermissions = updatedPermissions.map(p => {
+              const isSpecialAction = !['view', 'create', 'edit', 'delete'].includes(p.action);
+              return isSpecialAction ? { ...p, allowed: checked } : p;
+            });
+            
+            // Add missing special action permissions if they don't exist
+            modules.forEach(module => {
+              const moduleActions = getActionsForModule(module);
+              const specialActions = moduleActions.filter(action => 
+                !['view', 'create', 'edit', 'delete'].includes(action)
+              );
+              
+              specialActions.forEach(action => {
+                const existingPermission = updatedPermissions.find(p => 
+                  p.module === module && p.action === action
+                );
+                if (!existingPermission) {
+                  updatedPermissions.push({ module, action, allowed: checked });
+                }
+              });
+            });
+            
+            return { ...role, permissions: updatedPermissions };
+          }
+          return role;
+        });
+      });
+      
+      // Also update the editingRole state
+      setEditingRole(prev => {
+        if (!prev) return prev;
+        let updatedPermissions = [...prev.permissions];
+        
+        // Update existing special action permissions
+        updatedPermissions = updatedPermissions.map(p => {
+          const isSpecialAction = !['view', 'create', 'edit', 'delete'].includes(p.action);
+          return isSpecialAction ? { ...p, allowed: checked } : p;
+        });
+        
+        // Add missing special action permissions if they don't exist
+        modules.forEach(module => {
+          const moduleActions = getActionsForModule(module);
+          const specialActions = moduleActions.filter(action => 
+            !['view', 'create', 'edit', 'delete'].includes(action)
+          );
+          
+          specialActions.forEach(action => {
+            const existingPermission = updatedPermissions.find(p => 
+              p.module === module && p.action === action
+            );
+            if (!existingPermission) {
+              updatedPermissions.push({ module, action, allowed: checked });
+            }
+          });
+        });
+        
+        return { ...prev, permissions: updatedPermissions };
+      });
+    } else {
+      // Update new role permissions for special actions
+      setNewRolePermissions(prev => {
+        let updated = [...prev];
+        
+        // Update existing special action permissions
+        updated = updated.map(p => {
+          const isSpecialAction = !['view', 'create', 'edit', 'delete'].includes(p.action);
+          return isSpecialAction ? { ...p, allowed: checked } : p;
+        });
+        
+        // Add missing special action permissions if they don't exist
+        modules.forEach(module => {
+          const moduleActions = getActionsForModule(module);
+          const specialActions = moduleActions.filter(action => 
+            !['view', 'create', 'edit', 'delete'].includes(action)
+          );
+          
+          specialActions.forEach(action => {
+            const existingPermission = updated.find(p => 
+              p.module === module && p.action === action
+            );
+            if (!existingPermission) {
+              updated.push({ module, action, allowed: checked });
+            }
+          });
+        });
+        
+        return updated;
+      });
+    }
+  };
+
+    const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.type) {
-      alert('Please fill in all required fields');
+    // Reset errors
+    setErrors({ roleName: '', roleType: '' });
+    
+    // Validate required fields
+    let hasErrors = false;
+    const newErrors = { roleName: '', roleType: '' };
+    
+    if (!formData.roleName.trim()) {
+      newErrors.roleName = 'Role name is required';
+      hasErrors = true;
+    }
+    
+    if (!formData.roleType) {
+      newErrors.roleType = 'Role type is required';
+      hasErrors = true;
+    }
+    
+    if (hasErrors) {
+      setErrors(newErrors);
       return;
     }
 
-    if (editingRole) {
-      // Update existing role
-      setRoles(roles.map(role => 
-        role.id === editingRole.id 
-          ? { ...role, name: formData.name, type: formData.type, permissions, updatedAt: new Date().toISOString().split('T')[0] }
-          : role
-      ));
-    } else {
-      // Add new role
-      const newRole: Role = {
-        id: Date.now().toString(),
-        name: formData.name,
-        type: formData.type,
-        permissions,
-        createdAt: new Date().toISOString().split('T')[0],
-        updatedAt: new Date().toISOString().split('T')[0]
-      };
-      setRoles([...roles, newRole]);
-    }
+    const permissions: Permission[] = [];
+    modules.forEach(module => {
+      getActionsForModule(module).forEach(action => {
+        const allowed = editingRole
+          ? getPermissionValue(module, action, editingRole.permissions)
+          : getPermissionValue(module, action, newRolePermissions);
+        permissions.push({ module, action, allowed });
+      });
+    });
 
-    setShowAddForm(false);
-    setEditingRole(null);
-    setFormData({ name: '', type: '' });
+    const roleData = {
+      roleName: formData.roleName,
+      roleType: formData.roleType,
+      description: formData.description,
+      permissions
+    };
+
+    try {
+      if (editingRole) {
+        // Update existing role
+        const response = await fetch(`/api/permissions/roles/${editingRole.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(roleData)
+        });
+
+        if (response.ok) {
+          const updatedRole = await response.json();
+          setRoles(roles.map(role =>
+            role.id === editingRole.id
+              ? { ...updatedRole, updatedAt: new Date().toISOString().split('T')[0] }
+              : role
+          ));
+        }
+      } else {
+        // Create new role
+        const response = await fetch('/api/permissions/roles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(roleData)
+        });
+
+        if (response.ok) {
+          const newRole = await response.json();
+          setRoles([...roles, {
+            ...newRole,
+            createdAt: new Date().toISOString().split('T')[0],
+            updatedAt: new Date().toISOString().split('T')[0]
+          }]);
+        }
+      }
+
+      setShowAddForm(false);
+      setEditingRole(null);
+      setFormData({ roleName: '', roleType: '', description: '' });
+      setNewRolePermissions([]);
+    } catch (error) {
+      console.error('Error saving role:', error);
+      alert('Error saving role. Please try again.');
+    }
   };
 
   const handleCancel = () => {
     setShowAddForm(false);
     setEditingRole(null);
-    setFormData({ name: '', type: '' });
+    setFormData({ roleName: '', roleType: '', description: '' });
+    setNewRolePermissions([]);
+    setErrors({ roleName: '', roleType: '' });
   };
 
   return (
@@ -453,12 +675,14 @@ const RolePermission: React.FC = () => {
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Role Management</h1>
-          <button
-            onClick={handleAddRole}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
-          >
-            Add Role
-          </button>
+          {!showAddForm && (
+            <button
+              onClick={handleAddRole}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+            >
+              Add Role
+            </button>
+          )}
         </div>
 
         {/* Role Listing */}
@@ -473,6 +697,7 @@ const RolePermission: React.FC = () => {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role Name</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Updated</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -481,23 +706,20 @@ const RolePermission: React.FC = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {roles.map((role) => (
                     <tr key={role.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{role.name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{role.type}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{role.roleName}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{role.roleType}</td>
+                      <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">{role.description}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{role.createdAt}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{role.updatedAt}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => handleEditRole(role)}
-                          className="text-indigo-600 hover:text-indigo-900 mr-4"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteRole(role.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          Delete
-                        </button>
+                          <Button variant="ghost" size="sm" onClick={() => handleEditRole(role)}>
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleDeleteRole(role.id)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+
+                         
                       </td>
                     </tr>
                   ))}
@@ -524,438 +746,218 @@ const RolePermission: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Role Details */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-2">
+                     Role Name *
+                   </label>
+                   <input
+                     type="text"
+                     value={formData.roleName}
+                     onChange={(e) => {
+                       setFormData({ ...formData, roleName: e.target.value });
+                       if (errors.roleName) setErrors({ ...errors, roleName: '' });
+                     }}
+                     placeholder="Role Name *"
+                     className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 ${
+                       errors.roleName ? 'border-red-500' : 'border-gray-300'
+                     }`}
+                   />
+                   {errors.roleName && (
+                     <p className="mt-1 text-sm text-red-600">{errors.roleName}</p>
+                   )}
+                 </div>
+                                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-2">
+                     Role Type *
+                   </label>
+                   <select
+                     value={formData.roleType}
+                     onChange={(e) => {
+                       setFormData({ ...formData, roleType: e.target.value });
+                       if (errors.roleType) setErrors({ ...errors, roleType: '' });
+                     }}
+                     className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 ${
+                       errors.roleType ? 'border-red-500' : 'border-gray-300'
+                     }`}
+                   >
+                     <option value="">Role type*</option>
+                     <option value="Internal">Internal</option>
+                     <option value="External">External</option>
+                     {/* <option value="System">System</option>
+                     <option value="Custom">Custom</option> */}
+                   </select>
+                   {errors.roleType && (
+                     <p className="mt-1 text-sm text-red-600">{errors.roleType}</p>
+                   )}
+                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Role Name *
+                    Description
                   </label>
                   <input
                     type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Role Name *"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Role description"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50"
-                    required
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Role Type *
-                  </label>
-                  <select
-                    value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50"
-                    required
-                  >
-                    <option value="">Role type*</option>
-                    <option value="System">System</option>
-                    <option value="Custom">Custom</option>
-                    <option value="Admin">Admin</option>
-                    <option value="User">User</option>
-                  </select>
                 </div>
               </div>
 
               {/* Permissions Matrix */}
-              <div className="space-y-6">
-                {/* Permission Summary Section */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 bg-purple-800 text-white p-3 rounded-t-lg">
-                    Permission Summary (System-Controlled)
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border border-gray-300">
-                      <thead>
-                        <tr className="bg-purple-200">
-                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 border border-gray-300">
-                            Functionality
-                          </th>
-                          <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-300">
-                            Permission
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300">
-                            View All Jobs
-                          </td>
-                          <td className="px-4 py-3 text-center border border-gray-300">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900   bg-primary text-white p-3 rounded-t-lg">
+                  Permissions
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full border border-gray-300">
+                    <thead>
+                      <tr className="bg-primary text-white">
+                        <th className="px-4 py-3 text-left text-sm font-medium border border-gray-300">
+                          Module
+                        </th>
+                        <th className="px-4 py-3 text-center text-sm font-medium border border-gray-300">
+                          <div className="flex flex-col items-center space-y-2">
+                            <span>View</span>
                             <input
                               type="checkbox"
-                              checked={permissions.viewAllJobs}
-                              onChange={(e) => handlePermissionChange('viewAllJobs', e.target.checked)}
+                              onChange={(e) => handleSelectAll('view', e.target.checked)}
                               className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                             />
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300">
-                            Create/Edit/Delete Jobs
-                          </td>
-                          <td className="px-4 py-3 text-center border border-gray-300">
+                          </div>
+                        </th>
+                        <th className="px-4 py-3 text-center text-sm font-medium border border-gray-300">
+                          <div className="flex flex-col items-center space-y-2">
+                            <span>Create</span>
                             <input
                               type="checkbox"
-                              checked={permissions.createEditDeleteJobs}
-                              onChange={(e) => handlePermissionChange('createEditDeleteJobs', e.target.checked)}
+                              onChange={(e) => handleSelectAll('create', e.target.checked)}
                               className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                             />
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300">
-                            Assign Tasks to Labor
-                          </td>
-                          <td className="px-4 py-3 text-center border border-gray-300">
+                          </div>
+                        </th>
+                        <th className="px-4 py-3 text-center text-sm font-medium border border-gray-300">
+                          <div className="flex flex-col items-center space-y-2">
+                            <span>Edit</span>
                             <input
                               type="checkbox"
-                              checked={permissions.assignTasksToLabor}
-                              onChange={(e) => handlePermissionChange('assignTasksToLabor', e.target.checked)}
+                              onChange={(e) => handleSelectAll('edit', e.target.checked)}
                               className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                             />
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300">
-                            Submit Time & Materials
-                          </td>
-                          <td className="px-4 py-3 text-center border border-gray-300">
+                          </div>
+                        </th>
+                        <th className="px-4 py-3 text-center text-sm font-medium border border-gray-300">
+                          <div className="flex flex-col items-center space-y-2">
+                            <span>Delete</span>
                             <input
                               type="checkbox"
-                              checked={permissions.submitTimeMaterials}
-                              onChange={(e) => handlePermissionChange('submitTimeMaterials', e.target.checked)}
+                              onChange={(e) => handleSelectAll('delete', e.target.checked)}
                               className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                             />
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300">
-                            Generate & Send Invoices
-                          </td>
-                          <td className="px-4 py-3 text-center border border-gray-300">
+                          </div>
+                        </th>
+                        <th className="px-4 py-3 text-center text-sm font-medium border border-gray-300">
+                          <div className="flex flex-col items-center space-y-2">
+                            <span>Special Actions</span>
                             <input
                               type="checkbox"
-                              checked={permissions.generateSendInvoices}
-                              onChange={(e) => handlePermissionChange('generateSendInvoices', e.target.checked)}
+                              onChange={(e) => handleSelectAllSpecial(e.target.checked)}
                               className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                             />
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300">
-                            Upload Supplier Material Sheet
-                          </td>
-                          <td className="px-4 py-3 text-center border border-gray-300">
-                            <input
-                              type="checkbox"
-                              checked={permissions.uploadSupplierMaterialSheet}
-                              onChange={(e) => handlePermissionChange('uploadSupplierMaterialSheet', e.target.checked)}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                            />
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300">
-                            View Financial Reports
-                          </td>
-                          <td className="px-4 py-3 text-center border border-gray-300">
-                            <input
-                              type="checkbox"
-                              checked={permissions.viewFinancialReports}
-                              onChange={(e) => handlePermissionChange('viewFinancialReports', e.target.checked)}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                            />
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                          </div>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {modules.map((module) => {
+                        const moduleActions = getActionsForModule(module);
+                        const hasSpecialActions = moduleActions.length > 4;
+                        const isDashboard = module === 'dashboard';
 
-                {/* Job Permissions Section */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 bg-purple-800 text-white p-3 rounded-t-lg">
-                    JOB-Roles & Permissions
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border border-gray-300">
-                      <thead>
-                        <tr className="bg-purple-200">
-                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 border border-gray-300">
-                            Action
-                          </th>
-                          <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-300">
-                            Permission
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300">
-                            Create Job
-                          </td>
-                          <td className="px-4 py-3 text-center border border-gray-300">
-                            <input
-                              type="checkbox"
-                              checked={permissions.createJob}
-                              onChange={(e) => handlePermissionChange('createJob', e.target.checked)}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                            />
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300">
-                            Edit Job Details
-                          </td>
-                          <td className="px-4 py-3 text-center border border-gray-300">
-                            <input
-                              type="checkbox"
-                              checked={permissions.editJobDetails}
-                              onChange={(e) => handlePermissionChange('editJobDetails', e.target.checked)}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                            />
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300">
-                            Assign Contractor
-                          </td>
-                          <td className="px-4 py-3 text-center border border-gray-300">
-                            <input
-                              type="checkbox"
-                              checked={permissions.assignContractor}
-                              onChange={(e) => handlePermissionChange('assignContractor', e.target.checked)}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                            />
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300">
-                            Receive Assignment Notification
-                          </td>
-                          <td className="px-4 py-3 text-center border border-gray-300">
-                            <input
-                              type="checkbox"
-                              checked={permissions.receiveAssignmentNotification}
-                              onChange={(e) => handlePermissionChange('receiveAssignmentNotification', e.target.checked)}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                            />
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300">
-                            View Assigned Job
-                          </td>
-                          <td className="px-4 py-3 text-center border border-gray-300">
-                            <input
-                              type="checkbox"
-                              checked={permissions.viewAssignedJob}
-                              onChange={(e) => handlePermissionChange('viewAssignedJob', e.target.checked)}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                            />
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300">
-                            Modify Job Type or Billing
-                          </td>
-                          <td className="px-4 py-3 text-center border border-gray-300">
-                            <input
-                              type="checkbox"
-                              checked={permissions.modifyJobTypeBilling}
-                              onChange={(e) => handlePermissionChange('modifyJobTypeBilling', e.target.checked)}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                            />
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                        return (
+                          <tr key={module} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300 capitalize">
+                              {module.replace('_', ' ')}
+                            </td>
 
-                {/* Invoice Permissions Section */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 bg-purple-800 text-white p-3 rounded-t-lg">
-                    Invoice Permissions
-                  </h3>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Can Create Invoices */}
-                    <div>
-                      <h4 className="text-md font-semibold text-gray-800 mb-3">Can Create Invoices?</h4>
-                      <div className="overflow-x-auto">
-                        <table className="w-full border border-gray-300">
-                          <thead>
-                            <tr className="bg-purple-200">
-                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 border border-gray-300">
-                                Permission
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr className="hover:bg-gray-50">
-                              <td className="px-4 py-3 text-center border border-gray-300">
+                            {/* View Checkbox - Always show */}
+                            <td className="px-4 py-3 text-center border border-gray-300">
+                              <input
+                                type="checkbox"
+                                checked={editingRole ? getPermissionValue(module, 'view', editingRole.permissions) : getPermissionValue(module, 'view', newRolePermissions)}
+                                onChange={(e) => handlePermissionChange(module, 'view', e.target.checked)}
+                                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                              />
+                            </td>
+
+                            {/* Create Checkbox - Hide for dashboard */}
+                            <td className="px-4 py-3 text-center border border-gray-300">
+                              {!isDashboard ? (
                                 <input
                                   type="checkbox"
-                                  checked={permissions.canCreateInvoices}
-                                  onChange={(e) => handlePermissionChange('canCreateInvoices', e.target.checked)}
+                                  checked={editingRole ? getPermissionValue(module, 'create', editingRole.permissions) : getPermissionValue(module, 'create', newRolePermissions)}
+                                  onChange={(e) => handlePermissionChange(module, 'create', e.target.checked)}
                                   className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                                 />
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
 
-                    {/* Access to Invoices */}
-                    <div>
-                      <h4 className="text-md font-semibold text-gray-800 mb-3">Access to Invoices</h4>
-                      <div className="overflow-x-auto">
-                        <table className="w-full border border-gray-300">
-                          <thead>
-                            <tr className="bg-purple-200">
-                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 border border-gray-300">
-                                Access Level
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr className="hover:bg-gray-50">
-                              <td className="px-4 py-3 border border-gray-300">
-                                <select
-                                  value={permissions.accessToInvoices}
-                                  onChange={(e) => handlePermissionChange('accessToInvoices', e.target.value)}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50"
-                                >
-                                  <option value="No access">No access</option>
-                                  <option value="Full access (all invoices, markup, import/export)">Full access (all invoices, markup, import/export)</option>
-                                  <option value="Full access (no profit reports)">Full access (no profit reports)</option>
-                                  <option value="View own job invoices (limited)">View own job invoices (limited)</option>
-                                  <option value="Receives invoices via email">Receives invoices via email</option>
-                                  <option value="Receives final invoice only">Receives final invoice only</option>
-                                </select>
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                            {/* Edit Checkbox - Hide for dashboard */}
+                            <td className="px-4 py-3 text-center border border-gray-300">
+                              {!isDashboard ? (
+                                <input
+                                  type="checkbox"
+                                  checked={editingRole ? getPermissionValue(module, 'edit', editingRole.permissions) : getPermissionValue(module, 'edit', newRolePermissions)}
+                                  onChange={(e) => handlePermissionChange(module, 'edit', e.target.checked)}
+                                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                                />
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
 
-                {/* Invoice Actions Section */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 bg-purple-800 text-white p-3 rounded-t-lg">
-                    Invoice Actions by Role
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border border-gray-300">
-                      <thead>
-                        <tr className="bg-purple-200">
-                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 border border-gray-300">
-                            Action
-                          </th>
-                          <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-300">
-                            Permission
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300">
-                            Create Invoice
-                          </td>
-                          <td className="px-4 py-3 text-center border border-gray-300">
-                            <input
-                              type="checkbox"
-                              checked={permissions.createInvoice}
-                              onChange={(e) => handlePermissionChange('createInvoice', e.target.checked)}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                            />
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300">
-                            Edit Invoice (Before Finalizing)
-                          </td>
-                          <td className="px-4 py-3 text-center border border-gray-300">
-                            <input
-                              type="checkbox"
-                              checked={permissions.editInvoiceBeforeFinalizing}
-                              onChange={(e) => handlePermissionChange('editInvoiceBeforeFinalizing', e.target.checked)}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                            />
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300">
-                            Approve / Finalize Invoice
-                          </td>
-                          <td className="px-4 py-3 text-center border border-gray-300">
-                            <input
-                              type="checkbox"
-                              checked={permissions.approveFinalizeInvoice}
-                              onChange={(e) => handlePermissionChange('approveFinalizeInvoice', e.target.checked)}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                            />
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300">
-                            Send Invoice to Client
-                          </td>
-                          <td className="px-4 py-3 text-center border border-gray-300">
-                            <input
-                              type="checkbox"
-                              checked={permissions.sendInvoiceToClient}
-                              onChange={(e) => handlePermissionChange('sendInvoiceToClient', e.target.checked)}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                            />
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300">
-                            View All Invoices
-                          </td>
-                          <td className="px-4 py-3 text-center border border-gray-300">
-                            <input
-                              type="checkbox"
-                              checked={permissions.viewAllInvoices}
-                              onChange={(e) => handlePermissionChange('viewAllInvoices', e.target.checked)}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                            />
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300">
-                            Mark Invoice as Paid
-                          </td>
-                          <td className="px-4 py-3 text-center border border-gray-300">
-                            <input
-                              type="checkbox"
-                              checked={permissions.markInvoiceAsPaid}
-                              onChange={(e) => handlePermissionChange('markInvoiceAsPaid', e.target.checked)}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                            />
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300">
-                            View Invoice PDF
-                          </td>
-                          <td className="px-4 py-3 text-center border border-gray-300">
-                            <input
-                              type="checkbox"
-                              checked={permissions.viewInvoicePDF}
-                              onChange={(e) => handlePermissionChange('viewInvoicePDF', e.target.checked)}
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                            />
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+                            {/* Delete Checkbox - Hide for dashboard */}
+                            <td className="px-4 py-3 text-center border border-gray-300">
+                              {!isDashboard ? (
+                                <input
+                                  type="checkbox"
+                                  checked={editingRole ? getPermissionValue(module, 'delete', editingRole.permissions) : getPermissionValue(module, 'delete', newRolePermissions)}
+                                  onChange={(e) => handlePermissionChange(module, 'delete', e.target.checked)}
+                                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                                />
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+
+                            {/* Special Actions - Hide for dashboard */}
+                            <td className="px-4 py-3 text-center border border-gray-300">
+                              {!isDashboard && hasSpecialActions ? (
+                                <div className="space-y-2">
+                                  {moduleActions.filter(action => !['view', 'create', 'edit', 'delete'].includes(action)).map((action) => (
+                                    <div key={action} className="flex items-center justify-center">
+                                      <input
+                                        type="checkbox"
+                                        checked={editingRole ? getPermissionValue(module, action, editingRole.permissions) : getPermissionValue(module, action, newRolePermissions)}
+                                        onChange={(e) => handlePermissionChange(module, action, e.target.checked)}
+                                        className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                                      />
+                                      <span className="text-xs ml-1 capitalize">{action}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 

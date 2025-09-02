@@ -169,7 +169,7 @@ export function StaffManagementPage({
         </div>
       </div>
 
-      <Card className="bg-white shadow-sm border-0">
+      <Card className="bg-white shadow-md border-0">
         <CardContent className="p-0">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="border-b border-gray-200 px-6 pt-6">
@@ -215,7 +215,7 @@ function AllStaffPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-100 rounded-lg">
@@ -229,7 +229,7 @@ function AllStaffPage() {
           </CardContent>
         </Card>
         
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-[#E6F6FF] rounded-lg">
@@ -243,7 +243,7 @@ function AllStaffPage() {
           </CardContent>
         </Card>
         
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-green-100 rounded-lg">
@@ -257,7 +257,7 @@ function AllStaffPage() {
           </CardContent>
         </Card>
         
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-yellow-100 rounded-lg">
@@ -271,7 +271,7 @@ function AllStaffPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-purple-100 rounded-lg">

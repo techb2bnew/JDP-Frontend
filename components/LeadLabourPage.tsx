@@ -778,7 +778,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-green-100 rounded-lg">
@@ -794,7 +794,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
           </CardContent>
         </Card>
         
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-100 rounded-lg">
@@ -810,7 +810,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
           </CardContent>
         </Card>
         
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-[#E6F6FF] rounded-lg">
@@ -826,7 +826,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
           </CardContent>
         </Card>
         
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-yellow-100 rounded-lg">
@@ -844,7 +844,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       </div>
 
       {/* Filters and Search */}
-      <Card className="bg-white shadow-sm border-0">
+      <Card className="bg-white shadow-md border-0">
         <CardContent className="p-6">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4 flex-1">
@@ -892,7 +892,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       </Card>
 
       {/* Lead Labour Table */}
-      <Card className="bg-white shadow-sm border-0">
+      <Card className="bg-white shadow-md border-0">
         <CardContent className="p-0">
           <Table>
             <TableHeader>

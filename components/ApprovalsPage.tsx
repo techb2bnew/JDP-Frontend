@@ -341,7 +341,7 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -355,7 +355,7 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -369,7 +369,7 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -383,7 +383,7 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border-0">
+        <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -398,7 +398,7 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
         </Card>
       </div>
 
-      <Card className="bg-white shadow-sm border-0">
+      <Card className="bg-white shadow-md border-0">
         <CardContent className="p-0">
           <Table>
             <TableHeader>

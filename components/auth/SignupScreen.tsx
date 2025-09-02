@@ -3,29 +3,72 @@ import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { AuthStep } from '../AuthFlow'
 import svgPaths from '../../imports/svg-gg40su13b1'
+import { toast } from 'sonner'
 
 interface SignupScreenProps {
-  onStepChange: (step: AuthStep, email?: string) => void
+  onStepChange: (step: AuthStep, email?: string, role?: string) => void
   onAuthSuccess: (isNewUser?: boolean) => void
+}
+
+interface FormErrors {
+  email?: string
+  role?: string
 }
 
 export function SignupScreen({ onStepChange, onAuthSuccess }: SignupScreenProps) {
   const [email, setEmail] = useState<string>('')
+  const [role, setRole] = useState<string>('')
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [acceptTerms, setAcceptTerms] = useState<boolean>(false)
+  const [errors, setErrors] = useState<FormErrors>({})
 
-  const handleVerify = (): void => {
-    if (!email.trim()) return
+  const validateForm = (): boolean => {
+    const newErrors: FormErrors = {}
+    
+    if (!email.trim()) {
+      newErrors.email = 'Email is required'
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      newErrors.email = 'Please enter valid email'
+    }
+    
+    if (!role) {
+      newErrors.role = 'Role is required'
+    }
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleVerify = async (): Promise<void> => {
+    if (!validateForm()) return
     
     setIsLoading(true)
-    setTimeout(() => {
+    
+    try {
+      // For now, we'll just proceed to OTP screen
+      // In a real implementation, you might want to send OTP first
+      setTimeout(() => {
+        setIsLoading(false)
+        onStepChange('otp', email, role)
+      }, 1000)
+    } catch (error) {
       setIsLoading(false)
-      onStepChange('otp', email)
-    }, 1000)
+      toast.error('Something went wrong. Please try again.')
+    }
   }
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     setEmail(e.target.value)
+    if (errors.email) {
+      setErrors(prev => ({ ...prev, email: undefined }))
+    }
+  }
+
+  const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>): void => {
+    setRole(e.target.value)
+    if (errors.role) {
+      setErrors(prev => ({ ...prev, role: undefined }))
+    }
   }
 
   const handleTermsToggle = (): void => {
@@ -73,7 +116,7 @@ export function SignupScreen({ onStepChange, onAuthSuccess }: SignupScreenProps)
         <div className="mb-8">
           <h2 className="text-[24px] font-extrabold text-[#00a1ff] mb-2">Sign Up</h2>
           <p className="text-[16px] text-gray-900 leading-[26px] opacity-99">
-            Verify your email or phone to continue setting up securely.
+            Verify your email and select your role to continue setting up securely.
           </p>
         </div>
         
@@ -109,9 +152,45 @@ export function SignupScreen({ onStepChange, onAuthSuccess }: SignupScreenProps)
                 value={email}
                 onChange={handleEmailChange}
                 placeholder="Enter your email/ phone number"
-                className="pl-12 h-[50px] rounded-full border border-[rgba(17,24,39,0.2)]"
+                className={`pl-12 h-[50px] rounded-full border ${
+                  errors.email 
+                    ? 'border-[#e02424] bg-[#fff3f3] text-[#e02424]' 
+                    : email 
+                    ? 'border-[#00a1ff] bg-white' 
+                    : 'border-[rgba(17,24,39,0.2)]'
+                }`}
               />
             </div>
+            {errors.email && (
+              <p className="text-[#e02424] text-[14px] mt-1">{errors.email}</p>
+            )}
+          </div>
+
+          {/* Role Field */}
+          <div>
+            <label className="text-[18px] font-medium text-gray-900 block mb-2">
+              Role<span className="text-[#e02424]">*</span>
+            </label>
+            <select
+              value={role}
+              onChange={handleRoleChange}
+              className={`w-full px-4 py-3 h-[50px] rounded-full border focus:outline-none focus:ring-2 focus:ring-[#00a1ff] focus:border-transparent ${
+                errors.role 
+                  ? 'border-[#e02424] bg-[#fff3f3] text-[#e02424]' 
+                  : role 
+                  ? 'border-[#00a1ff] bg-white' 
+                  : 'border-[rgba(17,24,39,0.2)] bg-white'
+              }`}
+            >
+              <option value="">Select your role</option>
+              <option value="Staff">Staff</option>
+              <option value="Admin">Admin</option>
+              <option value="Labour">Labour</option>
+              <option value="Lead Labour">Lead Labour</option>
+            </select>
+            {errors.role && (
+              <p className="text-[#e02424] text-[14px] mt-1">{errors.role}</p>
+            )}
           </div>
           
           {/* Terms & Conditions */}
@@ -131,7 +210,7 @@ export function SignupScreen({ onStepChange, onAuthSuccess }: SignupScreenProps)
           {/* Verify Button */}
           <Button
             onClick={handleVerify}
-            disabled={isLoading || !email.trim() || !acceptTerms}
+            disabled={isLoading || !email.trim() || !role || !acceptTerms}
             className="w-full h-[50px] bg-primary text-white hover:bg-[#0090e6] text-white rounded-full text-[18px] font-medium"
           >
             {isLoading ? 'Verifying...' : 'Verify'}
