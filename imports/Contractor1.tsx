@@ -13,7 +13,7 @@ function Carat({ direction = "back" }: CaratProps) {
       <div className="relative size-full" data-name="direction=forward">
         <div className="absolute bottom-1/4 flex items-center justify-center left-[36.833%] right-[32.292%] top-1/4">
           <div className="flex-none h-[7.41px] rotate-[90deg] scale-y-[-100%] w-3">
-            <div className="relative size-full" data-name="Vector">
+            <div className="relative size-full" >
               <svg
                 className="block size-full"
                 fill="none"

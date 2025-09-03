@@ -25,6 +25,7 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
   const [errors, setErrors] = useState<FormErrors>({})
   const dispatch = useAppDispatch()
   const router = useRouter()
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {}
@@ -49,32 +50,37 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
     setIsLoading(true)
     
     try {
-      const response = await fetch('/api/auth/login', {
+      // Call external API directly
+      const response = await fetch(`${apiBaseUrl}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email, password }),
-        credentials: 'include',
       });
 
       if (response.ok) {
         const data = await response.json()
+        console.log('Login API response:', data)
         
-        if (data.success && data.token) {
+        if (data.success && data.data?.token) {
           // Store authentication data in localStorage
           const authData = {
-            user: data.user,
-            token: data.token,
+            user: data.data.user,
+            token: data.data.token,
             expires: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
           }
           
           localStorage.setItem('jdp_auth', JSON.stringify(authData))
           
+          // Set HTTP-only cookie for authentication
+          document.cookie = `auth-token=${data.data.token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+          document.cookie = `jdp_auth=${JSON.stringify(authData)}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+          
           // Dispatch login success action
           dispatch(loginSuccess({
-            user: data.user,
-            token: data.token
+            user: data.data.user,
+            token: data.data.token
           }))
           
           toast.success('Logged in successfully')

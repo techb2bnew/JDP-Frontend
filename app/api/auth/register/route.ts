@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Call external signup API
-    const signupResponse = await fetch('https://techrepairtracker.base2brand.com/api/auth/register', {
+    const signupResponse = await fetch('http://127.0.0.1:3000/api/auth/register', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

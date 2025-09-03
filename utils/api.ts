@@ -2,7 +2,7 @@ import { clearAuthData } from './auth'
 
 // API utility functions with authentication
 
-const API_BASE_URL = 'https://techrepairtracker.base2brand.com/api'
+const API_BASE_URL = 'http://127.0.0.1:3000/api'
 
 // Helper function to get auth token
 const getAuthToken = (): string | null => {
@@ -57,7 +57,7 @@ const authenticatedFetch = async (endpoint: string, options: RequestInit = {}) =
 export const apiClient = {
   // Auth
   login: async (email: string, password: string) => {
-    const response = await fetch(`${API_BASE_URL}/login`, {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
