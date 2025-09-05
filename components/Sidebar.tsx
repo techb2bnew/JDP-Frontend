@@ -25,11 +25,17 @@ interface SidebarProps {
   currentPage: string
   onPageChange: (page: string) => void
   onLogout: () => void
+  isSuperAdmin?: boolean
 }
 
-export function Sidebar({ currentPage, onPageChange, onLogout }: SidebarProps) {
+export function Sidebar({ currentPage, onPageChange, onLogout, isSuperAdmin = false }: SidebarProps) {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const [expandedProfiles, setExpandedProfiles] = useState(false)
+
+  // If super admin, don't show navigation
+  if (isSuperAdmin) {
+    return null;
+  }
 
   const navigation = [
     {

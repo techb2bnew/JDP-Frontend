@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Provider } from 'react-redux'
 import { store } from './redux/store'
 import { ThemeProvider } from './contexts/ThemeContext'
+import { PermissionProvider } from './contexts/PermissionContext'
 import { Toaster } from 'sonner'
 import { Sidebar } from './components/Sidebar'
 import { Header } from './components/Header'
@@ -170,8 +171,10 @@ export default function App() {
   return (
     <Provider store={store}>
       <ThemeProvider>
-        <AppContent />
-        <Toaster />
+        <PermissionProvider>
+          <AppContent />
+          <Toaster />
+        </PermissionProvider>
       </ThemeProvider>
     </Provider>
   );

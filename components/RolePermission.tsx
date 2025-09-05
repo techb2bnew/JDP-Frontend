@@ -8,6 +8,7 @@ import {
   Eye,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { updateUserPermissions } from '../utils/auth'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,6 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog'
+
 interface Permission {
   module: string;
   action: string;
@@ -34,8 +36,7 @@ interface Role {
   updatedAt: string;
 }
 
-const RolePermission: React.FC = () => {
-
+export default function RolePermission() {
   const [roles, setRoles] = useState<Role[]>([]);
 
   const [showAddForm, setShowAddForm] = useState(false);
@@ -45,12 +46,11 @@ const RolePermission: React.FC = () => {
     roleType: '',
     description: ''
   });
-
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({
     roleName: '',
     roleType: ''
   });
-  const [isLoading, setIsLoading] = useState(false);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -68,15 +68,16 @@ const RolePermission: React.FC = () => {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
+
       const response = await fetch(`${apiBaseUrl}/permissions/roles-with-permissions`, {
         method: 'GET',
         headers
       });
 
+
       if (response.ok) {
         const responseData = await response.json();
-        console.log('API Response:', responseData);
-        
+
         // Transform API response to match component's expected format
         if (responseData.success && responseData.data) {
           const transformedRoles = responseData.data.map((apiRole: any) => ({
@@ -90,15 +91,12 @@ const RolePermission: React.FC = () => {
           }));
           setRoles(transformedRoles);
         } else {
-          console.error('Invalid API response structure:', responseData);
           setRoles([]);
         }
       } else {
-        console.error('Failed to fetch roles:', response.status);
         setRoles([]);
       }
     } catch (error) {
-      console.error('Error fetching roles:', error);
       setRoles([]);
     }
   };
@@ -109,22 +107,23 @@ const RolePermission: React.FC = () => {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
+
       const response = await fetch(`${apiBaseUrl}/permissions/roles/${roleId}`, {
         method: 'GET',
         headers
       });
 
+
       if (response.ok) {
         const responseData = await response.json();
-        console.log('Fetched role data:', responseData);
-        
+
         if (responseData.success && responseData.data) {
           const apiRole = responseData.data.role; // Role data is nested in data.role
           const apiPermissions = responseData.data.permissions || []; // Permissions are in data.permissions
-          
+
           // Transform API permissions to component format dynamically
           const transformedPermissions: Permission[] = [];
-          
+
           // Create all possible permissions first (all unchecked)
           modules.forEach(module => {
             getActionsForModule(module).forEach(action => {
@@ -135,16 +134,16 @@ const RolePermission: React.FC = () => {
               });
             });
           });
-          
+
           // Now update permissions based on API response
           apiPermissions.forEach((apiPerm: any) => {
             // Extract module and action from the permission object
             const module = apiPerm.permission?.module;
             const action = apiPerm.permission?.action;
-            
+
             if (module && action) {
               // Find and update the corresponding permission
-              const existingPermission = transformedPermissions.find(p => 
+              const existingPermission = transformedPermissions.find(p =>
                 p.module === module && p.action === action
               );
               if (existingPermission) {
@@ -152,7 +151,7 @@ const RolePermission: React.FC = () => {
               }
             }
           });
-          
+
           // Transform API response to match component's expected format
           const transformedRole = {
             id: apiRole.id.toString(),
@@ -163,10 +162,10 @@ const RolePermission: React.FC = () => {
             createdAt: apiRole.created_at ? apiRole.created_at.split('T')[0] : '',
             updatedAt: apiRole.updated_at ? apiRole.updated_at.split('T')[0] : ''
           };
-          
+
           console.log('Transformed role:', transformedRole);
           console.log('Transformed permissions:', transformedPermissions);
-          
+
           setEditingRole(transformedRole);
           setFormData({
             roleName: transformedRole.roleName,
@@ -180,7 +179,7 @@ const RolePermission: React.FC = () => {
         toast.error('Failed to fetch role details');
       }
     } catch (error) {
-      console.error('Error fetching role details:', error);
+      console.error('RolePermission: Error fetching role details:', error);
       toast.error('Error fetching role details');
     }
   };
@@ -246,6 +245,12 @@ const RolePermission: React.FC = () => {
     setNewRolePermissions([]); // Clear new role permissions when editing
   };
 
+  const handleViewRole = (role: Role) => {
+    // For now, just show role details in console
+    console.log('Viewing role:', role);
+    // You can implement a view modal or redirect to a detail page here
+  };
+
   const handleDeleteRole = (role: Role) => {
     setRoleToDelete(role);
     setShowDeleteAlert(true);
@@ -253,10 +258,10 @@ const RolePermission: React.FC = () => {
 
   const confirmDeleteRole = async () => {
     if (!roleToDelete) return;
-    
+
     try {
       const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
-      const headers: Record<string, string> = { };
+      const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const response = await fetch(`${apiBaseUrl}/permissions/roles/${roleToDelete.id}`, {
@@ -562,7 +567,7 @@ const RolePermission: React.FC = () => {
     const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    
+
     const permissions: Permission[] = [];
     modules.forEach(module => {
       getActionsForModule(module).forEach(action => {
@@ -584,34 +589,57 @@ const RolePermission: React.FC = () => {
     };
 
     try {
-      setIsLoading(true);
+      setIsSubmitting(true);
       if (editingRole) {
         // Update existing role - only send roleId and permissions
         const updateData = {
           roleId: parseInt(editingRole.id),
+          roleName: formData.roleName,
           permissions: permissions.map(permission => ({
             module: permission.module,
             action: permission.action,
             allowed: permission.allowed
           }))
         };
-        
-        console.log('Sending update request with data:', updateData);
-        console.log('API URL:', `${apiBaseUrl}/permissions/roles/update-permissions`);
-        console.log('Headers:', headers);
-        
+
+
+        // Show a more detailed loading message
+        const loadingToastId = toast.loading('Updating role permissions... This may take a moment.');
+
         const response = await fetch(`${apiBaseUrl}/permissions/roles/update-permissions`, {
           method: 'POST',
           headers,
           body: JSON.stringify(updateData)
         });
 
+        // Dismiss loading toast
+        toast.dismiss(loadingToastId);
+
         if (response.ok) {
           const responseData = await response.json();
           if (responseData.success) {
             toast.success('Role updated successfully!');
-            // Refresh roles from API
-            await fetchRoles();
+
+            // Check if this is the current user's role being updated
+            const currentUser = JSON.parse(localStorage.getItem('jdp_auth') || '{}').user;
+            if (currentUser && currentUser.role === formData.roleName) {
+              // Update current user's permissions in localStorage
+              const updatedPermissions = permissions
+                .filter(p => p.allowed)
+                .map(p => ({
+                  id: Math.random(), // Generate temporary ID
+                  action: p.action,
+                  module: p.module,
+                  description: `${p.action} ${p.module}`,
+                  display_name: `${p.action.charAt(0).toUpperCase() + p.action.slice(1)} ${p.module.charAt(0).toUpperCase() + p.module.slice(1)}`
+                }));
+
+              updateUserPermissions(updatedPermissions);
+              toast.success('Your permissions have been updated!');
+            }
+
+            // Refresh roles from API in background (non-blocking)
+            fetchRoles();
           } else {
             toast.error(`Failed to update role: ${responseData.message || 'Unknown error'}`);
           }
@@ -621,18 +649,25 @@ const RolePermission: React.FC = () => {
         }
       } else {
         // Create new role
+
+        // Show a more detailed loading message
+        const loadingToastId = toast.loading('Creating new role... This may take a moment.');
+
         const response = await fetch(`${apiBaseUrl}/permissions/roles`, {
           method: 'POST',
           headers,
           body: JSON.stringify(baseRoleData)
         });
 
+        // Dismiss loading toast
+        toast.dismiss(loadingToastId);
+
         if (response.ok) {
           const responseData = await response.json();
           if (responseData.success) {
             toast.success('Role created successfully!');
-            // Refresh roles from API
-            await fetchRoles();
+            // Refresh roles from API in background (non-blocking)
+            fetchRoles();
           } else {
             toast.error(`Failed to create role: ${responseData.message || 'Unknown error'}`);
           }
@@ -647,10 +682,16 @@ const RolePermission: React.FC = () => {
       setFormData({ roleName: '', roleType: '', description: '' });
       setNewRolePermissions([]);
     } catch (error) {
-      console.error('Error saving role:', error);
-      toast.error('Error saving role. Please try again.');
+      console.error('RolePermission: Error saving role:', error);
+      // Dismiss any loading toast that might still be showing
+      toast.dismiss();
+      if (error instanceof Error) {
+        toast.error(`Error saving role: ${error.message}`);
+      } else {
+        toast.error('Error saving role. Please try again.');
+      }
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -669,12 +710,12 @@ const RolePermission: React.FC = () => {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Role Management</h1>
           {!showAddForm && (
-            <button
+            <Button
               onClick={handleAddRole}
               className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
             >
               Add Role
-            </button>
+            </Button>
           )}
         </div>
 
@@ -704,13 +745,30 @@ const RolePermission: React.FC = () => {
                       <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">{role.description}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{role.createdAt}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{role.updatedAt}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <Button variant="ghost" size="sm" onClick={() => handleEditRole(role)}>
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDeleteRole(role)}>
-                          <Trash2 className="h-3 w-3" />
-                        </Button> 
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <div className="flex space-x-2">
+                          {/* <Button
+                              onClick={() => handleViewRole(role)}
+                              variant="ghost"
+                              size="sm"
+                            >
+                              <Eye className="h-3 w-3" />
+                            </Button> */}
+                          <Button
+                            onClick={() => handleEditRole(role)}
+                            variant="ghost"
+                            size="sm"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            onClick={() => handleDeleteRole(role)}
+                            variant="ghost"
+                            size="sm"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -956,17 +1014,17 @@ const RolePermission: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleCancel}
-                    disabled={isLoading}
+                    disabled={isSubmitting}
                     className="px-6 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    disabled={isLoading}
+                    disabled={isSubmitting}
                     className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[120px]"
                   >
-                    {isLoading ? (
+                    {isSubmitting ? (
                       <>
                         <svg className="animate-spin h-5 w-5 text-white mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -985,25 +1043,23 @@ const RolePermission: React.FC = () => {
         )}
       </div>
 
-    {/* Delete Confirmation Modal */}
-    <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Are you sure you want to delete this role?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This action cannot be undone. This will permanently delete the role "{roleToDelete?.roleName}" from your system.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>No, Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={confirmDeleteRole} className="bg-red-600 hover:bg-red-700">
-            Yes, Delete
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  </div>
+      {/* Delete Confirmation Modal */}
+      <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to delete this role?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the role "{roleToDelete?.roleName}" from your system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No, Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteRole} className="bg-red-600 text-white hover:bg-red-700">
+              Yes, Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 };
-
-export default RolePermission;

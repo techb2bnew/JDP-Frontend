@@ -20,13 +20,25 @@ export default function DashboardLayout({
   const dispatch = useAppDispatch()
 
   useEffect(() => {
-    const authStatus = localStorage.getItem('isAuthenticated')
-    if (authStatus !== 'true') {
+    const checkAuth = () => {
+      const authData = localStorage.getItem('jdp_auth')
+      if (authData) {
+        try {
+          const parsed = JSON.parse(authData)
+          if (parsed.user && parsed.token && parsed.expires > Date.now()) {
+            setIsAuthenticated(true)
+            setIsLoading(false)
+            return
+          }
+        } catch (error) {
+          console.error('Error parsing auth data:', error)
+        }
+      }
+      // If no valid auth data, redirect to login
       router.push('/')
-      return
     }
-    setIsAuthenticated(true)
-    setIsLoading(false)
+
+    checkAuth()
   }, [router])
 
   const handleLogout = async () => {
@@ -59,7 +71,30 @@ export default function DashboardLayout({
     )
   }
 
+  // Check if user is super admin and on superDashboard page FIRST - before any other checks
+  const authData = localStorage.getItem('jdp_auth');
+  const isSuperAdmin = authData ? JSON.parse(authData).user?.role === 'Super Admin' : false;
+  const isSuperDashboardPage = pathname === '/superDashboard';
+
+  console.log('=== DASHBOARD LAYOUT DEBUG ===');
+  console.log('Pathname:', pathname);
+  console.log('Auth data:', authData);
+  console.log('Is super admin:', isSuperAdmin);
+  console.log('Is superDashboard page:', isSuperDashboardPage);
+
+  // For super admin on superDashboard page, show only the content without sidebar/header
+  if (isSuperAdmin && isSuperDashboardPage) {
+    console.log('✅ Rendering SuperAdminDashboard without layout');
+    return (
+      <div className="min-h-screen bg-background">
+        {children}
+      </div>
+    );
+  }
+
+  // Only check authentication for non-super admin users
   if (!isAuthenticated) {
+    console.log('❌ User not authenticated, redirecting to login');
     return null // Will redirect to login
   }
 

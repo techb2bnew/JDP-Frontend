@@ -12,6 +12,7 @@ import { LaborDetailsPage } from './LaborDetailsPage'
 import { SupplierDetailsPage } from './SupplierDetailsPage'
 import { StaffDetailsPage } from './StaffDetailsPage'
 import { UserDetailsPage } from './UserDetailsPage'
+import { usePermissions } from '../contexts/PermissionContext'
 import { 
   Users, 
   HardHat, 
@@ -34,10 +35,12 @@ export function StaffManagementPage({
   selectedLeadLabourId, 
   showLeadLabourDetails 
 }: StaffManagementPageProps) {
+  const { hasPermission, isLoading: permissionsLoading, permissions } = usePermissions()
   const [activeTab, setActiveTab] = useState('all')
+  
   const [viewState, setViewState] = useState<{
     type: 'list' | 'detail'
-    category: 'staff' | 'lead-labour' | 'labor' | 'supplier' | 'user' | null
+    category: 'staff' | 'lead-labour' | 'labor' | null
     selectedId: string | null
   }>({
     type: 'list',
@@ -45,7 +48,37 @@ export function StaffManagementPage({
     selectedId: null
   })
 
-  const handleViewDetails = (category: 'staff' | 'lead-labour' | 'labor' | 'supplier' | 'user', id: string) => {
+  // Check if user is admin (has no specific permissions but should see all tabs)
+  const isAdmin = !permissionsLoading && permissions.length === 0
+
+  // Permission checks for each module
+  // Show tab if user has ANY permission for that module OR if user is admin
+  const hasStaffPermissions = !permissionsLoading && (
+    isAdmin || 
+    hasPermission('staff', 'view') || 
+    hasPermission('staff', 'create') || 
+    hasPermission('staff', 'edit') || 
+    hasPermission('staff', 'delete')
+  )
+
+  const hasLeadLabourPermissions = !permissionsLoading && (
+    isAdmin || 
+    hasPermission('lead_labour', 'view') || 
+    hasPermission('lead_labour', 'create') || 
+    hasPermission('lead_labour', 'edit') || 
+    hasPermission('lead_labour', 'delete')
+  )
+
+  const hasLaborPermissions = !permissionsLoading && (
+    isAdmin || 
+    hasPermission('labour', 'view') || 
+    hasPermission('labour', 'create') || 
+    hasPermission('labour', 'edit') || 
+    hasPermission('labour', 'delete')
+  )
+
+
+  const handleViewDetails = (category: 'staff' | 'lead-labour' | 'labor', id: string) => {
     setViewState({
       type: 'detail',
       category,
@@ -74,13 +107,6 @@ export function StaffManagementPage({
   // Handle new detail views
   if (viewState.type === 'detail' && viewState.selectedId) {
     switch (viewState.category) {
-      case 'staff':
-        return (
-          <StaffDetailsPage 
-            staffId={viewState.selectedId} 
-            onBack={handleBackToList}
-          />
-        )
       case 'lead-labour':
         return (
           <EnhancedLeadLabourDetailsPage 
@@ -95,42 +121,45 @@ export function StaffManagementPage({
             onBack={handleBackToList}
           />
         )
-      case 'supplier':
-        return (
-          <SupplierDetailsPage 
-            supplierId={viewState.selectedId} 
-            onBack={handleBackToList}
-          />
-        )
-      case 'user':
-        return (
-          <UserDetailsPage 
-            userId={viewState.selectedId} 
-            onBack={handleBackToList}
-          />
-        )
+      // case 'supplier':
+      //   return (
+      //     <SupplierDetailsPage 
+      //       supplierId={viewState.selectedId} 
+      //       onBack={handleBackToList}
+      //     />
+      //   )
+      // case 'user':
+      //   return (
+      //     <UserDetailsPage 
+      //       userId={viewState.selectedId} 
+      //       onBack={handleBackToList}
+      //     />
+      //   )
     }
   }
 
-  const tabItems = [
-    { id: 'all', label: 'All', icon: Users },
-    { id: 'staff', label: 'Staff', icon: UserCog },
-    { id: 'lead-labour', label: 'Lead Labour', icon: HardHat },
-    { id: 'labor', label: 'Labor', icon: Wrench },
-    { id: 'supplier', label: 'Supplier', icon: Building2 },
-    { id: 'user', label: 'User', icon: User },
+  // Filter tabs based on permissions
+  const allTabItems = [
+    { id: 'all', label: 'All', icon: Users, show: true }, // Always show All tab
+    { id: 'staff', label: 'Staff', icon: UserCog, show: hasStaffPermissions },
+    { id: 'lead-labour', label: 'Lead Labour', icon: HardHat, show: hasLeadLabourPermissions },
+    { id: 'labor', label: 'Labor', icon: Wrench, show: hasLaborPermissions },
+    // { id: 'supplier', label: 'Supplier', icon: Building2, show: false },
+    // { id: 'user', label: 'User', icon: User, show: false },
   ]
+
+  const tabItems = allTabItems.filter(item => item.show)
+  const gridCols = tabItems.length <= 2 ? 'grid-cols-2' : 
+                   tabItems.length <= 3 ? 'grid-cols-3' : 
+                   tabItems.length <= 4 ? 'grid-cols-4' : 
+                   tabItems.length <= 5 ? 'grid-cols-5' : 'grid-cols-6'
 
   const renderTabContent = () => {
     switch (activeTab) {
       case 'all':
         return <AllStaffPage />
       case 'staff':
-        return (
-          <StaffPage 
-            onViewDetails={(id) => handleViewDetails('staff', id)} 
-          />
-        )
+        return <StaffPage />
       case 'lead-labour':
         return (
           <LeadLabourPage 
@@ -143,21 +172,43 @@ export function StaffManagementPage({
             onViewDetails={(id) => handleViewDetails('labor', id)} 
           />
         )
-      case 'supplier':
-        return (
-          <SupplierPage 
-            onViewDetails={(id) => handleViewDetails('supplier', id)} 
-          />
-        )
-      case 'user':
-        return (
-          <UserPage 
-            onViewDetails={(id) => handleViewDetails('user', id)} 
-          />
-        )
+      // case 'supplier':
+      //   return (
+      //     <SupplierPage 
+      //       onViewDetails={(id) => handleViewDetails('supplier', id)} 
+      //     />
+      //   )
+      // case 'user':
+      //   return (
+      //     <UserPage 
+      //       onViewDetails={(id) => handleViewDetails('user', id)} 
+      //     />
+      //   )
       default:
         return <AllStaffPage />
     }
+  }
+
+  // Show loading state while permissions are being loaded
+  if (permissionsLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-medium text-[#2b2b2b]">Staff Management</h1>
+            <p className="text-sm text-[#2b2b2b]/60 mt-1">Loading permissions...</p>
+          </div>
+        </div>
+        <Card className="bg-white shadow-md border-0">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <span className="ml-2 text-gray-600">Loading...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -173,7 +224,7 @@ export function StaffManagementPage({
         <CardContent className="p-0">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="border-b border-gray-200 px-6 pt-6">
-              <TabsList className="grid w-full grid-cols-6 bg-gray-50">
+              <TabsList className={`grid w-full ${gridCols} bg-gray-50`}>
                 {tabItems.map((item) => {
                   const Icon = item.icon
                   return (

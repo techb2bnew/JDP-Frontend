@@ -11,6 +11,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar'
 import { Badge } from '../ui/badge'
 import { Switch } from '../ui/switch'
 import { Textarea } from '../ui/textarea'
+import { toast } from 'sonner'
+import { apiClient } from '../../utils/api'
+import { getUserData, logout } from '../../utils/auth'
 import { 
   User, 
   Mail, 
@@ -131,6 +134,57 @@ export function AdminStaffProfilePage() {
         }
       }
     }))
+  }
+
+  const handlePasswordSubmit = async () => {
+    if (!passwordData.oldPassword) {
+      toast.error('Current password is required!')
+      return
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast.error('New passwords do not match!')
+      return
+    }
+    
+    if (passwordData.newPassword.length < 8) {
+      toast.error('Password must be at least 8 characters long!')
+      return
+    }
+
+    // Get current user data
+    const userData = getUserData()
+    if (!userData || !userData.id) {
+      toast.error('User data not found. Please login again.')
+      return
+    }
+
+    const loadingToast = toast.loading('Changing password...')
+    
+    try {
+      await apiClient.changePassword(
+        userData.id,
+        passwordData.oldPassword,
+        passwordData.newPassword
+      )
+      
+      toast.dismiss(loadingToast)
+      toast.success('Password changed successfully!', {
+        description: 'For security, you will be logged out in 30 seconds.',
+      })
+      
+      setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' })
+      
+      // Auto logout after 30 seconds for security
+      setTimeout(async () => {
+        await logout()
+        window.location.href = '/login'
+      }, 30000)
+      
+    } catch (error) {
+      toast.dismiss(loadingToast)
+      toast.error(error instanceof Error ? error.message : 'Failed to change password')
+    }
   }
 
   const formatDate = (dateString: string) => {
@@ -775,7 +829,11 @@ export function AdminStaffProfilePage() {
                 </div>
 
                 <div className="flex justify-end">
-                  <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+                  <Button 
+                    onClick={handlePasswordSubmit}
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
+                    disabled={!passwordData.oldPassword || !passwordData.newPassword || !passwordData.confirmPassword}
+                  >
                     Update Password
                   </Button>
                 </div>

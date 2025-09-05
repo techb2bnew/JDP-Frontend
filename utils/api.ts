@@ -157,12 +157,291 @@ export const apiClient = {
     return authenticatedFetch('/user/profile')
   },
 
-  updateUserProfile: async (userData: any) => {
-    return authenticatedFetch('/user/profile', {
-      method: 'PUT',
-      body: JSON.stringify(userData),
+  getUserProfile: async (userId: string) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+    
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${apiBaseUrl}/auth/profile?userId=${userId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
     })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to fetch profile')
+    }
+
+    return response.json()
   },
+
+  // Update User Profile
+  updateUserProfile: async (userId: string, profileData: {
+    full_name: string,
+    email: string,
+    phone: string,
+    job_title: string,
+    department: string,
+    address: string,
+    bio: string,
+    emergency_contact: string,
+    date_of_birth: string,
+    employee_id: string,
+    system_role: string
+  }) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+    
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${apiBaseUrl}/auth/profile/${userId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(profileData),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to update profile')
+    }
+
+    return response.json()
+  },
+
+
+  // Change Password
+  changePassword: async (userId: string, currentPassword: string, newPassword: string) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+    
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${apiBaseUrl}/auth/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        userId,
+        currentPassword,
+        newPassword
+      }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Password change failed')
+    }
+
+    return response.json()
+  },
+
+  // Create Staff
+  createStaff: async (staffData: {
+    full_name: string,
+    email: string,
+    phone: string,
+    position: string,
+    department: string,
+    date_of_joining: string,
+    address: string,
+    role: string,
+    status: string
+  }) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+    
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+
+    try {
+      console.log('API: Starting createStaff request to:', `${apiBaseUrl}/staff/createStaff`)
+      console.log('API: Request payload:', staffData)
+      
+      const response = await fetch(`${apiBaseUrl}/staff/createStaff`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(staffData),
+        signal: controller.signal
+      })
+
+      clearTimeout(timeoutId)
+      console.log('API: Response received, status:', response.status)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('API: Error response:', errorData)
+        throw new Error(errorData.message || 'Failed to create staff')
+      }
+
+      const result = await response.json()
+      console.log('API: Success response:', result)
+      return result
+    } catch (error) {
+      clearTimeout(timeoutId)
+      console.error('API: Request failed:', error)
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Request timeout - please try again')
+      }
+      throw error
+    }
+  },
+
+  // Get All Staff
+  getAllStaff: async () => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+    
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${apiBaseUrl}/staff/getAllStaff`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to fetch staff')
+    }
+
+    return response.json()
+  },
+
+  // Get Staff by ID
+  getStaffById: async (staffId: string) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+    
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${apiBaseUrl}/staff/getStaffById/${staffId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to fetch staff details')
+    }
+
+    return response.json()
+  },
+
+  // Update Staff
+  updateStaff: async (staffId: string, staffData: {
+    full_name: string,
+    email: string,
+    phone: string,
+    position: string,
+    department: string,
+    date_of_joining: string,
+    address: string,
+    role: string,
+    status: string
+  }) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+    
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+
+    try {
+      console.log('API: Starting updateStaff request to:', `${apiBaseUrl}/staff/updateStaff/${staffId}`)
+      console.log('API: Request payload:', staffData)
+      
+      const response = await fetch(`${apiBaseUrl}/staff/updateStaff/${staffId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(staffData),
+        signal: controller.signal
+      })
+
+      clearTimeout(timeoutId)
+      console.log('API: Response received, status:', response.status)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('API: Error response:', errorData)
+        throw new Error(errorData.message || 'Failed to update staff')
+      }
+
+      const result = await response.json()
+      console.log('API: Success response:', result)
+      return result
+    } catch (error) {
+      clearTimeout(timeoutId)
+      console.error('API: Request failed:', error)
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Request timeout - please try again')
+      }
+      throw error
+    }
+  },
+
+  // Delete Staff
+  deleteStaff: async (staffId: string) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+    
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${apiBaseUrl}/staff/deleteStaff/${staffId}`, {
+      method: 'DELETE',
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to delete staff')
+    }
+
+    return response.json()
+  },
+
 
   // Logout
   logout: async () => {

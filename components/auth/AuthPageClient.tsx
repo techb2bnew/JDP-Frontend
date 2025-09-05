@@ -27,7 +27,7 @@ export function AuthPageClient() {
             setIsAuthenticated(true)
           // console.log(authenticated, 'authtruetrue');
 
-            router.push('/dashboard')
+            // Don't redirect here - let LoginScreen handle role-based redirection
             return
           }
         }
@@ -44,18 +44,8 @@ export function AuthPageClient() {
   const handleAuthSuccess = async () => {
     setIsAuthenticated(true)
     // alert(isAuthenticated)
-    // Check for redirect URL
-    const response = await fetch('/api/auth/redirect-url', {
-      credentials: 'include',
-    })
-    
-    if (response) {
-      const { redirectUrl } = await response.json()
-      localStorage.setItem('isAuthenticated', 'true') 
-      router.push( '/dashboard')
-    } else {
-      router.push('/dashboard')
-    }
+    // Don't redirect here - let LoginScreen handle role-based redirection
+    // The LoginScreen will check the user's role and redirect accordingly
   }
 
   if (isLoading) {

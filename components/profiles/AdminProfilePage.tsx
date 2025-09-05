@@ -9,6 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar'
 import { Badge } from '../ui/badge'
 import { Separator } from '../ui/separator'
+import { toast } from 'sonner'
+import { apiClient } from '../../utils/api'
+import { getUserData, logout } from '../../utils/auth'
 import { 
   User, 
   Mail, 
@@ -82,19 +85,55 @@ export function AdminProfilePage() {
     setPasswordData(prev => ({ ...prev, [field]: value }))
   }
 
-  const handlePasswordSubmit = () => {
+  const handlePasswordSubmit = async () => {
+    if (!passwordData.oldPassword) {
+      toast.error('Current password is required!')
+      return
+    }
+
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      alert('New passwords do not match!')
+      toast.error('New passwords do not match!')
       return
     }
+    
     if (passwordData.newPassword.length < 8) {
-      alert('Password must be at least 8 characters long!')
+      toast.error('Password must be at least 8 characters long!')
       return
     }
-    // Here you would typically validate old password and update
-    console.log('Changing password...')
-    setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' })
-    alert('Password changed successfully!')
+
+    // Get current user data
+    const userData = getUserData()
+    if (!userData || !userData.id) {
+      toast.error('User data not found. Please login again.')
+      return
+    }
+
+    const loadingToast = toast.loading('Changing password...')
+    
+    try {
+      await apiClient.changePassword(
+        userData.id,
+        passwordData.oldPassword,
+        passwordData.newPassword
+      )
+      
+      toast.dismiss(loadingToast)
+      toast.success('Password changed successfully!', {
+        description: 'For security, you will be logged out in 30 seconds.',
+      })
+      
+      setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' })
+      
+      // Auto logout after 30 seconds for security
+      setTimeout(async () => {
+        await logout()
+        window.location.href = '/login'
+      }, 30000)
+      
+    } catch (error) {
+      toast.dismiss(loadingToast)
+      toast.error(error instanceof Error ? error.message : 'Failed to change password')
+    }
   }
 
   const handleProfilePictureUpload = (event: React.ChangeEvent<HTMLInputElement>) => {

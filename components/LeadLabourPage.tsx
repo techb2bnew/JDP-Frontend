@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from './ui/textarea'
 import { Checkbox } from './ui/checkbox'
 import { ActionButtonsPopup } from './ActionButtonsPopup'
+import { usePermissions } from '../contexts/PermissionContext'
+import { AutoSuggestInput } from './ui/auto-suggest-input'
 import { toast } from 'sonner'
 import { 
   Plus, 
@@ -30,7 +32,7 @@ import {
 } from 'lucide-react'
 
 interface LeadLabour {
-  id: string
+  id: string | number
   leadLabourId: string
   name: string
   email: string
@@ -42,9 +44,17 @@ interface LeadLabour {
   dateOfJoining: string
   specialization: string
   experience: string
+  trade?: string
+  role?: string
+  status?: string
+  idProofUrl?: string
+  photoUrl?: string
+  resumeUrl?: string
+  createdAt?: string
+  agreedTerms?: boolean
   certifications: string[]
-  hourlyRate: number
-  availability: 'available' | 'assigned' | 'on-leave' | 'unavailable'
+  hourlyRate: number | string
+  availability: 'available' | 'assigned' | 'on-leave' | 'unavailable' | string
   jobsCompleted: number
   lastAssignment: string
   skills: string[]
@@ -67,6 +77,7 @@ interface LeadLabour {
 }
 
 interface LeadLabourFormData {
+  role: string
   name: string
   email: string
   phone: string
@@ -77,6 +88,7 @@ interface LeadLabourFormData {
   dateOfJoining: string
   specialization: string
   experience: string
+  status: 'active' | 'inactive'
   certifications: string[]
   hourlyRate: number
   availability: 'available' | 'assigned' | 'on-leave' | 'unavailable'
@@ -101,140 +113,41 @@ interface LeadLabourFormData {
   agreeToTerms: boolean
 }
 
-const initialLeadLabourData: LeadLabour[] = [
-  {
-    id: 'LL001',
-    leadLabourId: 'LL-2025-001',
-    name: 'Michael Rodriguez',
-    email: 'michael.rodriguez@jdp.com',
-    phone: '+61 2222 021 301',
-    dob: '1985-05-15',
-    address: '142 Electric Ave, Sydney, NSW 2000, Australia',
-    notes: 'Experienced in high voltage systems with excellent safety record.',
-    department: 'Engineering',
-    dateOfJoining: '2020-01-15',
-    specialization: 'High Voltage Systems',
-    experience: '8 years',
-    certifications: ['Licensed Electrician', 'High Voltage Certificate', 'Safety Officer'],
-    hourlyRate: 85,
-    availability: 'available',
-    jobsCompleted: 67,
-    lastAssignment: '2025-01-20',
-    skills: ['High Voltage', 'Industrial Wiring', 'Safety Management', 'Team Leadership'],
-    emergencyContact: '+61 2222 021 302',
-    documents: {
-      idProof: { name: 'driving_license.pdf', url: '/documents/driving_license.pdf' },
-      photo: { name: 'profile_photo.jpg', url: '/photos/michael_photo.jpg' },
-      resume: { name: 'michael_resume.pdf', url: '/resumes/michael_resume.pdf' }
-    },
-    permissions: {
-      createJob: true,
-      addClient: true,
-      orderInventoryPrice: false,
-      invoicePrice: true,
-      invoiceGenerate: false,
-      closeJob: true,
-      changeLaborTime: true
-    },
-    agreeToTerms: true
-  },
-  {
-    id: 'LL002',
-    leadLabourId: 'LL-2025-002',
-    name: 'Sarah Thompson',
-    email: 'sarah.thompson@jdp.com',
-    phone: '+61 2222 021 303',
-    dob: '1982-03-22',
-    address: '78 Power St, Melbourne, VIC 3000, Australia',
-    notes: 'Expert in commercial electrical systems and team management.',
-    department: 'Operations',
-    dateOfJoining: '2018-03-10',
-    specialization: 'Commercial Electrical',
-    experience: '12 years',
-    certifications: ['Master Electrician', 'Commercial License', 'Team Management'],
-    hourlyRate: 95,
-    availability: 'assigned',
-    jobsCompleted: 103,
-    lastAssignment: '2025-01-22',
-    skills: ['Commercial Systems', 'Team Leadership', 'Code Compliance', 'Quality Control'],
-    emergencyContact: '+61 2222 021 304',
-    documents: {
-      idProof: { name: 'passport.pdf', url: '/documents/passport.pdf' },
-      photo: { name: 'sarah_photo.jpg', url: '/photos/sarah_photo.jpg' },
-      resume: { name: 'sarah_resume.pdf', url: '/resumes/sarah_resume.pdf' }
-    },
-    permissions: {
-      createJob: true,
-      addClient: true,
-      orderInventoryPrice: true,
-      invoicePrice: true,
-      invoiceGenerate: true,
-      closeJob: true,
-      changeLaborTime: true
-    },
-    agreeToTerms: true
-  }
-]
-
-const departments = ['Engineering', 'Operations', 'Management', 'Sales', 'HR', 'Finance']
-const specializations = [
-  'High Voltage Systems',
-  'Commercial Electrical',
-  'Industrial Automation',
-  'Residential & Solar',
-  'Data & Communications',
-  'Emergency Services',
-  'Maintenance & Repair'
-]
-
-const availableCertifications = [
-  'Licensed Electrician',
-  'Master Electrician',
-  'High Voltage Certificate',
-  'Commercial License',
-  'Industrial Electrician',
-  'Solar Installation',
-  'Safety Officer',
-  'Team Management',
-  'PLC Programming',
-  'Automation Systems',
-  'Energy Efficiency'
-]
-
-const skillOptions = [
-  'High Voltage',
-  'Industrial Wiring',
-  'Safety Management',
-  'Team Leadership',
-  'Commercial Systems',
-  'Code Compliance',
-  'Quality Control',
-  'PLC Systems',
-  'Motor Controls',
-  'Automation',
-  'Troubleshooting',
-  'Solar Systems',
-  'Residential Wiring',
-  'Energy Solutions',
-  'Customer Service'
-]
 
 interface LeadLabourPageProps {
   onViewDetails?: (id: string) => void
 }
 
 export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
-  const [leadLabours, setLeadLabours] = useState<LeadLabour[]>(initialLeadLabourData)
+  const { hasPermission, permissions } = usePermissions()
+  const [leadLabours, setLeadLabours] = useState<LeadLabour[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [editingLeadLabour, setEditingLeadLabour] = useState<LeadLabour | null>(null)
+  const [viewingLeadLabour, setViewingLeadLabour] = useState<LeadLabour | null>(null)
   const [filterSpecialization, setFilterSpecialization] = useState<string>('all')
-  const [filterAvailability, setFilterAvailability] = useState<string>('all')
+  const [filterStatus, setFilterStatus] = useState<string>('all')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
+  const [roles, setRoles] = useState<any[]>([])
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+  const [departments, setDepartments] = useState<string[]>([])
+  const [specializations, setSpecializations] = useState<string[]>([])
+
+  // Check if user is admin (has no specific permissions but should see all actions)
+  const isAdmin = permissions.length === 0
+
+  // Permission checks for lead labour module
+  const canViewLeadLabour = isAdmin || hasPermission('lead_labour', 'view')
+  const canCreateLeadLabour = isAdmin || hasPermission('lead_labour', 'create')
+  const canEditLeadLabour = isAdmin || hasPermission('lead_labour', 'edit')
+  const canDeleteLeadLabour = isAdmin || hasPermission('lead_labour', 'delete')
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
 
   const [formData, setFormData] = useState<LeadLabourFormData>({
+    role: '',
     name: '',
     email: '',
     phone: '',
@@ -245,6 +158,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     dateOfJoining: '',
     specialization: '',
     experience: '',
+    status: 'active',
     certifications: [],
     hourlyRate: 0,
     availability: 'available',
@@ -275,36 +189,24 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     return `LL-${year}-${String(count).padStart(3, '0')}`
   }
 
-  const getAvailabilityBadge = (availability: string) => {
-    switch (availability) {
-      case 'available':
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'active':
         return (
           <Badge className="bg-green-50 text-green-600 border-green-200 hover:bg-green-50">
-            Available
+            Active
           </Badge>
         )
-      case 'assigned':
-        return (
-          <Badge className="bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-50">
-            Assigned
-          </Badge>
-        )
-      case 'on-leave':
-        return (
-          <Badge className="bg-yellow-50 text-yellow-600 border-yellow-200 hover:bg-yellow-50">
-            On Leave
-          </Badge>
-        )
-      case 'unavailable':
+      case 'inactive':
         return (
           <Badge className="bg-red-50 text-red-600 border-red-200 hover:bg-red-50">
-            Unavailable
+            Inactive
           </Badge>
         )
       default:
         return (
           <Badge className="bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-50">
-            {availability}
+            {status}
           </Badge>
         )
     }
@@ -318,9 +220,9 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
                          labour.specialization.toLowerCase().includes(searchTerm.toLowerCase())
     
     const matchesSpecialization = filterSpecialization === 'all' || labour.specialization === filterSpecialization
-    const matchesAvailability = filterAvailability === 'all' || labour.availability === filterAvailability
+    const matchesStatus = filterStatus === 'all' || labour.status === filterStatus
     
-    return matchesSearch && matchesSpecialization && matchesAvailability
+    return matchesSearch && matchesSpecialization && matchesStatus
   })
 
   const paginatedLeadLabours = filteredLeadLabours.slice(
@@ -330,32 +232,127 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
 
   const totalPages = Math.ceil(filteredLeadLabours.length / itemsPerPage)
 
-  const handleCreate = () => {
-    if (!formData.name || !formData.email || !formData.phone || !formData.agreeToTerms) {
-      toast.error('Please fill in all required fields and agree to terms')
-      return
+  const handleCreate = async () => {
+    // Validation
+    if (!formData.role || !formData.name || !formData.email || !formData.phone || !formData.dob || !formData.address || !formData.department || !formData.dateOfJoining || !formData.specialization || !formData.experience || !formData.documents.idProof || !formData.agreeToTerms) {
+      const errors: Record<string, string> = {};
+      if (!formData.role) errors.role = 'Role is required';
+      if (!formData.name) errors.name = 'Name is required';
+      if (!formData.email) errors.email = 'Email is required';
+      if (!formData.phone) errors.phone = 'Phone is required';
+      if (!formData.dob) errors.dob = 'Date of Birth is required';
+      if (!formData.address) errors.address = 'Address is required';
+      if (!formData.department) errors.department = 'Department is required';
+      if (!formData.dateOfJoining) errors.dateOfJoining = 'Date of Joining is required';
+      if (!formData.specialization) errors.specialization = 'Specialization is required';
+      if (!formData.experience) errors.experience = 'Experience is required';
+      if (!formData.documents.idProof) errors.idProof = 'ID Proof is required';
+      if (!formData.agreeToTerms) errors.agreeToTerms = 'Please agree to terms';
+      
+      setValidationErrors(errors);
+      toast.error('Please fill in all required fields and agree to terms');
+      return;
     }
 
-    const newLeadLabour: LeadLabour = {
-      id: `LL${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
-      leadLabourId: generateLeadLabourId(),
-      ...formData,
-      documents: {
-        idProof: formData.documents.idProof ? { name: formData.documents.idProof.name, url: `/documents/${formData.documents.idProof.name}` } : null,
-        photo: formData.documents.photo ? { name: formData.documents.photo.name, url: `/photos/${formData.documents.photo.name}` } : null,
-        resume: formData.documents.resume ? { name: formData.documents.resume.name, url: `/resumes/${formData.documents.resume.name}` } : null
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      const errors = {...validationErrors, email: 'Please enter a valid email address'};
+      setValidationErrors(errors);
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    // Phone number validation (exactly 10 digits)
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(formData.phone)) {
+      const errors = {...validationErrors, phone: 'Phone number must be exactly 10 digits'};
+      setValidationErrors(errors);
+      toast.error('Phone number must be exactly 10 digits');
+      return;
+    }
+
+    let loadingToastId: string | number | undefined;
+
+    try {
+      loadingToastId = toast.loading('Creating lead labour...');
+      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      // Prepare FormData payload
+      const formDataPayload = new FormData();
+      formDataPayload.append('full_name', formData.name);
+      formDataPayload.append('email', formData.email.toLowerCase());
+      formDataPayload.append('phone', formData.phone);
+      formDataPayload.append('status', formData.status);
+      formDataPayload.append('labor_code', generateLeadLabourId());
+      formDataPayload.append('dob', formData.dob);
+      formDataPayload.append('address', formData.address);
+      formDataPayload.append('notes', formData.notes);
+      formDataPayload.append('department', formData.department);
+      formDataPayload.append('date_of_joining', formData.dateOfJoining);
+      formDataPayload.append('specialization', formData.specialization);
+      formDataPayload.append('trade', formData.experience);
+      formDataPayload.append('experience', formData.experience);
+      formDataPayload.append('agreed_terms', formData.agreeToTerms.toString());
+      formDataPayload.append('role', formData.role);
+      
+      // Append file uploads if they exist
+      if (formData.documents.idProof) {
+        formDataPayload.append('id_proof', formData.documents.idProof);
       }
-    }
+      if (formData.documents.photo) {
+        formDataPayload.append('photo_url', formData.documents.photo);
+      }
+      if (formData.documents.resume) {
+        formDataPayload.append('resume_url', formData.documents.resume);
+      }
 
-    setLeadLabours([...leadLabours, newLeadLabour])
-    resetForm()
-    setIsCreateDialogOpen(false)
-    toast.success('Lead Labour created successfully')
+      const response = await fetch(`${apiBaseUrl}/lead-labor/createLeadLabor`, {
+        method: 'POST',
+        headers,
+        body: formDataPayload
+      });
+
+      // Dismiss loading toast
+      if (loadingToastId) {
+        toast.dismiss(loadingToastId);
+      }
+
+      if (response.ok) {
+        const responseData = await response.json();
+        if (responseData.success) {
+          toast.success('Lead Labour created successfully');
+          resetForm();
+          setIsCreateDialogOpen(false);
+          // Refresh the data
+          fetchLeadLabourData();
+        } else {
+          toast.error(responseData.message || 'Failed to create lead labour');
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.message || 'Failed to create lead labour');
+      }
+    } catch (error) {
+      // Make sure to dismiss loading toast even on error
+      if (loadingToastId) {
+        toast.dismiss(loadingToastId);
+      }
+      console.error('Error creating lead labour:', error);
+      toast.error('Error creating lead labour. Please try again.');
+    }
+  }
+
+  const handleView = (id: string | number) => {
+    fetchLeadLabourById(Number(id));
   }
 
   const handleEdit = (leadLabour: LeadLabour) => {
     setEditingLeadLabour(leadLabour)
     setFormData({
+      role: leadLabour.role || '', // Use the role from leadLabour
       name: leadLabour.name,
       email: leadLabour.email,
       phone: leadLabour.phone,
@@ -366,17 +363,18 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       dateOfJoining: leadLabour.dateOfJoining,
       specialization: leadLabour.specialization,
       experience: leadLabour.experience,
+      status: (leadLabour.status as 'active' | 'inactive') || 'active',
       certifications: leadLabour.certifications,
-      hourlyRate: leadLabour.hourlyRate,
-      availability: leadLabour.availability,
+      hourlyRate: typeof leadLabour.hourlyRate === 'string' ? 0 : leadLabour.hourlyRate,
+      availability: leadLabour.availability as 'available' | 'assigned' | 'on-leave' | 'unavailable',
       jobsCompleted: leadLabour.jobsCompleted,
       lastAssignment: leadLabour.lastAssignment,
       skills: leadLabour.skills,
       emergencyContact: leadLabour.emergencyContact,
       documents: {
-        idProof: null,
-        photo: null,
-        resume: null
+        idProof: leadLabour.documents?.idProof ? new File([], leadLabour.documents.idProof.name) : null,
+        photo: leadLabour.documents?.photo ? new File([], leadLabour.documents.photo.name) : null,
+        resume: leadLabour.documents?.resume ? new File([], leadLabour.documents.resume.name) : null
       },
       permissions: leadLabour.permissions,
       agreeToTerms: leadLabour.agreeToTerms
@@ -384,41 +382,166 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     setIsEditDialogOpen(true)
   }
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (!editingLeadLabour) return
 
-    if (!formData.name || !formData.email || !formData.phone) {
-      toast.error('Please fill in all required fields')
-      return
+    // Validation
+    if (!formData.role || !formData.name || !formData.email || !formData.phone || !formData.dob || !formData.address || !formData.department || !formData.dateOfJoining || !formData.specialization || !formData.experience || !formData.agreeToTerms) {
+      const errors: Record<string, string> = {};
+      if (!formData.role) errors.role = 'Role is required';
+      if (!formData.name) errors.name = 'Name is required';
+      if (!formData.email) errors.email = 'Email is required';
+      if (!formData.phone) errors.phone = 'Phone is required';
+      if (!formData.dob) errors.dob = 'Date of Birth is required';
+      if (!formData.address) errors.address = 'Address is required';
+      if (!formData.department) errors.department = 'Department is required';
+      if (!formData.dateOfJoining) errors.dateOfJoining = 'Date of Joining is required';
+      if (!formData.specialization) errors.specialization = 'Specialization is required';
+      if (!formData.experience) errors.experience = 'Experience is required';
+      if (!formData.agreeToTerms) errors.agreeToTerms = 'Please agree to terms';
+      
+      setValidationErrors(errors);
+      toast.error('Please fill in all required fields and agree to terms');
+      return;
     }
 
-    setLeadLabours(leadLabours.map(labour => 
-      labour.id === editingLeadLabour.id 
-        ? { 
-            ...labour, 
-            ...formData,
-            documents: {
-              idProof: formData.documents.idProof ? { name: formData.documents.idProof.name, url: `/documents/${formData.documents.idProof.name}` } : labour.documents.idProof,
-              photo: formData.documents.photo ? { name: formData.documents.photo.name, url: `/photos/${formData.documents.photo.name}` } : labour.documents.photo,
-              resume: formData.documents.resume ? { name: formData.documents.resume.name, url: `/resumes/${formData.documents.resume.name}` } : labour.documents.resume
-            }
-          }
-        : labour
-    ))
-    
-    setIsEditDialogOpen(false)
-    setEditingLeadLabour(null)
-    resetForm()
-    toast.success('Lead Labour updated successfully')
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      const errors = {...validationErrors, email: 'Please enter a valid email address'};
+      setValidationErrors(errors);
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    // Phone number validation (exactly 10 digits)
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(formData.phone)) {
+      const errors = {...validationErrors, phone: 'Phone number must be exactly 10 digits'};
+      setValidationErrors(errors);
+      toast.error('Phone number must be exactly 10 digits');
+      return;
+    }
+
+    let loadingToastId: string | number | undefined;
+
+    try {
+      loadingToastId = toast.loading('Updating lead labour...');
+      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      // Prepare FormData payload
+      const formDataPayload = new FormData();
+      formDataPayload.append('full_name', formData.name);
+      formDataPayload.append('email', formData.email.toLowerCase());
+      formDataPayload.append('phone', formData.phone);
+      formDataPayload.append('status', formData.status);
+      formDataPayload.append('dob', formData.dob);
+      formDataPayload.append('address', formData.address);
+      formDataPayload.append('notes', formData.notes);
+      formDataPayload.append('department', formData.department);
+      formDataPayload.append('date_of_joining', formData.dateOfJoining);
+      formDataPayload.append('specialization', formData.specialization);
+      formDataPayload.append('trade', formData.experience);
+      formDataPayload.append('experience', formData.experience);
+      formDataPayload.append('agreed_terms', formData.agreeToTerms.toString());
+      formDataPayload.append('role', formData.role);
+      
+      // Append file uploads if they exist
+      if (formData.documents.idProof) {
+        formDataPayload.append('id_proof', formData.documents.idProof);
+      }
+      if (formData.documents.photo) {
+        formDataPayload.append('photo_url', formData.documents.photo);
+      }
+      if (formData.documents.resume) {
+        formDataPayload.append('resume_url', formData.documents.resume);
+      }
+
+      const response = await fetch(`${apiBaseUrl}/lead-labor/updateLeadLabor/${editingLeadLabour.id}`, {
+        method: 'POST',
+        headers,
+        body: formDataPayload
+      });
+
+      // Dismiss loading toast
+      if (loadingToastId) {
+        toast.dismiss(loadingToastId);
+      }
+
+      if (response.ok) {
+        const responseData = await response.json();
+        if (responseData.success) {
+          toast.success('Lead Labour updated successfully');
+          resetForm();
+          setIsEditDialogOpen(false);
+          setEditingLeadLabour(null);
+          // Refresh the data
+          fetchLeadLabourData();
+        } else {
+          toast.error(responseData.message || 'Failed to update lead labour');
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.message || 'Failed to update lead labour');
+      }
+    } catch (error) {
+      // Make sure to dismiss loading toast even on error
+      if (loadingToastId) {
+        toast.dismiss(loadingToastId);
+      }
+      console.error('Error updating lead labour:', error);
+      toast.error('Error updating lead labour. Please try again.');
+    }
   }
 
-  const handleDelete = (id: string) => {
-    setLeadLabours(leadLabours.filter(labour => labour.id !== id))
-    toast.success('Lead Labour deleted successfully')
+  const handleDelete = async (id: string | number) => {
+    let loadingToastId: string | number | undefined;
+
+    try {
+      loadingToastId = toast.loading('Deleting lead labour...');
+      
+      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const headers: Record<string, string> = { };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await fetch(`${apiBaseUrl}/lead-labor/deleteLeadLabor/${id}`, {
+        method: 'DELETE',
+        headers
+      });
+
+      // Dismiss loading toast
+      if (loadingToastId) {
+        toast.dismiss(loadingToastId);
+      }
+
+      if (response.ok) {
+        const responseData = await response.json();
+        if (responseData.success) {
+          toast.success('Lead Labour deleted successfully');
+          // Refresh the data
+          fetchLeadLabourData();
+        } else {
+          toast.error(responseData.message || 'Failed to delete lead labour');
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.message || 'Failed to delete lead labour');
+      }
+    } catch (error) {
+      // Make sure to dismiss loading toast even on error
+      if (loadingToastId) {
+        toast.dismiss(loadingToastId);
+      }
+      console.error('Error deleting lead labour:', error);
+      toast.error('Error deleting lead labour. Please try again.');
+    }
   }
 
   const resetForm = () => {
     setFormData({
+      role: '',
       name: '',
       email: '',
       phone: '',
@@ -429,6 +552,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       dateOfJoining: '',
       specialization: '',
       experience: '',
+      status: 'active',
       certifications: [],
       hourlyRate: 0,
       availability: 'available',
@@ -452,6 +576,8 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       },
       agreeToTerms: false
     })
+    setValidationErrors({})
+    setEditingLeadLabour(null)
   }
 
   const handleFileUpload = (type: 'idProof' | 'photo' | 'resume', file: File) => {
@@ -462,13 +588,20 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
         [type]: file
       }
     }))
+    
+    // Clear validation error for the specific file type
+    if (type === 'idProof' && validationErrors.idProof) {
+      setValidationErrors({...validationErrors, idProof: ''})
+    }
   }
 
-  const FileUploadArea = ({ type, label, accept }: { type: 'idProof' | 'photo' | 'resume', label: string, accept: string }) => (
+  const FileUploadArea = ({ type, label, accept, error }: { type: 'idProof' | 'photo' | 'resume', label: string, accept: string, error?: string }) => (
     <div className="space-y-2">
       <Label>{label}</Label>
       <div 
-        className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-[#00A1FF] transition-colors cursor-pointer"
+        className={`border-2 border-dashed rounded-lg p-6 text-center hover:border-[#00A1FF] transition-colors cursor-pointer ${
+          error ? 'border-red-300' : 'border-gray-300'
+        }`}
         onClick={() => document.getElementById(`file-${type}`)?.click()}
       >
         <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
@@ -487,6 +620,12 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       </div>
       {formData.documents[type] && (
         <p className="text-sm text-green-600">✓ {formData.documents[type]!.name}</p>
+      )}
+      {editingLeadLabour && editingLeadLabour.documents?.[type] && !formData.documents[type] && (
+        <p className="text-sm text-blue-600">📄 Current: {editingLeadLabour.documents[type]!.name}</p>
+      )}
+      {error && (
+        <p className="text-sm text-red-500 mt-1">{error}</p>
       )}
     </div>
   )
@@ -554,38 +693,265 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
   document.body.removeChild(link);
 };
 
+
+useEffect(() => {
+  fetchRoles();
+  fetchLeadLabourData();
+}, []);
+
+const fetchRoles = async () => {
+  try {
+    const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const response = await fetch(`${apiBaseUrl}/permissions/roles-with-permissions`, {
+      method: 'GET',
+      headers
+    });
+
+    if (response.ok) {
+      const responseData = await response.json();
+      console.log('API Response:', responseData);
+      
+      // Transform API response to match component's expected format
+      if (responseData.success && responseData.data) {
+        const transformedRoles = responseData.data.map((apiRole: any) => ({
+          id: apiRole.id.toString(),
+          roleName: apiRole.role_name || '',
+          roleType: apiRole.role_type || '',
+          permissions: apiRole.permissions || []
+        }));
+        
+        setRoles(transformedRoles);
+      } else {
+        console.error('Invalid API response structure:', responseData);
+      }
+    } else {
+      console.error('Failed to fetch roles:', response.status, response.statusText);
+    }
+  } catch (error) {
+    console.error('Error fetching roles:', error);
+  }
+};
+
+const fetchLeadLabourData = async () => {
+  try {
+    const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const response = await fetch(`${apiBaseUrl}/lead-labor/getAllLeadLabor`, {
+      method: 'GET',
+      headers
+    });
+
+    if (response.ok) {
+      const responseData = await response.json();
+      if (responseData.success && responseData.data) {
+        // Map API response to component data structure
+        const mappedData = responseData.data.map((item: any) => ({
+          id: item.id,
+          leadLabourId: item.labor_code,
+          name: item.users?.full_name || 'N/A',
+          email: item.users?.email || 'N/A',
+          phone: item.users?.phone || 'N/A',
+          dob: item.dob,
+          address: item.address,
+          notes: item.notes,
+          department: item.department,
+          dateOfJoining: item.date_of_joining,
+          specialization: item.specialization,
+          experience: item.experience,
+          trade: item.trade,
+          idProofUrl: item.id_proof_url,
+          photoUrl: item.photo_url,
+          resumeUrl: item.resume_url,
+          agreedTerms: item.agreed_terms,
+          status: item.users?.status || 'active',
+          role: item.users?.role || 'Lead labor',
+          createdAt: item.created_at,
+          jobsCompleted: 0, // Default value
+          hourlyRate: 0, // Default value
+          availability: 'available', // Default value
+          certifications: [], // Default value
+          lastAssignment: '', // Default value
+          skills: [], // Default value
+          emergencyContact: '', // Default value
+          documents: {
+            idProof: item.id_proof_url ? { name: item.id_proof_url.split('/').pop() || 'ID Proof', url: item.id_proof_url } : null,
+            photo: item.photo_url ? { name: item.photo_url.split('/').pop() || 'Photo', url: item.photo_url } : null,
+            resume: item.resume_url ? { name: item.resume_url.split('/').pop() || 'Resume', url: item.resume_url } : null
+          },
+          permissions: {
+            createJob: false,
+            addClient: false,
+            orderInventoryPrice: false,
+            invoicePrice: false,
+            invoiceGenerate: false,
+            closeJob: false,
+            changeLaborTime: false
+          },
+          agreeToTerms: item.agreed_terms
+        }));
+
+        setLeadLabours(mappedData);
+        
+        // Extract unique departments and specializations
+        const uniqueDepartments = Array.from(new Set(responseData.data.map((item: any) => item.department).filter(Boolean))) as string[];
+        const uniqueSpecializations = Array.from(new Set(responseData.data.map((item: any) => item.specialization).filter(Boolean))) as string[];
+        
+        setDepartments(uniqueDepartments);
+        setSpecializations(uniqueSpecializations);
+      }
+    } else {
+      console.error('Failed to fetch lead labour data:', response.status, response.statusText);
+    }
+  } catch (error) {
+    console.error('Error fetching lead labour data:', error);
+  }
+};
+
+const fetchLeadLabourById = async (id: number) => {
+  try {
+    const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const response = await fetch(`${apiBaseUrl}/lead-labor/getLeadLaborById/${id}`, {
+      method: 'GET',
+      headers
+    });
+
+    if (response.ok) {
+      const responseData = await response.json();
+      if (responseData.success && responseData.data) {
+        const item = responseData.data;
+        // Map API response to component data structure
+        const mappedData: LeadLabour = {
+          id: item.id,
+          leadLabourId: item.labor_code,
+          name: item.users?.full_name || 'N/A',
+          email: item.users?.email || 'N/A',
+          phone: item.users?.phone || 'N/A',
+          dob: item.dob,
+          address: item.address,
+          notes: item.notes,
+          department: item.department,
+          dateOfJoining: item.date_of_joining,
+          specialization: item.specialization,
+          experience: item.experience,
+          trade: item.trade,
+          idProofUrl: item.id_proof_url,
+          photoUrl: item.photo_url,
+          resumeUrl: item.resume_url,
+          agreedTerms: item.agreed_terms,
+          status: item.users?.status || 'active',
+          role: item.users?.role || 'Lead labor',
+          createdAt: item.created_at,
+          jobsCompleted: 0, // Default value
+          hourlyRate: 0, // Default value
+          availability: 'available', // Default value
+          certifications: [], // Default value
+          lastAssignment: '', // Default value
+          skills: [], // Default value
+          emergencyContact: '', // Default value
+          documents: {
+            idProof: item.id_proof_url ? { name: item.id_proof_url.split('/').pop() || 'ID Proof', url: item.id_proof_url } : null,
+            photo: item.photo_url ? { name: item.photo_url.split('/').pop() || 'Photo', url: item.photo_url } : null,
+            resume: item.resume_url ? { name: item.resume_url.split('/').pop() || 'Resume', url: item.resume_url } : null
+          },
+          permissions: {
+            createJob: false,
+            addClient: false,
+            orderInventoryPrice: false,
+            invoicePrice: false,
+            invoiceGenerate: false,
+            closeJob: false,
+            changeLaborTime: false
+          },
+          agreeToTerms: item.agreed_terms
+        };
+
+        setViewingLeadLabour(mappedData);
+        setIsViewDialogOpen(true);
+      }
+    } else {
+      console.error('Failed to fetch lead labour details:', response.status, response.statusText);
+      toast.error('Failed to fetch lead labour details');
+    }
+  } catch (error) {
+    console.error('Error fetching lead labour details:', error);
+    toast.error('Error fetching lead labour details');
+  }
+};
+
+
   const renderForm = () => (
     <div className="max-h-96 overflow-y-auto space-y-6">
       {/* Personal Details Section */}
       <div>
         <h3 className="text-lg font-medium text-[#2b2b2b] mb-4">Personal Details</h3>
         <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+              <Label htmlFor="role">Role *</Label>
+              <Select value={formData.role} onValueChange={(value) => {
+                setFormData({...formData, role: value})
+                if (validationErrors.role) {
+                  setValidationErrors({...validationErrors, role: ''})
+                }
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map((role) => (
+                    <SelectItem key={role.id} value={role.roleName}>
+                      {role.roleName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {validationErrors.role && (
+                <p className="text-sm text-red-500 mt-1">{validationErrors.role}</p>
+              )}
+            </div>
           <div className="space-y-2">
             <Label htmlFor="name">Full Name *</Label>
             <Input
               id="name"
               value={formData.name}
-              onChange={(e) => setFormData({...formData, name: e.target.value})}
+              onChange={(e) => {
+                setFormData({...formData, name: e.target.value})
+                if (validationErrors.name) {
+                  setValidationErrors({...validationErrors, name: ''})
+                }
+              }}
               placeholder="Enter full name"
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="leadLabourId">Lead Labour ID (Auto generated)</Label>
-            <Input
-              id="leadLabourId"
-              value={generateLeadLabourId()}
-              disabled
-              className="bg-gray-100"
-            />
+            {validationErrors.name && (
+              <p className="text-sm text-red-500 mt-1">{validationErrors.name}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="phone">Phone Number *</Label>
             <Input
               id="phone"
               value={formData.phone}
-              onChange={(e) => setFormData({...formData, phone: e.target.value})}
-              placeholder="Enter phone number"
+              onChange={(e) => {
+                // Only allow digits and limit to 10 characters
+                const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                setFormData({...formData, phone: value})
+                if (validationErrors.phone) {
+                  setValidationErrors({...validationErrors, phone: ''})
+                }
+              }}
+              placeholder="Enter 10-digit phone number"
+              className={validationErrors.phone ? 'border-red-500' : ''}
             />
+            {validationErrors.phone && (
+              <p className="text-sm text-red-500 mt-1">{validationErrors.phone}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email *</Label>
@@ -593,9 +959,18 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
               id="email"
               type="email"
               value={formData.email}
-              onChange={(e) => setFormData({...formData, email: e.target.value})}
+              onChange={(e) => {
+                setFormData({...formData, email: e.target.value})
+                if (validationErrors.email) {
+                  setValidationErrors({...validationErrors, email: ''})
+                }
+              }}
               placeholder="Enter your email address"
+              className={validationErrors.email ? 'border-red-500' : ''}
             />
+            {validationErrors.email && (
+              <p className="text-sm text-red-500 mt-1">{validationErrors.email}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="dob">DOB *</Label>
@@ -603,17 +978,45 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
               id="dob"
               type="date"
               value={formData.dob}
-              onChange={(e) => setFormData({...formData, dob: e.target.value})}
+              onChange={(e) => {
+                setFormData({...formData, dob: e.target.value})
+                if (validationErrors.dob) {
+                  setValidationErrors({...validationErrors, dob: ''})
+                }
+              }}
             />
+            {validationErrors.dob && (
+              <p className="text-sm text-red-500 mt-1">{validationErrors.dob}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+              <Label htmlFor="edit-status">Status</Label>
+              <Select value={formData.status} onValueChange={(value: 'active' | 'inactive') => setFormData({...formData, status: value})}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem> 
+                </SelectContent>
+              </Select>
           </div>
           <div className="col-span-2 space-y-2">
             <Label htmlFor="address">Address *</Label>
             <Input
               id="address"
               value={formData.address}
-              onChange={(e) => setFormData({...formData, address: e.target.value})}
+              onChange={(e) => {
+                setFormData({...formData, address: e.target.value})
+                if (validationErrors.address) {
+                  setValidationErrors({...validationErrors, address: ''})
+                }
+              }}
               placeholder="Enter address"
             />
+            {validationErrors.address && (
+              <p className="text-sm text-red-500 mt-1">{validationErrors.address}</p>
+            )}
           </div>
           <div className="col-span-2 space-y-2">
             <Label htmlFor="notes">Notes</Label>
@@ -634,16 +1037,35 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="department">Department *</Label>
-            <Select value={formData.department} onValueChange={(value) => setFormData({...formData, department: value})}>
-              <SelectTrigger>
-                <SelectValue placeholder="Enter department" />
-              </SelectTrigger>
-              <SelectContent>
-                {departments.map((dept) => (
-                  <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <AutoSuggestInput
+              label=""
+              value={formData.department}
+              onChange={(value) => {
+                setFormData({...formData, department: value})
+                if (validationErrors.department) {
+                  setValidationErrors({...validationErrors, department: ''})
+                }
+              }}
+              suggestions={departments}
+              placeholder="Enter department"
+              error={validationErrors.department}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="specialization">Specialization</Label>
+            <AutoSuggestInput
+              label=""
+              value={formData.specialization}
+              onChange={(value) => {
+                setFormData({...formData, specialization: value})
+                if (validationErrors.specialization) {
+                  setValidationErrors({...validationErrors, specialization: ''})
+                }
+              }}
+              suggestions={specializations}
+              placeholder="Enter specialization"
+              error={validationErrors.specialization}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="dateOfJoining">Date of Joining *</Label>
@@ -651,30 +1073,35 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
               id="dateOfJoining"
               type="date"
               value={formData.dateOfJoining}
-              onChange={(e) => setFormData({...formData, dateOfJoining: e.target.value})}
+              onChange={(e) => {
+                setFormData({...formData, dateOfJoining: e.target.value})
+                if (validationErrors.dateOfJoining) {
+                  setValidationErrors({...validationErrors, dateOfJoining: ''})
+                }
+              }}
+              className={validationErrors.dateOfJoining ? 'border-red-500' : ''}
             />
+            {validationErrors.dateOfJoining && (
+              <p className="text-sm text-red-500 mt-1">{validationErrors.dateOfJoining}</p>
+            )}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="specialization">Specialization</Label>
-            <Select value={formData.specialization} onValueChange={(value) => setFormData({...formData, specialization: value})}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select specialization" />
-              </SelectTrigger>
-              <SelectContent>
-                {specializations.map((spec) => (
-                  <SelectItem key={spec} value={spec}>{spec}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+         
           <div className="space-y-2">
             <Label htmlFor="experience">Experience</Label>
             <Input
               id="experience"
               value={formData.experience}
-              onChange={(e) => setFormData({...formData, experience: e.target.value})}
+              onChange={(e) => {
+                setFormData({...formData, experience: e.target.value})
+                if (validationErrors.experience) {
+                  setValidationErrors({...validationErrors, experience: ''})
+                }
+              }}
               placeholder="e.g., 5 years"
             />
+            {validationErrors.experience && (
+              <p className="text-sm text-red-500 mt-1">{validationErrors.experience}</p>
+            )}
           </div>
         </div>
       </div>
@@ -683,9 +1110,9 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       <div>
         <h3 className="text-lg font-medium text-[#2b2b2b] mb-4">Document Upload</h3>
         <div className="grid grid-cols-3 gap-4">
-          <FileUploadArea type="idProof" label="Select ID Proof *" accept=".pdf,.jpg,.jpeg,.png" />
-          <FileUploadArea type="photo" label="Photo Upload *" accept=".jpg,.jpeg,.png" />
-          <FileUploadArea type="resume" label="Resume Upload (Optional)" accept=".pdf,.doc,.docx" />
+          <FileUploadArea type="idProof" label="Select ID Proof *" accept=".pdf,.jpg,.jpeg,.png" error={validationErrors.idProof} />
+          <FileUploadArea type="photo" label="Photo Upload" accept=".jpg,.jpeg,.png" />
+          <FileUploadArea type="resume" label="Resume Upload" accept=".pdf,.doc,.docx" />
         </div>
       </div>
 
@@ -694,42 +1121,19 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
         <Checkbox
           id="agreeToTerms"
           checked={formData.agreeToTerms}
-          onCheckedChange={(checked) => setFormData({...formData, agreeToTerms: checked as boolean})}
+          onCheckedChange={(checked) => {
+            setFormData({...formData, agreeToTerms: checked as boolean})
+            if (validationErrors.agreeToTerms) {
+              setValidationErrors({...validationErrors, agreeToTerms: ''})
+            }
+          }}
         />
         <Label htmlFor="agreeToTerms" className="text-sm">
           Agreement to terms and conditions
         </Label>
-      </div>
-
-      {/* Permissions Section */}
-      <div>
-        <h3 className="text-lg font-medium text-[#2b2b2b] mb-4">Permissions</h3>
-        <div className="grid grid-cols-2 gap-4">
-          {Object.entries(formData.permissions).map(([key, value]) => (
-            <div key={key} className="flex items-center space-x-2">
-              <Checkbox
-                id={key}
-                checked={value}
-                onCheckedChange={(checked) => setFormData({
-                  ...formData,
-                  permissions: {
-                    ...formData.permissions,
-                    [key]: checked as boolean
-                  }
-                })}
-              />
-              <Label htmlFor={key} className="text-sm">
-                {key === 'createJob' && 'Create Job'}
-                {key === 'addClient' && 'Add Client/Customer'}
-                {key === 'orderInventoryPrice' && 'Order Inventory Price'}
-                {key === 'invoicePrice' && 'Invoice Price'}
-                {key === 'invoiceGenerate' && 'Invoice Generate'}
-                {key === 'closeJob' && 'Close Job'}
-                {key === 'changeLaborTime' && 'Change Labor Time'}
-              </Label>
-            </div>
-          ))}
-        </div>
+        {validationErrors.agreeToTerms && (
+          <p className="text-sm text-red-500 mt-1">{validationErrors.agreeToTerms}</p>
+        )}
       </div>
     </div>
   )
@@ -751,6 +1155,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
             <Download className="h-4 w-4" />
             Export
           </Button>
+          {canCreateLeadLabour && (
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2">
@@ -764,7 +1169,10 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
               </DialogHeader>
               {renderForm()}
               <div className="flex justify-end gap-3 mt-6">
-                <Button variant="outline" onClick={() => {setIsCreateDialogOpen(false); resetForm();}}>
+                  <Button variant="outline" onClick={() => {
+                    setIsCreateDialogOpen(false);
+                    resetForm();
+                  }}>
                   Cancel
                 </Button>
                 <Button onClick={handleCreate} className="bg-primary text-white hover:bg-[#0090e6]">
@@ -773,6 +1181,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
               </div>
             </DialogContent>
           </Dialog>
+          )}
         </div>
       </div>
 
@@ -785,9 +1194,9 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
                 <HardHat className="h-6 w-6 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Available</p>
+                <p className="text-sm text-gray-600">Active</p>
                 <p className="text-2xl font-medium text-[#2b2b2b]">
-                  {leadLabours.filter(l => l.availability === 'available').length}
+                  {leadLabours.filter(l => l.status === 'active').length}
                 </p>
               </div>
             </div>
@@ -797,13 +1206,13 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Calendar className="h-6 w-6 text-blue-600" />
+              <div className="p-2 bg-red-100 rounded-lg">
+                <Calendar className="h-6 w-6 text-red-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Assigned</p>
+                <p className="text-sm text-gray-600">Inactive</p>
                 <p className="text-2xl font-medium text-[#2b2b2b]">
-                  {leadLabours.filter(l => l.availability === 'assigned').length}
+                  {leadLabours.filter(l => l.status === 'inactive').length}
                 </p>
               </div>
             </div>
@@ -870,16 +1279,14 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
                 </SelectContent>
               </Select>
 
-              <Select value={filterAvailability} onValueChange={setFilterAvailability}>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
                 <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Filter by Availability" />
+                  <SelectValue placeholder="Filter by Status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="available">Available</SelectItem>
-                  <SelectItem value="assigned">Assigned</SelectItem>
-                  <SelectItem value="on-leave">On Leave</SelectItem>
-                  <SelectItem value="unavailable">Unavailable</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -907,7 +1314,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
                 <TableHead className="text-white font-medium">Specialization</TableHead>
                 <TableHead className="text-white font-medium">Experience</TableHead>
                 <TableHead className="text-white font-medium">Jobs Completed</TableHead>
-                <TableHead className="text-white font-medium">Availability</TableHead>
+                <TableHead className="text-white font-medium">Status</TableHead>
                 <TableHead className="text-white font-medium">Date Joined</TableHead>
                 <TableHead className="text-white font-medium">Action</TableHead>
               </TableRow>
@@ -918,7 +1325,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
                   <TableCell>
                     <input type="checkbox" className="rounded border-gray-300" />
                   </TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">#{labour.leadLabourId}</TableCell>
+                  <TableCell className="text-sm text-[#2b2b2b]/80">{labour.id}</TableCell>
                   <TableCell>
                     <div>
                       <div className="text-sm font-medium text-[#2b2b2b]/80">{labour.name}</div>
@@ -938,18 +1345,18 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
                   <TableCell className="text-sm text-[#2b2b2b]/80">{labour.specialization}</TableCell>
                   <TableCell className="text-sm text-[#2b2b2b]/80">{labour.experience}</TableCell>
                   <TableCell className="text-sm text-[#2b2b2b]/80">{labour.jobsCompleted}</TableCell>
-                  <TableCell>{getAvailabilityBadge(labour.availability)}</TableCell>
+                  <TableCell>{getStatusBadge(labour.status || 'active')}</TableCell>
                   <TableCell className="text-sm text-gray-900">{labour.dateOfJoining}</TableCell>
                   <TableCell>
                     <ActionButtonsPopup
-                      onView={onViewDetails ? () => onViewDetails(labour.id) : undefined}
+                      onView={() => handleView(labour.id)}
                       onEdit={() => handleEdit(labour)}
                       onDelete={() => handleDelete(labour.id)}
                       itemName={labour.name}
                       itemType="Lead Labour"
-                      showView={!!onViewDetails}
-                      showEdit={true}
-                      showDelete={true}
+                      showView={canViewLeadLabour}
+                      showEdit={canEditLeadLabour}
+                      showDelete={canDeleteLeadLabour}
                     />
                   </TableCell>
                 </TableRow>
@@ -999,11 +1406,153 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
           </DialogHeader>
           {renderForm()}
           <div className="flex justify-end gap-3 mt-6">
-            <Button variant="outline" onClick={() => {setIsEditDialogOpen(false); resetForm();}}>
+            <Button variant="outline" onClick={() => {
+              setIsEditDialogOpen(false);
+              resetForm();
+            }}>
               Cancel
             </Button>
             <Button onClick={handleUpdate} className="bg-primary text-white hover:bg-[#0090e6]">
               Update Lead Labour
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Dialog */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="max-w-4xl sm:max-w-[700px] max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Lead Labour Details</DialogTitle>
+          </DialogHeader>
+          {viewingLeadLabour && (
+            <div className="max-h-96 overflow-y-auto space-y-6">
+              {/* Personal Details Section */}
+              <div>
+                <h3 className="text-lg font-medium text-[#2b2b2b] mb-4">Personal Details</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Role</Label>
+                    <div className="p-2 bg-gray-50 rounded border">{viewingLeadLabour.role}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Full Name</Label>
+                    <div className="p-2 bg-gray-50 rounded border">{viewingLeadLabour.name}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Phone Number</Label>
+                    <div className="p-2 bg-gray-50 rounded border">{viewingLeadLabour.phone}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <div className="p-2 bg-gray-50 rounded border">{viewingLeadLabour.email}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Date of Birth</Label>
+                    <div className="p-2 bg-gray-50 rounded border">{viewingLeadLabour.dob}</div>
+                  </div>
+                  <div className="col-span-2 space-y-2">
+                    <Label>Address</Label>
+                    <div className="p-2 bg-gray-50 rounded border">{viewingLeadLabour.address}</div>
+                  </div>
+                  <div className="col-span-2 space-y-2">
+                    <Label>Notes</Label>
+                    <div className="p-2 bg-gray-50 rounded border">{viewingLeadLabour.notes}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Job Details Section */}
+              <div>
+                <h3 className="text-lg font-medium text-[#2b2b2b] mb-4">Job Details</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Department</Label>
+                    <div className="p-2 bg-gray-50 rounded border">{viewingLeadLabour.department}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Date of Joining</Label>
+                    <div className="p-2 bg-gray-50 rounded border">{viewingLeadLabour.dateOfJoining}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Specialization</Label>
+                    <div className="p-2 bg-gray-50 rounded border">{viewingLeadLabour.specialization}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Experience</Label>
+                    <div className="p-2 bg-gray-50 rounded border">{viewingLeadLabour.experience}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Trade</Label>
+                    <div className="p-2 bg-gray-50 rounded border">{viewingLeadLabour.trade}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <div className="p-2 bg-gray-50 rounded border">{viewingLeadLabour.status}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Document Links Section */}
+              <div>
+                <h3 className="text-lg font-medium text-[#2b2b2b] mb-4">Documents</h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>ID Proof</Label>
+                    {viewingLeadLabour.idProofUrl ? (
+                      <a href={viewingLeadLabour.idProofUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                        View ID Proof
+                      </a>
+                    ) : (
+                      <div className="p-2 bg-gray-50 rounded border text-gray-500">No document</div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Photo</Label>
+                    {viewingLeadLabour.photoUrl ? (
+                      <a href={viewingLeadLabour.photoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                        View Photo
+                      </a>
+                    ) : (
+                      <div className="p-2 bg-gray-50 rounded border text-gray-500">No document</div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Resume</Label>
+                    {viewingLeadLabour.resumeUrl ? (
+                      <a href={viewingLeadLabour.resumeUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                        View Resume
+                      </a>
+                    ) : (
+                      <div className="p-2 bg-gray-50 rounded border text-gray-500">No document</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Info */}
+              <div>
+                <h3 className="text-lg font-medium text-[#2b2b2b] mb-4">Additional Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Labor Code</Label>
+                    <div className="p-2 bg-gray-50 rounded border">{viewingLeadLabour.leadLabourId}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Created At</Label>
+                    <div className="p-2 bg-gray-50 rounded border">{viewingLeadLabour.createdAt ? new Date(viewingLeadLabour.createdAt).toLocaleDateString() : 'N/A'}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Agreed to Terms</Label>
+                    <div className="p-2 bg-gray-50 rounded border">{viewingLeadLabour.agreeToTerms ? 'Yes' : 'No'}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="flex justify-end gap-3 mt-6">
+            <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
+              Close
             </Button>
           </div>
         </DialogContent>

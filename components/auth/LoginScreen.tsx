@@ -66,7 +66,10 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
         if (data.success && data.data?.token) {
           // Store authentication data in localStorage
           const authData = {
-            user: data.data.user,
+            user: {
+              ...data.data.user,
+              permissions: data.data.permissions || [] // Store permissions
+            },
             token: data.data.token,
             expires: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
           }
@@ -77,17 +80,34 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
           document.cookie = `auth-token=${data.data.token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
           document.cookie = `jdp_auth=${JSON.stringify(authData)}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
           
+          // Dispatch custom event to notify PermissionContext to refresh
+          window.dispatchEvent(new CustomEvent('permissionsUpdated'));
+          
           // Dispatch login success action
           dispatch(loginSuccess({
-            user: data.data.user,
+            user: authData.user,
             token: data.data.token
           }))
           
           toast.success('Logged in successfully')
           onAuthSuccess(true)
           
-          // Redirect to dashboard
-          router.push('/dashboard')
+          // Redirect based on user role
+          console.log('=== LOGIN DEBUG ===');
+          console.log('Full API response:', data);
+          console.log('User data:', data.data.user);
+          console.log('User role:', data.data.user.role);
+          console.log('Role comparison:', data.data.user.role === 'Super Admin');
+          console.log('Role type:', typeof data.data.user.role);
+          console.log('Role length:', data.data.user.role.length); 
+          
+          if (data.data.user.role === 'Super Admin') {
+            console.log('✅ Redirecting Super Admin to /superDashboard');
+            router.push('/superDashboard')
+          } else {
+            console.log('✅ Redirecting regular user to /dashboard');
+            router.push('/dashboard')
+          }
         } else {
           toast.error(data.message || 'Login failed')
         }
@@ -115,6 +135,11 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
     if (errors.password) {
       setErrors(prev => ({ ...prev, password: undefined }))
     }
+  }
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
+    e.preventDefault()
+    handleSignIn()
   }
 
   return (
@@ -163,7 +188,7 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
           </p>
         </div>
         
-        <div className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* Email Field */}
           <div>
             <label className="text-[18px] font-medium text-gray-900 block mb-2">
@@ -271,7 +296,7 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
           
           {/* Sign In Button */}
           <Button
-            onClick={handleSignIn}
+            type="submit"
             disabled={isLoading}
             className="w-full h-[50px] bg-primary text-white hover:bg-[#0090e6] text-white rounded-full text-[18px] font-medium"
           >
@@ -291,7 +316,7 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
               </button>
             </p>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   )

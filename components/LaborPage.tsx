@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from './ui/textarea'
 import { Checkbox } from './ui/checkbox'
 import { ActionButtonsPopup } from './ActionButtonsPopup'
+import { usePermissions } from '../contexts/PermissionContext'
 import { toast } from 'sonner'
 import { 
   Plus, 
@@ -145,6 +146,7 @@ const skillOptions = [
 ]
 
 export function LaborPage({ onViewDetails }: LaborPageProps) {
+  const { hasPermission, permissions } = usePermissions()
   const [laborers, setLaborers] = useState<Labor[]>(initialLaborData)
   const [searchTerm, setSearchTerm] = useState('')
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
@@ -154,6 +156,15 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
   const [filterAvailability, setFilterAvailability] = useState<string>('all')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
+
+  // Check if user is admin (has no specific permissions but should see all actions)
+  const isAdmin = permissions.length === 0
+
+  // Permission checks for labour module
+  const canViewLabour = isAdmin || hasPermission('labour', 'view')
+  const canCreateLabour = isAdmin || hasPermission('labour', 'create')
+  const canEditLabour = isAdmin || hasPermission('labour', 'edit')
+  const canDeleteLabour = isAdmin || hasPermission('labour', 'delete')
 
   const [formData, setFormData] = useState<LaborFormData>({
     name: '',
@@ -578,28 +589,30 @@ function downloadCSV(data: Labor[], filename: string) {
             <Download className="h-4 w-4" />
             Export
           </Button>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2">
-                <Plus className="h-4 w-4" />
-                Add Labor Worker
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh]">
-              <DialogHeader>
-                <DialogTitle>Add New Labor Worker</DialogTitle>
-              </DialogHeader>
-              {renderForm()}
-              <div className="flex justify-end gap-3 mt-6">
-                <Button variant="outline" onClick={() => {setIsCreateDialogOpen(false); resetForm();}}>
-                  Cancel
+          {canCreateLabour && (
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Labor Worker
                 </Button>
-                <Button onClick={handleCreate} className="bg-primary text-white hover:bg-[#0090e6]">
-                  Create Labor Worker
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh]">
+                <DialogHeader>
+                  <DialogTitle>Add New Labor Worker</DialogTitle>
+                </DialogHeader>
+                {renderForm()}
+                <div className="flex justify-end gap-3 mt-6">
+                  <Button variant="outline" onClick={() => {setIsCreateDialogOpen(false); resetForm();}}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleCreate} className="bg-primary text-white hover:bg-[#0090e6]">
+                    Create Labor Worker
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
 
@@ -774,9 +787,9 @@ function downloadCSV(data: Labor[], filename: string) {
                       onDelete={() => handleDelete(labor.id)}
                       itemName={labor.name}
                       itemType="Labor Worker"
-                      showView={!!onViewDetails}
-                      showEdit={true}
-                      showDelete={true}
+                      showView={!!onViewDetails && canViewLabour}
+                      showEdit={canEditLabour}
+                      showDelete={canDeleteLabour}
                     />
                   </TableCell>
                 </TableRow>

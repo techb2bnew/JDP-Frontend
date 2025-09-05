@@ -40,7 +40,7 @@ export const getAuthData = (): { user: User; expires: number } | null => {
 // Authentication utility functions
 
 /**
- * Clear all authentication data from localStorage and cookies
+ * Clear all authentication data from localStorage, sessionStorage and cookies
  */
 export const clearAuthData = async (): Promise<void> => {
   if (typeof window === 'undefined') return
@@ -56,34 +56,83 @@ export const clearAuthData = async (): Promise<void> => {
     // Continue with local cleanup even if API call fails
   }
 
+  // Clear localStorage - remove all auth-related items
+  const localStorageKeys = [
+    'jdp_auth',
+    'isAuthenticated', 
+    'auth-token',
+    'user',
+    'token',
+    'authData',
+    'userData',
+    'permissions',
+    'role'
+  ]
+  
+  localStorageKeys.forEach(key => {
+    localStorage.removeItem(key)
+  })
+
+  // Clear sessionStorage - remove all auth-related items
+  const sessionStorageKeys = [
+    'jdp_auth',
+    'isAuthenticated',
+    'auth-token', 
+    'user',
+    'token',
+    'authData',
+    'userData',
+    'permissions',
+    'role'
+  ]
+  
+  sessionStorageKeys.forEach(key => {
+    sessionStorage.removeItem(key)
+  })
+
+  // Clear all localStorage and sessionStorage items that contain auth-related keywords
+  const authKeywords = ['auth', 'token', 'user', 'login', 'session']
+  
   // Clear localStorage
-  localStorage.removeItem('jdp_auth')
-  localStorage.removeItem('isAuthenticated')
-  localStorage.removeItem('auth-token')
-  localStorage.removeItem('user')
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const key = localStorage.key(i)
+    if (key && authKeywords.some(keyword => key.toLowerCase().includes(keyword))) {
+      localStorage.removeItem(key)
+    }
+  }
+  
+  // Clear sessionStorage
+  for (let i = sessionStorage.length - 1; i >= 0; i--) {
+    const key = sessionStorage.key(i)
+    if (key && authKeywords.some(keyword => key.toLowerCase().includes(keyword))) {
+      sessionStorage.removeItem(key)
+    }
+  }
   
   // Clear client-side cookies by setting them to expire in the past with all possible attributes
-  // Clear auth-token cookie with all possible combinations of attributes
-  document.cookie = 'auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
-  document.cookie = 'auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=;'
-  document.cookie = 'auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; secure;'
-  document.cookie = 'auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; secure; samesite=strict;'
-  document.cookie = 'auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; secure; samesite=lax;'
-  document.cookie = 'auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; secure; samesite=none;'
+  const cookieNames = ['auth-token', 'jdp_auth', 'token', 'session', 'auth']
   
-  // Clear jdp_auth cookie
-  document.cookie = 'jdp_auth=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
-  document.cookie = 'jdp_auth=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=;'
+  cookieNames.forEach(cookieName => {
+    // Clear with various path and domain combinations
+    document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`
+    document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname};`
+    document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${window.location.hostname};`
+    document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; secure;`
+    document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; secure; samesite=strict;`
+    document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; secure; samesite=lax;`
+    document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; secure; samesite=none;`
+  })
   
   // Clear any other auth-related cookies with various attribute combinations
   const cookies = document.cookie.split(';')
   cookies.forEach(cookie => {
     const eqPos = cookie.indexOf('=')
     const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim()
-    if (name.includes('auth') || name.includes('token')) {
+    if (name && authKeywords.some(keyword => name.toLowerCase().includes(keyword))) {
       // Try multiple combinations to ensure cookie is cleared
       document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`
-      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=;`
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname};`
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${window.location.hostname};`
       document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; secure;`
       document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; secure; samesite=strict;`
       document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; secure; samesite=lax;`
@@ -93,10 +142,14 @@ export const clearAuthData = async (): Promise<void> => {
   
   // Force clear by setting empty value with current timestamp
   const now = new Date()
-  document.cookie = `auth-token=; expires=${now.toUTCString()}; path=/;`
-  document.cookie = `jdp_auth=; expires=${now.toUTCString()}; path=/;`
+  cookieNames.forEach(cookieName => {
+    document.cookie = `${cookieName}=; expires=${now.toUTCString()}; path=/;`
+    document.cookie = `${cookieName}=; expires=${now.toUTCString()}; path=/; domain=${window.location.hostname};`
+  })
   
   console.log('Auth data cleared. Current cookies:', document.cookie)
+  console.log('localStorage cleared. Remaining items:', Object.keys(localStorage))
+  console.log('sessionStorage cleared. Remaining items:', Object.keys(sessionStorage))
 }
 
 /**
@@ -104,6 +157,17 @@ export const clearAuthData = async (): Promise<void> => {
  */
 export const logout = async (): Promise<void> => {
   await clearAuthData()
+}
+
+/**
+ * Force logout and redirect to login page
+ * This function can be used anywhere in the app for immediate logout
+ */
+export const forceLogout = async (): Promise<void> => {
+  await clearAuthData()
+  if (typeof window !== 'undefined') {
+    window.location.href = '/login'
+  }
 }
 
 /**
@@ -163,4 +227,73 @@ export const getUserData = (): any => {
   }
   
   return null
+}
+
+/**
+ * Update user permissions in localStorage and notify PermissionContext
+ */
+export const updateUserPermissions = (newPermissions: any[]): void => {
+  if (typeof window !== 'undefined') {
+    const authData = localStorage.getItem('jdp_auth')
+    if (authData) {
+      try {
+        const parsed = JSON.parse(authData)
+        if (parsed.user) {
+          // Update the user's permissions
+          parsed.user.permissions = newPermissions
+          
+          // Save back to localStorage
+          localStorage.setItem('jdp_auth', JSON.stringify(parsed))
+          
+          // Dispatch custom event to notify PermissionContext
+          window.dispatchEvent(new CustomEvent('permissionsUpdated'))
+          
+          console.log('User permissions updated in localStorage:', newPermissions)
+        }
+      } catch (error) {
+        console.error('Error updating user permissions:', error)
+      }
+    }
+  }
+}
+
+/**
+ * Refresh user permissions from API and update localStorage
+ * This can be called when permissions are updated on the server
+ */
+export const refreshUserPermissions = async (): Promise<void> => {
+  if (typeof window === 'undefined') return
+  
+  try {
+    const authData = localStorage.getItem('jdp_auth')
+    if (!authData) return
+    
+    const parsed = JSON.parse(authData)
+    if (!parsed.user || !parsed.token) return
+    
+    // Fetch updated user data from API
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${parsed.token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    if (response.ok) {
+      const userData = await response.json()
+      if (userData.success && userData.data) {
+        // Update user data in localStorage
+        parsed.user = userData.data
+        localStorage.setItem('jdp_auth', JSON.stringify(parsed))
+        
+        // Notify PermissionContext
+        window.dispatchEvent(new CustomEvent('permissionsUpdated'))
+        
+        console.log('User permissions refreshed from API:', userData.data.permissions)
+      }
+    }
+  } catch (error) {
+    console.error('Error refreshing user permissions:', error)
+  }
 }

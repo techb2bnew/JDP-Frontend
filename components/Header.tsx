@@ -23,16 +23,23 @@ interface HeaderProps {
   onLogout: () => void
   onNotificationViewAll: () => void
   onProfileClick: () => void
+  isSuperAdmin?: boolean
 }
 
 export function Header({ 
   currentPage, 
   onLogout, 
   onNotificationViewAll, 
-  onProfileClick 
+  onProfileClick,
+  isSuperAdmin = false
 }: HeaderProps) {
   const [showNotifications, setShowNotifications] = useState(false)
   const { theme, toggleTheme, isLoading } = useTheme()
+
+  // If super admin, don't show header
+  if (isSuperAdmin) {
+    return null;
+  }
 
   const getPageTitle = (page: string): string => {
     const titles: Record<string, string> = {

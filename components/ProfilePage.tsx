@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
@@ -8,6 +8,8 @@ import { Separator } from './ui/separator'
 import { Badge } from './ui/badge'
 import { Textarea } from './ui/textarea'
 import { toast } from 'sonner'
+import { apiClient } from '../utils/api'
+import { getUserData, logout } from '../utils/auth'
 import { 
   User,
   Mail,
@@ -28,7 +30,8 @@ import {
   UserCheck,
   Key,
   AlertTriangle,
-  Info
+  Info,
+  RefreshCw
 } from 'lucide-react'
 
 interface ProfilePageProps {
@@ -41,21 +44,22 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [profileError, setProfileError] = useState<string | null>(null)
 
   const [profileData, setProfileData] = useState({
-    firstName: 'Admin',
-    lastName: 'User',
-    email: 'admin@jdp.com',
-    phone: '+1 (555) 123-4567',
-    address: '123 Main Street, City, State 12345',
-    department: 'Administration',
-    role: 'System Administrator',
-    employeeId: 'EMP-001',
-    dateOfBirth: '1990-01-15',
-    emergencyContact: '+1 (555) 987-6543',
-    bio: 'Experienced system administrator with expertise in managing enterprise-level applications and ensuring optimal system performance.',
-    jobTitle: 'Senior System Administrator',
-    company: 'JDP',
+    fullName: '',
+    email: '',
+    phone: '',
+    address: '',
+    department: '',
+    role: '',
+    employeeId: '',
+    dateOfBirth: '',
+    emergencyContact: '',
+    bio: '',
+    position: '',
+    company: '',
     workLocation: 'Head Office - Building A'
   })
 
@@ -69,6 +73,95 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
     score: 0,
     feedback: []
   })
+
+  // Fetch profile data on component mount
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      try {
+        setIsLoading(true)
+        setProfileError(null)
+        
+        const userData = getUserData()
+        if (!userData || !userData.id) {
+          throw new Error('User data not found. Please login again.')
+        }
+
+        const response = await apiClient.getUserProfile(userData.id.toString())
+        
+        if (response.success && response.data?.user) {
+          const user = response.data.user
+          setProfileData({
+            fullName: user.full_name || '',
+            email: user.email || '',
+            phone: user.phone || '',
+            address: '', // Not provided in API response
+            department: '', // Not provided in API response
+            role: user.role || '',
+            employeeId: user.id?.toString() || '',
+            dateOfBirth: '', // Not provided in API response
+            emergencyContact: '', // Not provided in API response
+            bio: '', // Not provided in API response
+            position: user.role || '',
+            company: 'JDP',
+            workLocation: 'Head Office - Building A'
+          })
+        } else {
+          throw new Error(response.message || 'Failed to fetch profile data')
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error)
+        setProfileError(error instanceof Error ? error.message : 'Failed to load profile')
+        toast.error('Failed to load profile data')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchProfileData()
+  }, [])
+
+  // Function to refresh profile data
+  const refreshProfileData = async () => {
+    try {
+      setIsLoading(true)
+      setProfileError(null)
+      
+      const userData = getUserData()
+      if (!userData || !userData.id) {
+        throw new Error('User data not found. Please login again.')
+      }
+
+      const response = await apiClient.getUserProfile(userData.id.toString())
+      
+      if (response.success && response.data?.user) {
+        const user = response.data.user
+        setProfileData({
+          fullName: user.full_name || '',
+          email: user.email || '',
+          phone: user.phone || '',
+          address: '', // Not provided in API response
+          department: '', // Not provided in API response
+          role: user.role || '',
+          employeeId: user.id?.toString() || '',
+          dateOfBirth: '', // Not provided in API response
+          emergencyContact: '', // Not provided in API response
+          bio: '', // Not provided in API response
+          position: user.role || '',
+          company: 'JDP',
+          workLocation: 'Head Office - Building A'
+        })
+        toast.success('Profile data refreshed successfully!')
+      } else {
+        throw new Error(response.message || 'Failed to fetch profile data')
+      }
+    } catch (error) {
+      console.error('Error refreshing profile:', error)
+      setProfileError(error instanceof Error ? error.message : 'Failed to refresh profile')
+      toast.error('Failed to refresh profile data')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const checkPasswordStrength = (password: string) => {
     let score = 0
@@ -92,26 +185,58 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
     setPasswordStrength({ score, feedback:[] })
   }
 
-  const handleProfileUpdate = () => {
+  const handleProfileUpdate = async () => {
     // Validate required fields
-    if (!profileData.firstName || !profileData.lastName || !profileData.email) {
+    if (!profileData.fullName || !profileData.email) {
       toast.error('Please fill in all required fields!')
       return
     }
 
-    // Simulate API call with loading state
-    const loadingToast = toast.loading('Updating profile...')
-    
-    setTimeout(() => {
+    try {
+      const loadingToast = toast.loading('Updating profile...')
+      
+      // Get user ID from auth data
+      const userData = getUserData()
+      if (!userData?.id) {
+        toast.error('User ID not found')
+        return
+      }
+
+      const profilePayload = {
+        full_name: profileData.fullName,
+        email: profileData.email,
+        phone: profileData.phone,
+        job_title: profileData.position,
+        department: profileData.department,
+        address: profileData.address,
+        bio: profileData.bio,
+        emergency_contact: profileData.emergencyContact,
+        date_of_birth: profileData.dateOfBirth,
+        employee_id: "EMP-001", // This could be dynamic based on user data
+        system_role: profileData.position // Using position as system_role for now
+      }
+
+      const response = await apiClient.updateUserProfile(userData.id.toString(), profilePayload)
+
       toast.dismiss(loadingToast)
-      toast.success('Profile updated successfully!', {
-        description: 'Your changes have been saved and are now active.',
-      })
-      setIsEditingProfile(false)
-    }, 1500)
+
+      if (response.success) {
+        toast.success('Profile updated successfully!', {
+          description: 'Your changes have been saved and are now active.',
+        })
+        setIsEditingProfile(false)
+        // Refresh profile data
+        await refreshProfileData()
+      } else {
+        toast.error(response.message || 'Failed to update profile')
+      }
+    } catch (error) {
+      toast.dismiss()
+      toast.error(error instanceof Error ? error.message : 'Failed to update profile')
+    }
   }
 
-  const handlePasswordChange = () => {
+  const handlePasswordChange = async () => {
     if (!passwordData.currentPassword) {
       toast.error('Current password is required!')
       return
@@ -132,14 +257,27 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
       return
     }
 
-    // Simulate API call with loading state
+    // Get current user data
+    const userData = getUserData()
+    if (!userData || !userData.id) {
+      toast.error('User data not found. Please login again.')
+      return
+    }
+
     const loadingToast = toast.loading('Changing password...')
     
-    setTimeout(() => {
+    try {
+      await apiClient.changePassword(
+        userData.id,
+        passwordData.currentPassword,
+        passwordData.newPassword
+      )
+      
       toast.dismiss(loadingToast)
       toast.success('Password changed successfully!', {
         description: 'For security, you will be logged out in 30 seconds.',
       })
+      
       setIsChangingPassword(false)
       setPasswordData({
         currentPassword: '',
@@ -147,7 +285,17 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
         confirmPassword: ''
       })
       setPasswordStrength({ score: 0, feedback: [] })
-    }, 1500)
+      
+      // Auto logout after 30 seconds for security
+      setTimeout(async () => {
+        await logout()
+        window.location.href = '/login'
+      }, 30000)
+      
+    } catch (error) {
+      toast.dismiss(loadingToast)
+      toast.error(error instanceof Error ? error.message : 'Failed to change password')
+    }
   }
 
   const cancelPasswordChange = () => {
@@ -177,6 +325,38 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
     return 'Strong'
   }
 
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading profile...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (profileError) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Failed to Load Profile</h3>
+            <p className="text-muted-foreground mb-4">{profileError}</p>
+            <Button onClick={() => window.location.reload()}>
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -201,6 +381,16 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
           </div>
         </div>
         <div className="flex gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refreshProfileData}
+            disabled={isLoading}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           <Badge className="bg-green-50 text-green-600 border-green-200 hover:bg-green-50">
             <CheckCircle className="h-3 w-3 mr-1" />
             Account Active
@@ -234,35 +424,21 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
               </Button>
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName" className="text-sm font-medium text-gray-700">
-                    First Name *
+                  <Label htmlFor="fullName" className="text-sm font-medium text-gray-700">
+                    Full Name *
                   </Label>
                   <Input
-                    id="firstName"
-                    value={profileData.firstName}
+                    id="fullName"
+                    value={profileData.fullName}
                     onChange={(e) => setProfileData(prev => ({
                       ...prev,
-                      firstName: e.target.value
+                      fullName: e.target.value
                     }))}
                     disabled={!isEditingProfile}
                     className={`${!isEditingProfile ? 'bg-gray-50 text-gray-600' : 'bg-white'}`}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName" className="text-sm font-medium text-gray-700">
-                    Last Name *
-                  </Label>
-                  <Input
-                    id="lastName"
-                    value={profileData.lastName}
-                    onChange={(e) => setProfileData(prev => ({
-                      ...prev,
-                      lastName: e.target.value
-                    }))}
-                    disabled={!isEditingProfile}
-                    className={`${!isEditingProfile ? 'bg-gray-50 text-gray-600' : 'bg-white'}`}
+                    placeholder="Enter your full name"
                   />
                 </div>
               </div>
@@ -303,18 +479,19 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="jobTitle" className="text-sm font-medium text-gray-700">
-                    Job Title
+                  <Label htmlFor="position" className="text-sm font-medium text-gray-700">
+                    Position
                   </Label>
                   <Input
-                    id="jobTitle"
-                    value={profileData.jobTitle}
+                    id="position"
+                    value={profileData.position}
                     onChange={(e) => setProfileData(prev => ({
                       ...prev,
-                      jobTitle: e.target.value
+                      position: e.target.value
                     }))}
                     disabled={!isEditingProfile}
                     className={`${!isEditingProfile ? 'bg-gray-50 text-gray-600' : 'bg-white'}`}
+                    placeholder="Enter your position"
                   />
                 </div>
                 <div className="space-y-2">
@@ -678,7 +855,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
               <div className="relative inline-block mb-4">
                 <Avatar className="w-24 h-24 mx-auto">
                   <AvatarFallback className="bg-primary text-white text-2xl font-medium">
-                    {profileData.firstName.charAt(0)}{profileData.lastName.charAt(0)}
+                    {profileData.fullName.split(' ').map(name => name.charAt(0)).join('').toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <Button
@@ -690,9 +867,9 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
               </div>
               
               <h3 className="font-medium text-gray-900 mb-1">
-                {profileData.firstName} {profileData.lastName}
+                {profileData.fullName}
               </h3>
-              <p className="text-sm text-gray-600">{profileData.jobTitle}</p>
+              <p className="text-sm text-gray-600">{profileData.position}</p>
               <p className="text-sm text-gray-600">{profileData.department}</p>
               
               <Separator className="my-4" />

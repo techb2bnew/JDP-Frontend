@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -9,7 +9,10 @@ import { Label } from './ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { ActionButtonsPopup } from './ActionButtonsPopup'
 import { StaffDetailsPage } from './StaffDetailsPage'
+import { AutoSuggestInput } from './ui/auto-suggest-input'
 import { toast } from 'sonner'
+import { apiClient } from '../utils/api'
+import { usePermissions } from '../contexts/PermissionContext'
 import { 
   Plus, 
   Search, 
@@ -22,11 +25,13 @@ interface Staff {
   name: string
   email: string
   phone: string
+  dob: string
   address: string
   position: string
   department: string
   dateOfJoining: string
-  status: 'active' | 'inactive' | 'on-leave'
+  status: 'active' | 'inactive'
+  role: string
   avatar?: string
 }
 
@@ -34,11 +39,13 @@ interface StaffFormData {
   name: string
   email: string
   phone: string
+  dob: string
   address: string
   position: string
   department: string
   dateOfJoining: string
-  status: 'active' | 'inactive' | 'on-leave'
+  status: 'active' | 'inactive'
+  role: string
 }
 
 const initialStaffData: Staff[] = [
@@ -47,48 +54,42 @@ const initialStaffData: Staff[] = [
     name: 'John Smith',
     email: 'john@gmail.com',
     phone: '+61 2222 021 203',
+    dob: '1990-01-15',
     address: '47 W 13th St, New York, NY 10011, USA',
     position: 'Electrical Engineer',
     department: 'Engineering',
     dateOfJoining: '27-4-2025',
-    status: 'active'
+    status: 'active',
+    role: '1'
   },
   {
     id: '2122',
     name: 'David Smith',
     email: 'david@gmail.com',
     phone: '+61 2222 021 203',
+    dob: '1985-05-20',
     address: '47 W 13th St, New York, NY 10011, USA',
     position: 'Senior Technician',
     department: 'Operations',
     dateOfJoining: '07-4-2025',
-    status: 'active'
-  },
-  {
-    id: '0203',
-    name: 'Olivia',
-    email: 'olivia@gmail.com',
-    phone: '+61 2222 021 203',
-    address: '47 W 13th St, New York, NY 10011, USA',
-    position: 'Project Manager',
-    department: 'Management',
-    dateOfJoining: '15-4-2025',
-    status: 'on-leave'
-  },
+    status: 'active',
+    role: '2'
+  }, 
   {
     id: '0791',
     name: 'Alen',
     email: 'alen@gmail.com',
     phone: '+61 2222 021 203',
+    dob: '1992-12-10',
     address: '47 W 13th St, New York, NY 10011, USA',
     position: 'Technician',
     department: 'Operations',
     dateOfJoining: '19-4-2025',
-    status: 'inactive'
+    status: 'inactive',
+    role: '2'
   }
 ]
 
-const departments = ['Engineering', 'Operations', 'Management', 'Sales', 'HR', 'Finance']
 const positions = ['Electrical Engineer', 'Senior Technician', 'Technician', 'Project Manager', 'Sales Executive', 'HR Manager']
 
 interface StaffPageProps {
@@ -96,10 +97,11 @@ interface StaffPageProps {
 }
 
 export function StaffPage({ onViewDetails }: StaffPageProps) {
+  const { hasPermission, isLoading: permissionsLoading, permissions } = usePermissions()
   const [staff, setStaff] = useState<Staff[]>(initialStaffData)
   const [searchTerm, setSearchTerm] = useState('')
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isStaffDialogOpen, setIsStaffDialogOpen] = useState(false)
+  const [isEditMode, setIsEditMode] = useState(false)
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null)
   const [filterDepartment, setFilterDepartment] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<string>('all')
@@ -108,20 +110,154 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
   const [showDetails, setShowDetails] = useState(false)
   const itemsPerPage = 10
 
+  // Check if user is admin (has no specific permissions but should see all actions)
+  const isAdmin = !permissionsLoading && permissions.length === 0
+
+  // Permission checks for staff module (only check if permissions are loaded)
+  // Show buttons if user has specific permissions OR if user is admin
+  const canViewStaff = !permissionsLoading && (isAdmin || hasPermission('staff', 'view'))
+  const canCreateStaff = !permissionsLoading && (isAdmin || hasPermission('staff', 'create'))
+  const canEditStaff = !permissionsLoading && (isAdmin || hasPermission('staff', 'edit'))
+  const canDeleteStaff = !permissionsLoading && (isAdmin || hasPermission('staff', 'delete'))
+
   const [formData, setFormData] = useState<StaffFormData>({
     name: '',
     email: '',
     phone: '',
+    dob: '',
     address: '',
     position: '',
     department: '',
     dateOfJoining: '',
-    status: 'active'
+    status: 'active',
+    role: ''
   })
 
-  const handleViewDetails = (id: string) => { 
+  // State for roles from API
+  const [roles, setRoles] = useState<any[]>([])
+  const [isLoadingStaff, setIsLoadingStaff] = useState(false)
+  const [staffDetails, setStaffDetails] = useState<any>(null)
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false)
+  const [departments, setDepartments] = useState<string[]>([])
+  const [positions, setPositions] = useState<string[]>([])
+  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({})
+  
+  // API base URL
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+
+  // Validation functions
+  const validateField = (fieldName: string, value: string) => {
+    const errors = { ...validationErrors }
+    
+    switch (fieldName) {
+      case 'name':
+        if (!value.trim()) {
+          errors.name = 'Name is required'
+        } else if (value.trim().length < 2) {
+          errors.name = 'Name must be at least 2 characters'
+        } else if (!/^[a-zA-Z\s]+$/.test(value)) {
+          errors.name = 'Name can only contain letters and spaces'
+        } else {
+          delete errors.name
+        }
+        break
+        
+      case 'email':
+        if (!value.trim()) {
+          errors.email = 'Email is required'
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+          errors.email = 'Please enter a valid email address'
+        } else {
+          delete errors.email
+        }
+        break
+        
+      case 'phone':
+        if (!value.trim()) {
+          errors.phone = 'Phone number is required'
+        } else if (value.replace(/\D/g, '').length !== 10) {
+          errors.phone = 'Phone number must be exactly 10 digits'
+        } else {
+          delete errors.phone
+        }
+        break
+        
+      case 'dob':
+        if (!value.trim()) {
+          errors.dob = 'Date of Birth is required'
+        } else {
+          delete errors.dob
+        }
+        break
+        
+      case 'dateOfJoining':
+        if (!value.trim()) {
+          errors.dateOfJoining = 'Date of Joining is required'
+        } else {
+          delete errors.dateOfJoining
+        }
+        break
+        
+      case 'position':
+        if (!value.trim()) {
+          errors.position = 'Position is required'
+        } else if (value.trim().length < 2) {
+          errors.position = 'Position must be at least 2 characters'
+        } else {
+          delete errors.position
+        }
+        break
+        
+      case 'department':
+        if (!value.trim()) {
+          errors.department = 'Department is required'
+        } else if (value.trim().length < 2) {
+          errors.department = 'Department must be at least 2 characters'
+        } else {
+          delete errors.department
+        }
+        break
+        
+      case 'address':
+        if (value.trim() && value.trim().length < 5) {
+          errors.address = 'Address must be at least 5 characters'
+        } else {
+          delete errors.address
+        }
+        break
+    }
+    
+    setValidationErrors(errors)
+  }
+
+  const handleViewDetails = async (id: string) => { 
+    // If parent component provided onViewDetails callback, use it
+    if (onViewDetails) {
+      onViewDetails(id)
+      return
+    }
+    
+    // Otherwise, use internal state management
     setSelectedStaffId(id)
     setShowDetails(true)
+    
+    try {
+      setIsLoadingDetails(true)
+      const response = await apiClient.getStaffById(id)
+      
+      if (response.success && response.data) {
+        setStaffDetails(response.data)
+      } else {
+        toast.error('Failed to load staff details')
+        setStaffDetails(null)
+      }
+    } catch (error) {
+      console.error('Error fetching staff details:', error)
+      toast.error('Failed to load staff details')
+      setStaffDetails(null)
+    } finally {
+      setIsLoadingDetails(false)
+    }
   } 
 
   const handleBackToList = () => {
@@ -129,11 +265,107 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
     setShowDetails(false)
   }
 
+  // Fetch roles from API when component mounts
+  useEffect(() => {
+    fetchRoles();
+    fetchStaffData();
+  }, []);
+
+  const fetchRoles = async () => {
+    try {
+      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await fetch(`${apiBaseUrl}/permissions/roles-with-permissions`, {
+        method: 'GET',
+        headers
+      });
+
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('API Response:', responseData);
+        
+        // Transform API response to match component's expected format
+        if (responseData.success && responseData.data) {
+          const transformedRoles = responseData.data.map((apiRole: any) => ({
+            id: apiRole.id.toString(),
+            roleName: apiRole.role_name || '',
+            roleType: apiRole.role_type || '',
+            permissions: apiRole.permissions || []
+          }));
+          
+          setRoles(transformedRoles);
+        } else {
+          console.error('Invalid API response structure:', responseData);
+        }
+      } else {
+        console.error('Failed to fetch roles:', response.status, response.statusText);
+      }
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+    }
+  };
+
+  const fetchStaffData = async () => {
+    try {
+      setIsLoadingStaff(true);
+      const response = await apiClient.getAllStaff();
+      
+      if (response.success && response.data) {
+        // Transform API response to match component's expected format
+        const transformedStaff = response.data.map((apiStaff: any) => ({
+          id: apiStaff.id.toString(),
+          name: apiStaff.users?.full_name || '',
+          email: apiStaff.users?.email || '',
+          phone: apiStaff.users?.phone || '',
+          address: apiStaff.address || '',
+          position: apiStaff.position || '',
+          department: apiStaff.department || '',
+          dateOfJoining: apiStaff.date_of_joining || '',
+          status: apiStaff.users?.status || 'active',
+          role: apiStaff.users?.role || ''
+        }));
+        
+        setStaff(transformedStaff);
+        
+        // Extract unique departments and positions from the staff data
+        const departmentSet = new Set<string>();
+        const positionSet = new Set<string>();
+        
+        response.data.forEach((apiStaff: any) => {
+          if (apiStaff.department && apiStaff.department.trim() !== '') {
+            departmentSet.add(apiStaff.department);
+          }
+          if (apiStaff.position && apiStaff.position.trim() !== '') {
+            positionSet.add(apiStaff.position);
+          }
+        });
+        
+        const uniqueDepartments = Array.from(departmentSet);
+        const uniquePositions = Array.from(positionSet);
+        
+        setDepartments(uniqueDepartments);
+        setPositions(uniquePositions);
+      } else {
+        console.error('Invalid API response structure:', response);
+        toast.error('Failed to load staff data');
+      }
+    } catch (error) {
+      console.error('Error fetching staff:', error);
+      toast.error('Failed to load staff data');
+    } finally {
+      setIsLoadingStaff(false);
+    }
+  };
+
   // If showing details, render the details page
   if (showDetails && selectedStaffId) {
     return (
       <StaffDetailsPage 
         staffId={selectedStaffId} 
+        staffDetails={staffDetails}
+        isLoading={isLoadingDetails}
         onBack={handleBackToList}
       />
     )
@@ -151,12 +383,6 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
         return (
           <Badge className="bg-red-50 text-red-600 border-red-200 hover:bg-red-50">
             Inactive
-          </Badge>
-        )
-      case 'on-leave':
-        return (
-          <Badge className="bg-yellow-50 text-yellow-600 border-yellow-200 hover:bg-yellow-50">
-            On Leave
           </Badge>
         )
       default:
@@ -187,30 +413,75 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
 
   const totalPages = Math.ceil(filteredStaff.length / itemsPerPage)
 
-  const handleCreate = () => {
-    if (!formData.name || !formData.email || !formData.phone) {
-      toast.error('Please fill in all required fields')
+  const handleCreate = async () => {
+    if (!formData.name || !formData.email || !formData.phone || !formData.role) {
       return
     }
 
-    const newStaff: Staff = {
-      id: Math.random().toString(36).substr(2, 9),
-      ...formData
-    }
+    try {
+      const loadingToast = toast.loading('Creating staff member...')
+      
+      // Prepare API payload
+      const staffPayload = {
+        full_name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        position: formData.position,
+        department: formData.department,
+        date_of_joining: formData.dateOfJoining,
+        address: formData.address,
+        role: formData.role,
+        status: formData.status
+      }
 
-    setStaff([...staff, newStaff])
+      const response = await apiClient.createStaff(staffPayload)
+      
+      toast.dismiss(loadingToast)
+      
+      if (response.success) {
+        // Refresh staff list from API
+        await fetchStaffData()
+        
     setFormData({
       name: '',
       email: '',
       phone: '',
+      dob: '',
       address: '',
       position: '',
       department: '',
       dateOfJoining: '',
-      status: 'active'
+      status: 'active',
+      role: ''
     })
-    setIsCreateDialogOpen(false)
+        setIsStaffDialogOpen(false)
+        setIsEditMode(false)
     toast.success('Staff member created successfully')
+      } else {
+        toast.error(response.message || 'Failed to create staff member')
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create staff member')
+    }
+  }
+
+  const handleAddStaff = () => {
+    setFormData({
+      name: '',
+      email: '',
+      phone: '',
+      dob: '',
+      address: '',
+      position: '',
+      department: '',
+      dateOfJoining: '',
+      status: 'active',
+      role: ''
+    })
+    setValidationErrors({})
+    setIsEditMode(false)
+    setEditingStaff(null)
+    setIsStaffDialogOpen(true)
   }
 
   const handleEdit = (staffMember: Staff) => {
@@ -219,47 +490,188 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       name: staffMember.name,
       email: staffMember.email,
       phone: staffMember.phone,
+      dob: staffMember.dob || '',
       address: staffMember.address,
       position: staffMember.position,
       department: staffMember.department,
       dateOfJoining: staffMember.dateOfJoining,
-      status: staffMember.status
+      status: staffMember.status,
+      role: staffMember.role
     })
-    setIsEditDialogOpen(true)
+    setValidationErrors({})
+    setIsEditMode(true)
+    setIsStaffDialogOpen(true)
   }
 
-  const handleUpdate = () => {
-    if (!editingStaff) return
 
-    if (!formData.name || !formData.email || !formData.phone) {
-      toast.error('Please fill in all required fields')
-      return
+   const validateForm = () => {
+    const errors: {[key: string]: string} = {}
+    let isValid = true
+
+    // Validate all required fields
+    if (!formData.name.trim()) {
+      errors.name = 'Name is required'
+      isValid = false
+    } else if (!/^[a-zA-Z\s]{2,}$/.test(formData.name.trim())) {
+      errors.name = 'Name must be at least 2 characters and contain only letters/spaces'
+      isValid = false
     }
 
-    setStaff(staff.map(member => 
-      member.id === editingStaff.id 
-        ? { ...member, ...formData }
-        : member
-    ))
-    
-    setIsEditDialogOpen(false)
-    setEditingStaff(null)
-    setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      address: '',
-      position: '',
-      department: '',
-      dateOfJoining: '',
-      status: 'active'
-    })
-    toast.success('Staff member updated successfully')
+    if (!formData.email.trim()) {
+      errors.email = 'Email is required'
+      isValid = false
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      errors.email = 'Invalid email address'
+      isValid = false
+    }
+
+    if (!formData.phone.trim()) {
+      errors.phone = 'Phone is required'
+      isValid = false
+    } else if (!/^\d{10}$/.test(formData.phone)) {
+      errors.phone = 'Phone must be exactly 10 digits'
+      isValid = false
+    }
+
+    if (!formData.dob.trim()) {
+      errors.dob = 'Date of Birth is required'
+      isValid = false
+    }
+
+    if (!formData.dateOfJoining.trim()) {
+      errors.dateOfJoining = 'Date of Joining is required'
+      isValid = false
+    }
+
+    if (!formData.role.trim()) {
+      errors.role = 'Role is required'
+      isValid = false
+    }
+
+    // Validate required fields
+    if (!formData.position.trim()) {
+      errors.position = 'Position is required'
+      isValid = false
+    }
+
+    if (!formData.department.trim()) {
+      errors.department = 'Department is required'
+      isValid = false
+    }
+
+    // Validate optional fields if they have values
+    if (formData.address.trim() && formData.address.trim().length < 5) {
+      errors.address = 'Address must be at least 5 characters'
+      isValid = false
+    }
+
+    setValidationErrors(errors)
+    return isValid
   }
 
-  const handleDelete = (id: string) => {
-    setStaff(staff.filter(member => member.id !== id))
+  const handleSubmit = async () => {
+     if (!validateForm()) {
+      return
+    }
+    let loadingToastId: string | number | undefined
+
+    try {
+      loadingToastId = toast.loading(isEditMode ? 'Updating staff member...' : 'Creating staff member...')
+
+      const staffPayload = {
+        full_name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
+        phone: formData.phone.replace(/\D/g, ''), // Remove non-digits
+        dob: formData.dob,
+        position: formData.position.trim(),
+        department: formData.department.trim(),
+        date_of_joining: formData.dateOfJoining,
+        address: formData.address.trim(),
+        role: formData.role,
+        status: formData.status
+      }
+
+      console.log('Starting API call at:', new Date().toISOString())
+      console.log('Payload:', staffPayload)
+
+      let response
+      if (isEditMode && editingStaff) {
+        console.log('Updating staff with ID:', editingStaff.id)
+        response = await apiClient.updateStaff(editingStaff.id, staffPayload)
+      } else {
+        console.log('Creating new staff')
+        response = await apiClient.createStaff(staffPayload)
+      }
+
+      console.log('API call completed at:', new Date().toISOString())
+      console.log('Response:', response)
+      
+      // Dismiss loading toast
+      if (loadingToastId) {
+        toast.dismiss(loadingToastId)
+      }
+      
+      if (response.success) {
+        // Reset form and close dialog immediately
+        setFormData({
+          name: '',
+          email: '',
+          phone: '',
+          dob: '',
+          address: '',
+          position: '',
+          department: '',
+          dateOfJoining: '',
+          status: 'active',
+          role: ''
+        })
+        setValidationErrors({})
+        setEditingStaff(null)
+        setIsStaffDialogOpen(false)
+        setIsEditMode(false)
+        toast.success(isEditMode ? 'Staff member updated successfully' : 'Staff member created successfully')
+        
+        // Refresh staff list in background (don't await)
+        fetchStaffData()
+      } else {
+        toast.error(response.message || `Failed to ${isEditMode ? 'update' : 'create'} staff member`)
+      }
+    } catch (error) {
+      // Make sure to dismiss loading toast even on error
+      if (loadingToastId) {
+        toast.dismiss(loadingToastId)
+      }
+      toast.error(error instanceof Error ? error.message : `Failed to ${isEditMode ? 'update' : 'create'} staff member`)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    let loadingToastId: string | number | undefined
+    
+    try {
+      loadingToastId = toast.loading('Deleting staff member...')
+      
+      const response = await apiClient.deleteStaff(id)
+      
+      // Dismiss loading toast
+      if (loadingToastId) {
+        toast.dismiss(loadingToastId)
+      }
+      
+      if (response.success) {
+        // Refresh staff list from API
+        await fetchStaffData()
     toast.success('Staff member deleted successfully')
+      } else {
+        toast.error(response.message || 'Failed to delete staff member')
+      }
+    } catch (error) {
+      // Make sure to dismiss loading toast even on error
+      if (loadingToastId) {
+        toast.dismiss(loadingToastId)
+      }
+      toast.error(error instanceof Error ? error.message : 'Failed to delete staff member')
+    }
   }
 
   const resetForm = () => {
@@ -267,11 +679,13 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       name: '',
       email: '',
       phone: '',
+      dob: '',
       address: '',
       position: '',
       department: '',
       dateOfJoining: '',
-      status: 'active'
+      status: 'active',
+      role: ''
     })
   }
 
@@ -337,117 +751,12 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
             <Download className="h-4 w-4" />
             Export
           </Button>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2">
-                <Plus className="h-4 w-4" />
-                Add Staff
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl bg-white">
-              <DialogHeader>
-                <DialogTitle>Add New Staff Member</DialogTitle>
-                <DialogDescription>
-                  Fill in the information below to add a new staff member to your organization.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid grid-cols-2 gap-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    placeholder="Enter full name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    placeholder="Enter email address"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number *</Label>
-                  <Input
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                    placeholder="Enter phone number"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="position">Position</Label>
-                  <Select value={formData.position} onValueChange={(value) => setFormData({...formData, position: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select position" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {positions.map((position) => (
-                        <SelectItem key={position} value={position}>{position}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="department">Department</Label>
-                  <Select value={formData.department} onValueChange={(value) => setFormData({...formData, department: value})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {departments.map((dept) => (
-                        <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="dateOfJoining">Date of Joining</Label>
-                  <Input
-                    id="dateOfJoining"
-                    type="date"
-                    value={formData.dateOfJoining}
-                    onChange={(e) => setFormData({...formData, dateOfJoining: e.target.value})}
-                  />
-                </div>
-                <div className="col-span-2 space-y-2">
-                  <Label htmlFor="address">Address</Label>
-                  <Input
-                    id="address"
-                    value={formData.address}
-                    onChange={(e) => setFormData({...formData, address: e.target.value})}
-                    placeholder="Enter full address"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select value={formData.status} onValueChange={(value: 'active' | 'inactive' | 'on-leave') => setFormData({...formData, status: value})}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                      <SelectItem value="on-leave">On Leave</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={() => {setIsCreateDialogOpen(false); resetForm();}}>
-                  Cancel
-                </Button>
-                <Button onClick={handleCreate} className="bg-primary text-white hover:bg-[#0090e6]">
-                  Create Staff
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+          {canCreateStaff && (
+            <Button onClick={handleAddStaff} className="bg-primary text-white hover:bg-[#0090e6] gap-2">
+              <Plus className="h-4 w-4" />
+              Add Staff
+            </Button>
+          )}
         </div>
       </div>
 
@@ -486,7 +795,6 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="on-leave">On Leave</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -520,7 +828,23 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedStaff.map((member, index) => (
+              {isLoadingStaff ? (
+                <TableRow>
+                  <TableCell colSpan={11} className="text-center py-8">
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      <span className="ml-2 text-gray-600">Loading staff data...</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : paginatedStaff.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={11} className="text-center py-8 text-gray-500">
+                    No staff members found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedStaff.map((member, index) => (
                 <TableRow key={member.id} className={index % 2 === 1 ? "bg-[#eff4fa]" : ""}>
                   <TableCell>
                     <input type="checkbox" className="rounded border-gray-300" />
@@ -541,13 +865,14 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
                       onDelete={() => handleDelete(member.id)}
                       itemName={member.name}
                       itemType="Staff Member"
-                      showView={true}
-                      showEdit={true}
-                      showDelete={true}
+                      showView={canViewStaff}
+                      showEdit={canEditStaff}
+                      showDelete={canDeleteStaff}
                     />
                   </TableCell>
                 </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -585,24 +910,54 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
         </div>
       )}
 
-      {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      {/* Unified Staff Modal */}
+      <Dialog open={isStaffDialogOpen} onOpenChange={setIsStaffDialogOpen}>
         <DialogContent className="max-w-2xl bg-white">
           <DialogHeader>
-            <DialogTitle>Edit Staff Member</DialogTitle>
+            <DialogTitle>{isEditMode ? 'Edit Staff Member' : 'Add New Staff Member'}</DialogTitle>
             <DialogDescription>
-              Update the information below to modify the staff member's details.
+              {isEditMode 
+                ? 'Update the information below to modify the staff member\'s details.'
+                : 'Fill in the information below to add a new staff member to your organization.'
+              }
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="role">Role *</Label>
+              <Select value={formData.role} onValueChange={(value) => setFormData({...formData, role: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map((role) => (
+                    <SelectItem key={role.id} value={role.roleName}>
+                      {role.roleName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {validationErrors.role && (
+                <p className="text-sm text-red-500 mt-1">{validationErrors.role}</p>
+              )}
+            </div>
             <div className="space-y-2">
               <Label htmlFor="edit-name">Full Name *</Label>
               <Input
                 id="edit-name"
                 value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                placeholder="Enter full name"
+                onChange={(e) => {
+                  // Only allow letters and spaces
+                  const value = e.target.value.replace(/[^a-zA-Z\s]/g, '')
+                  setFormData({...formData, name: value})
+                  validateField('name', value)
+                }}
+                placeholder="Enter full name (letters only)"
+                className={validationErrors.name ? 'border-red-500' : ''}
               />
+              {validationErrors.name && (
+                <p className="text-sm text-red-500 mt-1">{validationErrors.name}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-email">Email *</Label>
@@ -610,83 +965,134 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
                 id="edit-email"
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
+                onChange={(e) => {
+                  setFormData({...formData, email: e.target.value})
+                  validateField('email', e.target.value)
+                }}
                 placeholder="Enter email address"
+                className={validationErrors.email ? 'border-red-500' : ''}
               />
+              {validationErrors.email && (
+                <p className="text-sm text-red-500 mt-1">{validationErrors.email}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-phone">Phone Number *</Label>
               <Input
                 id="edit-phone"
                 value={formData.phone}
-                onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                placeholder="Enter phone number"
+                onChange={(e) => {
+                  // Only allow digits and limit to 10 characters
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 10)
+                  setFormData({...formData, phone: value})
+                  validateField('phone', value)
+                }}
+                placeholder="Enter 10-digit phone number"
+                className={validationErrors.phone ? 'border-red-500' : ''}
               />
+              {validationErrors.phone && (
+                <p className="text-sm text-red-500 mt-1">{validationErrors.phone}</p>
+              )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-position">Position</Label>
-              <Select value={formData.position} onValueChange={(value) => setFormData({...formData, position: value})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select position" />
-                </SelectTrigger>
-                <SelectContent>
-                  {positions.map((position) => (
-                    <SelectItem key={position} value={position}>{position}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-department">Department</Label>
-              <Select value={formData.department} onValueChange={(value) => setFormData({...formData, department: value})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {departments.map((dept) => (
-                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-dateOfJoining">Date of Joining</Label>
+              <Label htmlFor="edit-dob">Date of Birth *</Label>
               <Input
-                id="edit-dateOfJoining"
+                id="edit-dob"
                 type="date"
-                value={formData.dateOfJoining}
-                onChange={(e) => setFormData({...formData, dateOfJoining: e.target.value})}
+                value={formData.dob}
+                onChange={(e) => {
+                  setFormData({...formData, dob: e.target.value})
+                  validateField('dob', e.target.value)
+                }}
+                className={validationErrors.dob ? 'border-red-500' : ''}
               />
+              {validationErrors.dob && (
+                <p className="text-sm text-red-500 mt-1">{validationErrors.dob}</p>
+              )}
             </div>
+            <AutoSuggestInput
+              label="Position"
+              value={formData.position}
+              onChange={(value) => {
+                setFormData({...formData, position: value})
+                validateField('position', value)
+              }}
+              onValidate={(value) => validateField('position', value)}
+              placeholder="Enter or select position"
+              suggestions={positions}
+              error={validationErrors.position}
+              required={true}
+            />
+            <AutoSuggestInput
+              label="Department"
+              value={formData.department}
+              onChange={(value) => {
+                setFormData({...formData, department: value})
+                validateField('department', value)
+              }}
+              onValidate={(value) => validateField('department', value)}
+              placeholder="Enter or select department"
+              suggestions={departments}
+              error={validationErrors.department}
+              required={true}
+            />
+           
             <div className="col-span-2 space-y-2">
               <Label htmlFor="edit-address">Address</Label>
               <Input
                 id="edit-address"
                 value={formData.address}
-                onChange={(e) => setFormData({...formData, address: e.target.value})}
+                onChange={(e) => {
+                  setFormData({...formData, address: e.target.value})
+                  validateField('address', e.target.value)
+                }}
                 placeholder="Enter full address"
+                className={validationErrors.address ? 'border-red-500' : ''}
               />
+              {validationErrors.address && (
+                <p className="text-sm text-red-500 mt-1">{validationErrors.address}</p>
+              )}
+            </div>
+             <div className="space-y-2">
+              <Label htmlFor="edit-dateOfJoining">Date of Joining *</Label>
+              <Input
+                id="edit-dateOfJoining"
+                type="date"
+                value={formData.dateOfJoining}
+                onChange={(e) => {
+                  setFormData({...formData, dateOfJoining: e.target.value})
+                  validateField('dateOfJoining', e.target.value)
+                }}
+                className={validationErrors.dateOfJoining ? 'border-red-500' : ''}
+              />
+              {validationErrors.dateOfJoining && (
+                <p className="text-sm text-red-500 mt-1">{validationErrors.dateOfJoining}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-status">Status</Label>
-              <Select value={formData.status} onValueChange={(value: 'active' | 'inactive' | 'on-leave') => setFormData({...formData, status: value})}>
+              <Select value={formData.status} onValueChange={(value: 'active' | 'inactive') => setFormData({...formData, status: value})}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="on-leave">On Leave</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem> 
                 </SelectContent>
               </Select>
             </div>
           </div>
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => {setIsEditDialogOpen(false); resetForm();}}>
+            <Button variant="outline" onClick={() => {
+              setIsStaffDialogOpen(false)
+              setIsEditMode(false)
+              setEditingStaff(null)
+              setValidationErrors({})
+            }}>
               Cancel
             </Button>
-            <Button onClick={handleUpdate} className="bg-primary text-white hover:bg-[#0090e6]">
-              Update Staff
+            <Button onClick={handleSubmit} className="bg-primary text-white hover:bg-[#0090e6]">
+              {isEditMode ? 'Update Staff' : 'Create Staff'}
             </Button>
           </div>
         </DialogContent>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
@@ -44,6 +44,8 @@ interface Staff {
 
 interface StaffDetailsPageProps {
   staffId: string
+  staffDetails: any
+  isLoading: boolean
   onBack: () => void
 }
 
@@ -126,9 +128,36 @@ const getStaffById = (id: string): Staff | null => {
 const departments = ['Engineering', 'Operations', 'Management', 'Sales', 'HR', 'Finance']
 const positions = ['Electrical Engineer', 'Senior Technician', 'Technician', 'Project Manager', 'Sales Executive', 'HR Manager']
 
-export function StaffDetailsPage({ staffId, onBack }: StaffDetailsPageProps) {
-  const [staff, setStaff] = useState<Staff | null>(getStaffById(staffId))
-  console.log(staff, 'staff>>>');
+export function StaffDetailsPage({ staffId, staffDetails, isLoading, onBack }: StaffDetailsPageProps) {
+  // Transform API data to component format
+  const transformApiData = (apiData: any): Staff | null => {
+    if (!apiData) return null
+    
+    return {
+      id: apiData.id?.toString() || staffId,
+      name: apiData.users?.full_name || '',
+      email: apiData.users?.email || '',
+      phone: apiData.users?.phone || '',
+      address: apiData.address || '',
+      position: apiData.position || '',
+      department: apiData.department || '',
+      dateOfJoining: apiData.date_of_joining || '',
+      status: apiData.users?.status || 'active',
+      employeeId: `EMP-${apiData.id}`,
+      manager: 'Not assigned',
+      salary: 0,
+      workSchedule: 'Full-time',
+      emergencyContact: 'Not provided',
+      notes: 'No additional notes'
+    }
+  }
+
+  const [staff, setStaff] = useState<Staff | null>(transformApiData(staffDetails))
+  
+  // Update staff when API data changes
+  React.useEffect(() => {
+    setStaff(transformApiData(staffDetails))
+  }, [staffDetails])
   
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editFormData, setEditFormData] = useState({
@@ -146,6 +175,27 @@ export function StaffDetailsPage({ staffId, onBack }: StaffDetailsPageProps) {
     emergencyContact: staff?.emergencyContact || '',
     notes: staff?.notes || ''
   })
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" onClick={onBack} className="gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Staff List
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="p-8 text-center">
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <span className="ml-2 text-gray-600">Loading staff details...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   if (!staff) {
     return (
@@ -276,10 +326,10 @@ export function StaffDetailsPage({ staffId, onBack }: StaffDetailsPageProps) {
             Back to Staff List
           </Button>
         </div>
-        <Button onClick={handleEdit} className="gap-2 bg-primary text-white hover:bg-[#0090e6]">
+        {/* <Button onClick={handleEdit} className="gap-2 bg-primary text-white hover:bg-[#0090e6]">
           <Edit className="h-4 w-4" />
           Edit Staff
-        </Button>
+        </Button> */}
       </div>
 
       {/* Staff Information */}
@@ -379,13 +429,13 @@ export function StaffDetailsPage({ staffId, onBack }: StaffDetailsPageProps) {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  {/* <div className="flex items-center gap-3">
                     <User className="h-4 w-4 text-gray-400" />
                     <div>
                       <p className="text-sm text-gray-600">Manager</p>
                       <p className="text-sm font-medium text-[#2b2b2b]">{staff.manager || 'Not assigned'}</p>
                     </div>
-                  </div>
+                  </div> */}
                 </div>
 
                 <div className="space-y-4">
@@ -397,7 +447,7 @@ export function StaffDetailsPage({ staffId, onBack }: StaffDetailsPageProps) {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  {/* <div className="flex items-center gap-3">
                     <Clock className="h-4 w-4 text-gray-400" />
                     <div>
                       <p className="text-sm text-gray-600">Work Schedule</p>
@@ -411,14 +461,14 @@ export function StaffDetailsPage({ staffId, onBack }: StaffDetailsPageProps) {
                       <p className="text-sm text-gray-600">Salary</p>
                       <p className="text-sm font-medium text-[#2b2b2b]">{formatSalary(staff.salary)}</p>
                     </div>
-                  </div>
+                  </div> */}
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Additional Notes */}
-          {staff.notes && (
+          {/* {staff.notes && (
             <Card className="bg-white shadow-md border-0">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -430,7 +480,7 @@ export function StaffDetailsPage({ staffId, onBack }: StaffDetailsPageProps) {
                 <p className="text-sm text-[#2b2b2b] leading-relaxed">{staff.notes}</p>
               </CardContent>
             </Card>
-          )}
+          )} */}
         </div>
 
         {/* Summary Card */}
@@ -480,7 +530,7 @@ export function StaffDetailsPage({ staffId, onBack }: StaffDetailsPageProps) {
       </div>
 
       {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      {/* <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Staff Member</DialogTitle>
@@ -627,7 +677,7 @@ export function StaffDetailsPage({ staffId, onBack }: StaffDetailsPageProps) {
             </Button>
           </div>
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
     </div>
   )
 }
