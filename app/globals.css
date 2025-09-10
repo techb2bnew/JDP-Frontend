@@ -122,3 +122,52 @@ body{
 .rdp-multiple_months {
     background: #fff;
 }
+
+/* Sonner Toast Customization */
+[data-sonner-toaster] {
+  --normal-bg: #ffffff;
+  --normal-border: #e5e7eb;
+  --normal-text: #374151;
+  --success-bg: #ffffff;
+  --success-border: #10b981;
+  --success-text: #374151;
+  --error-bg: #ffffff;
+  --error-border: #ef4444;
+  --error-text: #374151;
+  --warning-bg: #ffffff;
+  --warning-border: #f59e0b;
+  --warning-text: #374151;
+  --info-bg: #ffffff;
+  --info-border: #3b82f6;
+  --info-text: #374151;
+}
+
+[data-sonner-toast] {
+  background: var(--normal-bg) !important;
+  border: 1px solid var(--normal-border) !important;
+  color: var(--normal-text) !important;
+}
+
+[data-sonner-toast][data-type="success"] {
+  background: var(--success-bg) !important;
+  border: 1px solid var(--success-border) !important;
+  color: var(--success-text) !important;
+}
+
+[data-sonner-toast][data-type="error"] {
+  background: var(--error-bg) !important;
+  border: 1px solid var(--error-border) !important;
+  color: var(--error-text) !important;
+}
+
+[data-sonner-toast][data-type="warning"] {
+  background: var(--warning-bg) !important;
+  border: 1px solid var(--warning-border) !important;
+  color: var(--warning-text) !important;
+}
+
+[data-sonner-toast][data-type="info"] {
+  background: var(--info-bg) !important;
+  border: 1px solid var(--info-border) !important;
+  color: var(--info-text) !important;
+}

@@ -185,6 +185,8 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       case 'dob':
         if (!value.trim()) {
           errors.dob = 'Date of Birth is required'
+        } else if (new Date(value) > new Date()) {
+          errors.dob = 'Date of Birth cannot be in the future'
         } else {
           delete errors.dob
         }
@@ -314,7 +316,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       
       if (response.success && response.data) {
         // Transform API response to match component's expected format
-        const transformedStaff = response.data.map((apiStaff: any) => ({
+        const transformedStaff = response.data.data.map((apiStaff: any) => ({
           id: apiStaff.id.toString(),
           name: apiStaff.users?.full_name || '',
           email: apiStaff.users?.email || '',
@@ -333,7 +335,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
         const departmentSet = new Set<string>();
         const positionSet = new Set<string>();
         
-        response.data.forEach((apiStaff: any) => {
+        response.data.data.forEach((apiStaff: any) => {
           if (apiStaff.department && apiStaff.department.trim() !== '') {
             departmentSet.add(apiStaff.department);
           }
@@ -431,7 +433,8 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
         date_of_joining: formData.dateOfJoining,
         address: formData.address,
         role: formData.role,
-        status: formData.status
+        status: formData.status,
+        management_type: "staff"
       }
 
       const response = await apiClient.createStaff(staffPayload)
@@ -588,7 +591,8 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
         date_of_joining: formData.dateOfJoining,
         address: formData.address.trim(),
         role: formData.role,
-        status: formData.status
+        status: formData.status,
+        management_type: "staff"
       }
 
       console.log('Starting API call at:', new Date().toISOString())
@@ -839,8 +843,15 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
                 </TableRow>
               ) : paginatedStaff.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8 text-gray-500">
-                    No staff members found
+                  <TableCell colSpan={11} className="text-center py-8">
+                    <div className="flex flex-col items-center justify-center text-gray-500">
+                      <div className="text-lg font-medium mb-2">No data available</div>
+                      <div className="text-sm">
+                        {searchTerm || filterDepartment !== 'all' || filterStatus !== 'all' 
+                          ? 'No staff found matching your filters' 
+                          : 'No staff data found. Create your first staff member.'}
+                      </div>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (
@@ -1005,6 +1016,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
                   validateField('dob', e.target.value)
                 }}
                 className={validationErrors.dob ? 'border-red-500' : ''}
+                max={new Date().toISOString().split('T')[0]}
               />
               {validationErrors.dob && (
                 <p className="text-sm text-red-500 mt-1">{validationErrors.dob}</p>

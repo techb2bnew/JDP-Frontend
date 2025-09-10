@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -46,64 +46,28 @@ interface Labor {
 }
 
 interface LaborFormData {
-  name: string
+  full_name: string
   email: string
   phone: string
+  dob: string
   address: string
+  date_of_joining: string
+  status: 'active' | 'inactive'
   trade: string
   experience: string
-  hourlyRate: number
-  availability: 'available' | 'assigned' | 'on-leave' | 'unavailable'
-  jobsCompleted: number
-  dateOfJoining: string
-  supervisor: string
+  hourly_rate: number
+  supervisor_id: string
+  availability: string
   certifications: string[]
   skills: string[]
   notes: string
+  role: string
 }
 
 interface LaborPageProps {
   onViewDetails?: (id: string) => void
 }
 
-const initialLaborData: Labor[] = [
-  {
-    id: 'LB001',
-    laborId: 'LB-2025-001',
-    name: 'Robert Johnson',
-    email: 'robert.johnson@jdp.com',
-    phone: '+61 2222 021 401',
-    address: '156 Trade St, Sydney, NSW 2000, Australia',
-    trade: 'Electrical Assistant',
-    experience: '3 years',
-    hourlyRate: 45,
-    availability: 'available',
-    jobsCompleted: 28,
-    dateOfJoining: '2022-03-15',
-    supervisor: 'Michael Rodriguez',
-    certifications: ['Basic Electrical Safety', 'First Aid'],
-    skills: ['Wire Installation', 'Basic Troubleshooting', 'Tool Maintenance'],
-    notes: 'Reliable worker with good attention to detail.'
-  },
-  {
-    id: 'LB002',
-    laborId: 'LB-2025-002',
-    name: 'Maria Santos',
-    email: 'maria.santos@jdp.com',
-    phone: '+61 2222 021 402',
-    address: '89 Workshop Ave, Melbourne, VIC 3000, Australia',
-    trade: 'Cable Technician',
-    experience: '5 years',
-    hourlyRate: 55,
-    availability: 'assigned',
-    jobsCompleted: 45,
-    dateOfJoining: '2021-07-20',
-    supervisor: 'Sarah Thompson',
-    certifications: ['Cable Installation', 'Safety Officer', 'Equipment Operation'],
-    skills: ['Cable Running', 'Conduit Installation', 'Equipment Setup'],
-    notes: 'Experienced cable technician with strong technical skills.'
-  }
-]
 
 const trades = [
   'Electrical Assistant',
@@ -114,12 +78,7 @@ const trades = [
   'Equipment Operator'
 ]
 
-const supervisors = [
-  'Michael Rodriguez',
-  'Sarah Thompson',
-  'James Wilson',
-  'Emma Davis'
-]
+ 
 
 const availableCertifications = [
   'Basic Electrical Safety',
@@ -147,7 +106,7 @@ const skillOptions = [
 
 export function LaborPage({ onViewDetails }: LaborPageProps) {
   const { hasPermission, permissions } = usePermissions()
-  const [laborers, setLaborers] = useState<Labor[]>(initialLaborData)
+  const [laborers, setLaborers] = useState<Labor[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -159,28 +118,36 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
 
   // Check if user is admin (has no specific permissions but should see all actions)
   const isAdmin = permissions.length === 0
+  const [roles, setRoles] = useState<any[]>([])
+  const [leadLabours, setLeadLabours] = useState<any[]>([])
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+  const [isLoadingLabor, setIsLoadingLabor] = useState(false)
 
   // Permission checks for labour module
   const canViewLabour = isAdmin || hasPermission('labour', 'view')
   const canCreateLabour = isAdmin || hasPermission('labour', 'create')
   const canEditLabour = isAdmin || hasPermission('labour', 'edit')
   const canDeleteLabour = isAdmin || hasPermission('labour', 'delete')
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+
 
   const [formData, setFormData] = useState<LaborFormData>({
-    name: '',
+    role: '',
+    full_name: '',
     email: '',
     phone: '',
+    dob: '',
     address: '',
+    date_of_joining: '',
+    status: 'active', 
     trade: '',
     experience: '',
-    hourlyRate: 0,
-    availability: 'available',
-    jobsCompleted: 0,
-    dateOfJoining: '',
-    supervisor: '',
+    hourly_rate: 0,
+    supervisor_id: '',
+    availability: 'Full-time',
     certifications: [],
     skills: [],
-    notes: ''
+    notes: '',
   })
 
   const generateLaborId = () => {
@@ -244,87 +211,288 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
 
   const totalPages = Math.ceil(filteredLaborers.length / itemsPerPage)
 
-  const handleCreate = () => {
-    if (!formData.name || !formData.email || !formData.phone) {
-      toast.error('Please fill in all required fields')
-      return
+  const handleCreate = async () => {
+    // Validation
+    if (!formData.role || !formData.full_name || !formData.email || !formData.phone || !formData.dob || 
+        !formData.address || !formData.date_of_joining || !formData.trade || 
+        !formData.experience || !formData.supervisor_id ) {
+      const errors: Record<string, string> = {};
+      if (!formData.role) errors.role = 'Role is required';
+      if (!formData.full_name) errors.full_name = 'Full name is required';
+      if (!formData.email) errors.email = 'Email is required';
+      if (!formData.phone) errors.phone = 'Phone is required';
+      if (!formData.dob) errors.dob = 'Date of Birth is required';
+      if (formData.dob && new Date(formData.dob) > new Date()) {
+        errors.dob = 'Date of Birth cannot be in the future';
+      }
+      if (!formData.address) errors.address = 'Address is required';
+      if (!formData.date_of_joining) errors.date_of_joining = 'Date of Joining is required';
+      if (!formData.trade) errors.trade = 'Trade is required';
+      if (!formData.experience) errors.experience = 'Experience is required';
+      if (!formData.supervisor_id) errors.supervisor_id = 'Supervisor is required';
+      
+      setValidationErrors(errors);
+      toast.error('Please fill in all required fields');
+      return;
     }
 
-    const newLabor: Labor = {
-      id: `LB${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
-      laborId: generateLaborId(),
-      ...formData
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      const errors = {...validationErrors, email: 'Please enter a valid email address'};
+      setValidationErrors(errors);
+      toast.error('Please enter a valid email address');
+      return;
     }
 
-    setLaborers([...laborers, newLabor])
-    resetForm()
-    setIsCreateDialogOpen(false)
-    toast.success('Labor worker created successfully')
+    // Phone number validation (exactly 10 digits)
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(formData.phone)) {
+      const errors = {...validationErrors, phone: 'Phone number must be exactly 10 digits'};
+      setValidationErrors(errors);
+      toast.error('Phone number must be exactly 10 digits');
+      return;
+    }
+
+    let loadingToastId: string | number | undefined;
+    
+    try {
+      loadingToastId = toast.loading('Creating labor worker...');
+      
+      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      // Prepare payload according to API requirements
+      const payload = {
+        full_name: formData.full_name,
+        email: formData.email,
+        phone: formData.phone,
+        dob: formData.dob,
+        address: formData.address,
+        date_of_joining: formData.date_of_joining,
+        status: formData.status,
+        trade: formData.trade,
+        experience: formData.experience,
+        hourly_rate: formData.hourly_rate,
+        supervisor_id: parseInt(formData.supervisor_id),
+        availability: formData.availability,
+        certifications: formData.certifications,
+        skills: formData.skills,
+        notes: formData.notes,
+        role: formData.role,
+        management_type: "labor"
+      };
+
+      const response = await fetch(`${apiBaseUrl}/labor/createLabor`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      toast.dismiss(loadingToastId);
+
+      if (response.ok) {
+        const responseData = await response.json();
+        if (responseData.success) {
+          toast.success('Labor worker created successfully!');
+          setIsCreateDialogOpen(false);
+          resetForm();
+          setValidationErrors({});
+          // Refresh the labor list
+          fetchLaborData(currentPage, itemsPerPage);
+        } else {
+          toast.error(`Failed to create labor worker: ${responseData.message || 'Unknown error'}`);
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(`Failed to create labor worker: ${errorData.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      toast.dismiss(loadingToastId);
+      console.error('Error creating labor worker:', error);
+      toast.error('An error occurred while creating labor worker');
+    }
   }
 
-  const handleEdit = (labor: Labor) => {
+  const handleEdit = async (labor: Labor) => {
     setEditingLabor(labor)
-    setFormData({
-      name: labor.name,
-      email: labor.email,
-      phone: labor.phone,
-      address: labor.address,
-      trade: labor.trade,
-      experience: labor.experience,
-      hourlyRate: labor.hourlyRate,
-      availability: labor.availability,
-      jobsCompleted: labor.jobsCompleted,
-      dateOfJoining: labor.dateOfJoining,
-      supervisor: labor.supervisor,
-      certifications: labor.certifications,
-      skills: labor.skills,
-      notes: labor.notes || ''
-    })
     setIsEditDialogOpen(true)
+    
+    // Fetch fresh data from API using labor ID
+    await fetchLaborById(labor.id)
   }
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (!editingLabor) return
 
-    if (!formData.name || !formData.email || !formData.phone) {
-      toast.error('Please fill in all required fields')
-      return
+    // Validation
+    if (!formData.role || !formData.full_name || !formData.email || !formData.phone || !formData.dob || 
+        !formData.address || !formData.date_of_joining || !formData.trade || 
+        !formData.experience || !formData.supervisor_id) {
+      const errors: Record<string, string> = {};
+      if (!formData.role) errors.role = 'Role is required';
+      if (!formData.full_name) errors.full_name = 'Full name is required';
+      if (!formData.email) errors.email = 'Email is required';
+      if (!formData.phone) errors.phone = 'Phone is required';
+      if (!formData.dob) errors.dob = 'Date of Birth is required';
+      if (formData.dob && new Date(formData.dob) > new Date()) {
+        errors.dob = 'Date of Birth cannot be in the future';
+      }
+      if (!formData.address) errors.address = 'Address is required';
+      if (!formData.date_of_joining) errors.date_of_joining = 'Date of Joining is required';
+      if (!formData.trade) errors.trade = 'Trade is required';
+      if (!formData.experience) errors.experience = 'Experience is required';
+      if (!formData.supervisor_id) errors.supervisor_id = 'Supervisor is required';
+      
+      setValidationErrors(errors);
+      toast.error('Please fill in all required fields');
+      return;
     }
 
-    setLaborers(laborers.map(labor => 
-      labor.id === editingLabor.id 
-        ? { ...labor, ...formData }
-        : labor
-    ))
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      const errors = {...validationErrors, email: 'Please enter a valid email address'};
+      setValidationErrors(errors);
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    // Phone number validation (exactly 10 digits)
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(formData.phone)) {
+      const errors = {...validationErrors, phone: 'Phone number must be exactly 10 digits'};
+      setValidationErrors(errors);
+      toast.error('Phone number must be exactly 10 digits');
+      return;
+    }
+
+    let loadingToastId: string | number | undefined;
     
-    setIsEditDialogOpen(false)
-    setEditingLabor(null)
-    resetForm()
-    toast.success('Labor worker updated successfully')
+    try {
+      loadingToastId = toast.loading('Updating labor worker...');
+      
+      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      // Prepare payload according to API requirements
+      const payload = {
+        full_name: formData.full_name,
+        email: formData.email,
+        phone: formData.phone,
+        dob: formData.dob,
+        address: formData.address,
+        date_of_joining: formData.date_of_joining,
+        status: formData.status,
+        trade: formData.trade,
+        experience: formData.experience,
+        hourly_rate: formData.hourly_rate,
+        supervisor_id: parseInt(formData.supervisor_id),
+        availability: formData.availability,
+        certifications: formData.certifications,
+        skills: formData.skills,
+        notes: formData.notes,
+        role: formData.role,
+        management_type: "labor"
+      };
+
+      const response = await fetch(`${apiBaseUrl}/labor/updateLabor/${editingLabor.id}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      toast.dismiss(loadingToastId);
+
+      if (response.ok) {
+        const responseData = await response.json();
+        if (responseData.success) {
+          toast.success('Labor worker updated successfully!');
+          setIsEditDialogOpen(false);
+          setEditingLabor(null);
+          resetForm();
+          setValidationErrors({});
+          // Refresh the labor list
+          fetchLaborData(currentPage, itemsPerPage);
+        } else {
+          toast.error(`Failed to update labor worker: ${responseData.message || 'Unknown error'}`);
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(`Failed to update labor worker: ${errorData.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      toast.dismiss(loadingToastId);
+      console.error('Error updating labor worker:', error);
+      toast.error('An error occurred while updating labor worker');
+    }
   }
 
-  const handleDelete = (id: string) => {
-    setLaborers(laborers.filter(labor => labor.id !== id))
-    toast.success('Labor worker deleted successfully')
+  const handleDelete = async (id: string) => {
+    let loadingToastId: string | number | undefined;
+
+    try {
+      loadingToastId = toast.loading('Deleting labor worker...');
+      
+      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const headers: Record<string, string> = { };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await fetch(`${apiBaseUrl}/labor/deleteLabor/${id}`, {
+        method: 'DELETE',
+        headers
+      });
+
+      // Dismiss loading toast
+      if (loadingToastId) {
+        toast.dismiss(loadingToastId);
+      }
+
+      if (response.ok) {
+        const responseData = await response.json();
+        if (responseData.success) {
+          toast.success('Labor worker deleted successfully');
+          // Refresh the data
+          fetchLaborData(currentPage, itemsPerPage);
+        } else {
+          toast.error(responseData.message || 'Failed to delete labor worker');
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.message || 'Failed to delete labor worker');
+      }
+    } catch (error) {
+      // Make sure to dismiss loading toast even on error
+      if (loadingToastId) {
+        toast.dismiss(loadingToastId);
+      }
+      console.error('Error deleting labor worker:', error);
+      toast.error('Error deleting labor worker. Please try again.');
+    }
   }
 
   const resetForm = () => {
     setFormData({
-      name: '',
+      full_name: '',
       email: '',
       phone: '',
+      dob: '',
       address: '',
+      date_of_joining: '',
+      status: 'active',
       trade: '',
       experience: '',
-      hourlyRate: 0,
-      availability: 'available',
-      jobsCompleted: 0,
-      dateOfJoining: '',
-      supervisor: '',
+      hourly_rate: 0,
+      supervisor_id: '',
+      availability: 'Full-time',
       certifications: [],
       skills: [],
-      notes: ''
+      notes: '',
+      role: 'Labor'
     })
+    setValidationErrors({})
   }
 
   const handleCertificationChange = (certification: string, checked: boolean) => {
@@ -409,59 +577,345 @@ function downloadCSV(data: Labor[], filename: string) {
   link.click();
   document.body.removeChild(link);
 }
+useEffect(() => {
+  fetchRoles(); 
+  fetchLeadLabourData();
+  fetchLaborData(currentPage, itemsPerPage);
+}, [currentPage]);
+const fetchRoles = async () => {
+  try {
+    const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
 
+    const response = await fetch(`${apiBaseUrl}/permissions/roles-with-permissions`, {
+      method: 'GET',
+      headers
+    });
+
+    if (response.ok) {
+      const responseData = await response.json();
+      console.log('API Response:', responseData);
+      
+      // Transform API response to match component's expected format
+      if (responseData.success && responseData.data) {
+        const transformedRoles = responseData.data.map((apiRole: any) => ({
+          id: apiRole.id.toString(),
+          roleName: apiRole.role_name || '',
+          roleType: apiRole.role_type || '',
+          permissions: apiRole.permissions || []
+        }));
+        
+        setRoles(transformedRoles);
+      } else {
+        console.error('Invalid API response structure:', responseData);
+      }
+    } else {
+      console.error('Failed to fetch roles:', response.status, response.statusText);
+    }
+  } catch (error) {
+    console.error('Error fetching roles:', error);
+  }
+};
+const fetchLeadLabourData = async () => {
+  try {
+    const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const response = await fetch(`${apiBaseUrl}/lead-labor/getAllLeadLabor`, {
+      method: 'GET',
+      headers
+    });
+
+    if (response.ok) {
+      const responseData = await response.json();
+      
+      if (responseData.success && responseData.data && responseData.data.data && Array.isArray(responseData.data.data)) {
+        // Map API response to simple structure for supervisor dropdown
+        const mappedData = responseData.data.data.map((item: any) => ({
+          id: item.users?.id,
+          full_name: item.users?.full_name || 'N/A',
+          email: item.users?.email || 'N/A',
+          phone: item.users?.phone || 'N/A',
+          role: item.users?.role || 'Lead Labour'
+        }));
+
+        setLeadLabours(mappedData);
+      } else {
+        console.error('Invalid response structure:', responseData);
+        setLeadLabours([]); // Set empty array as fallback
+      }
+    } else {
+      console.error('Failed to fetch lead labour data:', response.status, response.statusText);
+      setLeadLabours([]); // Set empty array as fallback
+    }
+  } catch (error) {
+    console.error('Error fetching lead labour data:', error);
+    setLeadLabours([]); // Set empty array as fallback
+  }
+};
+
+const fetchLaborData = async (page: number = 1, limit: number = 10) => {
+  setIsLoadingLabor(true);
+  try {
+    const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const response = await fetch(`${apiBaseUrl}/labor/getAllLabor?page=${page}&limit=${limit}`, {
+      method: 'GET',
+      headers
+    });
+
+    if (response.ok) {
+      const responseData = await response.json();
+      
+      if (responseData.success && responseData.data && responseData.data.data && Array.isArray(responseData.data.data)) {
+        // Map API response to component data structure
+        const mappedData = responseData.data.data.map((item: any) => ({
+          id: item.id.toString(),
+          laborId: item.labor_code,
+          name: item.users?.full_name || 'N/A',
+          email: item.users?.email || 'N/A',
+          phone: item.users?.phone || 'N/A',
+          address: item.address || '',
+          trade: item.trade || '',
+          experience: item.experience || '',
+          hourlyRate: item.hourly_rate || 0,
+          availability: item.availability === 'Full-time' ? 'available' : 
+                       item.availability === 'Part-time' ? 'assigned' :
+                       item.availability === 'Contract' ? 'on-leave' : 'unavailable',
+          jobsCompleted: 0, // Default value since not in API
+          dateOfJoining: item.date_of_joining || '',
+          supervisor: item.supervisor?.full_name || 'N/A',
+          certifications: item.certifications ? [item.certifications] : [],
+          skills: Array.isArray(item.skills) ? item.skills : [],
+          notes: item.notes || ''
+        }));
+
+        setLaborers(mappedData);
+      } else {
+        console.error('Invalid labor response structure:', responseData);
+        setLaborers([]); // Set empty array as fallback
+      }
+    } else {
+      console.error('Failed to fetch labor data:', response.status, response.statusText);
+      setLaborers([]); // Set empty array as fallback
+    }
+  } catch (error) {
+    console.error('Error fetching labor data:', error);
+    setLaborers([]); // Set empty array as fallback
+  } finally {
+    setIsLoadingLabor(false);
+  }
+};
+
+const fetchLaborById = async (id: string) => {
+  try {
+    const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const response = await fetch(`${apiBaseUrl}/labor/getLaborById/${id}`, {
+      method: 'GET',
+      headers
+    });
+
+    if (response.ok) {
+      const responseData = await response.json();
+      
+      if (responseData.success && responseData.data) {
+        const item = responseData.data;
+        
+        // Map API response to form data structure
+        const formData = {
+          full_name: item.users?.full_name || '',
+          email: item.users?.email || '',
+          phone: item.users?.phone || '',
+          dob: item.dob || '',
+          address: item.address || '',
+          date_of_joining: item.date_of_joining || '',
+          status: (item.users?.status === 'active' ? 'active' : 'inactive') as 'active' | 'inactive',
+          trade: item.trade || '',
+          experience: item.experience || '',
+          hourly_rate: item.hourly_rate || 0,
+          supervisor_id: item.supervisor_id?.toString() || '',
+          availability: item.availability || 'Full-time',
+          certifications: Array.isArray(item.certifications) ? item.certifications : 
+                         item.certifications ? [item.certifications] : [],
+          skills: Array.isArray(item.skills) ? item.skills : 
+                 item.skills ? [item.skills] : [],
+          notes: item.notes || '',
+          role: item.users?.role || 'Labor'
+        };
+
+        setFormData(formData);
+        return formData;
+      } else {
+        console.error('Invalid labor by ID response structure:', responseData);
+        toast.error('Failed to load labor data');
+      }
+    } else {
+      console.error('Failed to fetch labor by ID:', response.status, response.statusText);
+      toast.error('Failed to load labor data');
+    }
+  } catch (error) {
+    console.error('Error fetching labor by ID:', error);
+    toast.error('Failed to load labor data');
+  }
+};
   const renderForm = () => (
     <div className="grid grid-cols-2 gap-4 py-4 max-h-96 overflow-y-auto">
       <div className="space-y-2">
-        <Label htmlFor="name">Full Name *</Label>
-        <Input
-          id="name"
-          value={formData.name}
-          onChange={(e) => setFormData({...formData, name: e.target.value})}
-          placeholder="Enter full name"
-        />
-      </div>
+              <Label htmlFor="role">Role *</Label>
+              <Select value={formData.role} onValueChange={(value) => {
+                setFormData({...formData, role: value})
+                if (validationErrors.role) {
+                  setValidationErrors({...validationErrors, role: ''})
+                }
+              }}>
+                <SelectTrigger className={validationErrors.role ? 'border-red-500' : ''}>
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map((role) => (
+                    <SelectItem key={role.id} value={role.roleName}>
+                      {role.roleName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {validationErrors.role && (
+                <p className="text-sm text-red-500 mt-1">{validationErrors.role}</p>
+              )}
+            </div>
+      
       <div className="space-y-2">
-        <Label htmlFor="laborId">Labor ID (Auto generated)</Label>
+        <Label htmlFor="full_name">Full Name *</Label>
         <Input
-          id="laborId"
-          value={generateLaborId()}
-          disabled
-          className="bg-gray-100"
+          id="full_name"
+          value={formData.full_name}
+          onChange={(e) => {
+            setFormData({...formData, full_name: e.target.value})
+            if (validationErrors.full_name) {
+              setValidationErrors({...validationErrors, full_name: ''})
+            }
+          }}
+          placeholder="Enter full name"
+          className={validationErrors.full_name ? 'border-red-500' : ''}
         />
+        {validationErrors.full_name && (
+          <p className="text-sm text-red-500 mt-1">{validationErrors.full_name}</p>
+        )}
       </div>
+      
       <div className="space-y-2">
         <Label htmlFor="email">Email *</Label>
         <Input
           id="email"
           type="email"
           value={formData.email}
-          onChange={(e) => setFormData({...formData, email: e.target.value})}
+          onChange={(e) => {
+            setFormData({...formData, email: e.target.value})
+            if (validationErrors.email) {
+              setValidationErrors({...validationErrors, email: ''})
+            }
+          }}
           placeholder="Enter email address"
+          className={validationErrors.email ? 'border-red-500' : ''}
         />
+        {validationErrors.email && (
+          <p className="text-sm text-red-500 mt-1">{validationErrors.email}</p>
+        )}
       </div>
+      
       <div className="space-y-2">
         <Label htmlFor="phone">Phone Number *</Label>
         <Input
           id="phone"
           value={formData.phone}
-          onChange={(e) => setFormData({...formData, phone: e.target.value})}
-          placeholder="Enter phone number"
+          onChange={(e) => {
+            // Only allow digits and limit to 10 characters
+            const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+            setFormData({...formData, phone: value})
+            if (validationErrors.phone) {
+              setValidationErrors({...validationErrors, phone: ''})
+            }
+          }}
+          placeholder="Enter 10-digit phone number"
+          className={validationErrors.phone ? 'border-red-500' : ''}
         />
+        {validationErrors.phone && (
+          <p className="text-sm text-red-500 mt-1">{validationErrors.phone}</p>
+        )}
       </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="dob">Date of Birth *</Label>
+        <Input
+          id="dob"
+          type="date"
+          value={formData.dob}
+          onChange={(e) => {
+            setFormData({...formData, dob: e.target.value})
+            if (validationErrors.dob) {
+              setValidationErrors({...validationErrors, dob: ''})
+            }
+          }}
+          max={new Date().toISOString().split('T')[0]}
+        />
+        {validationErrors.dob && (
+          <p className="text-sm text-red-500 mt-1">{validationErrors.dob}</p>
+        )}
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="date_of_joining">Date of Joining *</Label>
+        <Input
+          id="date_of_joining"
+          type="date"
+          value={formData.date_of_joining}
+          onChange={(e) => {
+            setFormData({...formData, date_of_joining: e.target.value})
+            if (validationErrors.date_of_joining) {
+              setValidationErrors({...validationErrors, date_of_joining: ''})
+            }
+          }}
+        />
+        {validationErrors.date_of_joining && (
+          <p className="text-sm text-red-500 mt-1">{validationErrors.date_of_joining}</p>
+        )}
+      </div>
+      
       <div className="col-span-2 space-y-2">
-        <Label htmlFor="address">Address</Label>
+        <Label htmlFor="address">Address *</Label>
         <Input
           id="address"
           value={formData.address}
-          onChange={(e) => setFormData({...formData, address: e.target.value})}
+          onChange={(e) => {
+            setFormData({...formData, address: e.target.value})
+            if (validationErrors.address) {
+              setValidationErrors({...validationErrors, address: ''})
+            }
+          }}
           placeholder="Enter full address"
+          className={validationErrors.address ? 'border-red-500' : ''}
         />
+        {validationErrors.address && (
+          <p className="text-sm text-red-500 mt-1">{validationErrors.address}</p>
+        )}
       </div>
+      
       <div className="space-y-2">
-        <Label htmlFor="trade">Trade</Label>
-        <Select value={formData.trade} onValueChange={(value) => setFormData({...formData, trade: value})}>
-          <SelectTrigger>
+        <Label htmlFor="trade">Trade *</Label>
+        <Select value={formData.trade} onValueChange={(value) => {
+          setFormData({...formData, trade: value})
+          if (validationErrors.trade) {
+            setValidationErrors({...validationErrors, trade: ''})
+          }
+        }}>
+          <SelectTrigger className={validationErrors.trade ? 'border-red-500' : ''}>
             <SelectValue placeholder="Select trade" />
           </SelectTrigger>
           <SelectContent>
@@ -470,61 +924,92 @@ function downloadCSV(data: Labor[], filename: string) {
             ))}
           </SelectContent>
         </Select>
+        {validationErrors.trade && (
+          <p className="text-sm text-red-500 mt-1">{validationErrors.trade}</p>
+        )}
       </div>
+      
       <div className="space-y-2">
-        <Label htmlFor="experience">Experience</Label>
+        <Label htmlFor="experience">Experience *</Label>
         <Input
           id="experience"
           value={formData.experience}
-          onChange={(e) => setFormData({...formData, experience: e.target.value})}
+          onChange={(e) => {
+            setFormData({...formData, experience: e.target.value})
+            if (validationErrors.experience) {
+              setValidationErrors({...validationErrors, experience: ''})
+            }
+          }}
           placeholder="e.g., 3 years"
+          className={validationErrors.experience ? 'border-red-500' : ''}
         />
+        {validationErrors.experience && (
+          <p className="text-sm text-red-500 mt-1">{validationErrors.experience}</p>
+        )}
       </div>
+      
       <div className="space-y-2">
-        <Label htmlFor="hourlyRate">Hourly Rate ($)</Label>
+        <Label htmlFor="hourly_rate">Hourly Rate ($)</Label>
         <Input
-          id="hourlyRate"
+          id="hourly_rate"
           type="number"
-          value={formData.hourlyRate || ''}
-          onChange={(e) => setFormData({...formData, hourlyRate: Number(e.target.value)})}
+          step="0.01"
+          value={formData.hourly_rate || ''}
+          onChange={(e) => setFormData({...formData, hourly_rate: Number(e.target.value)})}
           placeholder="Enter hourly rate"
         />
       </div>
+      
       <div className="space-y-2">
-        <Label htmlFor="supervisor">Supervisor</Label>
-        <Select value={formData.supervisor} onValueChange={(value) => setFormData({...formData, supervisor: value})}>
-          <SelectTrigger>
+        <Label htmlFor="supervisor_id">Supervisor *</Label>
+        <Select value={formData.supervisor_id} onValueChange={(value) => {
+          setFormData({...formData, supervisor_id: value})
+          if (validationErrors.supervisor_id) {
+            setValidationErrors({...validationErrors, supervisor_id: ''})
+          }
+        }}>
+          <SelectTrigger className={validationErrors.supervisor_id ? 'border-red-500' : ''}>
             <SelectValue placeholder="Select supervisor" />
           </SelectTrigger>
           <SelectContent>
-            {supervisors.map((supervisor) => (
-              <SelectItem key={supervisor} value={supervisor}>{supervisor}</SelectItem>
+            {leadLabours.map((supervisor) => (
+              <SelectItem key={supervisor.id} value={supervisor.id.toString()}>
+                {supervisor.full_name}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
+        {validationErrors.supervisor_id && (
+          <p className="text-sm text-red-500 mt-1">{validationErrors.supervisor_id}</p>
+        )}
       </div>
+      
       <div className="space-y-2">
         <Label htmlFor="availability">Availability</Label>
-        <Select value={formData.availability} onValueChange={(value: 'available' | 'assigned' | 'on-leave' | 'unavailable') => setFormData({...formData, availability: value})}>
+        <Select value={formData.availability} onValueChange={(value) => setFormData({...formData, availability: value})}>
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="available">Available</SelectItem>
-            <SelectItem value="assigned">Assigned</SelectItem>
-            <SelectItem value="on-leave">On Leave</SelectItem>
-            <SelectItem value="unavailable">Unavailable</SelectItem>
+            <SelectItem value="Full-time">Full-time</SelectItem>
+            <SelectItem value="Part-time">Part-time</SelectItem>
+            <SelectItem value="Contract">Contract</SelectItem>
+            <SelectItem value="On-call">On-call</SelectItem>
           </SelectContent>
         </Select>
       </div>
+      
       <div className="space-y-2">
-        <Label htmlFor="dateOfJoining">Date of Joining</Label>
-        <Input
-          id="dateOfJoining"
-          type="date"
-          value={formData.dateOfJoining}
-          onChange={(e) => setFormData({...formData, dateOfJoining: e.target.value})}
-        />
+        <Label htmlFor="status">Status</Label>
+        <Select value={formData.status} onValueChange={(value: 'active' | 'inactive') => setFormData({...formData, status: value})}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="inactive">Inactive</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       
       <div className="col-span-2 space-y-2">
@@ -558,14 +1043,14 @@ function downloadCSV(data: Labor[], filename: string) {
           ))}
         </div>
       </div>
-
+      
       <div className="col-span-2 space-y-2">
         <Label htmlFor="notes">Notes</Label>
         <Textarea
           id="notes"
           value={formData.notes}
           onChange={(e) => setFormData({...formData, notes: e.target.value})}
-          placeholder="Additional notes..."
+          placeholder="Enter any additional notes"
           rows={3}
         />
       </div>
@@ -753,47 +1238,71 @@ function downloadCSV(data: Labor[], filename: string) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedLaborers.map((labor, index) => (
-                <TableRow key={labor.id} className={index % 2 === 1 ? "bg-[#eff4fa]" : ""}>
-                  <TableCell>
-                    <input type="checkbox" className="rounded border-gray-300" />
-                  </TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">#{labor.laborId}</TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="text-sm font-medium text-[#2b2b2b]/80">{labor.name}</div>
-                      <div className="text-xs text-gray-500">{labor.email}</div>
+              {isLoadingLabor ? (
+                <TableRow>
+                  <TableCell colSpan={11} className="text-center py-8">
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      <span className="ml-2 text-gray-600">Loading labor data...</span>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="text-sm text-[#2b2b2b]/80">{labor.phone}</div>
-                      <div className="text-xs text-gray-500 flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        {labor.address.split(',')[0]}
+                </TableRow>
+              ) : paginatedLaborers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={11} className="text-center py-8">
+                    <div className="flex flex-col items-center justify-center text-gray-500">
+                      <div className="text-lg font-medium mb-2">No data available</div>
+                      <div className="text-sm">
+                        {searchTerm || filterTrade !== 'all' || filterAvailability !== 'all' 
+                          ? 'No labor found matching your filters' 
+                          : 'No labor data found. Create your first labor record.'}
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">{labor.trade}</TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">{labor.experience}</TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">${labor.hourlyRate}</TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">{labor.jobsCompleted}</TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">{labor.supervisor}</TableCell>
-                  <TableCell>{getAvailabilityBadge(labor.availability)}</TableCell>
-                  <TableCell>
-                    <ActionButtonsPopup
-                      onView={onViewDetails ? () => onViewDetails(labor.id) : undefined}
-                      onEdit={() => handleEdit(labor)}
-                      onDelete={() => handleDelete(labor.id)}
-                      itemName={labor.name}
-                      itemType="Labor Worker"
-                      showView={!!onViewDetails && canViewLabour}
-                      showEdit={canEditLabour}
-                      showDelete={canDeleteLabour}
-                    />
-                  </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                paginatedLaborers.map((labor, index) => (
+                  <TableRow key={labor.id} className={index % 2 === 1 ? "bg-[#eff4fa]" : ""}>
+                    <TableCell>
+                      <input type="checkbox" className="rounded border-gray-300" />
+                    </TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80">#{labor.laborId}</TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="text-sm font-medium text-[#2b2b2b]/80">{labor.name}</div>
+                        <div className="text-xs text-gray-500">{labor.email}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="text-sm text-[#2b2b2b]/80">{labor.phone}</div>
+                        <div className="text-xs text-gray-500 flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {labor.address.split(',')[0]}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80">{labor.trade}</TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80">{labor.experience}</TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80">${labor.hourlyRate}</TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80">{labor.jobsCompleted}</TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80">{labor.supervisor}</TableCell>
+                    <TableCell>{getAvailabilityBadge(labor.availability)}</TableCell>
+                    <TableCell>
+                      <ActionButtonsPopup
+                        onView={onViewDetails ? () => onViewDetails(labor.id) : undefined}
+                        onEdit={() => handleEdit(labor)}
+                        onDelete={() => handleDelete(labor.id)}
+                        itemName={labor.name}
+                        itemType="Labor Worker"
+                        showView={!!onViewDetails && canViewLabour}
+                        showEdit={canEditLabour}
+                        showDelete={canDeleteLabour}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

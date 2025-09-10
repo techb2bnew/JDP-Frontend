@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs' // Tabs components import karein
+import { usePermissions } from '../contexts/PermissionContext'
 import {
   Plus,
   Search,
@@ -96,6 +97,7 @@ const mockJobs: Job[] = [
 ]
 
 export function InvoicesPage() {
+  const { hasPermission } = usePermissions()
   const [activeTab, setActiveTab] = useState('invoices');
   const [invoices, setInvoices] = useState<Invoice[]>(invoicesData)
   const [searchTerm, setSearchTerm] = useState('')
@@ -178,13 +180,15 @@ export function InvoicesPage() {
           <h1 className="text-2xl font-semibold text-foreground">Invoices & Billing</h1>
           <p className="text-muted-foreground">Manage invoices, track timesheets, compare estimates, and handle approvals</p>
         </div>
-        <Button
-          onClick={() => setShowNewInvoiceDialog(true)}
-          className="bg-primary text-primary-foreground hover:bg-primary/90"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add New Invoice
-        </Button>
+        {hasPermission('invoices', 'create') && (
+          <Button
+            onClick={() => setShowNewInvoiceDialog(true)}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add New Invoice
+          </Button>
+        )}
       </div>
 
       {/* Tabs Navigation */}
@@ -345,15 +349,21 @@ export function InvoicesPage() {
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center justify-end gap-2">
-                              <Button variant="outline" size="icon" onClick={() => handleViewInvoice(invoice)}>
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                              <Button variant="outline" size="icon" onClick={() => handleDownloadInvoice()}>
-                                <Download className="w-4 h-4" />
-                              </Button>
-                              <Button variant="outline" size="icon" onClick={() => handleDeleteInvoice(invoice.id)}>
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+                              {hasPermission('invoices', 'view') && (
+                                <Button variant="outline" size="icon" onClick={() => handleViewInvoice(invoice)}>
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {hasPermission('invoices', 'view') && (
+                                <Button variant="outline" size="icon" onClick={() => handleDownloadInvoice()}>
+                                  <Download className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {hasPermission('invoices', 'delete') && (
+                                <Button variant="outline" size="icon" onClick={() => handleDeleteInvoice(invoice.id)}>
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -398,9 +408,15 @@ export function InvoicesPage() {
           </DialogHeader>
           {selectedInvoice && <InvoiceTemplate invoice={selectedInvoice} />}
           <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={handlePrintInvoice}><Printer className="h-4 w-4 mr-2" />Print</Button>
-            <Button variant="outline" onClick={handleDownloadInvoice}><Download className="h-4 w-4 mr-2" />Download PDF</Button>
-            <Button onClick={handleEmailInvoice} className="bg-primary text-primary-foreground hover:bg-primary/90"><Mail className="h-4 w-4 mr-2" />Send to Customer</Button>
+            {hasPermission('invoices', 'view') && (
+              <Button variant="outline" onClick={handlePrintInvoice}><Printer className="h-4 w-4 mr-2" />Print</Button>
+            )}
+            {hasPermission('invoices', 'view') && (
+              <Button variant="outline" onClick={handleDownloadInvoice}><Download className="h-4 w-4 mr-2" />Download PDF</Button>
+            )}
+            {hasPermission('invoices', 'edit') && (
+              <Button onClick={handleEmailInvoice} className="bg-primary text-primary-foreground hover:bg-primary/90"><Mail className="h-4 w-4 mr-2" />Send to Customer</Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

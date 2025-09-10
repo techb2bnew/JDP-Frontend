@@ -13,6 +13,7 @@ import { Label } from './ui/label'
 import { Textarea } from './ui/textarea'
 import { Checkbox } from './ui/checkbox'
 import { Separator } from './ui/separator'
+import { usePermissions } from '../contexts/PermissionContext'
 import {
   Plus,
   Search,
@@ -228,6 +229,7 @@ const suppliersData = [
 const categoriesData = ['Electrical', 'Construction Materials', 'Tools', 'Plumbing', 'Hardware']
 
 export function ProductsPage() {
+  const { hasPermission } = usePermissions()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedBranches, setSelectedBranches] = useState<string[]>([])
@@ -514,18 +516,24 @@ export function ProductsPage() {
           <p className="text-muted-foreground">Manage your electrical products catalog with dual SKU and pricing system</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleImport}>
-            <Upload className="h-4 w-4 mr-2" />
-            Import Products
-          </Button>
-          <Button variant="outline" onClick={handleExport}>
-            <Download className="h-4 w-4 mr-2" />
-            Export Products
-          </Button>
-          <Button onClick={() => handleAction('add')} className="bg-primary text-primary-foreground hover:bg-primary/90">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Product
-          </Button>
+          {hasPermission('products', 'create') && (
+            <Button variant="outline" onClick={handleImport}>
+              <Upload className="h-4 w-4 mr-2" />
+              Import Products
+            </Button>
+          )}
+          {hasPermission('products', 'view') && (
+            <Button variant="outline" onClick={handleExport}>
+              <Download className="h-4 w-4 mr-2" />
+              Export Products
+            </Button>
+          )}
+          {hasPermission('products', 'create') && (
+            <Button onClick={() => handleAction('add')} className="bg-primary text-primary-foreground hover:bg-primary/90">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Product
+            </Button>
+          )}
         </div>
       </div>
 
@@ -738,15 +746,21 @@ export function ProductsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => handleAction('view', product)}>
-                          <Eye className="h-3 w-3" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleAction('edit', product)}>
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleAction('delete', product)}>
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                        {hasPermission('products', 'view') && (
+                          <Button variant="ghost" size="sm" onClick={() => handleAction('view', product)}>
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                        )}
+                        {hasPermission('products', 'edit') && (
+                          <Button variant="ghost" size="sm" onClick={() => handleAction('edit', product)}>
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                        )}
+                        {hasPermission('products', 'delete') && (
+                          <Button variant="ghost" size="sm" onClick={() => handleAction('delete', product)}>
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -1073,14 +1087,18 @@ export function ProductsPage() {
           <DialogFooter>
             {currentAction === 'view' ? (
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => handleAction('edit', selectedProduct!)}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit
-                </Button>
-                <Button variant="outline" onClick={() => handleAction('delete', selectedProduct!)}>
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </Button>
+                {hasPermission('products', 'edit') && (
+                  <Button variant="outline" onClick={() => handleAction('edit', selectedProduct!)}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                )}
+                {hasPermission('products', 'delete') && (
+                  <Button variant="outline" onClick={() => handleAction('delete', selectedProduct!)}>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="flex gap-2">
@@ -1088,10 +1106,12 @@ export function ProductsPage() {
                   <X className="h-4 w-4 mr-2" />
                   Cancel
                 </Button>
-                <Button onClick={handleSaveProduct} className="bg-primary text-primary-foreground hover:bg-primary/90">
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Product
-                </Button>
+                {hasPermission('products', currentAction === 'add' ? 'create' : 'edit') && (
+                  <Button onClick={handleSaveProduct} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Product
+                  </Button>
+                )}
               </div>
             )}
           </DialogFooter>

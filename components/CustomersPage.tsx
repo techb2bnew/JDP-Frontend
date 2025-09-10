@@ -6,6 +6,7 @@ import { Input } from './ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
 import { Badge } from './ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
+import { usePermissions } from '../contexts/PermissionContext'
 import {
   Search,
   UserPlus,
@@ -117,6 +118,7 @@ const getInitials = (name: string) => {
 }
 
 export function CustomersPage() {
+  const { hasPermission } = usePermissions()
   const [searchTerm, setSearchTerm] = useState('')
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
@@ -221,14 +223,18 @@ export function CustomersPage() {
           <p className="text-muted-foreground">Manage and track all customer relationships and service history</p>
         </div>
         <div className='flex gap-2'>
-          <Button variant="outline" onClick={handleExportCustomers}>
-            <Download className="h-4 w-4 mr-2" />
-            Export Customers
-          </Button>
-          <Button className='text-white' onClick={() => setShowAddCustomerModal(true)}>
-            <UserPlus className="h-4 w-4 mr-2" />
-            Add Customer
-          </Button>
+          {hasPermission('customers', 'view') && (
+            <Button variant="outline" onClick={handleExportCustomers}>
+              <Download className="h-4 w-4 mr-2" />
+              Export Customers
+            </Button>
+          )}
+          {hasPermission('customers', 'create') && (
+            <Button className='text-white' onClick={() => setShowAddCustomerModal(true)}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Add Customer
+            </Button>
+          )}
         </div>
       </div>
 
@@ -403,26 +409,32 @@ export function CustomersPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="icon">
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button variant="outline" size="icon" onClick={() => {
-                        setEditingCustomer(customer);
-                        setCustomerFormData({
-                          name: customer.name,
-                          email: customer.email,
-                          phone: customer.phone,
-                          contactPerson: "John Smith",
-                          address: customer.location,
-                          company: customer.company || ""
-                        });
-                        setShowAddCustomerModal(true);
-                      }}>
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button variant="outline" size="icon">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {hasPermission('customers', 'view') && (
+                        <Button variant="outline" size="icon">
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {hasPermission('customers', 'edit') && (
+                        <Button variant="outline" size="icon" onClick={() => {
+                          setEditingCustomer(customer);
+                          setCustomerFormData({
+                            name: customer.name,
+                            email: customer.email,
+                            phone: customer.phone,
+                            contactPerson: "John Smith",
+                            address: customer.location,
+                            company: customer.company || ""
+                          });
+                          setShowAddCustomerModal(true);
+                        }}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {hasPermission('customers', 'delete') && (
+                        <Button variant="outline" size="icon">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

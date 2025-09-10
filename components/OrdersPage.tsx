@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Separator } from './ui/separator'
 import { Calendar } from './ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
+import { usePermissions } from '../contexts/PermissionContext'
 
 import { 
   Search, 
@@ -320,6 +321,7 @@ const ordersData: Order[] = [
 ]
 
 export function OrdersPage() {
+  const { hasPermission } = usePermissions()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined })
@@ -579,15 +581,19 @@ export function OrdersPage() {
                 </SelectContent>
               </Select>
               
-              <Button variant="outline" onClick={() => handleExport('csv')}>
-                <FileDown className="h-4 w-4 mr-2" />
-                CSV
-              </Button>
+              {hasPermission('orders', 'view') && (
+                <Button variant="outline" onClick={() => handleExport('csv')}>
+                  <FileDown className="h-4 w-4 mr-2" />
+                  CSV
+                </Button>
+              )}
               
-              <Button variant="outline" onClick={() => handleExport('pdf')}>
-                <Download className="h-4 w-4 mr-2" />
-                PDF
-              </Button>
+              {hasPermission('orders', 'view') && (
+                <Button variant="outline" onClick={() => handleExport('pdf')}>
+                  <Download className="h-4 w-4 mr-2" />
+                  PDF
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -631,19 +637,23 @@ export function OrdersPage() {
                     </TableCell>
                     <TableCell>{formatDate(order.orderDate)}</TableCell>
                     <TableCell>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleViewInvoice(order)}
-                      >
-                        <Receipt className="h-3 w-3 mr-1" />
-                        View Invoice
-                      </Button>
+                      {hasPermission('orders', 'view') && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleViewInvoice(order)}
+                        >
+                          <Receipt className="h-3 w-3 mr-1" />
+                          View Invoice
+                        </Button>
+                      )}
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="sm">
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      {hasPermission('orders', 'view') && (
+                        <Button variant="ghost" size="sm" onClick={() => setSelectedOrder(order)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -855,18 +865,24 @@ export function OrdersPage() {
           )}
           
           <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={handlePrintInvoice}>
-              <Printer className="h-4 w-4 mr-2" />
-              Print
-            </Button>
-            <Button variant="outline" onClick={() => handleExport('pdf')}>
-              <Download className="h-4 w-4 mr-2" />
-              Download PDF
-            </Button>
-            <Button onClick={handleEmailInvoice} className="bg-primary text-primary-foreground hover:bg-primary/90">
-              <Mail className="h-4 w-4 mr-2" />
-              Email Invoice
-            </Button>
+            {hasPermission('orders', 'view') && (
+              <Button variant="outline" onClick={handlePrintInvoice}>
+                <Printer className="h-4 w-4 mr-2" />
+                Print
+              </Button>
+            )}
+            {hasPermission('orders', 'view') && (
+              <Button variant="outline" onClick={() => handleExport('pdf')}>
+                <Download className="h-4 w-4 mr-2" />
+                Download PDF
+              </Button>
+            )}
+            {hasPermission('orders', 'edit') && (
+              <Button onClick={handleEmailInvoice} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                <Mail className="h-4 w-4 mr-2" />
+                Email Invoice
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

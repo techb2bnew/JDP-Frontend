@@ -40,7 +40,7 @@ export function StaffManagementPage({
   
   const [viewState, setViewState] = useState<{
     type: 'list' | 'detail'
-    category: 'staff' | 'lead-labour' | 'labor' | null
+    category: 'staff' | 'lead-labour' | 'labor' | 'supplier' | null
     selectedId: string | null
   }>({
     type: 'list',
@@ -78,7 +78,7 @@ export function StaffManagementPage({
   )
 
 
-  const handleViewDetails = (category: 'staff' | 'lead-labour' | 'labor', id: string) => {
+  const handleViewDetails = (category: 'staff' | 'lead-labour' | 'labor' | 'supplier', id: string) => {
     setViewState({
       type: 'detail',
       category,
@@ -121,13 +121,13 @@ export function StaffManagementPage({
             onBack={handleBackToList}
           />
         )
-      // case 'supplier':
-      //   return (
-      //     <SupplierDetailsPage 
-      //       supplierId={viewState.selectedId} 
-      //       onBack={handleBackToList}
-      //     />
-      //   )
+      case 'supplier':
+        return (
+          <SupplierDetailsPage 
+            supplierId={viewState.selectedId} 
+            onBack={handleBackToList}
+          />
+        )
       // case 'user':
       //   return (
       //     <UserDetailsPage 
@@ -144,7 +144,7 @@ export function StaffManagementPage({
     { id: 'staff', label: 'Staff', icon: UserCog, show: hasStaffPermissions },
     { id: 'lead-labour', label: 'Lead Labour', icon: HardHat, show: hasLeadLabourPermissions },
     { id: 'labor', label: 'Labor', icon: Wrench, show: hasLaborPermissions },
-    // { id: 'supplier', label: 'Supplier', icon: Building2, show: false },
+    { id: 'supplier', label: 'Supplier', icon: Building2, show: false },
     // { id: 'user', label: 'User', icon: User, show: false },
   ]
 
@@ -172,12 +172,12 @@ export function StaffManagementPage({
             onViewDetails={(id) => handleViewDetails('labor', id)} 
           />
         )
-      // case 'supplier':
-      //   return (
-      //     <SupplierPage 
-      //       onViewDetails={(id) => handleViewDetails('supplier', id)} 
-      //     />
-      //   )
+      case 'supplier':
+        return (
+          <SupplierPage 
+            onViewDetails={(id) => handleViewDetails('supplier', id)} 
+          />
+        )
       // case 'user':
       //   return (
       //     <UserPage 

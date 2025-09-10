@@ -121,6 +121,7 @@ interface LeadLabourPageProps {
 export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
   const { hasPermission, permissions } = usePermissions()
   const [leadLabours, setLeadLabours] = useState<LeadLabour[]>([])
+  const [isLoadingLeadLabour, setIsLoadingLeadLabour] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -241,6 +242,9 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       if (!formData.email) errors.email = 'Email is required';
       if (!formData.phone) errors.phone = 'Phone is required';
       if (!formData.dob) errors.dob = 'Date of Birth is required';
+      if (formData.dob && new Date(formData.dob) > new Date()) {
+        errors.dob = 'Date of Birth cannot be in the future';
+      }
       if (!formData.address) errors.address = 'Address is required';
       if (!formData.department) errors.department = 'Department is required';
       if (!formData.dateOfJoining) errors.dateOfJoining = 'Date of Joining is required';
@@ -297,6 +301,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       formDataPayload.append('experience', formData.experience);
       formDataPayload.append('agreed_terms', formData.agreeToTerms.toString());
       formDataPayload.append('role', formData.role);
+      formDataPayload.append('management_type', 'lead_labor');
       
       // Append file uploads if they exist
       if (formData.documents.idProof) {
@@ -393,6 +398,9 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       if (!formData.email) errors.email = 'Email is required';
       if (!formData.phone) errors.phone = 'Phone is required';
       if (!formData.dob) errors.dob = 'Date of Birth is required';
+      if (formData.dob && new Date(formData.dob) > new Date()) {
+        errors.dob = 'Date of Birth cannot be in the future';
+      }
       if (!formData.address) errors.address = 'Address is required';
       if (!formData.department) errors.department = 'Department is required';
       if (!formData.dateOfJoining) errors.dateOfJoining = 'Date of Joining is required';
@@ -447,6 +455,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       formDataPayload.append('experience', formData.experience);
       formDataPayload.append('agreed_terms', formData.agreeToTerms.toString());
       formDataPayload.append('role', formData.role);
+      formDataPayload.append('management_type', 'lead_labour');
       
       // Append file uploads if they exist
       if (formData.documents.idProof) {
@@ -736,6 +745,7 @@ const fetchRoles = async () => {
 };
 
 const fetchLeadLabourData = async () => {
+  setIsLoadingLeadLabour(true);
   try {
     const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -750,7 +760,7 @@ const fetchLeadLabourData = async () => {
       const responseData = await response.json();
       if (responseData.success && responseData.data) {
         // Map API response to component data structure
-        const mappedData = responseData.data.map((item: any) => ({
+        const mappedData = responseData.data.data.map((item: any) => ({
           id: item.id,
           leadLabourId: item.labor_code,
           name: item.users?.full_name || 'N/A',
@@ -798,8 +808,8 @@ const fetchLeadLabourData = async () => {
         setLeadLabours(mappedData);
         
         // Extract unique departments and specializations
-        const uniqueDepartments = Array.from(new Set(responseData.data.map((item: any) => item.department).filter(Boolean))) as string[];
-        const uniqueSpecializations = Array.from(new Set(responseData.data.map((item: any) => item.specialization).filter(Boolean))) as string[];
+        const uniqueDepartments = Array.from(new Set(responseData.data?.data?.map((item: any) => item.department).filter(Boolean))) as string[];
+        const uniqueSpecializations = Array.from(new Set(responseData.data?.data?.map((item: any) => item.specialization).filter(Boolean))) as string[];
         
         setDepartments(uniqueDepartments);
         setSpecializations(uniqueSpecializations);
@@ -809,6 +819,8 @@ const fetchLeadLabourData = async () => {
     }
   } catch (error) {
     console.error('Error fetching lead labour data:', error);
+  } finally {
+    setIsLoadingLeadLabour(false);
   }
 };
 
@@ -984,6 +996,7 @@ const fetchLeadLabourById = async (id: number) => {
                   setValidationErrors({...validationErrors, dob: ''})
                 }
               }}
+              max={new Date().toISOString().split('T')[0]}
             />
             {validationErrors.dob && (
               <p className="text-sm text-red-500 mt-1">{validationErrors.dob}</p>
@@ -1320,47 +1333,71 @@ const fetchLeadLabourById = async (id: number) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedLeadLabours.map((labour, index) => (
-                <TableRow key={labour.id} className={index % 2 === 1 ? "bg-[#eff4fa]" : ""}>
-                  <TableCell>
-                    <input type="checkbox" className="rounded border-gray-300" />
-                  </TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">{labour.id}</TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="text-sm font-medium text-[#2b2b2b]/80">{labour.name}</div>
-                      <div className="text-xs text-gray-500">{labour.email}</div>
+              {isLoadingLeadLabour ? (
+                <TableRow>
+                  <TableCell colSpan={11} className="text-center py-8">
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      <span className="ml-2 text-gray-600">Loading lead labour data...</span>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="text-sm text-[#2b2b2b]/80">{labour.phone}</div>
-                      <div className="text-xs text-gray-500 flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        {labour.address.split(',')[0]}
+                </TableRow>
+              ) : paginatedLeadLabours.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={11} className="text-center py-8">
+                    <div className="flex flex-col items-center justify-center text-gray-500">
+                      <div className="text-lg font-medium mb-2">No data available</div>
+                      <div className="text-sm">
+                        {searchTerm || filterSpecialization !== 'all' || filterStatus !== 'all' 
+                          ? 'No lead labour found matching your filters' 
+                          : 'No lead labour data found. Create your first lead labour record.'}
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">{labour.department}</TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">{labour.specialization}</TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">{labour.experience}</TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">{labour.jobsCompleted}</TableCell>
-                  <TableCell>{getStatusBadge(labour.status || 'active')}</TableCell>
-                  <TableCell className="text-sm text-gray-900">{labour.dateOfJoining}</TableCell>
-                  <TableCell>
-                    <ActionButtonsPopup
-                      onView={() => handleView(labour.id)}
-                      onEdit={() => handleEdit(labour)}
-                      onDelete={() => handleDelete(labour.id)}
-                      itemName={labour.name}
-                      itemType="Lead Labour"
-                      showView={canViewLeadLabour}
-                      showEdit={canEditLeadLabour}
-                      showDelete={canDeleteLeadLabour}
-                    />
-                  </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                paginatedLeadLabours.map((labour, index) => (
+                  <TableRow key={labour.id} className={index % 2 === 1 ? "bg-[#eff4fa]" : ""}>
+                    <TableCell>
+                      <input type="checkbox" className="rounded border-gray-300" />
+                    </TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80">{labour.id}</TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="text-sm font-medium text-[#2b2b2b]/80">{labour.name}</div>
+                        <div className="text-xs text-gray-500">{labour.email}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="text-sm text-[#2b2b2b]/80">{labour.phone}</div>
+                        <div className="text-xs text-gray-500 flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {labour.address.split(',')[0]}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80">{labour.department}</TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80">{labour.specialization}</TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80">{labour.experience}</TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80">{labour.jobsCompleted}</TableCell>
+                    <TableCell>{getStatusBadge(labour.status || 'active')}</TableCell>
+                    <TableCell className="text-sm text-gray-900">{labour.dateOfJoining}</TableCell>
+                    <TableCell>
+                      <ActionButtonsPopup
+                        onView={() => handleView(labour.id)}
+                        onEdit={() => handleEdit(labour)}
+                        onDelete={() => handleDelete(labour.id)}
+                        itemName={labour.name}
+                        itemType="Lead Labour"
+                        showView={canViewLeadLabour}
+                        showEdit={canEditLeadLabour}
+                        showDelete={canDeleteLeadLabour}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -1500,7 +1537,7 @@ const fetchLeadLabourById = async (id: number) => {
                   <div className="space-y-2">
                     <Label>ID Proof</Label>
                     {viewingLeadLabour.idProofUrl ? (
-                      <a href={viewingLeadLabour.idProofUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                      <a href={viewingLeadLabour.idProofUrl} target="_blank" rel="noopener noreferrer" className="relative top-[10px] text-blue-600 hover:underline">
                         View ID Proof
                       </a>
                     ) : (
@@ -1510,7 +1547,7 @@ const fetchLeadLabourById = async (id: number) => {
                   <div className="space-y-2">
                     <Label>Photo</Label>
                     {viewingLeadLabour.photoUrl ? (
-                      <a href={viewingLeadLabour.photoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                      <a href={viewingLeadLabour.photoUrl} target="_blank" rel="noopener noreferrer" className="relative top-[10px] text-blue-600 hover:underline">
                         View Photo
                       </a>
                     ) : (
@@ -1520,7 +1557,7 @@ const fetchLeadLabourById = async (id: number) => {
                   <div className="space-y-2">
                     <Label>Resume</Label>
                     {viewingLeadLabour.resumeUrl ? (
-                      <a href={viewingLeadLabour.resumeUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                      <a href={viewingLeadLabour.resumeUrl} target="_blank" rel="noopener noreferrer" className="relative top-[10px] text-blue-600 hover:underline">
                         View Resume
                       </a>
                     ) : (

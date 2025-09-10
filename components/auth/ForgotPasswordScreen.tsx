@@ -2,25 +2,53 @@ import { useState } from 'react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { AuthStep } from '../AuthFlow'
+import { toast } from 'sonner'
 import svgPaths from '../../imports/svg-gg40su13b1'
 // import img4541 from "figma:asset/a3e40afe539df138ee43712dc0bf65b14d1b7224.png"
 
 interface ForgotPasswordScreenProps {
-  onStepChange: (step: AuthStep) => void
+  onStepChange: (step: AuthStep, userEmail?: string, userRole?: string) => void
 }
 
 export function ForgotPasswordScreen({ onStepChange }: ForgotPasswordScreenProps) {
   const [email, setEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
-  const handleVerify = () => {
-    if (!email.trim()) return
+  const handleVerify = async () => {
+    if (!email.trim()) {
+      toast.error('Please enter your email address')
+      return
+    }
     
     setIsLoading(true)
-    setTimeout(() => {
+    
+    try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+      const response = await fetch(`${apiBaseUrl}/auth/forgot-password/send-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email.trim()
+        })
+      })
+
+      const responseData = await response.json()
+
+      if (response.ok && responseData.success) {
+        toast.success('OTP sent to your email successfully')
+        // Navigate to OTP screen with email
+        onStepChange('otp', email)
+      } else {
+        toast.error(responseData.message || 'Failed to send OTP')
+      }
+    } catch (error) {
+      console.error('Error sending OTP:', error)
+      toast.error('Failed to send OTP. Please try again.')
+    } finally {
       setIsLoading(false)
-      onStepChange('new-password')
-    }, 1000)
+    }
   }
 
   return (

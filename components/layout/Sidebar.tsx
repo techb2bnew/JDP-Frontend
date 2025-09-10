@@ -21,7 +21,8 @@ import {
   Bell
 } from "lucide-react"
 import { cn } from "../../lib/utils"
-import { LogoutConfirmationDialog } from "../LogoutConfirmationDialog" 
+import { LogoutConfirmationDialog } from "../LogoutConfirmationDialog"
+import { usePermissions } from "../../contexts/PermissionContext" 
 interface SidebarProps {
   currentPath: string
   onLogout: () => void
@@ -31,6 +32,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const [expandedProfiles, setExpandedProfiles] = useState(false)
   const router = useRouter()
+  const { hasAnyPermission } = usePermissions()
 
   const navigation = [
     {
@@ -38,93 +40,124 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       name: "Dashboard",
       icon: LayoutDashboard,
       href: "/dashboard",
-      description: "Overview of key metrics and summaries"
+      description: "Overview of key metrics and summaries",
+      module: "dashboard",
+      requiredActions: ["view"]
     },
     {
       id: "analytics",
       name: "Analytics", 
       icon: BarChart3,
       href: "/analytics",
-      description: "Reports, performance charts, and usage stats"
+      description: "Reports, performance charts, and usage stats",
+      module: "reports",
+      requiredActions: ["view"]
     },
     {
       id: "products",
       name: "Products",
       icon: Package,
       href: "/products",
-      description: "Manage product listings and details"
+      description: "Manage product listings and details",
+      module: "products",
+      requiredActions: ["view", "create", "edit", "delete"]
     },
     {
       id: "orders",
       name: "Orders",
       icon: ShoppingCart,
       href: "/orders",
-      description: "Track and manage customer orders"
+      description: "Track and manage customer orders",
+      module: "orders",
+      requiredActions: ["view", "create", "edit", "delete"]
     },
     {
       id: "invoices",
       name: "Invoices & Billing",
       icon: FileText,
       href: "/invoices",
-      description: "View and generate billing documents"
+      description: "View and generate billing documents",
+      module: "invoices",
+      requiredActions: ["view", "create", "edit", "delete"]
     },
     {
       id: "customers",
       name: "Customers",
       icon: Users,
       href: "/customers",
-      description: "Customer database and interactions"
+      description: "Customer database and interactions",
+      module: "customers",
+      requiredActions: ["view", "create", "edit", "delete"]
     },
     {
       id: "jobs",
       name: "Job Management",
       icon: Briefcase,
       href: "/jobs",
-      description: "Create and manage job postings"
+      description: "Create and manage job postings",
+      module: "jobs",
+      requiredActions: ["view", "create", "edit", "delete"]
     },
     {
       id: "tracking",
       name: "Live Tracking",
       icon: MapPin,
       href: "/tracking",
-      description: "Real-time job progress and resource tracking"
+      description: "Real-time job progress and resource tracking",
+      module: "tracking",
+      requiredActions: ["view"]
     },
     {
       id: "contractors",
       name: "Contractor Listing",
       icon: UserCheck,
       href: "/contractors",
-      description: "Directory of available contractors"
+      description: "Directory of available contractors",
+      module: "suppliers",
+      requiredActions: ["view", "create", "edit", "delete"]
     },
     {
       id: "staff",
       name: "Staff Management",
       icon: Users,
       href: "/staff",
-      description: "Administer staff accounts and permissions"
+      description: "Administer staff accounts and permissions",
+      module: "staff",
+      requiredActions: ["view", "create", "edit", "delete"]
     },
     {
       id: "notifications",
       name: "Notifications",
       icon: Bell,
       href: "/notifications",
-      description: "Manage and view system alerts and messages"
+      description: "Manage and view system alerts and messages",
+      module: "notification",
+      requiredActions: ["view", "create", "edit", "delete"]
     },
     {
       id: "configuration",
       name: "Configuration",
       icon: Settings,
       href: "/configuration",
-      description: "Configure system-wide settings for pricing and rates"
+      description: "Configure system-wide settings for pricing and rates",
+      module: "settings",
+      requiredActions: ["view", "create", "edit", "delete"]
     },
     {
       id: "role",
       name: "Role & Permission",
       icon: Users,
       href: "/role",
-      description: "Role & Permission"
+      description: "Role & Permission",
+      module: "settings",
+      requiredActions: ["view", "create", "edit", "delete"]
     }
   ]
+
+  // Filter navigation items based on permissions
+  const filteredNavigation = navigation.filter(item => {
+    return hasAnyPermission(item.module, item.requiredActions)
+  })
 
   // const profileSubItems = [
   //   {
@@ -177,7 +210,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
         </div>
 
         <nav className="flex-1 p-4 space-y-1">
-          {navigation.map((item) => {
+          {filteredNavigation.map((item) => {
             const active = isActive(item.href)
             const Icon = item.icon
 

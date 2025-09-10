@@ -12,6 +12,7 @@ import { TimesheetManagement } from './TimesheetManagement'
 import { InvoiceComparison } from './InvoiceComparison'
 import { JobApprovals } from './JobApprovals'
 import { toast } from 'sonner'
+import { usePermissions } from '../contexts/PermissionContext'
 import { 
   Plus, 
   Search, 
@@ -127,6 +128,7 @@ const initialJobs: Job[] = [
 ]
 
 export function JobManagementPage() {
+  const { hasPermission } = usePermissions()
   const [jobs, setJobs] = useState<Job[]>(initialJobs)
   const [currentView, setCurrentView] = useState<'list' | 'details' | 'create' | 'timesheets' | 'invoices' | 'approvals'>('list')
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
@@ -371,13 +373,15 @@ export function JobManagementPage() {
             <CheckSquare className="h-4 w-4" />
             Approvals
           </Button>
-          <Button 
-            onClick={handleCreateJob}
-            className="bg-primary text-primary-foreground hover:bg-[#0090e6] gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Add Job
-          </Button>
+          {hasPermission('jobs', 'create') && (
+            <Button 
+              onClick={handleCreateJob}
+              className="bg-primary text-primary-foreground hover:bg-[#0090e6] gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Job
+            </Button>
+          )}
         </div>
       </div>
 
@@ -539,9 +543,9 @@ export function JobManagementPage() {
                   onDelete={() => handleDeleteJob(job.id)}
                   itemName={job.title}
                   itemType="Job"
-                  showView={true}
-                  showEdit={true}
-                  showDelete={true}
+                  showView={hasPermission('jobs', 'view')}
+                  showEdit={hasPermission('jobs', 'edit')}
+                  showDelete={hasPermission('jobs', 'delete')}
                 />
               </div>
             </CardHeader>
@@ -613,7 +617,7 @@ export function JobManagementPage() {
                 : 'Create your first job to get started'
               }
             </p>
-            {(!searchTerm && filterType === 'all' && filterStatus === 'all' && filterLabor === 'all' && filterPriority === 'all') && (
+            {(!searchTerm && filterType === 'all' && filterStatus === 'all' && filterLabor === 'all' && filterPriority === 'all') && hasPermission('jobs', 'create') && (
               <Button onClick={handleCreateJob} className="bg-primary text-white hover:bg-[#0090e6] gap-2">
                 <Plus className="h-4 w-4" />
                 Create First Job

@@ -38,6 +38,9 @@ interface Role {
 
 export default function RolePermission() {
   const [roles, setRoles] = useState<Role[]>([]);
+  const [isLoadingRoles, setIsLoadingRoles] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
@@ -63,6 +66,7 @@ export default function RolePermission() {
   }, []);
 
   const fetchRoles = async () => {
+    setIsLoadingRoles(true);
     try {
       const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -98,8 +102,18 @@ export default function RolePermission() {
       }
     } catch (error) {
       setRoles([]);
+    } finally {
+      setIsLoadingRoles(false);
     }
   };
+
+  // Pagination logic
+  const paginatedRoles = roles.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const totalPages = Math.ceil(roles.length / itemsPerPage);
 
   const fetchRoleById = async (roleId: string) => {
     try {
@@ -738,43 +752,100 @@ export default function RolePermission() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {roles.map((role) => (
-                    <tr key={role.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{role.roleName}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{role.roleType}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">{role.description}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{role.createdAt}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{role.updatedAt}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <div className="flex space-x-2">
-                          {/* <Button
-                              onClick={() => handleViewRole(role)}
-                              variant="ghost"
-                              size="sm"
-                            >
-                              <Eye className="h-3 w-3" />
-                            </Button> */}
-                          <Button
-                            onClick={() => handleEditRole(role)}
-                            variant="ghost"
-                            size="sm"
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            onClick={() => handleDeleteRole(role)}
-                            variant="ghost"
-                            size="sm"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
+                  {isLoadingRoles ? (
+                    <tr>
+                      <td colSpan={6} className="text-center py-8">
+                        <div className="flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                          <span className="ml-2 text-gray-500">Loading roles...</span>
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  ) : paginatedRoles.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center py-8">
+                        <div className="flex flex-col items-center justify-center text-gray-500">
+                          <div className="text-lg font-medium mb-2">No data available</div>
+                          <div className="text-sm">No roles found. Create your first role.</div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedRoles.map((role) => (
+                      <tr key={role.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{role.roleName}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{role.roleType}</td>
+                        <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">{role.description}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{role.createdAt}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{role.updatedAt}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <div className="flex space-x-2">
+                            {/* <Button
+                                onClick={() => handleViewRole(role)}
+                                variant="ghost"
+                                size="sm"
+                              >
+                                <Eye className="h-3 w-3" />
+                              </Button> */}
+                            <Button
+                              onClick={() => handleEditRole(role)}
+                              variant="ghost"
+                              size="sm"
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              onClick={() => handleDeleteRole(role)}
+                              variant="ghost"
+                              size="sm"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
+            
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
+                <div className="text-sm text-gray-700">
+                  Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, roles.length)} of {roles.length} roles
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      onClick={() => setCurrentPage(page)}
+                      className={currentPage === page ? "bg-primary text-white hover:bg-[#0090e6]" : ""}
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                  
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

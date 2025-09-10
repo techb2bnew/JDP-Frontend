@@ -230,7 +230,8 @@ export const getUserData = (): any => {
 }
 
 /**
- * Update user permissions in localStorage and notify PermissionContext
+ * Update user permissions in localStorage (for admin panel use only)
+ * Note: This does NOT notify PermissionContext to prevent affecting current user
  */
 export const updateUserPermissions = (newPermissions: any[]): void => {
   if (typeof window !== 'undefined') {
@@ -245,10 +246,11 @@ export const updateUserPermissions = (newPermissions: any[]): void => {
           // Save back to localStorage
           localStorage.setItem('jdp_auth', JSON.stringify(parsed))
           
-          // Dispatch custom event to notify PermissionContext
-          window.dispatchEvent(new CustomEvent('permissionsUpdated'))
+          // Note: We intentionally do NOT dispatch 'permissionsUpdated' event
+          // to prevent admin permission changes from affecting current user's permissions
+          // Permissions will only be refreshed when user actually logs in
           
-          console.log('User permissions updated in localStorage:', newPermissions)
+          console.log('User permissions updated in localStorage (admin panel):', newPermissions)
         }
       } catch (error) {
         console.error('Error updating user permissions:', error)
@@ -287,8 +289,8 @@ export const refreshUserPermissions = async (): Promise<void> => {
         parsed.user = userData.data
         localStorage.setItem('jdp_auth', JSON.stringify(parsed))
         
-        // Notify PermissionContext
-        window.dispatchEvent(new CustomEvent('permissionsUpdated'))
+        // Notify PermissionContext (only when refreshing from API)
+        window.dispatchEvent(new CustomEvent('userLoggedIn'))
         
         console.log('User permissions refreshed from API:', userData.data.permissions)
       }

@@ -2,12 +2,13 @@ import { useState } from 'react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { AuthStep } from '../AuthFlow'
+import { toast } from 'sonner'
 // import img4541 from "figma:asset/a3e40afe539df138ee43712dc0bf65b14d1b7224.png"
 import { EyeOff } from 'lucide-react'
 
 interface NewPasswordScreenProps {
   email: string
-  onStepChange: (step: AuthStep) => void
+  onStepChange: (step: AuthStep, userEmail?: string, userRole?: string) => void
   onAuthSuccess: (isNewUser?: boolean) => void
 }
 
@@ -35,7 +36,7 @@ export function NewPasswordScreen({ email, onStepChange, onAuthSuccess }: NewPas
     }
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const validation = validatePassword(newPassword)
     
     if (!validation.isValid) {
@@ -49,10 +50,36 @@ export function NewPasswordScreen({ email, onStepChange, onAuthSuccess }: NewPas
     }
     
     setIsLoading(true)
-    setTimeout(() => {
+    
+    try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+      const response = await fetch(`${apiBaseUrl}/auth/forgot-password/reset`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email,
+          newPassword: newPassword,
+          confirmPassword: confirmPassword
+        })
+      })
+
+      const responseData = await response.json()
+
+      if (response.ok && responseData.success) {
+        toast.success('Password reset successfully')
+        // Navigate back to login
+        onStepChange('login')
+      } else {
+        toast.error(responseData.message || 'Failed to reset password')
+      }
+    } catch (error) {
+      console.error('Error resetting password:', error)
+      toast.error('Failed to reset password. Please try again.')
+    } finally {
       setIsLoading(false)
-      onAuthSuccess(false)
-    }, 1000)
+    }
   }
 
   const passwordValidation = validatePassword(newPassword)

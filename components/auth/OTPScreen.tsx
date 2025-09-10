@@ -9,11 +9,12 @@ import { apiClient } from '../../utils/api'
 interface OTPScreenProps {
   email: string
   role?: string
-  onStepChange: (step: AuthStep) => void
+  onStepChange: (step: AuthStep, userEmail?: string, userRole?: string) => void
   onAuthSuccess: (isNewUser?: boolean) => void
+  isForgotPassword?: boolean
 }
 
-export function OTPScreen({ email, role, onStepChange, onAuthSuccess }: OTPScreenProps) {
+export function OTPScreen({ email, role, onStepChange, onAuthSuccess, isForgotPassword = false }: OTPScreenProps) {
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [isLoading, setIsLoading] = useState(false)
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
@@ -45,35 +46,80 @@ export function OTPScreen({ email, role, onStepChange, onAuthSuccess }: OTPScree
     setIsLoading(true)
     
     try {
-      // Call the signup API using the utility function
-      const data = await apiClient.signup(
-        email,
-        role || 'Staff', // Default to Staff if no role provided
-        otpString
-      )
-      
-      toast.success(data.message || 'Registration successful!')
-      
-      // For signup flow, mark as new user
-      onAuthSuccess(true)
-      
-      // Redirect to login page after successful registration
-      setTimeout(() => {
-        router.push('/login')
-      }, 1500)
+      if (isForgotPassword) {
+        // Forgot password flow - verify OTP
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+        const response = await fetch(`${apiBaseUrl}/auth/forgot-password/verify-otp`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: email,
+            otp: otpString
+          })
+        })
+
+        const responseData = await response.json()
+
+        if (response.ok && responseData.success) {
+          toast.success('OTP verified successfully')
+          // Navigate to new password screen
+          onStepChange('new-password', email)
+        } else {
+          toast.error(responseData.message || 'Invalid OTP')
+        }
+      } else {
+        // Signup flow - call the signup API using the utility function
+        const data = await apiClient.signup(
+          email,
+          role || 'Staff', // Default to Staff if no role provided
+          otpString
+        )
+        
+        toast.success(data.message || 'Registration successful!')
+        
+        // For signup flow, mark as new user
+        onAuthSuccess(true)
+        
+        // Redirect to login page after successful registration
+        setTimeout(() => {
+          router.push('/login')
+        }, 1500)
+      }
       
     } catch (error) {
-      console.error('Registration error:', error)
-      toast.error(error instanceof Error ? error.message : 'Registration failed. Please try again.')
+      console.error('OTP verification error:', error)
+      toast.error(error instanceof Error ? error.message : 'OTP verification failed. Please try again.')
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleResend = () => {
-    // Simulate resend OTP
-    console.log('Resending OTP to:', email)
-    toast.info('OTP resent successfully')
+  const handleResend = async () => {
+    try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+      const response = await fetch(`${apiBaseUrl}/auth/forgot-password/resend-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email
+        })
+      })
+
+      const responseData = await response.json()
+
+      if (response.ok && responseData.success) {
+        toast.success('OTP resent successfully')
+      } else {
+        toast.error(responseData.message || 'Failed to resend OTP')
+      }
+    } catch (error) {
+      console.error('Error resending OTP:', error)
+      toast.error('Failed to resend OTP. Please try again.')
+    }
   }
 
   return (
@@ -173,7 +219,7 @@ export function OTPScreen({ email, role, onStepChange, onAuthSuccess }: OTPScree
           
           {/* Back Button */}
           <Button
-            onClick={() => onStepChange('signup')}
+            onClick={() => onStepChange('forgot-password')}
             variant="outline"
             className="w-full h-[50px] border-[rgba(0,161,255,0.2)] bg-[rgba(0,161,255,0.1)] text-[#00a1ff] rounded-full text-[18px] font-medium"
           >

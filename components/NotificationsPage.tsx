@@ -7,6 +7,7 @@ import { Badge } from './ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { Separator } from './ui/separator'
+import { usePermissions } from '../contexts/PermissionContext'
 import { 
   Bell,
   BellRing,
@@ -43,6 +44,7 @@ interface Notification {
 }
 
 export function NotificationsPage() {
+  const { hasPermission } = usePermissions()
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<string>('all')
   const [filterPriority, setFilterPriority] = useState<string>('all')
@@ -374,15 +376,17 @@ export function NotificationsPage() {
           <Badge className="bg-[#E6F6FF] text-[#00A1FF] border-[#00A1FF]/20 hover:bg-[#E6F6FF]">
             {unreadCount} unread
           </Badge>
-          <Button 
-            onClick={handleMarkAllAsRead}
-            variant="outline" 
-            className="gap-2"
-            disabled={unreadCount === 0}
-          >
-            <Check className="h-4 w-4" />
-            Mark All Read
-          </Button>
+          {hasPermission('notification', 'edit') && (
+            <Button 
+              onClick={handleMarkAllAsRead}
+              variant="outline" 
+              className="gap-2"
+              disabled={unreadCount === 0}
+            >
+              <Check className="h-4 w-4" />
+              Mark All Read
+            </Button>
+          )}
         </div>
       </div>
 
@@ -617,34 +621,38 @@ export function NotificationsPage() {
                           </span>
                           
                           <div className="flex items-center gap-1">
-                            {notification.isRead ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleMarkAsUnread(notification.id)}
-                                className="p-1 h-auto"
-                              >
-                                <EyeOff className="h-4 w-4 text-gray-400" />
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleMarkAsRead(notification.id)}
-                                className="p-1 h-auto"
-                              >
-                                <Eye className="h-4 w-4 text-gray-400" />
-                              </Button>
+                            {hasPermission('notification', 'edit') && (
+                              notification.isRead ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleMarkAsUnread(notification.id)}
+                                  className="p-1 h-auto"
+                                >
+                                  <EyeOff className="h-4 w-4 text-gray-400" />
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleMarkAsRead(notification.id)}
+                                  className="p-1 h-auto"
+                                >
+                                  <Eye className="h-4 w-4 text-gray-400" />
+                                </Button>
+                              )
                             )}
                             
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteNotification(notification.id)}
-                              className="p-1 h-auto text-red-500 hover:text-red-700"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            {hasPermission('notification', 'delete') && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteNotification(notification.id)}
+                                className="p-1 h-auto text-red-500 hover:text-red-700"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                           
                           {!notification.isRead && (

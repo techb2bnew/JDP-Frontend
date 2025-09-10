@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { useAppDispatch } from '../../redux/hooks'
 import { loginSuccess } from '../../redux/slices/authSlice'
 import { useRouter } from 'next/navigation'
+import { Eye, EyeOff } from 'lucide-react'
 
 interface LoginScreenProps {
   onStepChange: (step: AuthStep, email?: string) => void
@@ -21,6 +22,7 @@ interface FormErrors {
 export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
   const [email, setEmail] = useState<string>('')
   const [password, setPassword] = useState<string>('')
+  const [showPassword, setShowPassword] = useState<boolean>(false)
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [errors, setErrors] = useState<FormErrors>({})
   const dispatch = useAppDispatch()
@@ -56,7 +58,7 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, login_by: "admin" }),
       });
 
       if (response.ok) {
@@ -81,7 +83,7 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
           document.cookie = `jdp_auth=${JSON.stringify(authData)}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
           
           // Dispatch custom event to notify PermissionContext to refresh
-          window.dispatchEvent(new CustomEvent('permissionsUpdated'));
+          window.dispatchEvent(new CustomEvent('userLoggedIn'));
           
           // Dispatch login success action
           dispatch(loginSuccess({
@@ -93,13 +95,13 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
           onAuthSuccess(true)
           
           // Redirect based on user role
-          console.log('=== LOGIN DEBUG ===');
-          console.log('Full API response:', data);
-          console.log('User data:', data.data.user);
-          console.log('User role:', data.data.user.role);
-          console.log('Role comparison:', data.data.user.role === 'Super Admin');
-          console.log('Role type:', typeof data.data.user.role);
-          console.log('Role length:', data.data.user.role.length); 
+          // console.log('=== LOGIN DEBUG ===');
+          // console.log('Full API response:', data);
+          // console.log('User data:', data.data.user);
+          // console.log('User role:', data.data.user.role);
+          // console.log('Role comparison:', data.data.user.role === 'Super Admin');
+          // console.log('Role type:', typeof data.data.user.role);
+          // console.log('Role length:', data.data.user.role.length); 
           
           if (data.data.user.role === 'Super Admin') {
             console.log('✅ Redirecting Super Admin to /superDashboard');
@@ -261,11 +263,11 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
                 </svg>
               </div>
               <Input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={handlePasswordChange}
                 placeholder="Enter your password"
-                className={`pl-12 h-[50px] rounded-full border ${
+                className={`pl-12 pr-12 h-[50px] rounded-full border ${
                   errors.password 
                     ? 'border-[#e02424] bg-[#fff3f3] text-[#e02424]' 
                     : password 
@@ -273,6 +275,17 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
                     : 'border-[rgba(17,24,39,0.2)]'
                 }`}
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 transform -translate-y-1/2 z-10 text-gray-500 hover:text-gray-700 focus:outline-none"
+              >
+                {showPassword ? (
+                  <EyeOff className="h-5 w-5" />
+                ) : (
+                  <Eye className="h-5 w-5" />
+                )}
+              </button>
             </div>
             {errors.password && (
               <p className="text-[#e02424] text-[14px] mt-1">{errors.password}</p>
@@ -282,8 +295,8 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
           {/* Remember & Forgot */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-5 h-5 border border-black border-opacity-30 rounded-sm" />
-              <span className="text-[14px] text-gray-900 opacity-70">Remember this device</span>
+              {/* <div className="w-5 h-5 border border-black border-opacity-30 rounded-sm" />
+              <span className="text-[14px] text-gray-900 opacity-70">Remember this device</span> */}
             </div>
             <button
               type="button"
@@ -304,7 +317,7 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
           </Button>
           
           {/* Create Account Link */}
-          <div className="text-center">
+          {/* <div className="text-center">
             <p className="text-[14px] text-gray-900">
               Don't have an account?{' '}
               <button
@@ -315,7 +328,7 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
                 Create an account
               </button>
             </p>
-          </div>
+          </div> */}
         </form>
       </div>
     </div>

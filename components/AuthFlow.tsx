@@ -79,6 +79,7 @@ export function AuthFlow({ onAuthSuccess }: AuthFlowProps) {
           role={role}
           onStepChange={handleStepChange}
           onAuthSuccess={handleAuthSuccess}
+          isForgotPassword={currentStep === 'otp' && !!email && !role}
         />
       )
     case 'forgot-password':

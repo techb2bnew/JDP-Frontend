@@ -18,6 +18,7 @@ interface PermissionContextType {
   hasAllPermissions: (module: string, actions: string[]) => boolean;
   setPermissions: (permissions: Permission[]) => void;
   refreshPermissions: () => void;
+  forceRefreshPermissions: () => void;
 }
 
 const PermissionContext = createContext<PermissionContextType | undefined>(undefined);
@@ -61,24 +62,40 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
     // Load permissions initially
     loadPermissions();
 
-    // Listen for storage changes (when permissions are updated)
+    // Only listen for storage changes from other tabs/windows (not same tab)
+    // This prevents updating permissions when admin modifies staff permissions
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'jdp_auth') {
-        loadPermissions();
+      // Only update if the change came from another tab/window
+      if (e.key === 'jdp_auth' && e.storageArea === localStorage && e.newValue !== e.oldValue) {
+        // Check if this is a login event (new token) vs permission modification
+        try {
+          const newData = e.newValue ? JSON.parse(e.newValue) : null;
+          const oldData = e.oldValue ? JSON.parse(e.oldValue) : null;
+          
+          // Only update if it's a different user logging in (different user ID)
+          // This prevents admin permission changes from affecting current user's permissions
+          if (newData?.user?.id !== oldData?.user?.id) {
+            loadPermissions();
+          }
+        } catch (error) {
+          console.error('Error parsing storage change:', error);
+        }
       }
     };
 
-    // Listen for custom permission update events
-    const handlePermissionUpdate = () => {
+    // Listen for custom login events (when user actually logs in)
+    const handleLoginEvent = () => {
       loadPermissions();
     };
 
     window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('permissionsUpdated', handlePermissionUpdate);
+    window.addEventListener('userLoggedIn', handleLoginEvent);
+    // Note: We intentionally do NOT listen for 'permissionsUpdated' events
+    // to prevent admin permission changes from affecting current user
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('permissionsUpdated', handlePermissionUpdate);
+      window.removeEventListener('userLoggedIn', handleLoginEvent);
     };
   }, []);
 
@@ -110,6 +127,23 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
     }
   };
 
+  // Function to manually refresh permissions (call this after login)
+  const forceRefreshPermissions = () => {
+    const authData = localStorage.getItem('jdp_auth');
+    if (authData) {
+      try {
+        const parsed = JSON.parse(authData);
+        if (parsed.user?.permissions) {
+          setPermissions(parsed.user.permissions);
+          // Dispatch custom event to notify other components
+          window.dispatchEvent(new CustomEvent('userLoggedIn'));
+        }
+      } catch (error) {
+        console.error('Error parsing permissions:', error);
+      }
+    }
+  };
+
   const value: PermissionContextType = {
     permissions,
     isLoading,
@@ -118,6 +152,7 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
     hasAllPermissions,
     setPermissions,
     refreshPermissions,
+    forceRefreshPermissions,
   };
 
   return (
