@@ -17,6 +17,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/
 import { useState } from "react"
 import { NotificationPopup } from "../NotificationPopup"
 import { useTheme } from "../../contexts/ThemeContext"
+import { toast } from "sonner"
 import {
   Plus,
   Filter,
@@ -45,6 +46,71 @@ export function Header({
 }: HeaderProps) {
   const [showNotifications, setShowNotifications] = useState(false)
   const { theme, toggleTheme, isLoading } = useTheme()
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+
+  // Get user data from localStorage
+  const getUserData = () => {
+    try {
+      const authData = localStorage.getItem('jdp_auth');
+      if (authData) {
+        const parsed = JSON.parse(authData);
+        return parsed.user || null;
+      }
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+    }
+    return null;
+  };
+
+  const userData = getUserData();
+
+  const handleLogout = async () => {
+    let loadingToastId: string | number | undefined;
+
+    try {
+      loadingToastId = toast.loading('Logging out...');
+      
+      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await fetch(`${apiBaseUrl}/auth/logout`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({})
+      });
+
+      toast.dismiss(loadingToastId);
+
+      if (response.ok) {
+        const responseData = await response.json();
+        if (responseData.success) {
+          toast.success('Logged out successfully!');
+          // Clear localStorage
+          localStorage.removeItem('jdp_auth');
+          // Call the original onLogout function
+          onLogout();
+        } else {
+          toast.error(responseData.message || 'Failed to logout');
+          // Still call onLogout to clear local state
+          onLogout();
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.message || 'Failed to logout');
+        // Still call onLogout to clear local state
+        onLogout();
+      }
+    } catch (error) {
+      if (loadingToastId) {
+        toast.dismiss(loadingToastId);
+      }
+      console.error('Error during logout:', error);
+      toast.error('An error occurred during logout');
+      // Still call onLogout to clear local state
+      onLogout();
+    }
+  };
 
   const getPageTitle = (path: string): string => {
     const titles: Record<string, string> = {
@@ -224,14 +290,17 @@ export function Header({
                 <DropdownMenuLabel>
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10">
-                      <AvatarImage src="/assets/images/avatars/admin-user.jpg" alt="Admin" />
+                      <AvatarImage 
+                        src={userData?.photo_url || "/assets/images/avatars/admin-user.jpg"} 
+                        alt={userData?.full_name || "User"} 
+                      />
                       <AvatarFallback className="bg-primary text-primary-foreground">
-                        <User className="h-5 w-5" />
+                        {userData?.full_name ? userData.full_name.charAt(0).toUpperCase() : <User className="h-5 w-5" />}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-medium">Admin User</p>
-                      <p className="text-sm text-muted-foreground">admin@jdp.com</p>
+                      <p className="font-medium">{userData?.full_name || "User"}</p>
+                      <p className="text-sm text-muted-foreground">{userData?.email || "user@example.com"}</p>
                     </div>
                   </div>
                 </DropdownMenuLabel>
@@ -246,7 +315,7 @@ export function Header({
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={onLogout}
+                  onClick={handleLogout}
                   className="logout-button cursor-pointer"
                 >
                   <div className="flex items-center">

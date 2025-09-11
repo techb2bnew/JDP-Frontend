@@ -211,7 +211,9 @@ export default function RolePermission() {
     'labour',
     'lead_labour',
     'notification',
-    'settings'
+    'inventory_price',
+    'bluesheet',
+    'role_permission'
   ];
 
   const actions = ['view', 'create', 'edit', 'delete'];
@@ -224,7 +226,9 @@ export default function RolePermission() {
     'orders': ['view', 'create', 'edit', 'delete'],
     'invoices': ['view', 'create', 'edit', 'delete', 'export'],
     'reports': ['view', 'create', 'edit', 'delete'],
-    'settings': ['view', 'create', 'edit', 'delete']
+    'inventory_price': ['view', 'create', 'edit', 'delete'],
+    'bluesheet': ['view', 'create', 'edit', 'delete'],
+    'role_permission': ['view', 'create', 'edit', 'delete']
   };
 
   const getActionsForModule = (module: string): string[] => {
@@ -908,19 +912,7 @@ export default function RolePermission() {
                   {errors.roleType && (
                     <p className="mt-1 text-sm text-red-600">{errors.roleType}</p>
                   )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Role description"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50"
-                  />
-                </div>
+                </div> 
               </div>
 
               {/* Permissions Matrix */}

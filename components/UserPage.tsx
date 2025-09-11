@@ -398,7 +398,7 @@ export function UserPage({ onViewDetails }: UserPageProps) {
     document.body.removeChild(link);
   }
   const renderForm = () => (
-    <div className="grid grid-cols-2 gap-4 py-4 max-h-96 overflow-y-auto">
+    <div className="grid grid-cols-2 gap-4 py-4 max-h-[80vh] overflow-y-auto p-2">
       <div className="space-y-2">
         <Label htmlFor="firstName">First Name *</Label>
         <Input

@@ -489,15 +489,28 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
 
   const handleEdit = (staffMember: Staff) => {
     setEditingStaff(staffMember)
+    
+    // Format date for HTML date input (YYYY-MM-DD)
+    const formatDateForInput = (dateString: string) => {
+      if (!dateString) return '';
+      try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return '';
+        return date.toISOString().split('T')[0];
+      } catch {
+        return '';
+      }
+    };
+    
     setFormData({
       name: staffMember.name,
       email: staffMember.email,
       phone: staffMember.phone,
-      dob: staffMember.dob || '',
+      dob: formatDateForInput(staffMember.dob),
       address: staffMember.address,
       position: staffMember.position,
       department: staffMember.department,
-      dateOfJoining: staffMember.dateOfJoining,
+      dateOfJoining: formatDateForInput(staffMember.dateOfJoining),
       status: staffMember.status,
       role: staffMember.role
     })
@@ -937,7 +950,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
             <div className="space-y-2">
               <Label htmlFor="role">Role *</Label>
               <Select value={formData.role} onValueChange={(value) => setFormData({...formData, role: value})}>
-                <SelectTrigger>
+                <SelectTrigger className={validationErrors.role ? 'border-red-500' : ''}>
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>

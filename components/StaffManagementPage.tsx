@@ -77,6 +77,14 @@ export function StaffManagementPage({
     hasPermission('labour', 'delete')
   )
 
+  const hasSupplierPermissions = !permissionsLoading && (
+    isAdmin || 
+    hasPermission('suppliers', 'view') || 
+    hasPermission('suppliers', 'create') || 
+    hasPermission('suppliers', 'edit') || 
+    hasPermission('suppliers', 'delete')
+  )
+
 
   const handleViewDetails = (category: 'staff' | 'lead-labour' | 'labor' | 'supplier', id: string) => {
     setViewState({
@@ -144,7 +152,7 @@ export function StaffManagementPage({
     { id: 'staff', label: 'Staff', icon: UserCog, show: hasStaffPermissions },
     { id: 'lead-labour', label: 'Lead Labour', icon: HardHat, show: hasLeadLabourPermissions },
     { id: 'labor', label: 'Labor', icon: Wrench, show: hasLaborPermissions },
-    { id: 'supplier', label: 'Supplier', icon: Building2, show: false },
+    { id: 'supplier', label: 'Supplier', icon: Building2, show: hasSupplierPermissions },
     // { id: 'user', label: 'User', icon: User, show: false },
   ]
 

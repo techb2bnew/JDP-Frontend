@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -10,12 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from './ui/textarea'
 import { ActionButtonsPopup } from './ActionButtonsPopup'
 import { toast } from 'sonner'
-import { 
-  Plus, 
-  Search, 
-  MoreVertical, 
-  Edit, 
-  Trash2, 
+import { SupplierDetailsPage } from './SupplierDetailsPage'
+import {
+  Plus,
+  Search,
+  MoreVertical,
+  Edit,
+  Trash2,
   Eye,
   Upload,
   Download,
@@ -23,22 +24,19 @@ import {
   Phone,
   Mail,
   MapPin,
-  Star,
   Package
 } from 'lucide-react'
 
 interface Supplier {
   id: string
   supplierId: string
+  fullName: string
+  role?: string
   companyName: string
   contactPerson: string
   email: string
   phone: string
   address: string
-  category: string
-  products: string[]
-  paymentTerms: string
-  rating: number
   status: 'active' | 'inactive' | 'pending' | 'suspended'
   contractStart: string
   contractEnd: string
@@ -47,15 +45,13 @@ interface Supplier {
 }
 
 interface SupplierFormData {
+  fullName: string
+  role: string
   companyName: string
   contactPerson: string
   email: string
   phone: string
   address: string
-  category: string
-  products: string[]
-  paymentTerms: string
-  rating: number
   status: 'active' | 'inactive' | 'pending' | 'suspended'
   contractStart: string
   contractEnd: string
@@ -67,121 +63,35 @@ interface SupplierPageProps {
   onViewDetails?: (id: string) => void
 }
 
-const initialSupplierData: Supplier[] = [
-  {
-    id: 'SP001',
-    supplierId: 'SP-2025-001',
-    companyName: 'ElectroTech Supplies Pty Ltd',
-    contactPerson: 'Jennifer Clarke',
-    email: 'jennifer@electrotech.com.au',
-    phone: '+61 2222 021 501',
-    address: '45 Industrial Blvd, Sydney, NSW 2000, Australia',
-    category: 'Electrical Components',
-    products: ['Cables', 'Switches', 'Circuit Breakers', 'Conduits'],
-    paymentTerms: 'Net 30',
-    rating: 4.8,
-    status: 'active',
-    contractStart: '2024-01-15',
-    contractEnd: '2025-12-31',
-    totalOrders: 127,
-    notes: 'Reliable supplier with excellent quality products and fast delivery.'
-  },
-  {
-    id: 'SP002',
-    supplierId: 'SP-2025-002',
-    companyName: 'Power Components Australia',
-    contactPerson: 'Mark Stevens',
-    email: 'mark@powercomponents.com.au',
-    phone: '+61 2222 021 502',
-    address: '78 Commerce St, Melbourne, VIC 3000, Australia',
-    category: 'Power Equipment',
-    products: ['Transformers', 'Generators', 'Power Supplies', 'UPS Systems'],
-    paymentTerms: 'Net 45',
-    rating: 4.5,
-    status: 'active',
-    contractStart: '2023-06-01',
-    contractEnd: '2025-05-31',
-    totalOrders: 89,
-    notes: 'Specialized in high-quality power equipment with competitive pricing.'
-  },
-  {
-    id: 'SP003',
-    supplierId: 'SP-2025-003',
-    companyName: 'Safety First Equipment',
-    contactPerson: 'Lisa Wong',
-    email: 'lisa@safetyfirst.com.au',
-    phone: '+61 2222 021 503',
-    address: '156 Safety Ave, Brisbane, QLD 4000, Australia',
-    category: 'Safety Equipment',
-    products: ['Hard Hats', 'Safety Glasses', 'Gloves', 'Harnesses'],
-    paymentTerms: 'Net 15',
-    rating: 4.9,
-    status: 'active',
-    contractStart: '2024-03-10',
-    contractEnd: '2026-03-09',
-    totalOrders: 203,
-    notes: 'Excellent safety equipment supplier with fast turnaround times.'
-  }
-]
 
-const categories = [
-  'Electrical Components',
-  'Power Equipment',
-  'Safety Equipment',
-  'Tools & Instruments',
-  'Lighting Solutions',
-  'HVAC Systems',
-  'Building Materials'
-]
 
-const paymentTermsOptions = [
-  'Cash on Delivery',
-  'Net 15',
-  'Net 30',
-  'Net 45',
-  'Net 60',
-  '2/10 Net 30'
-]
-
-const productOptions = [
-  'Cables',
-  'Switches',
-  'Circuit Breakers',
-  'Conduits',
-  'Transformers',
-  'Generators',
-  'Power Supplies',
-  'UPS Systems',
-  'Hard Hats',
-  'Safety Glasses',
-  'Gloves',
-  'Harnesses',
-  'LED Lights',
-  'Fixtures',
-  'Panels'
-]
 
 export function SupplierPage({ onViewDetails }: SupplierPageProps) {
-  const [suppliers, setSuppliers] = useState<Supplier[]>(initialSupplierData)
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null)
-  const [filterCategory, setFilterCategory] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+  const [isLoading, setIsLoading] = useState(true)
+  const [totalSuppliers, setTotalSuppliers] = useState(0)
+  const [viewingSupplier, setViewingSupplier] = useState<Supplier | null>(null)
+  const [supplierDetails, setSupplierDetails] = useState<any>(null)
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false)
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+  const [roles, setRoles] = useState<any[]>([])
 
   const [formData, setFormData] = useState<SupplierFormData>({
+    fullName: '',
+    role: '',
     companyName: '',
     contactPerson: '',
     email: '',
     phone: '',
     address: '',
-    category: '',
-    products: [],
-    paymentTerms: '',
-    rating: 0,
     status: 'pending',
     contractStart: '',
     contractEnd: '',
@@ -230,217 +140,641 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
     }
   }
 
-  const getRatingStars = (rating: number) => {
-    return Array.from({ length: 5 }, (_, i) => (
-      <Star
-        key={i}
-        className={`h-4 w-4 ${
-          i < Math.floor(rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
-        }`}
-      />
-    ))
-  }
 
   const filteredSuppliers = suppliers.filter(supplier => {
-    const matchesSearch = supplier.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         supplier.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         supplier.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         supplier.phone.includes(searchTerm) ||
-                         supplier.supplierId.includes(searchTerm)
-    
-    const matchesCategory = filterCategory === 'all' || supplier.category === filterCategory
+    const matchesSearch = supplier.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      supplier.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      supplier.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      supplier.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      supplier.phone.includes(searchTerm) ||
+      supplier.supplierId.includes(searchTerm)
+
     const matchesStatus = filterStatus === 'all' || supplier.status === filterStatus
-    
-    return matchesSearch && matchesCategory && matchesStatus
+
+    return matchesSearch && matchesStatus
   })
 
-  const paginatedSuppliers = filteredSuppliers.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
+  // For API-based pagination, we don't need to slice the data
+  const paginatedSuppliers = filteredSuppliers
+  const totalPages = Math.ceil(totalSuppliers / itemsPerPage)
 
-  const totalPages = Math.ceil(filteredSuppliers.length / itemsPerPage)
+  const handleCreate = async () => {
+    // Validation
+    if (!formData.fullName || !formData.role || !formData.companyName || !formData.contactPerson || !formData.email || !formData.phone) {
+      const errors: Record<string, string> = {};
+      if (!formData.fullName) errors.fullName = 'Full Name is required';
+      if (!formData.role) errors.role = 'Role is required';
+      if (!formData.companyName) errors.companyName = 'Company Name is required';
+      if (!formData.contactPerson) errors.contactPerson = 'Contact Person is required';
+      if (!formData.email) errors.email = 'Email is required';
+      if (!formData.phone) errors.phone = 'Phone is required';
 
-  const handleCreate = () => {
-    if (!formData.companyName || !formData.contactPerson || !formData.email || !formData.phone) {
-      toast.error('Please fill in all required fields')
-      return
+      setValidationErrors(errors);
+      toast.error('Please fill in all required fields');
+      return;
     }
 
-    const newSupplier: Supplier = {
-      id: `SP${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
-      supplierId: generateSupplierId(),
-      ...formData
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      const errors = { ...validationErrors, email: 'Please enter a valid email address' };
+      setValidationErrors(errors);
+      toast.error('Please enter a valid email address');
+      return;
     }
 
-    setSuppliers([...suppliers, newSupplier])
-    resetForm()
-    setIsCreateDialogOpen(false)
-    toast.success('Supplier created successfully')
+    // Phone number validation (exactly 10 digits)
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(formData.phone)) {
+      const errors = { ...validationErrors, phone: 'Phone number must be exactly 10 digits' };
+      setValidationErrors(errors);
+      toast.error('Phone number must be exactly 10 digits');
+      return;
+    }
+
+    let loadingToastId: string | number | undefined;
+
+    try {
+      loadingToastId = toast.loading('Creating supplier...');
+
+      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      // Prepare payload according to API requirements
+      const payload = {
+        full_name: formData.fullName,
+        email: formData.email,
+        phone: formData.phone,
+        role: formData.role,
+        status: formData.status === 'active' ? 'Active' : formData.status === 'inactive' ? 'Inactive' : formData.status === 'pending' ? 'Pending' : 'Suspended',
+        company_name: formData.companyName,
+        contact_person: formData.contactPerson,
+        address: formData.address,
+        contract_start: formData.contractStart,
+        contract_end: formData.contractEnd,
+        notes: formData.notes
+      };
+
+      const response = await fetch(`${apiBaseUrl}/suppliers/createSupplier`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      toast.dismiss(loadingToastId);
+
+      if (response.ok) {
+        const responseData = await response.json();
+        if (responseData.success) {
+          toast.success('Supplier created successfully!');
+          setIsCreateDialogOpen(false);
+          resetForm();
+          setValidationErrors({});
+          // Refresh the supplier list
+          fetchSuppliersData(currentPage, itemsPerPage);
+        } else {
+          toast.error(responseData.message || 'Failed to create supplier');
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.message || 'Failed to create supplier');
+      }
+    } catch (error) {
+      if (loadingToastId) {
+        toast.dismiss(loadingToastId);
+      }
+      console.error('Error creating supplier:', error);
+      toast.error('An error occurred while creating supplier');
+    }
   }
 
-  const handleEdit = (supplier: Supplier) => {
+  const handleEdit = async (supplier: Supplier) => {
     setEditingSupplier(supplier)
-    setFormData({
-      companyName: supplier.companyName,
-      contactPerson: supplier.contactPerson,
-      email: supplier.email,
-      phone: supplier.phone,
-      address: supplier.address,
-      category: supplier.category,
-      products: supplier.products,
-      paymentTerms: supplier.paymentTerms,
-      rating: supplier.rating,
-      status: supplier.status,
-      contractStart: supplier.contractStart,
-      contractEnd: supplier.contractEnd,
-      totalOrders: supplier.totalOrders,
-      notes: supplier.notes || ''
-    })
     setIsEditDialogOpen(true)
+
+    // Show loading state
+    let loadingToastId: string | number | undefined;
+
+    try {
+      loadingToastId = toast.loading('Loading supplier details...');
+
+      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await fetch(`${apiBaseUrl}/suppliers/getSupplierById/${supplier.id}`, {
+        method: 'GET',
+        headers
+      });
+
+      toast.dismiss(loadingToastId);
+
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('Edit Supplier API Response:', responseData);
+
+        if (responseData.success && responseData.data) {
+          const apiData = responseData.data;
+          const userData = apiData.users || {};
+
+          // Populate form with API data
+          setFormData({
+            fullName: userData.full_name || userData.name || '',
+            role: userData.role || '',
+            companyName: apiData.company_name || '',
+            contactPerson: apiData.contact_person || '',
+            email: userData.email || '',
+            phone: userData.phone || '',
+            address: apiData.address || '',
+            status: userData.status?.toLowerCase() || 'pending',
+            contractStart: apiData.contract_start || '',
+            contractEnd: apiData.contract_end || '',
+            totalOrders: apiData.total_orders || 0,
+            notes: apiData.notes || ''
+          });
+        } else {
+          console.error('Invalid edit supplier API response structure:', responseData);
+          toast.error('Failed to load supplier details for editing');
+          // Fallback to existing data
+          setFormData({
+            fullName: supplier.fullName,
+            role: supplier.role || '',
+            companyName: supplier.companyName,
+            contactPerson: supplier.contactPerson,
+            email: supplier.email,
+            phone: supplier.phone,
+            address: supplier.address,
+            status: supplier.status,
+            contractStart: supplier.contractStart,
+            contractEnd: supplier.contractEnd,
+            totalOrders: supplier.totalOrders,
+            notes: supplier.notes || ''
+          });
+        }
+      } else {
+        console.error('Failed to fetch supplier details for editing:', response.status, response.statusText);
+        toast.error('Failed to load supplier details for editing');
+        // Fallback to existing data
+        setFormData({
+          fullName: supplier.fullName,
+          role: supplier.role || '',
+          companyName: supplier.companyName,
+          contactPerson: supplier.contactPerson,
+          email: supplier.email,
+          phone: supplier.phone,
+          address: supplier.address,
+          status: supplier.status,
+          contractStart: supplier.contractStart,
+          contractEnd: supplier.contractEnd,
+          totalOrders: supplier.totalOrders,
+          notes: supplier.notes || ''
+        });
+      }
+    } catch (error) {
+      if (loadingToastId) {
+        toast.dismiss(loadingToastId);
+      }
+      console.error('Error fetching supplier details for editing:', error);
+      toast.error('An error occurred while loading supplier details');
+      // Fallback to existing data
+      setFormData({
+        fullName: supplier.fullName,
+        role: supplier.role || '',
+        companyName: supplier.companyName,
+        contactPerson: supplier.contactPerson,
+        email: supplier.email,
+        phone: supplier.phone,
+        address: supplier.address,
+        status: supplier.status,
+        contractStart: supplier.contractStart,
+        contractEnd: supplier.contractEnd,
+        totalOrders: supplier.totalOrders,
+        notes: supplier.notes || ''
+      });
+    }
   }
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (!editingSupplier) return
 
-    if (!formData.companyName || !formData.contactPerson || !formData.email || !formData.phone) {
-      toast.error('Please fill in all required fields')
-      return
+    // Validation
+    if (!formData.fullName || !formData.role || !formData.companyName || !formData.contactPerson || !formData.email || !formData.phone) {
+      const errors: Record<string, string> = {};
+      if (!formData.fullName) errors.fullName = 'Full Name is required';
+      if (!formData.role) errors.role = 'Role is required';
+      if (!formData.companyName) errors.companyName = 'Company Name is required';
+      if (!formData.contactPerson) errors.contactPerson = 'Contact Person is required';
+      if (!formData.email) errors.email = 'Email is required';
+      if (!formData.phone) errors.phone = 'Phone is required';
+
+      setValidationErrors(errors);
+      toast.error('Please fill in all required fields');
+      return;
     }
 
-    setSuppliers(suppliers.map(supplier => 
-      supplier.id === editingSupplier.id 
-        ? { ...supplier, ...formData }
-        : supplier
-    ))
-    
-    setIsEditDialogOpen(false)
-    setEditingSupplier(null)
-    resetForm()
-    toast.success('Supplier updated successfully')
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      const errors = { ...validationErrors, email: 'Please enter a valid email address' };
+      setValidationErrors(errors);
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    // Phone number validation (exactly 10 digits)
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(formData.phone)) {
+      const errors = { ...validationErrors, phone: 'Phone number must be exactly 10 digits' };
+      setValidationErrors(errors);
+      toast.error('Phone number must be exactly 10 digits');
+      return;
+    }
+
+    let loadingToastId: string | number | undefined;
+
+    try {
+      loadingToastId = toast.loading('Updating supplier...');
+
+      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      // Prepare payload according to API requirements
+      const payload = {
+        full_name: formData.fullName,
+        email: formData.email,
+        phone: formData.phone,
+        role: formData.role,
+        status: formData.status === 'active' ? 'Active' : formData.status === 'inactive' ? 'Inactive' : formData.status === 'pending' ? 'Pending' : 'Suspended',
+        company_name: formData.companyName,
+        contact_person: formData.contactPerson,
+        address: formData.address,
+        contract_start: formData.contractStart,
+        contract_end: formData.contractEnd,
+        notes: formData.notes
+      };
+
+      const response = await fetch(`${apiBaseUrl}/suppliers/updateSupplier/${editingSupplier.id}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      toast.dismiss(loadingToastId);
+
+      if (response.ok) {
+        const responseData = await response.json();
+        if (responseData.success) {
+          toast.success('Supplier updated successfully!');
+          setIsEditDialogOpen(false);
+          setEditingSupplier(null);
+          resetForm();
+          setValidationErrors({});
+          // Refresh the supplier list
+          fetchSuppliersData(currentPage, itemsPerPage);
+        } else {
+          toast.error(responseData.message || 'Failed to update supplier');
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.message || 'Failed to update supplier');
+      }
+    } catch (error) {
+      if (loadingToastId) {
+        toast.dismiss(loadingToastId);
+      }
+      console.error('Error updating supplier:', error);
+      toast.error('An error occurred while updating supplier');
+    }
   }
 
-  const handleDelete = (id: string) => {
-    setSuppliers(suppliers.filter(supplier => supplier.id !== id))
-    toast.success('Supplier deleted successfully')
+  const handleView = async (supplier: Supplier) => {
+    setViewingSupplier(supplier);
+    await fetchSupplierDetails(supplier.id);
+  };
+
+  const handleBackToList = () => {
+    setViewingSupplier(null);
+    setSupplierDetails(null);
+  };
+
+  const handleDelete = async (id: string) => {
+
+
+    let loadingToastId: string | number | undefined;
+
+    try {
+      loadingToastId = toast.loading('Deleting supplier...');
+
+      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await fetch(`${apiBaseUrl}/suppliers/deleteSupplier/${id}`, {
+        method: 'DELETE',
+        headers
+      });
+
+      toast.dismiss(loadingToastId);
+
+      if (response.ok) {
+        const responseData = await response.json();
+        if (responseData.success) {
+          toast.success('Supplier deleted successfully!');
+          // Refresh the supplier list
+          fetchSuppliersData(currentPage, itemsPerPage);
+        } else {
+          toast.error(responseData.message || 'Failed to delete supplier');
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.message || 'Failed to delete supplier');
+      }
+    } catch (error) {
+      if (loadingToastId) {
+        toast.dismiss(loadingToastId);
+      }
+      console.error('Error deleting supplier:', error);
+      toast.error('An error occurred while deleting supplier');
+    }
   }
 
   const resetForm = () => {
     setFormData({
+      fullName: '',
+      role: '',
       companyName: '',
       contactPerson: '',
       email: '',
       phone: '',
       address: '',
-      category: '',
-      products: [],
-      paymentTerms: '',
-      rating: 0,
       status: 'pending',
       contractStart: '',
       contractEnd: '',
       totalOrders: 0,
       notes: ''
     })
+    setValidationErrors({})
   }
 
-  const handleProductChange = (product: string, checked: boolean) => {
-    if (checked) {
-      setFormData(prev => ({
-        ...prev,
-        products: [...prev.products, product]
-      }))
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        products: prev.products.filter(p => p !== product)
-      }))
-    }
-  }
 
   function convertSuppliersToCSV(data: Supplier[]) {
-  const headers = [
-    'Supplier ID',
-    'Company Name',
-    'Contact Person',
-    'Email',
-    'Phone',
-    'Address',
-    'Category',
-    'Products',
-    'Payment Terms',
-    'Rating',
-    'Status',
-    'Contract Start',
-    'Contract End',
-    'Total Orders',
-    'Notes'
-  ].join(',');
+    const headers = [
+      'Supplier ID',
+      'Full Name',
+      'Company Name',
+      'Contact Person',
+      'Email',
+      'Phone',
+      'Address',
+      'Status',
+      'Contract Start',
+      'Contract End',
+      'Total Orders',
+      'Notes'
+    ].join(',');
 
-  const rows = data.map(supplier => [
-    supplier.supplierId,
-    supplier.companyName,
-    supplier.contactPerson,
-    supplier.email,
-    supplier.phone,
-    supplier.address,
-    supplier.category,
-    supplier.products.join('; '),
-    supplier.paymentTerms,
-    supplier.rating,
-    supplier.status,
-    supplier.contractStart,
-    supplier.contractEnd,
-    supplier.totalOrders,
-    supplier.notes || ''
-  ].map(field => `"${field?.toString().replace(/"/g, '""')}"`).join(','));
+    const rows = data.map(supplier => [
+      supplier.supplierId,
+      supplier.fullName,
+      supplier.companyName,
+      supplier.contactPerson,
+      supplier.email,
+      supplier.phone,
+      supplier.address,
+      supplier.status,
+      supplier.contractStart,
+      supplier.contractEnd,
+      supplier.totalOrders,
+      supplier.notes || ''
+    ].map(field => `"${field?.toString().replace(/"/g, '""')}"`).join(','));
 
-  return [headers, ...rows].join('\n');
-}
+    return [headers, ...rows].join('\n');
+  }
 
-function downloadCSV(data: Supplier[], filename: string) {
-  const csv = convertSuppliersToCSV(data);
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  const url = URL.createObjectURL(blob);
-  
-  link.setAttribute('href', url);
-  link.setAttribute('download', filename);
-  link.style.visibility = 'hidden';
-  
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
+  function downloadCSV(data: Supplier[], filename: string) {
+    const csv = convertSuppliersToCSV(data);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  useEffect(() => {
+    fetchRoles();
+    fetchSuppliersData(currentPage, itemsPerPage);
+  }, []);
+
+  const fetchRoles = async () => {
+    try {
+      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await fetch(`${apiBaseUrl}/permissions/roles-with-permissions`, {
+        method: 'GET',
+        headers
+      });
+
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('API Response:', responseData);
+
+        // Transform API response to match component's expected format
+        if (responseData.success && responseData.data) {
+          const transformedRoles = responseData.data.map((apiRole: any) => ({
+            id: apiRole.id.toString(),
+            roleName: apiRole.role_name || '',
+            roleType: apiRole.role_type || '',
+            permissions: apiRole.permissions || []
+          }));
+
+          setRoles(transformedRoles);
+        } else {
+          console.error('Invalid API response structure:', responseData);
+        }
+      } else {
+        console.error('Failed to fetch roles:', response.status, response.statusText);
+      }
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+    }
+  };
+
+  const fetchSuppliersData = async (page: number, limit: number) => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await fetch(`${apiBaseUrl}/suppliers/getAllSuppliers?page=${page}&limit=${limit}`, {
+        method: 'GET',
+        headers
+      });
+
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('Suppliers API Response:', responseData);
+
+        if (responseData.success && responseData.data) {
+          // Transform API response to match component's expected format
+          const transformedSuppliers = responseData.data?.data.map((apiSupplier: any) => ({
+            id: apiSupplier.id.toString(),
+            supplierId: apiSupplier.supplier_code || '',
+            fullName: apiSupplier.users.full_name || '',
+            role: apiSupplier.role || '',
+            companyName: apiSupplier.company_name || '',
+            contactPerson: apiSupplier.contact_person || '',
+            email: apiSupplier.users.email || '',
+            phone: apiSupplier.users.phone || '',
+            address: apiSupplier.address || '',
+            status: apiSupplier.users.status?.toLowerCase() || '',
+            contractStart: apiSupplier.contract_start || '',
+            contractEnd: apiSupplier.contract_end || '',
+            totalOrders: apiSupplier.total_orders || 0,
+            notes: apiSupplier.notes || ''
+          }));
+
+          setSuppliers(transformedSuppliers);
+          setTotalSuppliers(responseData.total || transformedSuppliers.length);
+        } else {
+          console.error('Invalid suppliers API response structure:', responseData);
+          setSuppliers([]);
+        }
+      } else {
+        console.error('Failed to fetch suppliers:', response.status, response.statusText);
+        setSuppliers([]);
+      }
+    } catch (error) {
+      console.error('Error fetching suppliers:', error);
+      setSuppliers([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchSupplierDetails = async (supplierId: string) => {
+    try {
+      setIsLoadingDetails(true);
+      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await fetch(`${apiBaseUrl}/suppliers/getSupplierById/${supplierId}`, {
+        method: 'GET',
+        headers
+      });
+
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('Supplier Details API Response:', responseData);
+
+        if (responseData.success && responseData.data) {
+          setSupplierDetails(responseData.data);
+        } else {
+          console.error('Invalid supplier details API response structure:', responseData);
+          toast.error('Failed to load supplier details');
+        }
+      } else {
+        console.error('Failed to fetch supplier details:', response.status, response.statusText);
+        toast.error('Failed to load supplier details');
+      }
+    } catch (error) {
+      console.error('Error fetching supplier details:', error);
+      toast.error('An error occurred while loading supplier details');
+    } finally {
+      setIsLoadingDetails(false);
+    }
+  };
 
   const renderForm = () => (
-    <div className="grid grid-cols-2 gap-4 py-4 max-h-96 overflow-y-auto">
+    <div className="grid grid-cols-2 gap-4 py-4 max-h-[65vh] overflow-y-auto p-2">
+      <div className="space-y-2">
+        <Label htmlFor="role">Role *</Label>
+        <Select value={formData.role} onValueChange={(value) => {
+          setFormData({ ...formData, role: value })
+          if (validationErrors.role) {
+            setValidationErrors({ ...validationErrors, role: '' })
+          }
+        }}>
+          <SelectTrigger className={validationErrors.role ? 'border-red-500' : ''}>
+            <SelectValue placeholder="Select role" />
+          </SelectTrigger>
+          <SelectContent>
+            {roles.map((role) => (
+              <SelectItem key={role.id} value={role.roleName}>
+                {role.roleName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {validationErrors.role && (
+          <p className="text-sm text-red-500 mt-1">{validationErrors.role}</p>
+        )}
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="fullName">Full Name *</Label>
+        <Input
+          id="fullName"
+          value={formData.fullName}
+          onChange={(e) => {
+            setFormData({ ...formData, fullName: e.target.value })
+            if (validationErrors.fullName) {
+              setValidationErrors({ ...validationErrors, fullName: '' })
+            }
+          }}
+          placeholder="Enter full name"
+          className={validationErrors.fullName ? 'border-red-500' : ''}
+        />
+        {validationErrors.fullName && (
+          <p className="text-sm text-red-500 mt-1">{validationErrors.fullName}</p>
+        )}
+      </div>
       <div className="space-y-2">
         <Label htmlFor="companyName">Company Name *</Label>
         <Input
           id="companyName"
           value={formData.companyName}
-          onChange={(e) => setFormData({...formData, companyName: e.target.value})}
+          onChange={(e) => {
+            setFormData({ ...formData, companyName: e.target.value })
+            if (validationErrors.companyName) {
+              setValidationErrors({ ...validationErrors, companyName: '' })
+            }
+          }}
           placeholder="Enter company name"
+          className={validationErrors.companyName ? 'border-red-500' : ''}
         />
+        {validationErrors.companyName && (
+          <p className="text-sm text-red-500 mt-1">{validationErrors.companyName}</p>
+        )}
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="supplierId">Supplier ID (Auto generated)</Label>
-        <Input
-          id="supplierId"
-          value={generateSupplierId()}
-          disabled
-          className="bg-gray-100"
-        />
-      </div>
+
       <div className="space-y-2">
         <Label htmlFor="contactPerson">Contact Person *</Label>
         <Input
           id="contactPerson"
           value={formData.contactPerson}
-          onChange={(e) => setFormData({...formData, contactPerson: e.target.value})}
+          onChange={(e) => {
+            setFormData({ ...formData, contactPerson: e.target.value })
+            if (validationErrors.contactPerson) {
+              setValidationErrors({ ...validationErrors, contactPerson: '' })
+            }
+          }}
           placeholder="Enter contact person name"
+          className={validationErrors.contactPerson ? 'border-red-500' : ''}
         />
+        {validationErrors.contactPerson && (
+          <p className="text-sm text-red-500 mt-1">{validationErrors.contactPerson}</p>
+        )}
       </div>
       <div className="space-y-2">
         <Label htmlFor="email">Email *</Label>
@@ -448,57 +782,41 @@ function downloadCSV(data: Supplier[], filename: string) {
           id="email"
           type="email"
           value={formData.email}
-          onChange={(e) => setFormData({...formData, email: e.target.value})}
+          onChange={(e) => {
+            setFormData({ ...formData, email: e.target.value })
+            if (validationErrors.email) {
+              setValidationErrors({ ...validationErrors, email: '' })
+            }
+          }}
           placeholder="Enter email address"
+          className={validationErrors.email ? 'border-red-500' : ''}
         />
+        {validationErrors.email && (
+          <p className="text-sm text-red-500 mt-1">{validationErrors.email}</p>
+        )}
       </div>
       <div className="space-y-2">
         <Label htmlFor="phone">Phone Number *</Label>
         <Input
           id="phone"
           value={formData.phone}
-          onChange={(e) => setFormData({...formData, phone: e.target.value})}
-          placeholder="Enter phone number"
+          onChange={(e) => {
+            const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+            setFormData({ ...formData, phone: value })
+            if (validationErrors.phone) {
+              setValidationErrors({ ...validationErrors, phone: '' })
+            }
+          }}
+          placeholder="Enter 10-digit phone number"
+          className={validationErrors.phone ? 'border-red-500' : ''}
         />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="category">Category</Label>
-        <Select value={formData.category} onValueChange={(value) => setFormData({...formData, category: value})}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select category" />
-          </SelectTrigger>
-          <SelectContent>
-            {categories.map((category) => (
-              <SelectItem key={category} value={category}>{category}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="col-span-2 space-y-2">
-        <Label htmlFor="address">Address</Label>
-        <Input
-          id="address"
-          value={formData.address}
-          onChange={(e) => setFormData({...formData, address: e.target.value})}
-          placeholder="Enter full address"
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="paymentTerms">Payment Terms</Label>
-        <Select value={formData.paymentTerms} onValueChange={(value) => setFormData({...formData, paymentTerms: value})}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select payment terms" />
-          </SelectTrigger>
-          <SelectContent>
-            {paymentTermsOptions.map((term) => (
-              <SelectItem key={term} value={term}>{term}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {validationErrors.phone && (
+          <p className="text-sm text-red-500 mt-1">{validationErrors.phone}</p>
+        )}
       </div>
       <div className="space-y-2">
         <Label htmlFor="status">Status</Label>
-        <Select value={formData.status} onValueChange={(value: 'active' | 'inactive' | 'pending' | 'suspended') => setFormData({...formData, status: value})}>
+        <Select value={formData.status} onValueChange={(value: 'active' | 'inactive' | 'pending' | 'suspended') => setFormData({ ...formData, status: value })}>
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
@@ -510,26 +828,24 @@ function downloadCSV(data: Supplier[], filename: string) {
           </SelectContent>
         </Select>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="rating">Rating (0-5)</Label>
+      <div className="col-span-2 space-y-2">
+        <Label htmlFor="address">Address</Label>
         <Input
-          id="rating"
-          type="number"
-          min="0"
-          max="5"
-          step="0.1"
-          value={formData.rating || ''}
-          onChange={(e) => setFormData({...formData, rating: Number(e.target.value)})}
-          placeholder="Enter rating"
+          id="address"
+          value={formData.address}
+          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+          placeholder="Enter full address"
         />
       </div>
+
       <div className="space-y-2">
         <Label htmlFor="contractStart">Contract Start</Label>
         <Input
           id="contractStart"
           type="date"
           value={formData.contractStart}
-          onChange={(e) => setFormData({...formData, contractStart: e.target.value})}
+          max={formData.contractEnd || undefined}
+          onChange={(e) => setFormData({ ...formData, contractStart: e.target.value })}
         />
       </div>
       <div className="space-y-2">
@@ -538,40 +854,35 @@ function downloadCSV(data: Supplier[], filename: string) {
           id="contractEnd"
           type="date"
           value={formData.contractEnd}
-          onChange={(e) => setFormData({...formData, contractEnd: e.target.value})}
+          min={formData.contractStart || undefined}
+          onChange={(e) => setFormData({ ...formData, contractEnd: e.target.value })}
         />
       </div>
-      
-      <div className="col-span-2 space-y-2">
-        <Label>Products/Services</Label>
-        <div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto border rounded p-2">
-          {productOptions.map((product) => (
-            <div key={product} className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id={`product-${product}`}
-                checked={formData.products.includes(product)}
-                onChange={(e) => handleProductChange(product, e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              <label htmlFor={`product-${product}`} className="text-sm">{product}</label>
-            </div>
-          ))}
-        </div>
-      </div>
+
 
       <div className="col-span-2 space-y-2">
         <Label htmlFor="notes">Notes</Label>
         <Textarea
           id="notes"
           value={formData.notes}
-          onChange={(e) => setFormData({...formData, notes: e.target.value})}
+          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
           placeholder="Additional notes..."
           rows={3}
         />
       </div>
     </div>
   )
+
+  // Show supplier details page if viewing a supplier
+  if (viewingSupplier) {
+    return (
+      <SupplierDetailsPage
+        supplierId={viewingSupplier.id}
+        onBack={handleBackToList}
+        supplierData={supplierDetails}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -580,16 +891,16 @@ function downloadCSV(data: Supplier[], filename: string) {
           <h2 className="text-xl font-medium text-[#2b2b2b]">Supplier Management</h2>
           <p className="text-sm text-[#2b2b2b]/60 mt-1">Manage your suppliers and vendor relationships.</p>
         </div>
-        
+
         <div className="flex items-center gap-3">
           <Button variant="outline" className="gap-2">
             <Upload className="h-4 w-4" />
             Import
           </Button>
           <Button variant="outline" className="gap-2" onClick={() => {
-    downloadCSV(filteredSuppliers, `suppliers-export-${new Date().toISOString().split('T')[0]}.csv`);
-    toast.success('CSV export started');
-  }}>
+            downloadCSV(filteredSuppliers, `suppliers-export-${new Date().toISOString().split('T')[0]}.csv`);
+            toast.success('CSV export started');
+          }}>
             <Download className="h-4 w-4" />
             Export
           </Button>
@@ -606,7 +917,7 @@ function downloadCSV(data: Supplier[], filename: string) {
               </DialogHeader>
               {renderForm()}
               <div className="flex justify-end gap-3 mt-6">
-                <Button variant="outline" onClick={() => {setIsCreateDialogOpen(false); resetForm();}}>
+                <Button variant="outline" onClick={() => { setIsCreateDialogOpen(false); resetForm(); }}>
                   Cancel
                 </Button>
                 <Button onClick={handleCreate} className="bg-primary text-white hover:bg-[#0090e6]">
@@ -619,7 +930,7 @@ function downloadCSV(data: Supplier[], filename: string) {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -635,7 +946,7 @@ function downloadCSV(data: Supplier[], filename: string) {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -651,23 +962,8 @@ function downloadCSV(data: Supplier[], filename: string) {
             </div>
           </CardContent>
         </Card>
-        
-        <Card className="bg-white shadow-md border-0">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-[#E6F6FF] rounded-lg">
-                <Star className="h-6 w-6 text-[#00A1FF]" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Avg Rating</p>
-                <p className="text-2xl font-medium text-[#2b2b2b]">
-                  {suppliers.length > 0 ? (suppliers.reduce((acc, s) => acc + s.rating, 0) / suppliers.length).toFixed(1) : '0.0'}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
+
+
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -699,18 +995,7 @@ function downloadCSV(data: Supplier[], filename: string) {
                   className="pl-10"
                 />
               </div>
-              
-              <Select value={filterCategory} onValueChange={setFilterCategory}>
-                <SelectTrigger className="w-56">
-                  <SelectValue placeholder="Filter by Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category} value={category}>{category}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
 
               <Select value={filterStatus} onValueChange={setFilterStatus}>
                 <SelectTrigger className="w-48">
@@ -725,7 +1010,7 @@ function downloadCSV(data: Supplier[], filename: string) {
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <span>Total: {filteredSuppliers.length}</span>
             </div>
@@ -743,63 +1028,75 @@ function downloadCSV(data: Supplier[], filename: string) {
                   <input type="checkbox" className="rounded border-white/30" />
                 </TableHead>
                 <TableHead className="text-white font-medium">ID</TableHead>
+                <TableHead className="text-white font-medium">Name</TableHead>
                 <TableHead className="text-white font-medium">Company</TableHead>
                 <TableHead className="text-white font-medium">Contact</TableHead>
-                <TableHead className="text-white font-medium">Category</TableHead>
-                <TableHead className="text-white font-medium">Rating</TableHead>
                 <TableHead className="text-white font-medium">Orders</TableHead>
-                <TableHead className="text-white font-medium">Payment Terms</TableHead>
                 <TableHead className="text-white font-medium">Status</TableHead>
                 <TableHead className="text-white font-medium">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedSuppliers.map((supplier, index) => (
-                <TableRow key={supplier.id} className={index % 2 === 1 ? "bg-[#eff4fa]" : ""}>
-                  <TableCell>
-                    <input type="checkbox" className="rounded border-gray-300" />
-                  </TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">#{supplier.supplierId}</TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="text-sm font-medium text-[#2b2b2b]/80">{supplier.companyName}</div>
-                      <div className="text-xs text-gray-500 flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        {supplier.address.split(',')[0]}
-                      </div>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8">
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      <span className="ml-2 text-gray-600">Loading suppliers...</span>
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="text-sm text-[#2b2b2b]/80">{supplier.contactPerson}</div>
-                      <div className="text-xs text-gray-500">{supplier.email}</div>
-                      <div className="text-xs text-gray-500">{supplier.phone}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">{supplier.category}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      {getRatingStars(supplier.rating)}
-                      <span className="text-xs text-gray-500 ml-1">{supplier.rating}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">{supplier.totalOrders}</TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">{supplier.paymentTerms}</TableCell>
-                  <TableCell>{getStatusBadge(supplier.status)}</TableCell>
-                  <TableCell>
-                    <ActionButtonsPopup
-                      onView={onViewDetails ? () => onViewDetails(supplier.id) : undefined}
-                      onEdit={() => handleEdit(supplier)}
-                      onDelete={() => handleDelete(supplier.id)}
-                      itemName={supplier.companyName}
-                      itemType="Supplier"
-                      showView={!!onViewDetails}
-                      showEdit={true}
-                      showDelete={true}
-                    />
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : paginatedSuppliers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8">
+                    <div className="text-gray-500">No suppliers found</div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedSuppliers.map((supplier, index) => (
+                  <TableRow key={supplier.id} className={index % 2 === 1 ? "bg-[#eff4fa]" : ""}>
+                    <TableCell>
+                      <input type="checkbox" className="rounded border-gray-300" />
+                    </TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80">#{supplier.supplierId}</TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="text-sm text-[#2b2b2b]/80">{supplier.fullName}</div>
+                        <div className="text-xs text-gray-500">{supplier.email}</div>
+                        <div className="text-xs text-gray-500">{supplier.phone}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="text-sm font-medium text-[#2b2b2b]/80">{supplier.companyName}</div>
+                        <div className="text-xs text-gray-500 flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {supplier.address.split(',')[0]}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="text-sm text-[#2b2b2b]/80">{supplier.contactPerson}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80">{supplier.totalOrders}</TableCell>
+                    <TableCell>{getStatusBadge(supplier.status)}</TableCell>
+                    <TableCell>
+                      <ActionButtonsPopup
+                        onView={() => handleView(supplier)}
+                        onEdit={() => handleEdit(supplier)}
+                        onDelete={() => handleDelete(supplier.id)}
+                        itemName={supplier.companyName}
+                        itemType="Supplier"
+                        showView={!!onViewDetails}
+                        showEdit={true}
+                        showDelete={true}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -810,26 +1107,37 @@ function downloadCSV(data: Supplier[], filename: string) {
         <div className="flex items-center justify-center gap-2">
           <Button
             variant="outline"
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            onClick={() => {
+              const newPage = Math.max(currentPage - 1, 1);
+              setCurrentPage(newPage);
+              fetchSuppliersData(newPage, itemsPerPage);
+            }}
             disabled={currentPage === 1}
           >
             Previous
           </Button>
-          
+
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
             <Button
               key={page}
               variant={currentPage === page ? "default" : "outline"}
-              onClick={() => setCurrentPage(page)}
+              onClick={() => {
+                setCurrentPage(page);
+                fetchSuppliersData(page, itemsPerPage);
+              }}
               className={currentPage === page ? "bg-primary text-white hover:bg-[#0090e6]" : ""}
             >
               {page}
             </Button>
           ))}
-          
+
           <Button
             variant="outline"
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            onClick={() => {
+              const newPage = Math.min(currentPage + 1, totalPages);
+              setCurrentPage(newPage);
+              fetchSuppliersData(newPage, itemsPerPage);
+            }}
             disabled={currentPage === totalPages}
           >
             Next
@@ -845,7 +1153,7 @@ function downloadCSV(data: Supplier[], filename: string) {
           </DialogHeader>
           {renderForm()}
           <div className="flex justify-end gap-3 mt-6">
-            <Button variant="outline" onClick={() => {setIsEditDialogOpen(false); resetForm();}}>
+            <Button variant="outline" onClick={() => { setIsEditDialogOpen(false); resetForm(); }}>
               Cancel
             </Button>
             <Button onClick={handleUpdate} className="bg-primary text-white hover:bg-[#0090e6]">

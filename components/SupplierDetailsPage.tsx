@@ -6,28 +6,13 @@ import { ArrowLeft, Download, Edit, FileText } from 'lucide-react'
 interface SupplierDetailsPageProps {
   supplierId: string
   onBack: () => void
+  supplierData?: any
 }
 
-export function SupplierDetailsPage({ supplierId, onBack }: SupplierDetailsPageProps) {
-  // Mock data for supplier details
-  const supplierData = {
-    id: '#2122',
-    companyName: 'ElectroTech Supplies Pty Ltd',
-    contactPerson: 'David Smith',
-    email: 'david@electrotech.com.au',
-    phone: '+61 2222 021 203',
-    gender: 'Male',
-    address: '47 W 13th St, New York, NY 10011, USA',
-    businessType: 'N/A',
-    position: 'Supplier',
-    gstNumber: 'DE303972433',
-    website: 'www.abc.com',
-    businessContact: '+61 2222 021 204',
-    documents: {
-      idProof: 'Driving License',
-      otherDetails: 'Over the years JDP quickly realized that their success is based on providing'
-    }
-  }
+export function SupplierDetailsPage({ supplierId, onBack, supplierData }: SupplierDetailsPageProps) {
+  // Use provided supplier data from API
+  const data = supplierData || {}
+  const userData = data.users || {}
 
   return (
     <div className="space-y-6">
@@ -42,8 +27,8 @@ export function SupplierDetailsPage({ supplierId, onBack }: SupplierDetailsPageP
             <h1 className="text-xl font-semibold text-[#2b2b2b]">Supplier Details</h1>
           </div>
         </div>
-        
-        <div className="flex items-center gap-3">
+
+        {/* <div className="flex items-center gap-3">
           <Button variant="outline" className="gap-2">
             <Download className="h-4 w-4" />
             Export
@@ -52,7 +37,7 @@ export function SupplierDetailsPage({ supplierId, onBack }: SupplierDetailsPageP
             <Edit className="h-4 w-4" />
             Edit Details
           </Button>
-        </div>
+        </div> */}
       </div>
 
       {/* Main Content */}
@@ -63,34 +48,34 @@ export function SupplierDetailsPage({ supplierId, onBack }: SupplierDetailsPageP
             <div className="flex items-center gap-3 mb-6">
               <h2 className="text-base font-semibold text-[#2b2b2b]">Business details</h2>
               <Badge className="bg-[#E6F6FF] text-[#00A1FF] border-[#00A1FF]/20">
-                {supplierData.id}
+                {data.supplier_code || data.id || supplierId}
               </Badge>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-16 gap-y-6">
               <div className="space-y-6">
                 <div>
                   <p className="text-sm text-[#2b2b2b]/70 mb-1">Full Name</p>
-                  <p className="text-sm text-[#2b2b2b]">{supplierData.contactPerson}</p>
+                  <p className="text-sm text-[#2b2b2b]">{userData.full_name || data.contact_person || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-sm text-[#2b2b2b]/70 mb-1">Phone number</p>
-                  <p className="text-sm text-[#2b2b2b]">{supplierData.phone}</p>
+                  <p className="text-sm text-[#2b2b2b]">{userData.phone || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-sm text-[#2b2b2b]/70 mb-1">Address</p>
-                  <p className="text-sm text-[#2b2b2b]">{supplierData.address}</p>
+                  <p className="text-sm text-[#2b2b2b]">{data.address || 'N/A'}</p>
                 </div>
               </div>
-              
+
               <div className="space-y-6">
                 <div>
                   <p className="text-sm text-[#2b2b2b]/70 mb-1">Email</p>
-                  <p className="text-sm text-[#2b2b2b]">{supplierData.email}</p>
+                  <p className="text-sm text-[#2b2b2b]">{userData.email || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-[#2b2b2b]/70 mb-1">Gender</p>
-                  <p className="text-sm text-[#2b2b2b]">{supplierData.gender}</p>
+                  <p className="text-sm text-[#2b2b2b]/70 mb-1">Status</p>
+                  <p className="text-sm text-[#2b2b2b]">{userData.status || 'N/A'}</p>
                 </div>
               </div>
             </div>
@@ -102,63 +87,48 @@ export function SupplierDetailsPage({ supplierId, onBack }: SupplierDetailsPageP
           {/* More Details Section */}
           <div>
             <h2 className="text-base font-semibold text-[#2b2b2b] mb-6">More Details</h2>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-16 gap-y-6">
               <div className="space-y-6">
                 <div>
                   <p className="text-sm text-[#2b2b2b]/70 mb-1">Company/Business</p>
-                  <p className="text-sm text-[#2b2b2b]">{supplierData.businessType}</p>
+                  <p className="text-sm text-[#2b2b2b]">{data.company_name || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-[#2b2b2b]/70 mb-1">GST/VAT Number</p>
-                  <p className="text-sm text-[#2b2b2b]">{supplierData.gstNumber}</p>
+                  <p className="text-sm text-[#2b2b2b]/70 mb-1">Contact Person</p>
+                  <p className="text-sm text-[#2b2b2b]">{data.contact_person || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-[#2b2b2b]/70 mb-1">Business Contact Number</p>
-                  <p className="text-sm text-[#2b2b2b]">{supplierData.businessContact}</p>
+                  <p className="text-sm text-[#2b2b2b]/70 mb-1">Contract Start</p>
+                  <p className="text-sm text-[#2b2b2b]">{data.contract_start || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-[#2b2b2b]/70 mb-1">Notes</p>
+                  <p className="text-sm text-[#2b2b2b] max-w-[233px]">
+                    {data.notes || 'N/A'}
+                  </p>
                 </div>
               </div>
-              
+
               <div className="space-y-6">
                 <div>
-                  <p className="text-sm text-[#2b2b2b]/70 mb-1">Position</p>
-                  <p className="text-sm text-[#2b2b2b]">{supplierData.position}</p>
+                  <p className="text-sm text-[#2b2b2b]/70 mb-1">Role</p>
+                  <p className="text-sm text-[#2b2b2b]">{userData.role || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-[#2b2b2b]/70 mb-1">Website</p>
-                  <p className="text-sm text-[#2b2b2b]">{supplierData.website}</p>
+                  <p className="text-sm text-[#2b2b2b]/70 mb-1">Contract End</p>
+                  <p className="text-sm text-[#2b2b2b]">{data.contract_end || 'N/A'}</p>
                 </div>
+                <div>
+                  <p className="text-sm text-[#2b2b2b]/70 mb-1">Supplier Code</p>
+                  <p className="text-sm text-[#2b2b2b]">{data.supplier_code || 'N/A'}</p>
+                </div> 
+                
               </div>
             </div>
           </div>
 
-          {/* Divider */}
-          <div className="border-t border-[#d9d9d9]"></div>
 
-          {/* Document Upload Section */}
-          <div>
-            <h2 className="text-base font-semibold text-[#2b2b2b] mb-6">Document Upload</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-16 gap-y-6">
-              <div>
-                <p className="text-sm text-[#2b2b2b]/70 mb-1">ID Proof</p>
-                <p className="text-sm text-[#2b2b2b]">{supplierData.documents.idProof}</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-[#2b2b2b]/70 mb-1">Other Detail</p>
-                <p className="text-sm text-[#2b2b2b] max-w-[233px]">
-                  {supplierData.documents.otherDetails}
-                </p>
-              </div>
-
-              <div className="flex justify-center">
-                <div className="w-[187px] h-[187px] rounded-[13px] bg-gray-100 flex items-center justify-center">
-                  <FileText className="h-16 w-16 text-gray-400" />
-                </div>
-              </div>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>

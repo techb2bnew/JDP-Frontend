@@ -11,6 +11,7 @@ import { Textarea } from './ui/textarea'
 import { Checkbox } from './ui/checkbox'
 import { ActionButtonsPopup } from './ActionButtonsPopup'
 import { usePermissions } from '../contexts/PermissionContext'
+import { AutoSuggestInput } from './ui/auto-suggest-input'
 import { toast } from 'sonner'
 import { 
   Plus, 
@@ -69,14 +70,6 @@ interface LaborPageProps {
 }
 
 
-const trades = [
-  'Electrical Assistant',
-  'Cable Technician',
-  'Apprentice Electrician',
-  'Maintenance Worker',
-  'Installation Helper',
-  'Equipment Operator'
-]
 
  
 
@@ -122,6 +115,7 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
   const [leadLabours, setLeadLabours] = useState<any[]>([])
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [isLoadingLabor, setIsLoadingLabor] = useState(false)
+  const [trades, setTrades] = useState<string[]>([])
 
   // Permission checks for labour module
   const canViewLabour = isAdmin || hasPermission('labour', 'view')
@@ -695,6 +689,10 @@ const fetchLaborData = async (page: number = 1, limit: number = 10) => {
         }));
 
         setLaborers(mappedData);
+        
+        // Extract unique trades from API response
+        const uniqueTrades = Array.from(new Set(responseData.data?.data?.map((item: any) => item.trade).filter(Boolean))) as string[];
+        setTrades(uniqueTrades);
       } else {
         console.error('Invalid labor response structure:', responseData);
         setLaborers([]); // Set empty array as fallback
@@ -766,7 +764,7 @@ const fetchLaborById = async (id: string) => {
   }
 };
   const renderForm = () => (
-    <div className="grid grid-cols-2 gap-4 py-4 max-h-96 overflow-y-auto">
+    <div className="grid grid-cols-2 gap-4 py-4 max-h-[65vh] overflow-y-auto p-2">
       <div className="space-y-2">
               <Label htmlFor="role">Role *</Label>
               <Select value={formData.role} onValueChange={(value) => {
@@ -857,6 +855,7 @@ const fetchLaborById = async (id: string) => {
           id="dob"
           type="date"
           value={formData.dob}
+          className={validationErrors.dob ? 'border-red-500' : ''}
           onChange={(e) => {
             setFormData({...formData, dob: e.target.value})
             if (validationErrors.dob) {
@@ -875,6 +874,7 @@ const fetchLaborById = async (id: string) => {
         <Input
           id="date_of_joining"
           type="date"
+          className={validationErrors.date_of_joining ? 'border-red-500' : ''}
           value={formData.date_of_joining}
           onChange={(e) => {
             setFormData({...formData, date_of_joining: e.target.value})
@@ -908,25 +908,20 @@ const fetchLaborById = async (id: string) => {
       </div>
       
       <div className="space-y-2">
-        <Label htmlFor="trade">Trade *</Label>
-        <Select value={formData.trade} onValueChange={(value) => {
-          setFormData({...formData, trade: value})
-          if (validationErrors.trade) {
-            setValidationErrors({...validationErrors, trade: ''})
-          }
-        }}>
-          <SelectTrigger className={validationErrors.trade ? 'border-red-500' : ''}>
-            <SelectValue placeholder="Select trade" />
-          </SelectTrigger>
-          <SelectContent>
-            {trades.map((trade) => (
-              <SelectItem key={trade} value={trade}>{trade}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {validationErrors.trade && (
-          <p className="text-sm text-red-500 mt-1">{validationErrors.trade}</p>
-        )}
+        <AutoSuggestInput
+          label="Trade"
+          value={formData.trade}
+          onChange={(value) => {
+            setFormData({...formData, trade: value})
+            if (validationErrors.trade) {
+              setValidationErrors({...validationErrors, trade: ''})
+            }
+          }}
+          suggestions={trades}
+          placeholder="Enter trade"
+          error={validationErrors.trade}
+          required={true}
+        />
       </div>
       
       <div className="space-y-2">

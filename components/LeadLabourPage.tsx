@@ -28,6 +28,7 @@ import {
   FileText,
   Camera,
   Shield,
+  X,
   Briefcase
 } from 'lucide-react'
 
@@ -97,9 +98,9 @@ interface LeadLabourFormData {
   skills: string[]
   emergencyContact: string
   documents: {
-    idProof: File | null
-    photo: File | null
-    resume: File | null
+    idProof: File | { name: string; url: string } | null
+    photo: File | { name: string; url: string } | null
+    resume: File | { name: string; url: string } | null
   }
   permissions: {
     createJob: boolean
@@ -304,14 +305,14 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       formDataPayload.append('management_type', 'lead_labor');
       
       // Append file uploads if they exist
-      if (formData.documents.idProof) {
-        formDataPayload.append('id_proof', formData.documents.idProof);
+      if (formData.documents.idProof && formData.documents.idProof instanceof File) {
+        formDataPayload.append('id_proof', formData.documents.idProof as File);
       }
-      if (formData.documents.photo) {
-        formDataPayload.append('photo_url', formData.documents.photo);
+      if (formData.documents.photo && formData.documents.photo instanceof File) {
+        formDataPayload.append('photo_url', formData.documents.photo as File);
       }
-      if (formData.documents.resume) {
-        formDataPayload.append('resume_url', formData.documents.resume);
+      if (formData.documents.resume && formData.documents.resume instanceof File) {
+        formDataPayload.append('resume_url', formData.documents.resume as File);
       }
 
       const response = await fetch(`${apiBaseUrl}/lead-labor/createLeadLabor`, {
@@ -377,9 +378,9 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       skills: leadLabour.skills,
       emergencyContact: leadLabour.emergencyContact,
       documents: {
-        idProof: leadLabour.documents?.idProof ? new File([], leadLabour.documents.idProof.name) : null,
-        photo: leadLabour.documents?.photo ? new File([], leadLabour.documents.photo.name) : null,
-        resume: leadLabour.documents?.resume ? new File([], leadLabour.documents.resume.name) : null
+        idProof: leadLabour.documents?.idProof || null,
+        photo: leadLabour.documents?.photo || null,
+        resume: leadLabour.documents?.resume || null
       },
       permissions: leadLabour.permissions,
       agreeToTerms: leadLabour.agreeToTerms
@@ -458,14 +459,14 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       formDataPayload.append('management_type', 'lead_labour');
       
       // Append file uploads if they exist
-      if (formData.documents.idProof) {
-        formDataPayload.append('id_proof', formData.documents.idProof);
+      if (formData.documents.idProof && formData.documents.idProof instanceof File) {
+        formDataPayload.append('id_proof', formData.documents.idProof as File);
       }
-      if (formData.documents.photo) {
-        formDataPayload.append('photo_url', formData.documents.photo);
+      if (formData.documents.photo && formData.documents.photo instanceof File) {
+        formDataPayload.append('photo_url', formData.documents.photo as File);
       }
-      if (formData.documents.resume) {
-        formDataPayload.append('resume_url', formData.documents.resume);
+      if (formData.documents.resume && formData.documents.resume instanceof File) {
+        formDataPayload.append('resume_url', formData.documents.resume as File);
       }
 
       const response = await fetch(`${apiBaseUrl}/lead-labor/updateLeadLabor/${editingLeadLabour.id}`, {
@@ -589,7 +590,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     setEditingLeadLabour(null)
   }
 
-  const handleFileUpload = (type: 'idProof' | 'photo' | 'resume', file: File) => {
+  const handleFileUpload = (type: 'idProof' | 'photo' | 'resume', file: File | { name: string; url: string } | null) => {
     setFormData(prev => ({
       ...prev,
       documents: {
@@ -604,40 +605,96 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     }
   }
 
-  const FileUploadArea = ({ type, label, accept, error }: { type: 'idProof' | 'photo' | 'resume', label: string, accept: string, error?: string }) => (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      <div 
-        className={`border-2 border-dashed rounded-lg p-6 text-center hover:border-[#00A1FF] transition-colors cursor-pointer ${
-          error ? 'border-red-300' : 'border-gray-300'
-        }`}
-        onClick={() => document.getElementById(`file-${type}`)?.click()}
-      >
-        <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-        <p className="text-sm text-gray-600">Drag and drop files here</p>
-        <p className="text-xs text-gray-500 mt-1">or click to browse</p>
-        <input
-          id={`file-${type}`}
-          type="file"
-          accept={accept}
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0]
-            if (file) handleFileUpload(type, file)
-          }}
-        />
+  const FileUploadArea = ({ type, label, accept, error }: { type: 'idProof' | 'photo' | 'resume', label: string, accept: string, error?: string }) => {
+    const currentFile = formData.documents[type]
+    const isImageFile = currentFile && (
+      (currentFile instanceof File && currentFile.type.startsWith('image/')) ||
+      (!(currentFile instanceof File) && currentFile && (currentFile as any).name && /\.(jpg|jpeg|png|gif)$/i.test((currentFile as any).name))
+    )
+    
+    return (
+      <div className="space-y-2">
+        <Label>{label}</Label>
+        
+        {currentFile ? (
+          <div className="relative border-2 border-dashed rounded-lg p-4">
+            {isImageFile ? (
+              <div className="relative">
+                <img 
+                  src={currentFile instanceof File ? URL.createObjectURL(currentFile) : (currentFile as any).url} 
+                  alt="Preview" 
+                  className="w-full h-32 object-cover rounded-lg"
+                />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleFileUpload(type, null)
+                  }}
+                  className="absolute  top-0 right-0   bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="relative p-2 bg-gray-50 rounded flex items-center justify-center gap-3">
+                <div className="flex items-center justify-center">
+                  <FileText className="h-6 w-6 text-gray-400" />
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleFileUpload(type, null)
+                  }}
+                  className="  bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div 
+            className={`border-2 border-dashed rounded-lg p-6 text-center hover:border-[#00A1FF] transition-colors cursor-pointer ${
+              error ? 'border-red-300' : 'border-gray-300'
+            }`}
+            onClick={() => document.getElementById(`file-${type}`)?.click()}
+          >
+            <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+            <p className="text-sm text-gray-600">Drag and drop files here</p>
+            <p className="text-xs text-gray-500 mt-1">or click to browse</p>
+            <input
+              id={`file-${type}`}
+              type="file"
+              accept={accept}
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) handleFileUpload(type, file)
+              }}
+            />
+          </div>
+        )}
+        
+        {editingLeadLabour && editingLeadLabour.documents?.[type] && !formData.documents[type] && (
+          <div className="mt-2">
+            <p className="text-sm text-blue-600 mb-2">📄 Current: {editingLeadLabour.documents[type]!.name}</p>
+            {editingLeadLabour.documents[type]!.name && /\.(jpg|jpeg|png|gif)$/i.test(editingLeadLabour.documents[type]!.name) && (
+              <img 
+                src={editingLeadLabour.documents[type]!.url} 
+                alt="Current Preview" 
+                className="w-full h-32 object-cover rounded-lg border"
+              />
+            )}
+          </div>
+        )}
+        {error && (
+          <p className="text-sm text-red-500 mt-1">{error}</p>
+        )}
       </div>
-      {formData.documents[type] && (
-        <p className="text-sm text-green-600">✓ {formData.documents[type]!.name}</p>
-      )}
-      {editingLeadLabour && editingLeadLabour.documents?.[type] && !formData.documents[type] && (
-        <p className="text-sm text-blue-600">📄 Current: {editingLeadLabour.documents[type]!.name}</p>
-      )}
-      {error && (
-        <p className="text-sm text-red-500 mt-1">{error}</p>
-      )}
-    </div>
-  )
+    )
+  }
 
   const exportToCSV = () => {
   // CSV header
@@ -900,7 +957,7 @@ const fetchLeadLabourById = async (id: number) => {
 
 
   const renderForm = () => (
-    <div className="max-h-96 overflow-y-auto space-y-6">
+    <div className="max-h-[65vh] overflow-y-auto space-y-6 p-2">
       {/* Personal Details Section */}
       <div>
         <h3 className="text-lg font-medium text-[#2b2b2b] mb-4">Personal Details</h3>
@@ -913,7 +970,7 @@ const fetchLeadLabourById = async (id: number) => {
                   setValidationErrors({...validationErrors, role: ''})
                 }
               }}>
-                <SelectTrigger>
+                <SelectTrigger className={validationErrors.role ? 'border-red-500' : ''}>
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -933,6 +990,7 @@ const fetchLeadLabourById = async (id: number) => {
             <Input
               id="name"
               value={formData.name}
+              className={validationErrors.name ? 'border-red-500' : ''}
               onChange={(e) => {
                 setFormData({...formData, name: e.target.value})
                 if (validationErrors.name) {
@@ -990,6 +1048,7 @@ const fetchLeadLabourById = async (id: number) => {
               id="dob"
               type="date"
               value={formData.dob}
+              className={validationErrors.dob ? 'border-red-500' : ''}
               onChange={(e) => {
                 setFormData({...formData, dob: e.target.value})
                 if (validationErrors.dob) {
@@ -1019,6 +1078,7 @@ const fetchLeadLabourById = async (id: number) => {
             <Input
               id="address"
               value={formData.address}
+              className={validationErrors.address ? 'border-red-500' : ''}
               onChange={(e) => {
                 setFormData({...formData, address: e.target.value})
                 if (validationErrors.address) {
@@ -1104,6 +1164,8 @@ const fetchLeadLabourById = async (id: number) => {
             <Input
               id="experience"
               value={formData.experience}
+              className={validationErrors.experience ? 'border-red-500' : ''}
+
               onChange={(e) => {
                 setFormData({...formData, experience: e.target.value})
                 if (validationErrors.experience) {
@@ -1463,7 +1525,7 @@ const fetchLeadLabourById = async (id: number) => {
             <DialogTitle>Lead Labour Details</DialogTitle>
           </DialogHeader>
           {viewingLeadLabour && (
-            <div className="max-h-96 overflow-y-auto space-y-6">
+            <div className="max-h-[70vh] overflow-y-auto space-y-6 p-2">
               {/* Personal Details Section */}
               <div>
                 <h3 className="text-lg font-medium text-[#2b2b2b] mb-4">Personal Details</h3>
