@@ -11,12 +11,13 @@ import { Textarea } from './ui/textarea'
 import { ActionButtonsPopup } from './ActionButtonsPopup'
 import { toast } from 'sonner'
 import { SupplierDetailsPage } from './SupplierDetailsPage'
-import {
-  Plus,
-  Search,
-  MoreVertical,
-  Edit,
-  Trash2,
+import { globalApiCall } from '../utils/globalApiHandler'
+import { 
+  Plus, 
+  Search, 
+  MoreVertical, 
+  Edit, 
+  Trash2, 
   Eye,
   Upload,
   Download,
@@ -144,13 +145,13 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
   const filteredSuppliers = suppliers.filter(supplier => {
     const matchesSearch = supplier.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       supplier.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      supplier.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      supplier.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      supplier.phone.includes(searchTerm) ||
-      supplier.supplierId.includes(searchTerm)
-
+                         supplier.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         supplier.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         supplier.phone.includes(searchTerm) ||
+                         supplier.supplierId.includes(searchTerm)
+    
     const matchesStatus = filterStatus === 'all' || supplier.status === filterStatus
-
+    
     return matchesSearch && matchesStatus
   })
 
@@ -207,7 +208,7 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
         email: formData.email,
         phone: formData.phone,
         role: formData.role,
-        status: formData.status === 'active' ? 'Active' : formData.status === 'inactive' ? 'Inactive' : formData.status === 'pending' ? 'Pending' : 'Suspended',
+        status: formData.status === 'active' ? 'active' : formData.status === 'inactive' ? 'inactive' : formData.status === 'pending' ? 'pending' : 'suspended',
         company_name: formData.companyName,
         contact_person: formData.contactPerson,
         address: formData.address,
@@ -279,7 +280,7 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
           const userData = apiData.users || {};
 
           // Populate form with API data
-          setFormData({
+    setFormData({
             fullName: userData.full_name || userData.name || '',
             role: userData.role || '',
             companyName: apiData.company_name || '',
@@ -300,16 +301,16 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
           setFormData({
             fullName: supplier.fullName,
             role: supplier.role || '',
-            companyName: supplier.companyName,
-            contactPerson: supplier.contactPerson,
-            email: supplier.email,
-            phone: supplier.phone,
-            address: supplier.address,
-            status: supplier.status,
-            contractStart: supplier.contractStart,
-            contractEnd: supplier.contractEnd,
-            totalOrders: supplier.totalOrders,
-            notes: supplier.notes || ''
+      companyName: supplier.companyName,
+      contactPerson: supplier.contactPerson,
+      email: supplier.email,
+      phone: supplier.phone,
+      address: supplier.address,
+      status: supplier.status,
+      contractStart: supplier.contractStart,
+      contractEnd: supplier.contractEnd,
+      totalOrders: supplier.totalOrders,
+      notes: supplier.notes || ''
           });
         }
       } else {
@@ -406,7 +407,7 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
         email: formData.email,
         phone: formData.phone,
         role: formData.role,
-        status: formData.status === 'active' ? 'Active' : formData.status === 'inactive' ? 'Inactive' : formData.status === 'pending' ? 'Pending' : 'Suspended',
+        status: formData.status === 'active' ? 'active' : formData.status === 'inactive' ? 'inactive' : formData.status === 'pending' ? 'pending' : 'suspended',
         company_name: formData.companyName,
         contact_person: formData.contactPerson,
         address: formData.address,
@@ -520,143 +521,137 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
 
 
   function convertSuppliersToCSV(data: Supplier[]) {
-    const headers = [
-      'Supplier ID',
+  const headers = [
+    'Supplier ID',
       'Full Name',
-      'Company Name',
-      'Contact Person',
-      'Email',
-      'Phone',
-      'Address',
-      'Status',
-      'Contract Start',
-      'Contract End',
-      'Total Orders',
-      'Notes'
-    ].join(',');
+    'Company Name',
+    'Contact Person',
+    'Email',
+    'Phone',
+    'Address',
+    'Status',
+    'Contract Start',
+    'Contract End',
+    'Total Orders',
+    'Notes'
+  ].join(',');
 
-    const rows = data.map(supplier => [
-      supplier.supplierId,
+  const rows = data.map(supplier => [
+    supplier.supplierId,
       supplier.fullName,
-      supplier.companyName,
-      supplier.contactPerson,
-      supplier.email,
-      supplier.phone,
-      supplier.address,
-      supplier.status,
-      supplier.contractStart,
-      supplier.contractEnd,
-      supplier.totalOrders,
-      supplier.notes || ''
-    ].map(field => `"${field?.toString().replace(/"/g, '""')}"`).join(','));
+    supplier.companyName,
+    supplier.contactPerson,
+    supplier.email,
+    supplier.phone,
+    supplier.address,
+    supplier.status,
+    supplier.contractStart,
+    supplier.contractEnd,
+    supplier.totalOrders,
+    supplier.notes || ''
+  ].map(field => `"${field?.toString().replace(/"/g, '""')}"`).join(','));
 
-    return [headers, ...rows].join('\n');
-  }
+  return [headers, ...rows].join('\n');
+}
 
-  function downloadCSV(data: Supplier[], filename: string) {
-    const csv = convertSuppliersToCSV(data);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
+function downloadCSV(data: Supplier[], filename: string) {
+  const csv = convertSuppliersToCSV(data);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.visibility = 'hidden';
+  
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
 
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-
-  useEffect(() => {
-    fetchRoles();
+useEffect(() => {
+  fetchRoles(); 
     fetchSuppliersData(currentPage, itemsPerPage);
-  }, []);
+}, []);
 
-  const fetchRoles = async () => {
-    try {
-      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+const fetchRoles = async () => {
+  try {
+    const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const response = await fetch(`${apiBaseUrl}/permissions/roles-with-permissions`, {
-        method: 'GET',
-        headers
-      });
+    const response = await fetch(`${apiBaseUrl}/permissions/roles-with-permissions`, {
+      method: 'GET',
+      headers
+    });
 
-      if (response.ok) {
-        const responseData = await response.json();
-        console.log('API Response:', responseData);
-
-        // Transform API response to match component's expected format
-        if (responseData.success && responseData.data) {
-          const transformedRoles = responseData.data.map((apiRole: any) => ({
-            id: apiRole.id.toString(),
-            roleName: apiRole.role_name || '',
-            roleType: apiRole.role_type || '',
-            permissions: apiRole.permissions || []
-          }));
-
-          setRoles(transformedRoles);
-        } else {
-          console.error('Invalid API response structure:', responseData);
-        }
+    if (response.ok) {
+      const responseData = await response.json();
+      console.log('API Response:', responseData);
+      
+      // Transform API response to match component's expected format
+      if (responseData.success && responseData.data) {
+        const transformedRoles = responseData.data.map((apiRole: any) => ({
+          id: apiRole.id.toString(),
+          roleName: apiRole.role_name || '',
+          roleType: apiRole.role_type || '',
+          permissions: apiRole.permissions || []
+        }));
+        
+        setRoles(transformedRoles);
       } else {
-        console.error('Failed to fetch roles:', response.status, response.statusText);
+        console.error('Invalid API response structure:', responseData);
       }
-    } catch (error) {
-      console.error('Error fetching roles:', error);
+    } else {
+      console.error('Failed to fetch roles:', response.status, response.statusText);
     }
-  };
+  } catch (error) {
+    console.error('Error fetching roles:', error);
+  }
+};
 
   const fetchSuppliersData = async (page: number, limit: number) => {
     try {
       setIsLoading(true);
-      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const response = await fetch(`${apiBaseUrl}/suppliers/getAllSuppliers?page=${page}&limit=${limit}`, {
-        method: 'GET',
-        headers
+      
+      const response = await globalApiCall(`${apiBaseUrl}/suppliers/getAllSuppliers?page=${page}&limit=${limit}`, {
+        method: 'GET'
       });
 
-      if (response.ok) {
-        const responseData = await response.json();
-        console.log('Suppliers API Response:', responseData);
+      const responseData = await response.json();
+      console.log('Suppliers API Response:', responseData);
 
-        if (responseData.success && responseData.data) {
-          // Transform API response to match component's expected format
-          const transformedSuppliers = responseData.data?.data.map((apiSupplier: any) => ({
-            id: apiSupplier.id.toString(),
-            supplierId: apiSupplier.supplier_code || '',
-            fullName: apiSupplier.users.full_name || '',
-            role: apiSupplier.role || '',
-            companyName: apiSupplier.company_name || '',
-            contactPerson: apiSupplier.contact_person || '',
-            email: apiSupplier.users.email || '',
-            phone: apiSupplier.users.phone || '',
-            address: apiSupplier.address || '',
-            status: apiSupplier.users.status?.toLowerCase() || '',
-            contractStart: apiSupplier.contract_start || '',
-            contractEnd: apiSupplier.contract_end || '',
-            totalOrders: apiSupplier.total_orders || 0,
-            notes: apiSupplier.notes || ''
-          }));
+      if (responseData.success && responseData.data) {
+        // Transform API response to match component's expected format
+        const transformedSuppliers = responseData.data?.data.map((apiSupplier: any) => ({
+          id: apiSupplier.id.toString(),
+          supplierId: apiSupplier.supplier_code || '',
+          fullName: apiSupplier.users.full_name || '',
+          role: apiSupplier.role || '',
+          companyName: apiSupplier.company_name || '',
+          contactPerson: apiSupplier.contact_person || '',
+          email: apiSupplier.users.email || '',
+          phone: apiSupplier.users.phone || '',
+          address: apiSupplier.address || '',
+          status: apiSupplier.users.status?.toLowerCase() || '',
+          contractStart: apiSupplier.contract_start || '',
+          contractEnd: apiSupplier.contract_end || '',
+          totalOrders: apiSupplier.total_orders || 0,
+          notes: apiSupplier.notes || ''
+        }));
 
-          setSuppliers(transformedSuppliers);
-          setTotalSuppliers(responseData.total || transformedSuppliers.length);
-        } else {
-          console.error('Invalid suppliers API response structure:', responseData);
-          setSuppliers([]);
-        }
+        setSuppliers(transformedSuppliers);  
+        setTotalSuppliers(responseData.data.pagination.totalItems || transformedSuppliers.length);
       } else {
-        console.error('Failed to fetch suppliers:', response.status, response.statusText);
+        console.error('Invalid suppliers API response structure:', responseData);
         setSuppliers([]);
       }
     } catch (error) {
       console.error('Error fetching suppliers:', error);
-      setSuppliers([]);
+      // Error is already handled by globalApiCall (token revocation, etc.)
+      if (!(error instanceof Error && error.message?.includes('Session expired'))) {
+        setSuppliers([]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -675,21 +670,17 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
       });
 
       if (response.ok) {
-        const responseData = await response.json();
-        console.log('Supplier Details API Response:', responseData);
+        const responseData = await response.json(); 
 
         if (responseData.success && responseData.data) {
           setSupplierDetails(responseData.data);
-        } else {
-          console.error('Invalid supplier details API response structure:', responseData);
+        } else { 
           toast.error('Failed to load supplier details');
         }
-      } else {
-        console.error('Failed to fetch supplier details:', response.status, response.statusText);
+      } else { 
         toast.error('Failed to load supplier details');
       }
-    } catch (error) {
-      console.error('Error fetching supplier details:', error);
+    } catch (error) { 
       toast.error('An error occurred while loading supplier details');
     } finally {
       setIsLoadingDetails(false);
@@ -698,29 +689,29 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
 
   const renderForm = () => (
     <div className="grid grid-cols-2 gap-4 py-4 max-h-[65vh] overflow-y-auto p-2">
-      <div className="space-y-2">
-        <Label htmlFor="role">Role *</Label>
+       <div className="space-y-2">
+              <Label htmlFor="role">Role *</Label>
         <Select value={formData.role} onValueChange={(value) => {
           setFormData({ ...formData, role: value })
           if (validationErrors.role) {
             setValidationErrors({ ...validationErrors, role: '' })
           }
         }}>
-          <SelectTrigger className={validationErrors.role ? 'border-red-500' : ''}>
-            <SelectValue placeholder="Select role" />
-          </SelectTrigger>
-          <SelectContent>
-            {roles.map((role) => (
-              <SelectItem key={role.id} value={role.roleName}>
-                {role.roleName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {validationErrors.role && (
-          <p className="text-sm text-red-500 mt-1">{validationErrors.role}</p>
-        )}
-      </div>
+                <SelectTrigger className={validationErrors.role ? 'border-red-500' : ''}>
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map((role) => (
+                    <SelectItem key={role.id} value={role.roleName}>
+                      {role.roleName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {validationErrors.role && (
+                <p className="text-sm text-red-500 mt-1">{validationErrors.role}</p>
+              )}
+            </div>
       <div className="space-y-2">
         <Label htmlFor="fullName">Full Name *</Label>
         <Input
@@ -756,7 +747,7 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
         {validationErrors.companyName && (
           <p className="text-sm text-red-500 mt-1">{validationErrors.companyName}</p>
         )}
-      </div>
+      </div> 
 
       <div className="space-y-2">
         <Label htmlFor="contactPerson">Contact Person *</Label>
@@ -858,7 +849,7 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
           onChange={(e) => setFormData({ ...formData, contractEnd: e.target.value })}
         />
       </div>
-
+      
 
       <div className="col-span-2 space-y-2">
         <Label htmlFor="notes">Notes</Label>
@@ -891,16 +882,16 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
           <h2 className="text-xl font-medium text-[#2b2b2b]">Supplier Management</h2>
           <p className="text-sm text-[#2b2b2b]/60 mt-1">Manage your suppliers and vendor relationships.</p>
         </div>
-
+        
         <div className="flex items-center gap-3">
           <Button variant="outline" className="gap-2">
             <Upload className="h-4 w-4" />
             Import
           </Button>
           <Button variant="outline" className="gap-2" onClick={() => {
-            downloadCSV(filteredSuppliers, `suppliers-export-${new Date().toISOString().split('T')[0]}.csv`);
-            toast.success('CSV export started');
-          }}>
+    downloadCSV(filteredSuppliers, `suppliers-export-${new Date().toISOString().split('T')[0]}.csv`);
+    toast.success('CSV export started');
+  }}>
             <Download className="h-4 w-4" />
             Export
           </Button>
@@ -946,7 +937,7 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
             </div>
           </CardContent>
         </Card>
-
+        
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -962,8 +953,8 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
             </div>
           </CardContent>
         </Card>
-
-
+        
+        
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -995,7 +986,7 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
                   className="pl-10"
                 />
               </div>
-
+              
 
               <Select value={filterStatus} onValueChange={setFilterStatus}>
                 <SelectTrigger className="w-48">
@@ -1010,7 +1001,7 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
                 </SelectContent>
               </Select>
             </div>
-
+            
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <span>Total: {filteredSuppliers.length}</span>
             </div>
@@ -1054,11 +1045,11 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
                 </TableRow>
               ) : (
                 paginatedSuppliers.map((supplier, index) => (
-                  <TableRow key={supplier.id} className={index % 2 === 1 ? "bg-[#eff4fa]" : ""}>
-                    <TableCell>
-                      <input type="checkbox" className="rounded border-gray-300" />
-                    </TableCell>
-                    <TableCell className="text-sm text-[#2b2b2b]/80">#{supplier.supplierId}</TableCell>
+                <TableRow key={supplier.id} className={index % 2 === 1 ? "bg-[#eff4fa]" : ""}>
+                  <TableCell>
+                    <input type="checkbox" className="rounded border-gray-300" />
+                  </TableCell>
+                  <TableCell className="text-sm text-[#2b2b2b]/80">#{supplier.supplierId}</TableCell>
                     <TableCell>
                       <div>
                         <div className="text-sm text-[#2b2b2b]/80">{supplier.fullName}</div>
@@ -1066,35 +1057,35 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
                         <div className="text-xs text-gray-500">{supplier.phone}</div>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="text-sm font-medium text-[#2b2b2b]/80">{supplier.companyName}</div>
-                        <div className="text-xs text-gray-500 flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {supplier.address.split(',')[0]}
-                        </div>
+                  <TableCell>
+                    <div>
+                      <div className="text-sm font-medium text-[#2b2b2b]/80">{supplier.companyName}</div>
+                      <div className="text-xs text-gray-500 flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        {supplier.address.split(',')[0]}
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="text-sm text-[#2b2b2b]/80">{supplier.contactPerson}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-[#2b2b2b]/80">{supplier.totalOrders}</TableCell>
-                    <TableCell>{getStatusBadge(supplier.status)}</TableCell>
-                    <TableCell>
-                      <ActionButtonsPopup
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <div className="text-sm text-[#2b2b2b]/80">{supplier.contactPerson}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm text-[#2b2b2b]/80">{supplier.totalOrders}</TableCell>
+                  <TableCell>{getStatusBadge(supplier.status)}</TableCell>
+                  <TableCell>
+                    <ActionButtonsPopup
                         onView={() => handleView(supplier)}
-                        onEdit={() => handleEdit(supplier)}
-                        onDelete={() => handleDelete(supplier.id)}
-                        itemName={supplier.companyName}
-                        itemType="Supplier"
-                        showView={!!onViewDetails}
-                        showEdit={true}
-                        showDelete={true}
-                      />
-                    </TableCell>
-                  </TableRow>
+                      onEdit={() => handleEdit(supplier)}
+                      onDelete={() => handleDelete(supplier.id)}
+                      itemName={supplier.companyName}
+                      itemType="Supplier"
+                      showView={!!onViewDetails}
+                      showEdit={true}
+                      showDelete={true}
+                    />
+                  </TableCell>
+                </TableRow>
                 ))
               )}
             </TableBody>
@@ -1116,7 +1107,7 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
           >
             Previous
           </Button>
-
+          
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
             <Button
               key={page}
@@ -1130,7 +1121,7 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
               {page}
             </Button>
           ))}
-
+          
           <Button
             variant="outline"
             onClick={() => {

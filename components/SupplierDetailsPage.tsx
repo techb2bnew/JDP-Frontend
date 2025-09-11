@@ -95,13 +95,14 @@ export function SupplierDetailsPage({ supplierId, onBack, supplierData }: Suppli
                   <p className="text-sm text-[#2b2b2b]">{data.company_name || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-[#2b2b2b]/70 mb-1">Contact Person</p>
-                  <p className="text-sm text-[#2b2b2b]">{data.contact_person || 'N/A'}</p>
-                </div>
-                <div>
                   <p className="text-sm text-[#2b2b2b]/70 mb-1">Contract Start</p>
                   <p className="text-sm text-[#2b2b2b]">{data.contract_start || 'N/A'}</p>
                 </div>
+                <div>
+                  <p className="text-sm text-[#2b2b2b]/70 mb-1">Contact Person</p>
+                  <p className="text-sm text-[#2b2b2b]">{data.contact_person || 'N/A'}</p>
+                </div>
+                
                 <div>
                   <p className="text-sm text-[#2b2b2b]/70 mb-1">Notes</p>
                   <p className="text-sm text-[#2b2b2b] max-w-[233px]">

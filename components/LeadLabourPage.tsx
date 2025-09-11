@@ -137,6 +137,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [departments, setDepartments] = useState<string[]>([])
   const [specializations, setSpecializations] = useState<string[]>([])
+  const [totalLead, setTotalLead] = useState(0)
 
   // Check if user is admin (has no specific permissions but should see all actions)
   const isAdmin = permissions.length === 0
@@ -227,12 +228,9 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     return matchesSearch && matchesSpecialization && matchesStatus
   })
 
-  const paginatedLeadLabours = filteredLeadLabours.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
-
-  const totalPages = Math.ceil(filteredLeadLabours.length / itemsPerPage)
+  
+  const paginatedLeadLabours = filteredLeadLabours
+  const totalPages = Math.ceil(totalLead / itemsPerPage) 
 
   const handleCreate = async () => {
     // Validation
@@ -333,7 +331,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
           resetForm();
           setIsCreateDialogOpen(false);
           // Refresh the data
-          fetchLeadLabourData();
+          fetchLeadLabourData(currentPage, itemsPerPage);
         } else {
           toast.error(responseData.message || 'Failed to create lead labour');
         }
@@ -488,7 +486,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
           setIsEditDialogOpen(false);
           setEditingLeadLabour(null);
           // Refresh the data
-          fetchLeadLabourData();
+          fetchLeadLabourData(currentPage, itemsPerPage);
         } else {
           toast.error(responseData.message || 'Failed to update lead labour');
         }
@@ -531,7 +529,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
         if (responseData.success) {
           toast.success('Lead Labour deleted successfully');
           // Refresh the data
-          fetchLeadLabourData();
+          fetchLeadLabourData(currentPage, itemsPerPage);
         } else {
           toast.error(responseData.message || 'Failed to delete lead labour');
         }
@@ -662,7 +660,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
             onClick={() => document.getElementById(`file-${type}`)?.click()}
           >
             <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-            <p className="text-sm text-gray-600">Drag and drop files here</p>
+            <p className="text-sm text-gray-600">Upload file here</p>
             <p className="text-xs text-gray-500 mt-1">or click to browse</p>
             <input
               id={`file-${type}`}
@@ -762,7 +760,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
 
 useEffect(() => {
   fetchRoles();
-  fetchLeadLabourData();
+  fetchLeadLabourData(currentPage, itemsPerPage);
 }, []);
 
 const fetchRoles = async () => {
@@ -801,7 +799,7 @@ const fetchRoles = async () => {
   }
 };
 
-const fetchLeadLabourData = async () => {
+const fetchLeadLabourData = async (page: number, limit: number) => {
   setIsLoadingLeadLabour(true);
   try {
     const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
@@ -863,6 +861,7 @@ const fetchLeadLabourData = async () => {
         }));
 
         setLeadLabours(mappedData);
+        setTotalLead(responseData.data.pagination.totalItems || mappedData.length);
         
         // Extract unique departments and specializations
         const uniqueDepartments = Array.from(new Set(responseData.data?.data?.map((item: any) => item.department).filter(Boolean))) as string[];
@@ -1470,7 +1469,11 @@ const fetchLeadLabourById = async (id: number) => {
         <div className="flex items-center justify-center gap-2">
           <Button
             variant="outline"
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            onClick={() => {
+              const newPage = Math.max(currentPage - 1, 1);
+              setCurrentPage(newPage);
+              fetchLeadLabourData(newPage, itemsPerPage);
+            }}
             disabled={currentPage === 1}
           >
             Previous
@@ -1480,7 +1483,10 @@ const fetchLeadLabourById = async (id: number) => {
             <Button
               key={page}
               variant={currentPage === page ? "default" : "outline"}
-              onClick={() => setCurrentPage(page)}
+              onClick={() => {
+                setCurrentPage(page);
+                fetchLeadLabourData(page, itemsPerPage);
+              }}
               className={currentPage === page ? "bg-primary text-white hover:bg-[#0090e6]" : ""}
             >
               {page}
@@ -1489,7 +1495,11 @@ const fetchLeadLabourById = async (id: number) => {
           
           <Button
             variant="outline"
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            onClick={() => {
+              const newPage = Math.min(currentPage + 1, totalPages);
+              setCurrentPage(newPage);
+              fetchLeadLabourData(newPage, itemsPerPage);
+            }}
             disabled={currentPage === totalPages}
           >
             Next

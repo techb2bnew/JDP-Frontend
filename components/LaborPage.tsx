@@ -123,6 +123,7 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
   const canEditLabour = isAdmin || hasPermission('labour', 'edit')
   const canDeleteLabour = isAdmin || hasPermission('labour', 'delete')
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+  const [totalLabor, setTotalLabor] = useState(0)
 
 
   const [formData, setFormData] = useState<LaborFormData>({
@@ -198,12 +199,9 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
     return matchesSearch && matchesTrade && matchesAvailability
   })
 
-  const paginatedLaborers = filteredLaborers.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
-
-  const totalPages = Math.ceil(filteredLaborers.length / itemsPerPage)
+ 
+    const paginatedLaborers = filteredLaborers
+  const totalPages = Math.ceil(totalLabor / itemsPerPage)
 
   const handleCreate = async () => {
     // Validation
@@ -689,6 +687,7 @@ const fetchLaborData = async (page: number = 1, limit: number = 10) => {
         }));
 
         setLaborers(mappedData);
+        setTotalLabor(responseData.data.pagination.totalItems || mappedData.length);
         
         // Extract unique trades from API response
         const uniqueTrades = Array.from(new Set(responseData.data?.data?.map((item: any) => item.trade).filter(Boolean))) as string[];
@@ -1308,7 +1307,11 @@ const fetchLaborById = async (id: string) => {
         <div className="flex items-center justify-center gap-2">
           <Button
             variant="outline"
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            onClick={() => {
+              const newPage = Math.max(currentPage - 1, 1);
+              setCurrentPage(newPage);
+              fetchLaborData(newPage, itemsPerPage);
+            }}
             disabled={currentPage === 1}
           >
             Previous
@@ -1318,7 +1321,10 @@ const fetchLaborById = async (id: string) => {
             <Button
               key={page}
               variant={currentPage === page ? "default" : "outline"}
-              onClick={() => setCurrentPage(page)}
+              onClick={() => {
+                setCurrentPage(page);
+                fetchLaborData(page, itemsPerPage);
+              }}
               className={currentPage === page ? "bg-primary text-white hover:bg-[#0090e6]" : ""}
             >
               {page}
@@ -1327,7 +1333,11 @@ const fetchLaborById = async (id: string) => {
           
           <Button
             variant="outline"
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            onClick={() => {
+              const newPage = Math.min(currentPage + 1, totalPages);
+              setCurrentPage(newPage);
+              fetchLaborData(newPage, itemsPerPage);
+            }}
             disabled={currentPage === totalPages}
           >
             Next

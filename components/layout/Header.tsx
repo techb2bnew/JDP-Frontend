@@ -18,6 +18,8 @@ import { useState } from "react"
 import { NotificationPopup } from "../NotificationPopup"
 import { useTheme } from "../../contexts/ThemeContext"
 import { toast } from "sonner"
+import { usePermissions } from '../../contexts/PermissionContext'
+
 import {
   Plus,
   Filter,
@@ -47,6 +49,7 @@ export function Header({
   const [showNotifications, setShowNotifications] = useState(false)
   const { theme, toggleTheme, isLoading } = useTheme()
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+  const { hasPermission } = usePermissions()
 
   // Get user data from localStorage
   const getUserData = () => {
@@ -69,7 +72,7 @@ export function Header({
 
     try {
       loadingToastId = toast.loading('Logging out...');
-      
+
       const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -183,29 +186,33 @@ export function Header({
             </h1>
 
             {/* Search */}
-            <div className="relative hidden md:block w-[35%]">
+            {/* <div className="relative hidden md:block w-[35%]">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search..."
                 className=" pl-9 transition-all duration-200 focus:w-80 bg-[#f8f8f8]"
               />
-            </div>
+            </div> */}
+
+          </div>
+
+          <div className="flex items-center space-x-3">
+              {hasPermission('jobs', 'create') && (
             <Link href={'/jobs'}
               className="flex items-center w-[120px] p-2 justify-center border rounded gap-2"
             >
               <Briefcase className="h-4 w-4" />
               View Jobs
             </Link>
+              )}
+              {hasPermission('jobs', 'create') && (
             <Button
               className="bg-primary text-white hover:bg-[#0090e6] gap-2 text-[#fff]"
             >
               <Plus className="h-4 w-4" />
               Create New Estimate
             </Button>
-          </div>
-
-          <div className="flex items-center space-x-3">
-
+              )}
 
             {/* Theme Toggle */}
             {/* <Tooltip>
@@ -233,6 +240,8 @@ export function Header({
 
             {/* Notifications */}
             <div className="relative">
+              {hasPermission('notification', 'view') && (
+
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -256,7 +265,7 @@ export function Header({
                   <p>Notifications {unreadCount > 0 && `(${unreadCount} unread)`}</p>
                 </TooltipContent>
               </Tooltip>
-
+              )}
               {showNotifications && (
                 <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)}>
                   <div onClick={(e) => e.stopPropagation()}>
@@ -290,9 +299,9 @@ export function Header({
                 <DropdownMenuLabel>
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10">
-                      <AvatarImage 
-                        src={userData?.photo_url || "/assets/images/avatars/admin-user.jpg"} 
-                        alt={userData?.full_name || "User"} 
+                      <AvatarImage
+                        src={userData?.photo_url || "/assets/images/avatars/admin-user.jpg"}
+                        alt={userData?.full_name || "User"}
                       />
                       <AvatarFallback className="bg-primary text-primary-foreground">
                         {userData?.full_name ? userData.full_name.charAt(0).toUpperCase() : <User className="h-5 w-5" />}

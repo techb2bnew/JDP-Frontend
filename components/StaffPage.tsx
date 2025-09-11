@@ -19,6 +19,7 @@ import {
   Upload,
   Download
 } from 'lucide-react'
+import { globalApiCall } from '../utils/globalApiHandler'
 
 interface Staff {
   id: string
@@ -109,6 +110,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null)
   const [showDetails, setShowDetails] = useState(false)
   const itemsPerPage = 10
+  const [totalStaff, setTotalStaff] = useState(0) 
 
   // Check if user is admin (has no specific permissions but should see all actions)
   const isAdmin = !permissionsLoading && permissions.length === 0
@@ -270,7 +272,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
   // Fetch roles from API when component mounts
   useEffect(() => {
     fetchRoles();
-    fetchStaffData();
+    fetchStaffData(currentPage, itemsPerPage);
   }, []);
 
   const fetchRoles = async () => {
@@ -308,19 +310,25 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       console.error('Error fetching roles:', error);
     }
   };
-
-  const fetchStaffData = async () => {
+  const fetchStaffData = async (page: number, limit: number) => {
     try {
       setIsLoadingStaff(true);
-      const response = await apiClient.getAllStaff();
       
-      if (response.success && response.data) {
+      const response = await globalApiCall(`${apiBaseUrl}/suppliers/getAllSuppliers?page=${page}&limit=${limit}`, {
+        method: 'GET'
+      });
+
+      const responseData = await response.json();
+      
+      
+      if (responseData.success && responseData.data) {
         // Transform API response to match component's expected format
-        const transformedStaff = response.data.data.map((apiStaff: any) => ({
+        const transformedStaff = responseData.data.data.map((apiStaff: any) => ({
           id: apiStaff.id.toString(),
           name: apiStaff.users?.full_name || '',
           email: apiStaff.users?.email || '',
           phone: apiStaff.users?.phone || '',
+          dob: apiStaff.dob || '',
           address: apiStaff.address || '',
           position: apiStaff.position || '',
           department: apiStaff.department || '',
@@ -330,12 +338,13 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
         }));
         
         setStaff(transformedStaff);
+        setTotalStaff(responseData.data.pagination.totalItems || transformedStaff.length);
         
         // Extract unique departments and positions from the staff data
         const departmentSet = new Set<string>();
         const positionSet = new Set<string>();
         
-        response.data.data.forEach((apiStaff: any) => {
+        responseData.data.data.forEach((apiStaff: any) => {
           if (apiStaff.department && apiStaff.department.trim() !== '') {
             departmentSet.add(apiStaff.department);
           }
@@ -408,12 +417,10 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
     return matchesSearch && matchesDepartment && matchesStatus
   })
 
-  const paginatedStaff = filteredStaff.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
-
-  const totalPages = Math.ceil(filteredStaff.length / itemsPerPage)
+  
+  const paginatedStaff = filteredStaff
+ 
+  const totalPages = Math.ceil(totalStaff / itemsPerPage)
 
   const handleCreate = async () => {
     if (!formData.name || !formData.email || !formData.phone || !formData.role) {
@@ -431,6 +438,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
         position: formData.position,
         department: formData.department,
         date_of_joining: formData.dateOfJoining,
+        dob: formData.dob,
         address: formData.address,
         role: formData.role,
         status: formData.status,
@@ -443,7 +451,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       
       if (response.success) {
         // Refresh staff list from API
-        await fetchStaffData()
+        await fetchStaffData(currentPage, itemsPerPage)
         
     setFormData({
       name: '',
@@ -649,7 +657,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
         toast.success(isEditMode ? 'Staff member updated successfully' : 'Staff member created successfully')
         
         // Refresh staff list in background (don't await)
-        fetchStaffData()
+        fetchStaffData(currentPage, itemsPerPage)
       } else {
         toast.error(response.message || `Failed to ${isEditMode ? 'update' : 'create'} staff member`)
       }
@@ -677,7 +685,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       
       if (response.success) {
         // Refresh staff list from API
-        await fetchStaffData()
+        await fetchStaffData(currentPage, itemsPerPage)
     toast.success('Staff member deleted successfully')
       } else {
         toast.error(response.message || 'Failed to delete staff member')
@@ -839,6 +847,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
                 <TableHead className="text-white font-medium">Address</TableHead>
                 <TableHead className="text-white font-medium">Position</TableHead>
                 <TableHead className="text-white font-medium">Department</TableHead>
+                <TableHead className="text-white font-medium">DOB</TableHead>
                 <TableHead className="text-white font-medium">Date of Joining</TableHead>
                 <TableHead className="text-white font-medium">Status</TableHead>
                 <TableHead className="text-white font-medium">Action</TableHead>
@@ -880,6 +889,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
                   <TableCell className="text-sm text-gray-900 max-w-xs truncate">{member.address}</TableCell>
                   <TableCell className="text-sm text-[#2b2b2b]/80">{member.position}</TableCell>
                   <TableCell className="text-sm text-[#2b2b2b]/80">{member.department}</TableCell>
+                  <TableCell className="text-sm text-gray-900">{member.dob}</TableCell>
                   <TableCell className="text-sm text-gray-900">{member.dateOfJoining}</TableCell>
                   <TableCell>{getStatusBadge(member.status)}</TableCell>
                   <TableCell>
@@ -907,7 +917,11 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
         <div className="flex items-center justify-center gap-2">
           <Button
             variant="outline"
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            onClick={() => {
+              const newPage = Math.max(currentPage - 1, 1);
+              setCurrentPage(newPage);
+              fetchStaffData(newPage, itemsPerPage);
+            }}
             disabled={currentPage === 1}
           >
             Previous
@@ -917,7 +931,10 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
             <Button
               key={page}
               variant={currentPage === page ? "default" : "outline"}
-              onClick={() => setCurrentPage(page)}
+              onClick={() => {
+                setCurrentPage(page);
+                fetchStaffData(page, itemsPerPage);
+              }}
               className={currentPage === page ? "bg-primary text-white hover:bg-[#0090e6]" : ""}
             >
               {page}
@@ -926,7 +943,11 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
           
           <Button
             variant="outline"
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            onClick={() => {
+              const newPage = Math.min(currentPage + 1, totalPages);
+              setCurrentPage(newPage);
+              fetchStaffData(newPage, itemsPerPage);
+            }}
             disabled={currentPage === totalPages}
           >
             Next

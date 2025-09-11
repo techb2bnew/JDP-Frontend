@@ -22,11 +22,30 @@ const getAuthToken = (): string | null => {
   return null
 }
 
-// Helper function to make authenticated API calls
+// Global token revocation handler
+const handleTokenRevocation = async () => {
+  console.log('Token revoked - clearing auth data and redirecting to login')
+  await clearAuthData()
+  
+  // Show toast notification
+  if (typeof window !== 'undefined') {
+    // Import toast dynamically to avoid SSR issues
+    const { toast } = await import('sonner')
+    toast.error('Session expired. Please login again.')
+  }
+  
+  // Redirect to login page
+  if (typeof window !== 'undefined') {
+    window.location.href = '/login'
+  }
+}
+
+// Helper function to make authenticated API calls with global token handling
 const authenticatedFetch = async (endpoint: string, options: RequestInit = {}) => {
   const token = getAuthToken()
   
   if (!token) {
+    await handleTokenRevocation()
     throw new Error('No authentication token found')
   }
 
@@ -40,11 +59,26 @@ const authenticatedFetch = async (endpoint: string, options: RequestInit = {}) =
   })
 
   if (!response.ok) {
+    // Handle token revocation globally
     if (response.status === 401) {
-      // Token expired or invalid, clear auth data
-      await clearAuthData()
-      window.location.href = '/login'
-      throw new Error('Authentication expired. Please login again.')
+      try {
+        const errorData = await response.json().catch(() => ({}))
+        
+        // Check for specific token revocation message
+        if (errorData.message && (
+          errorData.message.includes('Token has been revoked') ||
+          errorData.message.includes('Token expired') ||
+          errorData.message.includes('Invalid token') ||
+          errorData.message.includes('Please login again')
+        )) {
+          await handleTokenRevocation()
+          throw new Error('Session expired. Please login again.')
+        }
+      } catch (parseError) {
+        // If we can't parse the error, still handle as token revocation
+        await handleTokenRevocation()
+        throw new Error('Session expired. Please login again.')
+      }
     }
     
     const errorData = await response.json().catch(() => ({}))
@@ -52,6 +86,56 @@ const authenticatedFetch = async (endpoint: string, options: RequestInit = {}) =
   }
 
   return response.json()
+}
+
+// Global API interceptor for manual fetch calls
+export const globalApiCall = async (url: string, options: RequestInit = {}) => {
+  const token = getAuthToken()
+  
+  // Add authorization header if token exists
+  const headers = {
+    'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    ...options.headers,
+  }
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  })
+
+  if (!response.ok) {
+    // Handle token revocation globally
+    if (response.status === 401) {
+      try {
+        const errorData = await response.json().catch(() => ({}))
+        
+        // Check for specific token revocation message
+        if (errorData.message && (
+          errorData.message.includes('Token has been revoked') ||
+          errorData.message.includes('Token expired') ||
+          errorData.message.includes('Invalid token') ||
+          errorData.message.includes('Please login again')
+        )) {
+          await handleTokenRevocation()
+          throw new Error('Session expired. Please login again.')
+        }
+      } catch (parseError) {
+        // If we can't parse the error, still handle as token revocation
+        await handleTokenRevocation()
+        throw new Error('Session expired. Please login again.')
+      }
+    }
+    
+    const errorData = await response.json().catch(() => ({}))
+    throw new Error(errorData.message || `API request failed: ${response.status}`)
+  }
+
+  return response
 }
 
 export const apiClient = {
@@ -159,25 +243,9 @@ export const apiClient = {
 
   getUserProfile: async (userId: string) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
-    const token = getAuthToken()
-    
-    if (!token) {
-      throw new Error('No authentication token found')
-    }
-
-    const response = await fetch(`${apiBaseUrl}/auth/profile?userId=${userId}`, {
+    const response = await globalApiCall(`${apiBaseUrl}/auth/profile?userId=${userId}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
     })
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.message || 'Failed to fetch profile')
-    }
-
     return response.json()
   },
 
@@ -367,6 +435,7 @@ export const apiClient = {
     position: string,
     department: string,
     date_of_joining: string,
+    dob: string,
     address: string,
     role: string,
     status: string

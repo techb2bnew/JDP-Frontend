@@ -748,8 +748,7 @@ export default function RolePermission() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th> 
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Updated</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -778,8 +777,7 @@ export default function RolePermission() {
                     paginatedRoles.map((role) => (
                       <tr key={role.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{role.roleName}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{role.roleType}</td>
-                        <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">{role.description}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{role.roleType}</td> 
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{role.createdAt}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{role.updatedAt}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
