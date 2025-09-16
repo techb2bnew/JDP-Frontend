@@ -309,7 +309,7 @@ export function DashboardOverview() {
       <div className="bg-gradient-to-r from-[#00A1FF] to-[#0090e6] rounded-xl p-6 text-white">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Welcome back, Admin! 👋</h1>
+            <h1 className="text-3xl font-bold mb-2">Welcome back! 👋</h1>
             <p className="text-blue-100 text-lg">
               Here's what's happening with your business today. You have{' '}
               <span className="font-semibold text-white">3 urgent tasks</span> pending.
