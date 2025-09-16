@@ -110,7 +110,7 @@ export function AutoSuggestInput({
   return (
     <div className={`space-y-2 relative ${className}`}>
       <Label htmlFor={label.toLowerCase().replace(/\s+/g, '-')}>
-        {label} {required && <span className="text-red-500">*</span>}
+        {label} {required && <span className="text-black-500">*</span>}
       </Label>
       <div className="relative">
         <Input

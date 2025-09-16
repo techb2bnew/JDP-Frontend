@@ -243,7 +243,7 @@ export const apiClient = {
 
   getUserProfile: async (userId: string) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
-    const response = await globalApiCall(`${apiBaseUrl}/auth/profile?userId=${userId}`, {
+    const response = await globalApiCall(`${apiBaseUrl}/staff/getStaffById/${userId}`, {
       method: 'GET',
     })
     return response.json()
@@ -254,11 +254,11 @@ export const apiClient = {
     full_name: string,
     email: string,
     phone: string,
-    job_title: string,
+    position: string,
     department: string,
     address: string,
-    bio: string,
-    emergency_contact: string,
+    bio?: string,
+    emergency_contact?: string,
     date_of_birth: string,
     employee_id: string,
     system_role: string
@@ -270,8 +270,8 @@ export const apiClient = {
       throw new Error('No authentication token found')
     }
 
-    const response = await fetch(`${apiBaseUrl}/auth/profile/${userId}`, {
-      method: 'PUT',
+    const response = await fetch(`${apiBaseUrl}/staff/updateStaff/${userId}`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,

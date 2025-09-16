@@ -220,7 +220,7 @@ export const getUserData = (): any => {
   try {
     const parsed = JSON.parse(authData)
     if (parsed.user && parsed.expires > Date.now()) {
-      return parsed.user
+      return parsed
     }
   } catch {
     // Invalid JSON

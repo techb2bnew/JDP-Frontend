@@ -49,9 +49,11 @@ import {
   Tag,
   Users,
   TriangleAlert,
-  DollarSign
+  DollarSign,
+  ArrowUpAZ
 } from 'lucide-react'
 import { Product, Branch } from '../types/product'
+import { globalApiCall } from '../utils/globalApiHandler'
 
 interface ProductFormData {
   name: string;
@@ -71,161 +73,30 @@ interface ProductFormData {
   status: 'active' | 'inactive' | 'draft';
 }
 
+interface Supplier {
+  id: string;
+  supplierId: string;
+  fullName: string;
+  role: string;
+  companyName: string;
+  contactPerson: string;
+  email: string;
+  phone: string;
+  address: string;
+  status: string;
+  contractStart: string;
+  contractEnd: string;
+  totalOrders: number;
+  notes: string;
+}
+
 type ProductAction = 'add' | 'edit' | 'view' | 'delete';
 type FilterStatus = 'all' | 'active' | 'inactive' | 'draft';
 // Mock data
-const branchesData: Branch[] = [
-  {
-    id: 'BR-001',
-    name: 'Downtown Main Branch',
-    address: '123 Main Street',
-    city: 'New York',
-    state: 'NY',
-    zipCode: '10001',
-    phone: '+1 (555) 123-4567',
-    manager: 'John Smith'
-  },
-  {
-    id: 'BR-002',
-    name: 'Brooklyn Distribution Center',
-    address: '456 Industrial Ave',
-    city: 'Brooklyn',
-    state: 'NY',
-    zipCode: '11201',
-    phone: '+1 (555) 234-5678',
-    manager: 'Sarah Johnson'
-  },
-  {
-    id: 'BR-003',
-    name: 'Queens Warehouse',
-    address: '789 Warehouse Blvd',
-    city: 'Queens',
-    state: 'NY',
-    zipCode: '11004',
-    phone: '+1 (555) 345-6789',
-    manager: 'Mike Wilson'
-  },
-  {
-    id: 'BR-004',
-    name: 'Manhattan Store',
-    address: '321 Commerce Plaza',
-    city: 'Manhattan',
-    state: 'NY',
-    zipCode: '10003',
-    phone: '+1 (555) 456-7890',
-    manager: 'Lisa Davis'
-  }
-]
+// Static branchesData removed - not currently used in the component
 
-const productsData: Product[] = [
-  {
-    id: 'PRD-2025-001',
-    name: 'Main Electrical Panel 200A',
-    category: 'Electrical',
-    ptrPrice: 450.00,
-    stock: 45,
-    status: 'active',
-    branches: [branchesData[0], branchesData[1]],
-    image: 'https://images.unsplash.com/photo-1621905251918-48416bd8575a?w=50&h=50&fit=crop&crop=center',
-    description: 'High-quality 200A electrical panel suitable for residential and commercial use.',
-    sku: 'ELC-PNL-200A',
-    createdDate: '2024-12-15',
-    lastUpdated: '2025-01-20',
-    minStockLevel: 10,
-    maxStockLevel: 100,
-    supplier: 'ElectriCorp Supply'
-  },
-  {
-    id: 'PRD-2025-002',
-    name: 'Circuit Breakers 20A (10 Pack)',
-    category: 'Electrical',
-    ptrPrice: 180.00,
-    stock: 156,
-    status: 'active',
-    branches: [branchesData[0], branchesData[2], branchesData[3]],
-    image: 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=50&h=50&fit=crop&crop=center',
-    description: 'Pack of 10 circuit breakers, 20A capacity with safety certification.',
-    sku: 'CB-20A-10PK',
-    createdDate: '2024-12-10',
-    lastUpdated: '2025-01-18',
-    minStockLevel: 50,
-    maxStockLevel: 200,
-    supplier: 'SafeBreaker Inc'
-  },
-  {
-    id: 'PRD-2025-003',
-    name: 'Copper Wire 12 AWG (500 ft)',
-    category: 'Electrical',
-    ptrPrice: 125.00,
-    stock: 23,
-    status: 'active',
-    branches: [branchesData[1]],
-    image: 'https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=50&h=50&fit=crop&crop=center',
-    description: '500 feet of premium copper wire, 12 AWG for electrical installations.',
-    sku: 'CW-12AWG-500FT',
-    createdDate: '2024-11-20',
-    lastUpdated: '2025-01-15',
-    minStockLevel: 20,
-    maxStockLevel: 80,
-    supplier: 'CopperWire Solutions'
-  },
-  {
-    id: 'PRD-2025-004',
-    name: 'Fine Sand (5 Cubic Yards)',
-    category: 'Construction Materials',
-    ptrPrice: 150.00,
-    stock: 12,
-    status: 'active',
-    branches: [branchesData[1], branchesData[2]],
-    image: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=50&h=50&fit=crop&crop=center',
-    description: 'High-quality fine sand for construction and landscaping projects.',
-    sku: 'SND-FNE-5YD',
-    createdDate: '2024-12-01',
-    lastUpdated: '2025-01-12',
-    minStockLevel: 5,
-    maxStockLevel: 50,
-    supplier: 'BuildMaterial Corp'
-  },
-  {
-    id: 'PRD-2025-005',
-    name: 'Pea Gravel (3 Cubic Yards)',
-    category: 'Construction Materials',
-    ptrPrice: 120.00,
-    stock: 0,
-    status: 'inactive',
-    branches: [branchesData[2]],
-    image: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=50&h=50&fit=crop&crop=center',
-    description: 'Premium pea gravel for drainage and decorative applications.',
-    sku: 'GRV-PEA-3YD',
-    createdDate: '2024-11-15',
-    lastUpdated: '2025-01-10',
-    minStockLevel: 3,
-    maxStockLevel: 30,
-    supplier: 'Stone & Gravel Co'
-  },
-  {
-    id: 'PRD-2025-006',
-    name: 'Professional Testing Kit',
-    category: 'Tools',
-    ptrPrice: 350.00,
-    stock: 8,
-    status: 'draft',
-    branches: [branchesData[0], branchesData[3]],
-    image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=50&h=50&fit=crop&crop=center',
-    description: 'Comprehensive testing kit for electrical and construction work.',
-    sku: 'TST-KIT-PRO',
-    createdDate: '2024-12-20',
-    lastUpdated: '2025-01-22',
-    minStockLevel: 5,
-    maxStockLevel: 25,
-    supplier: 'ProTools Inc'
-  }
-]
-const suppliersData = [
-  { id: 'SUP-001', name: 'ElectriCorp Supply' },
-  { id: 'SUP-002', name: 'SafeBreaker Inc' },
-  { id: 'SUP-003', name: 'CopperWire Solutions' }
-];
+// Static productsData removed - now using API data from /products/getAllProducts
+// Remove static suppliersData - will be replaced with API data
 const categoriesData = ['Electrical', 'Construction Materials', 'Tools', 'Plumbing', 'Hardware']
 
 export function ProductsPage() {
@@ -240,6 +111,23 @@ export function ProductsPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [productToDelete, setProductToDelete] = useState<Product | null>(null)
   const [showAddSupplierModal, setShowAddSupplierModal] = useState(false);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [totalSuppliers, setTotalSuppliers] = useState(0);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [products, setProducts] = useState<Product[]>([]);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  const [viewProductData, setViewProductData] = useState<any>(null);
+  const [isLoadingView, setIsLoadingView] = useState(false);
+  const [sortBy, setSortBy] = useState('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [productStats, setProductStats] = useState<any>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+
   const [formData, setFormData] = useState<ProductFormData>({
     name: '',
     supplier: '',
@@ -248,10 +136,10 @@ export function ProductsPage() {
     supplierSku: '',
     jdpSku: '',
     supplierCostPrice: 0,
-    markupPercentage: 40,
+    markupPercentage: 0,
     markupAmount: 0,
     jdpPrice: 0,
-    profitMargin: 28.6,
+    profitMargin: 0,
     stockQuantity: 0,
     unit: 'piece',
     branchIds: [],
@@ -279,8 +167,16 @@ export function ProductsPage() {
     }));
   }, [formData.supplierCostPrice, formData.markupPercentage]);
 
-  // Filter products
-  const filteredProducts = productsData.filter(product => {
+  // Fetch suppliers and products data on component mount
+  useEffect(() => {
+    fetchSuppliersData(1, 100); // Fetch first 100 suppliers
+    fetchProductsData(currentPage, itemsPerPage); // Fetch products for current page
+    fetchProductStats(); // Fetch product statistics
+  }, [currentPage, itemsPerPage]);
+
+  // Filter and sort products
+  const filteredProducts = products
+    .filter(product => {
     const matchesSearch =
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -293,6 +189,16 @@ export function ProductsPage() {
       product.branches.some(branch => selectedBranches.includes(branch.id))
 
     return matchesSearch && matchesCategory && matchesStatus && matchesBranches
+  })
+    .sort((a, b) => {
+      // Only sort if sortBy is set (button clicked)
+      if (!sortBy) return 0;
+      
+      if (sortOrder === 'asc') {
+        return a.name.localeCompare(b.name)
+      } else {
+        return b.name.localeCompare(a.name)
+      }
   })
 
   const getStatusColor = (status: string) => {
@@ -325,26 +231,19 @@ export function ProductsPage() {
       setProductToDelete(product);
       setShowDeleteAlert(true);
     } else if (action === 'view' && product) {
+      // Fetch product details from API for view
+      fetchProductForView(product.id).then(() => {
       setShowProductModal(true);
-    } else if (action === 'edit' && product) {
-      setFormData({
-        name: product.name,
-        supplier: product.supplier || '',
-        category: product.category,
-        description: product.description || '',
-        supplierSku: product.sku || '',
-        jdpSku: product.sku ? `JDP-${product.sku.split('-').slice(1).join('-')}` : '',
-        supplierCostPrice: product.ptrPrice,
-        markupPercentage: 40,
-        markupAmount: product.ptrPrice * 0.4,
-        jdpPrice: product.ptrPrice * 1.4,
-        profitMargin: 28.6,
-        stockQuantity: product.stock,
-        unit: 'piece',
-        branchIds: product.branches.map(b => b.id),
-        status: product.status
+      }).catch((error) => {
+        console.error('Failed to load product for viewing:', error);
       });
+    } else if (action === 'edit' && product) {
+      // Fetch product details from API
+      fetchProductById(product.id).then(() => {
       setShowProductModal(true);
+      }).catch((error) => {
+        console.error('Failed to load product for editing:', error);
+      });
     } else if (action === 'add') {
       setFormData({
         name: '',
@@ -354,10 +253,10 @@ export function ProductsPage() {
         supplierSku: '',
         jdpSku: '',
         supplierCostPrice: 0,
-        markupPercentage: 40,
+        markupPercentage: 0,
         markupAmount: 0,
         jdpPrice: 0,
-        profitMargin: 28.6,
+        profitMargin: 0,
         stockQuantity: 0,
         unit: 'piece',
         branchIds: [],
@@ -383,18 +282,173 @@ export function ProductsPage() {
     }
   }
 
-  const handleSaveProduct = () => {
-    console.log('Saving product:', formData)
-    // Here you would typically save to backend
-    setShowProductModal(false)
-    resetForm()
+  const clearValidationError = (field: string) => {
+    if (validationErrors[field]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
+  };
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+
+    if (!formData.name.trim()) {
+      errors.name = 'Product name is required';
+    }
+    if (!formData.category) {
+      errors.category = 'Category is required';
+    }
+    if (!formData.supplier) {
+      errors.supplier = 'Supplier is required';
+    }
+    if (!formData.supplierSku.trim()) {
+      errors.supplierSku = 'Supplier SKU is required';
+    }
+    if (!formData.supplierCostPrice || formData.supplierCostPrice <= 0) {
+      errors.supplierCostPrice = 'Supplier cost price must be greater than 0';
+    }
+    if (!formData.markupPercentage || formData.markupPercentage < 0) {
+      errors.markupPercentage = 'Markup percentage must be 0 or greater';
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSaveProduct = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      
+      // Get system IP address
+      const getSystemIP = async () => {
+        try {
+          const response = await fetch('https://api.ipify.org?format=json');
+          const data = await response.json();
+          return data.ip;
+        } catch (error) {
+          console.error('Error fetching IP:', error);
+          return 'unknown';
+        }
+      };
+
+      const systemIP = await getSystemIP();
+
+      const payload = {
+        product_name: formData.name,
+        category: formData.category,
+        supplier_id: parseInt(formData.supplier),
+        description: formData.description,
+        supplier_sku: formData.supplierSku,
+        jdp_sku: formData.jdpSku,
+        supplier_cost_price: formData.supplierCostPrice,
+        markup_percentage: formData.markupPercentage,
+        stock_quantity: formData.stockQuantity,
+        unit: formData.unit,
+        status: formData.status,
+        system_ip: systemIP
+      };
+
+      let response;
+      let successMessage;
+
+      if (currentAction === 'edit' && selectedProduct) {
+        // Update existing product
+        console.log('Updating product with payload:', payload);
+        response = await globalApiCall(`${apiBaseUrl}/products/updateProduct/${selectedProduct.id}`, {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        successMessage = 'Product updated successfully!';
+      } else {
+        // Create new product
+        console.log('Creating product with payload:', payload);
+        response = await globalApiCall(`${apiBaseUrl}/products/createProduct`, {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        successMessage = 'Product created successfully!';
+      }
+
+      const responseData = await response.json();
+      console.log('Product operation response:', responseData);
+
+      if (responseData.success) {
+        // Show success message
+        if (typeof window !== 'undefined') {
+          const { toast } = await import('sonner');
+          toast.success(successMessage);
+        }
+        
+        setShowProductModal(false);
+        resetForm();
+        // Refresh the products list and stats
+        fetchProductsData(currentPage, itemsPerPage);
+        fetchProductStats();
+      } else {
+        throw new Error(responseData.message || `Failed to ${currentAction === 'edit' ? 'update' : 'create'} product`);
+      }
+    } catch (error) {
+      console.error(`Error ${currentAction === 'edit' ? 'updating' : 'creating'} product:`, error);
+      if (typeof window !== 'undefined') {
+        const { toast } = await import('sonner');
+        toast.error(error instanceof Error ? error.message : `Failed to ${currentAction === 'edit' ? 'update' : 'create'} product`);
+      }
+    } finally {
+      setIsLoading(false);
+    }
   }
 
-  const handleDeleteProduct = () => {
-    console.log('Deleting product:', productToDelete?.id)
-    // Here you would typically delete from backend
-    setShowDeleteAlert(false)
-    setProductToDelete(null)
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return;
+
+    try {
+      setIsLoading(true); 
+      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await fetch(`${apiBaseUrl}/products/deleteProduct/${productToDelete.id}`, {
+        method: 'DELETE',
+        headers
+      });
+
+      const responseData = await response.json();
+      console.log('Product deletion response:', responseData);
+
+      if (responseData.success) {
+        // Show success message
+        if (typeof window !== 'undefined') {
+          const { toast } = await import('sonner');
+          toast.success('Product deleted successfully!');
+        }
+        
+        setShowDeleteAlert(false);
+        setProductToDelete(null);
+        // Close view modal if it's open
+        setShowProductModal(false);
+        setViewProductData(null);
+        // Refresh the products list and stats
+        fetchProductsData(currentPage, itemsPerPage);
+        fetchProductStats();
+      } else {
+        throw new Error(responseData.message || 'Failed to delete product');
+      }
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      if (typeof window !== 'undefined') {
+        const { toast } = await import('sonner');
+        toast.error(error instanceof Error ? error.message : 'Failed to delete product');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   const resetForm = () => {
@@ -406,10 +460,10 @@ export function ProductsPage() {
       supplierSku: '',
       jdpSku: '',
       supplierCostPrice: 0,
-      markupPercentage: 40,
+      markupPercentage: 0,
       markupAmount: 0,
       jdpPrice: 0,
-      profitMargin: 28.6,
+      profitMargin: 0,
       stockQuantity: 0,
       unit: 'piece',
       branchIds: [],
@@ -417,6 +471,7 @@ export function ProductsPage() {
     })
     setSelectedProduct(null)
     setCurrentAction('add')
+    setValidationErrors({})
   }
 
  const handleExport = () => {
@@ -442,7 +497,7 @@ export function ProductsPage() {
   ];
 
   // Prepare CSV rows
-  const rows = productsData.map(product => [
+  const rows = products.map(product => [
     product.id,
     product.name,
     product.category,
@@ -501,11 +556,217 @@ export function ProductsPage() {
     })
   }
 
-  // Calculate summary statistics
-  const totalProducts = productsData.length
-  const activeProducts = productsData.filter(p => p.status === 'active').length
-  const inactiveProducts = productsData.filter(p => p.status === 'inactive').length
-  const draftProducts = productsData.filter(p => p.status === 'draft').length
+  const fetchSuppliersData = async (page: number, limit: number) => {
+    try {
+      setIsLoading(true);
+      
+      const response = await globalApiCall(`${apiBaseUrl}/suppliers/getAllSuppliers?page=${page}&limit=${limit}`, {
+        method: 'GET'
+      });
+
+      const responseData = await response.json();
+      console.log('Suppliers API Response:', responseData);
+
+      if (responseData.success && responseData.data) {
+        // Transform API response to match component's expected format
+        const transformedSuppliers = responseData.data?.data.map((apiSupplier: any) => ({
+          id: apiSupplier.id.toString(),
+          supplierId: apiSupplier.supplier_code || '',
+          fullName: apiSupplier.users.full_name || '',
+          role: apiSupplier.role || '',
+          companyName: apiSupplier.company_name || '',
+          contactPerson: apiSupplier.contact_person || '',
+          email: apiSupplier.users.email || '',
+          phone: apiSupplier.users.phone || '',
+          address: apiSupplier.address || '',
+          status: apiSupplier.users.status?.toLowerCase() || '',
+          contractStart: apiSupplier.contract_start || '',
+          contractEnd: apiSupplier.contract_end || '',
+          totalOrders: apiSupplier.total_orders || 0,
+          notes: apiSupplier.notes || ''
+        }));
+
+        setSuppliers(transformedSuppliers);  
+        setTotalSuppliers(responseData.data.pagination.totalItems || transformedSuppliers.length);
+      } else {
+        console.error('Invalid suppliers API response structure:', responseData);
+        setSuppliers([]);
+      }
+    } catch (error) {
+      console.error('Error fetching suppliers:', error);
+      // Error is already handled by globalApiCall (token revocation, etc.)
+      if (!(error instanceof Error && error.message?.includes('Session expired'))) {
+        setSuppliers([]);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchProductsData = async (page: number, limit: number) => {
+    try {
+      setIsLoadingProducts(true);
+      
+      const response = await globalApiCall(`${apiBaseUrl}/products/getAllProducts?page=${page}&limit=${limit}`, {
+        method: 'GET'
+      });
+
+      const responseData = await response.json();
+      console.log('Products API Response:', responseData);
+
+      if (responseData.success && responseData.data) {
+        // Transform API response to match component's expected format
+        const transformedProducts = responseData.data?.data.map((apiProduct: any) => ({
+          id: apiProduct.id?.toString() || `PRD-${Date.now()}`,
+          name: apiProduct.product_name || '',
+          category: apiProduct.category || '',
+          ptrPrice: apiProduct.supplier_cost_price || 0,
+          jdp_price: apiProduct.jdp_price || 0,
+          stock: apiProduct.stock_quantity || 0,
+          markup_amount: apiProduct.markup_amount || 0,
+          status: apiProduct.status || 'active',
+          jdpSku: apiProduct.jdp_sku || '', 
+          branches: [], // Will be populated if branch data is available in API
+          image: '', // Will be populated if image data is available in API
+          description: apiProduct.description || '',
+          sku: apiProduct.supplier_sku || '',
+          createdDate: apiProduct.created_at ? new Date(apiProduct.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          lastUpdated: apiProduct.updated_at ? new Date(apiProduct.updated_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          minStockLevel: 0, // Default value, can be updated if available in API
+          maxStockLevel: 100, // Default value, can be updated if available in API
+          supplier: apiProduct.supplier_name || 'Unknown Supplier'
+        }));
+
+        setProducts(transformedProducts);
+        setTotalProducts(responseData.data.pagination?.totalItems || transformedProducts.length);
+      } else {
+        console.error('Invalid products API response structure:', responseData);
+        setProducts([]);
+      }
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      // Error is already handled by globalApiCall (token revocation, etc.)
+      if (!(error instanceof Error && error.message?.includes('Session expired'))) {
+        setProducts([]);
+      }
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  };
+
+  const fetchProductById = async (productId: string) => {
+    try {
+      setIsLoading(true);
+      
+      const response = await globalApiCall(`${apiBaseUrl}/products/getProductById/${productId}`, {
+        method: 'GET'
+      });
+
+      const responseData = await response.json();
+      console.log('Product by ID API Response:', responseData);
+
+      if (responseData.success && responseData.data) {
+        const apiProduct = responseData.data;
+        
+        // Transform API response to match form data format
+        const productData: ProductFormData = {
+          name: apiProduct.product_name || '',
+          supplier: apiProduct.supplier_id?.toString() || '',
+          category: apiProduct.category || '',
+          description: apiProduct.description || '',
+          supplierSku: apiProduct.supplier_sku || '',
+          jdpSku: apiProduct.jdp_sku || '',
+          supplierCostPrice: apiProduct.supplier_cost_price || 0,
+          markupPercentage: apiProduct.markup_percentage || 0,
+          markupAmount: apiProduct.markup_amount || 0,
+          jdpPrice: apiProduct.jdp_price || 0,
+          profitMargin: apiProduct.profit_margin || 0,
+          stockQuantity: apiProduct.stock_quantity || 0,
+          unit: apiProduct.unit || 'piece',
+          branchIds: [], // Will be populated if branch data is available
+          status: apiProduct.status || 'draft' // Use API status or default to draft
+        };
+
+        setFormData(productData);
+        return productData;
+      } else {
+        throw new Error(responseData.message || 'Failed to fetch product details');
+      }
+    } catch (error) {
+      console.error('Error fetching product by ID:', error);
+      if (typeof window !== 'undefined') {
+        const { toast } = await import('sonner');
+        toast.error(error instanceof Error ? error.message : 'Failed to fetch product details');
+      }
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchProductForView = async (productId: string) => {
+    try {
+      setIsLoadingView(true);
+      
+      const response = await globalApiCall(`${apiBaseUrl}/products/getProductById/${productId}`, {
+        method: 'GET'
+      });
+
+      const responseData = await response.json();
+      console.log('Product View API Response:', responseData);
+
+      if (responseData.success && responseData.data) {
+        setViewProductData(responseData.data);
+        return responseData.data;
+      } else {
+        throw new Error(responseData.message || 'Failed to fetch product details');
+      }
+    } catch (error) {
+      console.error('Error fetching product for view:', error);
+      if (typeof window !== 'undefined') {
+        const { toast } = await import('sonner');
+        toast.error(error instanceof Error ? error.message : 'Failed to fetch product details');
+      }
+      throw error;
+    } finally {
+      setIsLoadingView(false);
+    }
+  };
+
+  const fetchProductStats = async () => {
+    try {
+      setIsLoadingStats(true);
+      
+      const response = await globalApiCall(`${apiBaseUrl}/products/getProductStats/stats`, {
+        method: 'GET'
+      });
+
+      const responseData = await response.json();
+      console.log('Product Stats API Response:', responseData);
+
+      if (responseData.success && responseData.data) {
+        setProductStats(responseData.data);
+      } else {
+        console.error('Invalid product stats API response structure:', responseData);
+        setProductStats(null);
+      }
+    } catch (error) {
+      console.error('Error fetching product stats:', error);
+      if (!(error instanceof Error && error.message?.includes('Session expired'))) {
+        setProductStats(null);
+      }
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
+
+  // Calculate summary statistics from API data
+  const totalProductsCount = productStats?.total || totalProducts
+  const activeProductsCount = productStats?.active || products.filter(p => p.status === 'active').length
+  const inactiveProductsCount = productStats?.inactive || products.filter(p => p.status === 'inactive').length
+  const draftProductsCount = productStats?.draft || products.filter(p => p.status === 'draft').length
+  const lowStockCount = productStats?.lowStock || 0
+  const totalInventoryValue = productStats?.totalInventoryValue || 0
 
   return (
     <div className="space-y-6">
@@ -516,6 +777,7 @@ export function ProductsPage() {
           <p className="text-muted-foreground">Manage your electrical products catalog with dual SKU and pricing system</p>
         </div>
         <div className="flex gap-2">
+         
           {hasPermission('products', 'create') && (
             <Button variant="outline" onClick={handleImport}>
               <Upload className="h-4 w-4 mr-2" />
@@ -544,7 +806,16 @@ export function ProductsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-sm font-medium text-muted-foreground">Total Products</CardTitle>
-                <div className="text-2xl font-semibold text-foreground">{totalProducts}</div>
+                <div className="text-2xl font-semibold text-foreground">
+                  {isLoadingStats ? (
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  ) : (
+                    totalProductsCount
+                  )}
+                </div>
+                {!isLoadingStats && productStats && (
+                  <p className="text-xs text-muted-foreground mt-1">All products in inventory</p>
+                )}
               </div>
                <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
                 <Package className="w-5 h-5 text-black-600" />
@@ -558,7 +829,16 @@ export function ProductsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-sm font-medium text-muted-foreground">Active Products</CardTitle>
-                <div className="text-2xl font-semibold text-green-600">{activeProducts}</div>
+                <div className="text-2xl font-semibold text-green-600">
+                  {isLoadingStats ? (
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
+                  ) : (
+                    activeProductsCount
+                  )}
+                </div>
+                {!isLoadingStats && productStats && (
+                  <p className="text-xs text-muted-foreground mt-1">{productStats.activePercentage}% of total</p>
+                )}
               </div>
               <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
                 <CheckCircle className="w-5 h-5 text-green-600" />
@@ -572,7 +852,16 @@ export function ProductsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-sm font-medium text-muted-foreground">Low Stock Items</CardTitle>
-                <div className="text-2xl font-semibold text-yellow-600">{inactiveProducts}</div>
+                <div className="text-2xl font-semibold text-yellow-600">
+                  {isLoadingStats ? (
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-yellow-600"></div>
+                  ) : (
+                    lowStockCount
+                  )}
+                </div>
+                {!isLoadingStats && productStats && (
+                  <p className="text-xs text-muted-foreground mt-1">{productStats.lowStockPercentage}% of total</p>
+                )}
               </div>
               <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
                 <TriangleAlert className="w-5 h-5 text-yellow-600" />
@@ -586,7 +875,16 @@ export function ProductsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-sm font-medium text-muted-foreground">Total Inventory Value</CardTitle>
-                <div className="text-2xl font-semibold text-gray-600">${draftProducts}</div>
+                <div className="text-2xl font-semibold text-gray-600">
+                  {isLoadingStats ? (
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-600"></div>
+                  ) : (
+                    `$${totalInventoryValue}`
+                  )}
+                </div>
+                {!isLoadingStats && productStats && (
+                  <p className="text-xs text-muted-foreground mt-1">Current inventory worth</p>
+                )}
               </div>
               <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
                 <DollarSign className="w-5 h-5 text-gray-600" />
@@ -617,7 +915,7 @@ export function ProductsPage() {
             {/* Category Filter */}
             <div className='flex flex-wrap gap-2'>
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-[160px]">
+                <SelectTrigger className="w-[fit-content]">
                   <Filter className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>
@@ -644,6 +942,18 @@ export function ProductsPage() {
                 </SelectContent>
               </Select>
             </div>
+            <Button
+            variant="outline"
+            size="icon"
+            className='w-[70px]'
+            onClick={() => {
+              setSortBy('name');
+              setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+            }}
+          >
+            <ArrowUpAZ className="w-4 h-4" />
+            {sortOrder === 'asc' ? 'A-Z' : 'Z-A'}
+          </Button>
             {/* Branch Filter */}
             {/* <div className="flex gap-2">
               <div className="flex flex-wrap gap-2">
@@ -681,7 +991,23 @@ export function ProductsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map((product) => (
+                {isLoadingProducts ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8">
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                        <span className="ml-2">Loading products...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredProducts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      No products found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredProducts.map((product) => (
                   <TableRow key={product.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -710,32 +1036,24 @@ export function ProductsPage() {
                       <div className='flex gap-3 items-center'>
                           <Tag className='w-4 h-4 text-gray-500'/>
                       <div className='bg-gray-100 text-black-500 p-[5px] rounded w-auto'>
-                        {product.id}
+                        {product.jdpSku}
                       </div>
                       </div>
                       </TableCell>
                     <TableCell className="font-medium">{formatCurrency(product.ptrPrice)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <span>{product.stock}</span>
-                        {product.minStockLevel && product.stock <= product.minStockLevel && (
-                          <Badge className="bg-orange-100 text-orange-800 border-orange-200 text-xs">
-                            Low
-                          </Badge>
-                        )}
+                        <span>{product.markup_amount}</span>
+                        
                       </div>
                     </TableCell>
 
-                    <TableCell className="font-medium">{formatCurrency(product.ptrPrice)}</TableCell>
+                    <TableCell className="font-medium">{formatCurrency(product.jdp_price || 0)}</TableCell>
 
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span>{product.stock}</span>
-                        {product.minStockLevel && product.stock <= product.minStockLevel && (
-                          <Badge className="bg-orange-100 text-orange-800 border-orange-200 text-xs">
-                            Low
-                          </Badge>
-                        )}
+                       
                       </div>
                     </TableCell>
                     <TableCell>
@@ -764,10 +1082,41 @@ export function ProductsPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
+          
+          {/* Pagination Controls */}
+          {totalProducts > itemsPerPage && (
+            <div className="flex items-center justify-between px-4 py-3 border-t">
+              <div className="text-sm text-muted-foreground">
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalProducts)} of {totalProducts} products
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1 || isLoadingProducts}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm">
+                  Page {currentPage} of {Math.ceil(totalProducts / itemsPerPage)}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                  disabled={currentPage >= Math.ceil(totalProducts / itemsPerPage) || isLoadingProducts}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -789,9 +1138,151 @@ export function ProductsPage() {
           </DialogHeader>
 
           <div className="space-y-6">
-            {currentAction === 'view' && selectedProduct ? (
-              // View Mode (keep your existing view code)
-              <div>View mode content</div>
+            {currentAction === 'view' && viewProductData ? (
+              // View Mode - Product Details
+              <div className="space-y-6">
+                {isLoadingView ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <span className="ml-2">Loading product details...</span>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Product Information Section */}
+                    <div className="grid grid-cols-2 gap-6">
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Product Name</Label>
+                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                          {viewProductData.product_name}
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Category</Label>
+                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                          {viewProductData.category}
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Supplier SKU</Label>
+                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 font-mono">
+                          {viewProductData.supplier_sku}
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700 mb-2 block">JDP SKU</Label>
+                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 font-mono">
+                          {viewProductData.jdp_sku}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Pricing Information Section */}
+                    <div className="grid grid-cols-2 gap-6">
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Supplier Cost Price</Label>
+                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                          {formatCurrency(viewProductData.supplier_cost_price || 0)}
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700 mb-2 block">JDP Price</Label>
+                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                          {formatCurrency(viewProductData.jdp_price || 0)}
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Markup Percentage</Label>
+                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                          {viewProductData.markup_percentage}%
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Markup Amount</Label>
+                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                          {formatCurrency(viewProductData.markup_amount || 0)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Stock and Unit Information */}
+                    <div className="grid grid-cols-2 gap-6">
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Stock Quantity</Label>
+                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                          {viewProductData.stock_quantity}
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Unit</Label>
+                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 capitalize">
+                          {viewProductData.unit}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700 mb-2 block">Description</Label>
+                      <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 min-h-[60px]">
+                        {viewProductData.description || 'No description provided'}
+                      </div>
+                    </div>
+
+                    {/* Supplier Information */}
+                    {viewProductData.suppliers && (
+                      <div className="space-y-4">
+                        <h4 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">Supplier Information</h4>
+                        <div className="grid grid-cols-2 gap-6">
+                          <div>
+                            <Label className="text-sm font-medium text-gray-700 mb-2 block">Company Name</Label>
+                            <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                              {viewProductData.suppliers.company_name}
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium text-gray-700 mb-2 block">Contact Person</Label>
+                            <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                              {viewProductData.suppliers.contact_person}
+                            </div>
+                          </div>
+                          {viewProductData.suppliers.users && (
+                            <>
+                              <div>
+                                <Label className="text-sm font-medium text-gray-700 mb-2 block">Email</Label>
+                                <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                                  {viewProductData.suppliers.users.email}
+                                </div>
+                              </div>
+                              <div>
+                                <Label className="text-sm font-medium text-gray-700 mb-2 block">Phone</Label>
+                                <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                                  {viewProductData.suppliers.users.phone}
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Timestamps */}
+                    <div className="grid grid-cols-2 gap-6">
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Created At</Label>
+                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                          {new Date(viewProductData.created_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Last Updated</Label>
+                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                          {new Date(viewProductData.updated_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
               // Add/Edit Mode - redesigned to match the image
               <div className="space-y-6">
@@ -812,11 +1303,17 @@ export function ProductsPage() {
                       <Input
                         id="name"
                         value={formData.name}
-                        onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                        onChange={(e) => {
+                          setFormData(prev => ({ ...prev, name: e.target.value }));
+                          clearValidationError('name');
+                        }}
                         placeholder="Enter product name"
-                        className="mt-1"
+                        className={`mt-1 ${validationErrors.name ? 'border-red-500' : ''}`}
                         required
                       />
+                      {validationErrors.name && (
+                        <p className="text-red-500 text-sm mt-1">{validationErrors.name}</p>
+                      )}
                     </div>
                     <div>
                       <Label htmlFor="category" className="flex items-center gap-1 mb-2">
@@ -825,10 +1322,13 @@ export function ProductsPage() {
                       </Label>
                       <Select
                         value={formData.category}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                        onValueChange={(value) => {
+                          setFormData(prev => ({ ...prev, category: value }));
+                          clearValidationError('category');
+                        }}
                         required
                       >
-                        <SelectTrigger className="mt-1">
+                        <SelectTrigger className={`mt-1 ${validationErrors.category ? 'border-red-500' : ''}`}>
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                         <SelectContent>
@@ -839,30 +1339,36 @@ export function ProductsPage() {
                           ))}
                         </SelectContent>
                       </Select>
+                      {validationErrors.category && (
+                        <p className="text-red-500 text-sm mt-1">{validationErrors.category}</p>
+                      )}
                     </div>
                     <div>
                       <Label htmlFor="supplier" className="flex items-center gap-1 mb-2">
                         {/* <TruckIcon className="h-4 w-4 text-blue-500" /> */}
                         Supplier *
                       </Label>
-                      <div className="flex gap-2">
+                      <div className="">
                         <Select
                           value={formData.supplier}
-                          onValueChange={(value) => setFormData(prev => ({ ...prev, supplier: value }))}
+                          onValueChange={(value) => {
+                            setFormData(prev => ({ ...prev, supplier: value }));
+                            clearValidationError('supplier');
+                          }}
                           required
                         >
-                          <SelectTrigger className="mt-1">
+                          <SelectTrigger className={`mt-1 ${validationErrors.supplier ? 'border-red-500' : ''}`}>
                             <SelectValue placeholder="Select supplier" />
                           </SelectTrigger>
                           <SelectContent>
-                            {suppliersData.map((supplier) => (
+                            {suppliers.map((supplier) => (
                               <SelectItem key={supplier.id} value={supplier.id}>
-                                {supplier.name}
+                                {supplier.companyName} - {supplier.contactPerson}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
-                        <Button
+                        {/* <Button
                           type="button"
                           variant="outline"
                           size="icon"
@@ -870,8 +1376,11 @@ export function ProductsPage() {
                           onClick={() => setShowAddSupplierModal(true)}
                         >
                           <Plus className="h-4 w-4" />
-                        </Button>
+                        </Button> */}
                       </div>
+                      {validationErrors.supplier && (
+                        <p className="text-red-500 text-sm mt-1">{validationErrors.supplier}</p>
+                      )}
                     </div>
                     <div>
                       <Label htmlFor="description" className="flex items-center gap-1 mb-2">
@@ -905,11 +1414,17 @@ export function ProductsPage() {
                       <Input
                         id="supplierSku"
                         value={formData.supplierSku}
-                        onChange={(e) => setFormData(prev => ({ ...prev, supplierSku: e.target.value }))}
+                        onChange={(e) => {
+                          setFormData(prev => ({ ...prev, supplierSku: e.target.value }));
+                          clearValidationError('supplierSku');
+                        }}
                         placeholder="SL-XXX-XXX-B81"
-                        className="mt-1"
+                        className={`mt-1 ${validationErrors.supplierSku ? 'border-red-500' : ''}`}
                         required
                       />
+                      {validationErrors.supplierSku && (
+                        <p className="text-red-500 text-sm mt-1">{validationErrors.supplierSku}</p>
+                      )}
                     </div>
                     <div>
                       <Label htmlFor="jdpSku" className="flex items-center gap-1 mb-2">
@@ -949,12 +1464,18 @@ export function ProductsPage() {
                           step="0.01"
                           min="0"
                           value={formData.supplierCostPrice}
-                          onChange={(e) => setFormData(prev => ({ ...prev, supplierCostPrice: parseFloat(e.target.value) || 0 }))}
+                          onChange={(e) => {
+                            setFormData(prev => ({ ...prev, supplierCostPrice: parseFloat(e.target.value) || 0 }));
+                            clearValidationError('supplierCostPrice');
+                          }}
                           placeholder="0.00"
-                          className="pl-8"
+                          className={`pl-8 ${validationErrors.supplierCostPrice ? 'border-red-500' : ''}`}
                           required
                         />
                       </div>
+                      {validationErrors.supplierCostPrice && (
+                        <p className="text-red-500 text-sm mt-1">{validationErrors.supplierCostPrice}</p>
+                      )}
                     </div>
                     <div>
                       <Label htmlFor="markupPercentage" className="flex items-center gap-1">
@@ -969,12 +1490,44 @@ export function ProductsPage() {
                           step="1"
                           min="0"
                           value={formData.markupPercentage}
-                          onChange={(e) => setFormData(prev => ({ ...prev, markupPercentage: parseInt(e.target.value) || 0 }))}
-                          placeholder="40"
-                          className="pr-8"
+                          onChange={(e) => {
+                            setFormData(prev => ({ ...prev, markupPercentage: parseInt(e.target.value) || 0 }));
+                            clearValidationError('markupPercentage');
+                          }}
+                          placeholder="0"
+                          className={`pr-8 ${validationErrors.markupPercentage ? 'border-red-500' : ''}`}
                           required
                         />
                       </div>
+                      {validationErrors.markupPercentage && (
+                        <p className="text-red-500 text-sm mt-1">{validationErrors.markupPercentage}</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label htmlFor="markupPercentage" className="flex items-center gap-1">
+                        {/* <PercentIcon className="h-4 w-4 text-blue-500" /> */}
+                        Markup Percentage *
+                      </Label>
+                      <div className="relative mt-2">
+                        <span className="absolute right-3 top-1/2 transform -translate-y-1/2">%</span>
+                        <Input
+                          id="markupPercentage"
+                          type="number"
+                          step="1"
+                          min="0"
+                          value={formData.markupPercentage}
+                          onChange={(e) => {
+                            setFormData(prev => ({ ...prev, markupPercentage: parseInt(e.target.value) || 0 }));
+                            clearValidationError('markupPercentage');
+                          }}
+                          placeholder="0"
+                          className={`pr-8 ${validationErrors.markupPercentage ? 'border-red-500' : ''}`}
+                          required
+                        />
+                      </div>
+                      {validationErrors.markupPercentage && (
+                        <p className="text-red-500 text-sm mt-1">{validationErrors.markupPercentage}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1078,6 +1631,24 @@ export function ProductsPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                    <div>
+                      <Label htmlFor="status" className="flex items-center gap-1 mb-2">
+                        Status
+                      </Label>
+                      <Select
+                        value={formData.status}
+                        onValueChange={(value: 'active' | 'inactive' | 'draft') => setFormData(prev => ({ ...prev, status: value }))}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                          <SelectItem value="draft">Draft</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1107,9 +1678,13 @@ export function ProductsPage() {
                   Cancel
                 </Button>
                 {hasPermission('products', currentAction === 'add' ? 'create' : 'edit') && (
-                  <Button onClick={handleSaveProduct} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                  <Button 
+                    onClick={handleSaveProduct} 
+                    disabled={isLoading}
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
                     <Save className="h-4 w-4 mr-2" />
-                    Save Product
+                    {isLoading ? 'Saving...' : 'Save Product'}
                   </Button>
                 )}
               </div>
@@ -1179,9 +1754,13 @@ export function ProductsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>No</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteProduct} className="bg-red-600 hover:bg-red-700">
-              Yes
+            <AlertDialogCancel disabled={isLoading}>No</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteProduct} 
+              disabled={isLoading}
+              className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {isLoading ? 'Deleting...' : 'Yes'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

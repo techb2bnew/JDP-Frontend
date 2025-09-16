@@ -20,6 +20,9 @@ export interface Product {
   image?: string
   description?: string
   sku?: string
+  jdpSku?: string
+  jdp_price?: number
+  markup_amount?: number
   createdDate: string
   lastUpdated: string
   minStockLevel?: number

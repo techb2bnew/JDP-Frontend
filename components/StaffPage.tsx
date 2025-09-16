@@ -314,7 +314,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
     try {
       setIsLoadingStaff(true);
       
-      const response = await globalApiCall(`${apiBaseUrl}/suppliers/getAllSuppliers?page=${page}&limit=${limit}`, {
+      const response = await globalApiCall(`${apiBaseUrl}/staff/getAllStaff?page=${page}&limit=${limit}`, {
         method: 'GET'
       });
 

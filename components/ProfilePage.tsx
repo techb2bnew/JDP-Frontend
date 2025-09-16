@@ -56,8 +56,6 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
     role: '',
     employeeId: '',
     dateOfBirth: '',
-    emergencyContact: '',
-    bio: '',
     position: '',
     company: '',
     workLocation: 'Head Office - Building A'
@@ -76,35 +74,48 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
 
   // Fetch profile data on component mount
   useEffect(() => {
+
+    
     const fetchProfileData = async () => {
       try {
         setIsLoading(true)
         setProfileError(null)
         
         const userData = getUserData()
-        if (!userData || !userData.id) {
+        if (!userData || !userData.user || !userData.user.id) {
           throw new Error('User data not found. Please login again.')
         }
 
-        const response = await apiClient.getUserProfile(userData.id.toString())
+        // Extract staff ID from user data
+        const staffId = userData.user.staff && userData.user.staff.length > 0 ? userData.user.staff[0].id : null
+        if (!staffId) {
+          throw new Error('Staff profile not found. Please contact administrator.')
+        }
+
+        const response = await apiClient.getUserProfile(staffId.toString())
         
-        if (response.success && response.data?.user) {
-          const user = response.data.user
-          setProfileData({
-            fullName: user.full_name || '',
-            email: user.email || '',
-            phone: user.phone || '',
-            address: '', // Not provided in API response
-            department: '', // Not provided in API response
-            role: user.role || '',
-            employeeId: user.id?.toString() || '',
-            dateOfBirth: '', // Not provided in API response
-            emergencyContact: '', // Not provided in API response
-            bio: '', // Not provided in API response
-            position: user.role || '',
+        if (response.success && response.data) {
+          const staffData = response.data
+          const userData = staffData.users || {}
+          console.log('Staff Data:', staffData)
+          console.log('User Data:', userData)
+          
+          const profileDataToSet = {
+            fullName: userData.full_name || '',
+            email: userData.email || '',
+            phone: userData.phone || '',
+            address: staffData.address || '',
+            department: staffData.department || '',
+            role: userData.role || '',
+            employeeId: staffData.id?.toString() || '',
+            dateOfBirth: staffData.dob || '',
+            position: staffData.position || '',
             company: 'JDP',
             workLocation: 'Head Office - Building A'
-          })
+          }
+          
+          console.log('Profile Data to Set:', profileDataToSet)
+          setProfileData(profileDataToSet)
         } else {
           throw new Error(response.message || 'Failed to fetch profile data')
         }
@@ -127,29 +138,40 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
       setProfileError(null)
       
       const userData = getUserData()
-      if (!userData || !userData.id) {
+      if (!userData || !userData.user || !userData.user.id) {
         throw new Error('User data not found. Please login again.')
       }
 
-      const response = await apiClient.getUserProfile(userData.id.toString())
+      // Extract staff ID from user data
+      const staffId = userData.user.staff && userData.user.staff.length > 0 ? userData.user.staff[0].id : null
+      if (!staffId) {
+        throw new Error('Staff profile not found. Please contact administrator.')
+      }
+
+      const response = await apiClient.getUserProfile(staffId.toString())
       
-      if (response.success && response.data?.user) {
-        const user = response.data.user
-        setProfileData({
-          fullName: user.full_name || '',
-          email: user.email || '',
-          phone: user.phone || '',
-          address: '', // Not provided in API response
-          department: '', // Not provided in API response
-          role: user.role || '',
-          employeeId: user.id?.toString() || '',
-          dateOfBirth: '', // Not provided in API response
-          emergencyContact: '', // Not provided in API response
-          bio: '', // Not provided in API response
-          position: user.role || '',
+      if (response.success && response.data) {
+        const staffData = response.data
+        const userData = staffData.users || {}
+        console.log('Refresh - Staff Data:', staffData)
+        console.log('Refresh - User Data:', userData)
+        
+        const profileDataToSet = {
+          fullName: userData.full_name || '',
+          email: userData.email || '',
+          phone: userData.phone || '',
+          address: staffData.address || '',
+          department: staffData.department || '',
+          role: userData.role || '',
+          employeeId: staffData.id?.toString() || '',
+          dateOfBirth: staffData.dob || '',
+          position: staffData.position || '',
           company: 'JDP',
           workLocation: 'Head Office - Building A'
-        })
+        }
+        
+        console.log('Refresh - Profile Data to Set:', profileDataToSet)
+        setProfileData(profileDataToSet)
         toast.success('Profile data refreshed successfully!')
       } else {
         throw new Error(response.message || 'Failed to fetch profile data')
@@ -197,30 +219,47 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
       
       // Get user ID from auth data
       const userData = getUserData()
-      if (!userData?.id) {
+      if (!userData?.user?.id) {
         toast.error('User ID not found')
         return
+      }
+      
+      // Extract staff ID from user data
+      const staffId = userData.user.staff && userData.user.staff.length > 0 ? userData.user.staff[0].id : null
+      if (!staffId) {
+        throw new Error('Staff profile not found. Please contact administrator.')
       }
 
       const profilePayload = {
         full_name: profileData.fullName,
         email: profileData.email,
         phone: profileData.phone,
-        job_title: profileData.position,
+        position: profileData.position,
         department: profileData.department,
         address: profileData.address,
-        bio: profileData.bio,
-        emergency_contact: profileData.emergencyContact,
         date_of_birth: profileData.dateOfBirth,
         employee_id: "EMP-001", // This could be dynamic based on user data
         system_role: profileData.position // Using position as system_role for now
       }
 
-      const response = await apiClient.updateUserProfile(userData.id.toString(), profilePayload)
+      const response = await apiClient.updateUserProfile(staffId.toString(), profilePayload)
 
       toast.dismiss(loadingToast)
 
       if (response.success) {
+        // Update localStorage with updated profile data
+        const userData = getUserData()
+        if (userData) {
+          const updatedUserData = {
+            ...userData,
+            user: {
+              ...userData.user,
+              full_name: profileData.fullName
+            }
+          }
+          localStorage.setItem('jdp_auth', JSON.stringify(updatedUserData))
+        }
+
         toast.success('Profile updated successfully!', {
           description: 'Your changes have been saved and are now active.',
         })
@@ -259,7 +298,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
 
     // Get current user data
     const userData = getUserData()
-    if (!userData || !userData.id) {
+    if (!userData || !userData.user || !userData.user.id) {
       toast.error('User data not found. Please login again.')
       return
     }
@@ -268,7 +307,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
     
     try {
       await apiClient.changePassword(
-        userData.id,
+        userData.user.id,
         passwordData.currentPassword,
         passwordData.newPassword
       )
@@ -374,7 +413,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
             </Button>
           )}
           <div>
-            <h1 className="text-2xl font-medium text-gray-900">Admin Profile</h1>
+            <h1 className="text-2xl font-medium text-gray-900">Profile</h1>
             <p className="text-sm text-gray-600 mt-1">
               Manage your personal information, account settings, and security preferences
             </p>
@@ -452,12 +491,8 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
                     id="email"
                     type="email"
                     value={profileData.email}
-                    onChange={(e) => setProfileData(prev => ({
-                      ...prev,
-                      email: e.target.value
-                    }))}
-                    disabled={!isEditingProfile}
-                    className={`${!isEditingProfile ? 'bg-gray-50 text-gray-600' : 'bg-white'}`}
+                    disabled={true}
+                    className="bg-gray-50 text-gray-600"
                   />
                 </div>
                 <div className="space-y-2">
@@ -527,55 +562,22 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
                 />
               </div>
 
+
               <div className="space-y-2">
-                <Label htmlFor="bio" className="text-sm font-medium text-gray-700">
-                  Bio
+                <Label htmlFor="dateOfBirth" className="text-sm font-medium text-gray-700">
+                  Date of Birth
                 </Label>
-                <Textarea
-                  id="bio"
-                  value={profileData.bio}
+                <Input
+                  id="dateOfBirth"
+                  type="date"
+                  value={profileData.dateOfBirth}
                   onChange={(e) => setProfileData(prev => ({
                     ...prev,
-                    bio: e.target.value
+                    dateOfBirth: e.target.value
                   }))}
                   disabled={!isEditingProfile}
-                  className={`${!isEditingProfile ? 'bg-gray-50 text-gray-600' : 'bg-white'} min-h-[100px]`}
-                  placeholder="Tell us about yourself..."
+                  className={`${!isEditingProfile ? 'bg-gray-50 text-gray-600' : 'bg-white'}`}
                 />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="emergencyContact" className="text-sm font-medium text-gray-700">
-                    Emergency Contact
-                  </Label>
-                  <Input
-                    id="emergencyContact"
-                    value={profileData.emergencyContact}
-                    onChange={(e) => setProfileData(prev => ({
-                      ...prev,
-                      emergencyContact: e.target.value
-                    }))}
-                    disabled={!isEditingProfile}
-                    className={`${!isEditingProfile ? 'bg-gray-50 text-gray-600' : 'bg-white'}`}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="dateOfBirth" className="text-sm font-medium text-gray-700">
-                    Date of Birth
-                  </Label>
-                  <Input
-                    id="dateOfBirth"
-                    type="date"
-                    value={profileData.dateOfBirth}
-                    onChange={(e) => setProfileData(prev => ({
-                      ...prev,
-                      dateOfBirth: e.target.value
-                    }))}
-                    disabled={!isEditingProfile}
-                    className={`${!isEditingProfile ? 'bg-gray-50 text-gray-600' : 'bg-white'}`}
-                  />
-                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
