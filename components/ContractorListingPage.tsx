@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
@@ -10,6 +10,15 @@ import { ScrollArea } from './ui/scroll-area'
 import { Progress } from './ui/progress'
 import { Separator } from './ui/separator'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog'
+import { Input } from './ui/input'
+import { Label } from './ui/label'
+import { Textarea } from './ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
+import { toast } from 'sonner'
+import jsPDF from 'jspdf'
+import { globalApiCall } from '../utils/globalApiHandler'
+import { ArrowUpAZ, Edit, Trash2 } from 'lucide-react'
 import { 
   ChevronDown, 
   ChevronRight,
@@ -905,6 +914,358 @@ export function ContractorListingPage() {
   const [expandedSubJobs, setExpandedSubJobs] = useState<Set<string>>(new Set(['SUB-004']))
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [invoiceSubJob, setInvoiceSubJob] = useState<SubJob | null>(null)
+  
+  // Create Contract Modal State
+  const [showCreateContractModal, setShowCreateContractModal] = useState(false)
+  const [contractFormData, setContractFormData] = useState({
+    contractor_name: '',
+    email: '',
+    phone: '',
+    address: '',
+    note: '',
+    company_name: '',
+    status: 'active'
+  })
+  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Contractor Listing State
+  const [contractors, setContractors] = useState<any[]>([])
+  const [totalContractors, setTotalContractors] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
+  const [isLoadingContractors, setIsLoadingContractors] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+
+  // Edit contractor state
+  const [editingContractor, setEditingContractor] = useState<any>(null)
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [isViewMode, setIsViewMode] = useState(false)
+
+  // Delete contractor state
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false)
+  const [contractorToDelete, setContractorToDelete] = useState<any>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+
+  // Fetch contractors data
+  const fetchContractorsData = async () => {
+    try {
+      setIsLoadingContractors(true)
+      
+      const response = await globalApiCall(`${apiBaseUrl}/contractor/getContractors?page=${currentPage}&limit=${itemsPerPage}`, {
+        method: 'GET'
+      })
+
+      const responseData = await response.json()
+      console.log('Contractors API Response:', responseData)
+
+      if (responseData.success && responseData.data) {
+        setContractors(responseData.data.contractors || [])
+        setTotalContractors(responseData.data.pagination?.total || 0)
+      } else {
+        console.error('Invalid contractors API response structure:', responseData)
+        setContractors([])
+        setTotalContractors(0)
+      }
+    } catch (error) {
+      console.error('Error fetching contractors:', error)
+      if (!(error instanceof Error && error.message?.includes('Session expired'))) {
+        setContractors([])
+        setTotalContractors(0)
+      }
+    } finally {
+      setIsLoadingContractors(false)
+    }
+  }
+
+  // Filter and sort contractors (client-side for search and status filter)
+  const filteredContractors = contractors
+    .filter(contractor => {
+      const matchesSearch = contractor.contractor_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           contractor.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           contractor.company_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      
+      const matchesStatus = statusFilter === 'all' || contractor.status === statusFilter
+      
+      return matchesSearch && matchesStatus
+    })
+    .sort((a, b) => {
+      if (!sortBy) return 0
+      
+      const aValue = a[sortBy] || ''
+      const bValue = b[sortBy] || ''
+      
+      if (sortOrder === 'asc') {
+        return aValue.toString().localeCompare(bValue.toString())
+      } else {
+        return bValue.toString().localeCompare(aValue.toString())
+      }
+    })
+
+  // Handle sorting
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortBy(field)
+      setSortOrder('asc')
+    }
+  }
+
+  // Pagination - use API pagination
+  const totalPages = Math.ceil(totalContractors / itemsPerPage)
+  const displayContractors = filteredContractors
+
+  // Fetch contractor by ID for editing
+  const fetchContractorById = async (contractorId: string) => {
+    try {
+      const response = await globalApiCall(`${apiBaseUrl}/contractor/getContractorById/${contractorId}`, {
+        method: 'GET'
+      })
+
+      const responseData = await response.json()
+      console.log('Get Contractor by ID API Response:', responseData)
+
+      if (responseData.success && responseData.data) {
+        const contractorData = responseData.data
+        setContractFormData({
+          contractor_name: contractorData.contractor_name || '',
+          email: contractorData.email || '',
+          phone: contractorData.phone || '',
+          address: contractorData.address || '',
+          note: '',
+          company_name: contractorData.company_name || '',
+          status: contractorData.status || 'active'
+        })
+        setEditingContractor(contractorData)
+        setIsEditMode(true)
+        setShowCreateContractModal(true)
+      } else {
+        toast.error(responseData.message || 'Failed to fetch contractor data')
+      }
+    } catch (error) {
+      console.error('Error fetching contractor by ID:', error)
+      if (!(error instanceof Error && error.message?.includes('Session expired'))) {
+        toast.error('Failed to fetch contractor data')
+      }
+    }
+  }
+
+  // Handle edit contractor
+  const handleEditContractor = (contractorId: string) => {
+    fetchContractorById(contractorId)
+  }
+
+  // Handle view contractor
+  const handleViewContractor = (contractorId: string) => {
+    fetchContractorById(contractorId)
+    setIsViewMode(true)
+    setIsEditMode(false)
+  }
+
+  // Handle switch from view to edit mode
+  const handleSwitchToEdit = () => {
+    setIsViewMode(false)
+    setIsEditMode(true)
+  }
+
+  // Handle delete contractor
+  const handleDeleteContractor = (contractor: any) => {
+    setContractorToDelete(contractor)
+    setShowDeleteAlert(true)
+  }
+
+  // Confirm delete contractor
+  const confirmDeleteContractor = async () => {
+    if (!contractorToDelete) return
+
+    setIsDeleting(true)
+    try { 
+      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await fetch(`${apiBaseUrl}/contractor/deleteContractor/${contractorToDelete.id}`, {
+        method: 'DELETE',
+        headers
+      });
+      const responseData = await response.json()
+      console.log('Delete Contractor API Response:', responseData)
+
+      if (responseData.success) {
+        toast.success('Contractor deleted successfully!')
+        setShowDeleteAlert(false)
+        setContractorToDelete(null)
+        // Refresh contractors list
+        await fetchContractorsData()
+      } else {
+        toast.error(responseData.message || 'Failed to delete contractor')
+      }
+    } catch (error) {
+      console.error('Error deleting contractor:', error)
+      if (!(error instanceof Error && error.message?.includes('Session expired'))) {
+        toast.error('Failed to delete contractor. Please try again.')
+      }
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  // Reset to page 1 when search or filter changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, statusFilter])
+
+  // Fetch data on component mount and page changes
+  useEffect(() => {
+    fetchContractorsData()
+  }, [currentPage])
+
+  // Validation function
+  const validateForm = () => {
+    const errors: {[key: string]: string} = {}
+    
+    if (!contractFormData.contractor_name.trim()) {
+      errors.contractor_name = 'Contractor name is required'
+    }
+    
+    if (!contractFormData.email.trim()) {
+      errors.email = 'Email is required'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contractFormData.email)) {
+      errors.email = 'Please enter a valid email address'
+    }
+    
+    if (!contractFormData.phone.trim()) {
+      errors.phone = 'Phone number is required'
+    } else if (!/^\d{10}$/.test(contractFormData.phone.replace(/\D/g, ''))) {
+      errors.phone = 'Phone number must be exactly 10 digits'
+    }
+    
+    setValidationErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  // Clear validation error for specific field
+  const clearValidationError = (field: string) => {
+    if (validationErrors[field]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors[field]
+        return newErrors
+      })
+    }
+  }
+
+  // Handle form input changes
+  const handleInputChange = (field: string, value: string) => {
+    setContractFormData(prev => ({
+      ...prev,
+      [field]: value
+    }))
+    clearValidationError(field)
+  }
+
+  // Handle form submission
+  const handleCreateContract = async () => {
+    if (!validateForm()) {
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      // Get system IP
+      const ipResponse = await fetch('https://api.ipify.org?format=json')
+      const ipData = await ipResponse.json()
+      const system_ip = ipData.ip
+
+      // Prepare payload
+      const payload = {
+        contractor_name: contractFormData.contractor_name,
+        company_name: contractFormData.company_name,
+        email: contractFormData.email.toLowerCase(),
+        phone: contractFormData.phone,
+        address: contractFormData.address,
+        status: contractFormData.status,
+        system_ip: system_ip
+      }
+
+      // Call API - Create or Update
+      const apiUrl = isEditMode 
+        ? `${apiBaseUrl}/contractor/updateContractor/${editingContractor.id}`
+        : `${apiBaseUrl}/contractor/createContractor`
+      
+      const response = await globalApiCall(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      })
+
+      const responseData = await response.json()
+      console.log('Create Contractor API Response:', responseData)
+
+      if (responseData.success) {
+        const successMessage = isEditMode ? 'Contractor updated successfully!' : 'Contractor created successfully!'
+        toast.success(successMessage)
+        setShowCreateContractModal(false)
+        
+        // Reset form and edit state
+        setContractFormData({
+          contractor_name: '',
+          email: '',
+          phone: '',
+          address: '',
+          note: '',
+          company_name: '',
+          status: 'active'
+        })
+        setValidationErrors({})
+        setEditingContractor(null)
+        setIsEditMode(false)
+        // Refresh contractors list
+        await fetchContractorsData()
+      } else {
+        const errorMessage = isEditMode ? 'Failed to update contractor' : 'Failed to create contractor'
+        toast.error(responseData.message || errorMessage)
+      }
+    } catch (error) {
+      console.error('Error creating contractor:', error)
+      if (!(error instanceof Error && error.message?.includes('Session expired'))) {
+        toast.error('Failed to create contractor. Please try again.')
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Handle modal close
+  const handleCloseModal = () => {
+    setShowCreateContractModal(false)
+    setContractFormData({
+      contractor_name: '',
+      email: '',
+      phone: '',
+      address: '',
+      note: '',
+      company_name: '',
+      status: 'active'
+    })
+    setValidationErrors({})
+    setEditingContractor(null)
+    setIsEditMode(false)
+    setIsViewMode(false)
+  }
 
   const toggleContractor = (contractorId: string) => {
     const newExpanded = new Set(expandedContractors)
@@ -969,12 +1330,663 @@ export function ContractorListingPage() {
   }
 
   const handlePrintInvoice = () => {
-    window.print()
+    if (!invoiceSubJob || !selectedJobData || !selectedContractorData) {
+      toast.error('Invoice data not available')
+      return
+    }
+
+    try {
+      // First try to open a new window
+      const printWindow = window.open('', '_blank', 'width=800,height=600')
+      
+      if (!printWindow) {
+        // If popup is blocked, use alternative method
+        toast.error('Popup blocked. Using alternative print method...')
+        handlePrintInvoiceAlternative()
+        return
+      }
+
+      // Generate the HTML content for printing
+      const printContent = generateInvoiceHTML(invoiceSubJob, selectedJobData, selectedContractorData)
+      
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Invoice - ${invoiceSubJob.invoices[0]?.invoiceNumber || `INV-${invoiceSubJob.id}`}</title>
+          <style>
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+            
+            body {
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              font-size: 12px;
+              line-height: 1.4;
+              color: #333;
+              background: white;
+              padding: 20px;
+            }
+            
+            .invoice-container {
+              max-width: 800px;
+              margin: 0 auto;
+              background: white;
+            }
+            
+            .invoice-header {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              margin-bottom: 30px;
+              border-bottom: 2px solid #3b82f6;
+              padding-bottom: 20px;
+            }
+            
+            .invoice-title {
+              font-size: 32px;
+              font-weight: bold;
+              color: #3b82f6;
+            }
+            
+            .invoice-details {
+              font-size: 10px;
+              color: #666;
+            }
+            
+            .company-info {
+              text-align: right;
+              font-size: 12px;
+            }
+            
+            .company-name {
+              font-weight: bold;
+              font-size: 14px;
+              margin-bottom: 5px;
+            }
+            
+            .invoice-body {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 30px;
+            }
+            
+            .bill-to, .job-details {
+              flex: 1;
+            }
+            
+            .section-title {
+              font-weight: bold;
+              font-size: 12px;
+              margin-bottom: 8px;
+            }
+            
+            .section-content {
+              font-size: 10px;
+              line-height: 1.5;
+            }
+            
+            .materials-section, .labor-section {
+              margin-bottom: 30px;
+            }
+            
+            .section-heading {
+              font-weight: bold;
+              font-size: 14px;
+              margin-bottom: 15px;
+              color: #333;
+            }
+            
+            .table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 20px;
+            }
+            
+            .table th {
+              background-color: #f3f4f6;
+              padding: 8px;
+              text-align: left;
+              font-weight: bold;
+              font-size: 10px;
+              border: 1px solid #e5e7eb;
+            }
+            
+            .table td {
+              padding: 6px 8px;
+              font-size: 10px;
+              border: 1px solid #e5e7eb;
+            }
+            
+            .table .text-right {
+              text-align: right;
+            }
+            
+            .invoice-summary {
+              display: flex;
+              justify-content: flex-end;
+              margin-bottom: 30px;
+            }
+            
+            .summary-box {
+              background-color: #f3f4f6;
+              padding: 15px;
+              width: 300px;
+              border: 1px solid #e5e7eb;
+            }
+            
+            .summary-row {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 5px;
+              font-size: 10px;
+            }
+            
+            .summary-total {
+              font-weight: bold;
+              font-size: 12px;
+              color: #3b82f6;
+              border-top: 1px solid #e5e7eb;
+              padding-top: 5px;
+              margin-top: 5px;
+            }
+            
+            .payment-terms {
+              font-size: 10px;
+              color: #666;
+              line-height: 1.5;
+            }
+            
+            .payment-terms h4 {
+              font-weight: bold;
+              margin-bottom: 5px;
+              color: #333;
+            }
+            
+            @media print {
+              body {
+                padding: 0;
+              }
+              
+              .invoice-container {
+                max-width: none;
+                margin: 0;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          ${printContent}
+        </body>
+        </html>
+      `)
+      
+      printWindow.document.close()
+      
+      // Wait for content to load, then print
+      setTimeout(() => {
+        try {
+          printWindow.focus()
+          printWindow.print()
+          
+          // Close window after a delay to allow printing
+          setTimeout(() => {
+            printWindow.close()
+          }, 1000)
+          
+          toast.success('Print dialog opened successfully!')
+        } catch (error) {
+          console.error('Error in print timeout:', error)
+          toast.error('Failed to open print dialog')
+          printWindow.close()
+        }
+      }, 500)
+    } catch (error) {
+      console.error('Error printing invoice:', error)
+      toast.error('Failed to print invoice. Please try again.')
+    }
+  }
+
+  // Alternative print method using current window
+  const handlePrintInvoiceAlternative = () => {
+    if (!invoiceSubJob || !selectedJobData || !selectedContractorData) {
+      toast.error('Invoice data not available')
+      return
+    }
+
+    try {
+      // Create a temporary div with print content
+      const printContent = generateInvoiceHTML(invoiceSubJob, selectedJobData, selectedContractorData)
+      
+      // Create a temporary container
+      const tempDiv = document.createElement('div')
+      tempDiv.innerHTML = printContent
+      tempDiv.style.position = 'absolute'
+      tempDiv.style.left = '-9999px'
+      tempDiv.style.top = '-9999px'
+      
+      // Add print styles
+      const printStyles = document.createElement('style')
+      printStyles.textContent = `
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          .print-invoice, .print-invoice * {
+            visibility: visible;
+          }
+          .print-invoice {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            background: white;
+            padding: 20px;
+          }
+        }
+      `
+      
+      // Add classes and styles
+      tempDiv.className = 'print-invoice'
+      tempDiv.style.fontFamily = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
+      tempDiv.style.fontSize = '12px'
+      tempDiv.style.lineHeight = '1.4'
+      tempDiv.style.color = '#333'
+      tempDiv.style.background = 'white'
+      tempDiv.style.padding = '20px'
+      tempDiv.style.maxWidth = '800px'
+      tempDiv.style.margin = '0 auto'
+      
+      // Add to document
+      document.head.appendChild(printStyles)
+      document.body.appendChild(tempDiv)
+      
+      // Print
+      window.print()
+      
+      // Clean up
+      setTimeout(() => {
+        document.body.removeChild(tempDiv)
+        document.head.removeChild(printStyles)
+      }, 1000)
+      
+      toast.success('Print dialog opened successfully!')
+    } catch (error) {
+      console.error('Error in alternative print method:', error)
+      toast.error('Failed to print invoice. Please try again.')
+    }
+  }
+
+  // Helper function to generate invoice HTML
+  const generateInvoiceHTML = (subJob: SubJob, job: Job, contractor: Contractor) => {
+    const totalMaterialCost = subJob.orders.reduce((sum, order) => sum + (order.unitPrice * order.quantityUsed), 0)
+    const totalLaborCost = subJob.timesheets.reduce((sum, timesheet) => sum + timesheet.totalAmount, 0)
+    const subtotal = totalMaterialCost + totalLaborCost
+    const taxRate = 0.08
+    const taxAmount = subtotal * taxRate
+    const totalAmount = subtotal + taxAmount
+
+    const formatCurrency = (amount: number) => {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2
+      }).format(amount)
+    }
+
+    const formatDate = (dateString: string) => {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
+    }
+
+    return `
+      <div class="invoice-container">
+        <!-- Invoice Header -->
+        <div class="invoice-header">
+          <div>
+            <div class="invoice-title">INVOICE</div>
+            <div class="invoice-details">
+              <div>Invoice #: ${subJob.invoices[0]?.invoiceNumber || `INV-${subJob.id}`}</div>
+              <div>Issue Date: ${formatDate(subJob.invoices[0]?.issueDate || new Date().toISOString())}</div>
+              <div>Due Date: ${formatDate(subJob.invoices[0]?.dueDate || new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString())}</div>
+            </div>
+          </div>
+          <div class="company-info">
+            <div class="company-name">JDP Corporation</div>
+            <div>1234 Business Street</div>
+            <div>City, State 12345</div>
+            <div>Phone: (555) 123-4567</div>
+            <div>Email: billing@jdpcorp.com</div>
+          </div>
+        </div>
+
+        <!-- Bill To & Job Details -->
+        <div class="invoice-body">
+          <div class="bill-to">
+            <div class="section-title">Bill To:</div>
+            <div class="section-content">
+              <div>${job.customer}</div>
+              <div>${job.location}</div>
+            </div>
+          </div>
+          <div class="job-details">
+            <div class="section-title">Job Details:</div>
+            <div class="section-content">
+              <div>Job ID: ${job.id}</div>
+              <div>Sub-Job: ${subJob.title}</div>
+              <div>Contractor: ${contractor.name}</div>
+              <div>Completion: ${subJob.completedDate ? formatDate(subJob.completedDate) : 'In Progress'}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Materials Used -->
+        <div class="materials-section">
+          <div class="section-heading">Materials Used</div>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Description</th>
+                <th>Qty Used</th>
+                <th>Unit Price</th>
+                <th class="text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${subJob.orders.filter(order => order.quantityUsed > 0).map(order => `
+                <tr>
+                  <td>${order.sku}</td>
+                  <td>${order.name}</td>
+                  <td>${order.quantityUsed}</td>
+                  <td>${formatCurrency(order.unitPrice)}</td>
+                  <td class="text-right">${formatCurrency(order.unitPrice * order.quantityUsed)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Labor -->
+        <div class="labor-section">
+          <div class="section-heading">Labor</div>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Labor Name</th>
+                <th>Date</th>
+                <th>Hours</th>
+                <th>Rate</th>
+                <th class="text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${subJob.timesheets.filter(ts => ts.approved).map(timesheet => `
+                <tr>
+                  <td>${timesheet.laborName}</td>
+                  <td>${formatDate(timesheet.date)}</td>
+                  <td>${timesheet.hoursWorked}h</td>
+                  <td>${formatCurrency(timesheet.hourlyRate)}/h</td>
+                  <td class="text-right">${formatCurrency(timesheet.totalAmount)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Invoice Summary -->
+        <div class="invoice-summary">
+          <div class="summary-box">
+            <div class="summary-row">
+              <span>Materials Subtotal:</span>
+              <span>${formatCurrency(totalMaterialCost)}</span>
+            </div>
+            <div class="summary-row">
+              <span>Labor Subtotal:</span>
+              <span>${formatCurrency(totalLaborCost)}</span>
+            </div>
+            <div class="summary-row">
+              <span>Subtotal:</span>
+              <span>${formatCurrency(subtotal)}</span>
+            </div>
+            <div class="summary-row">
+              <span>Tax (8%):</span>
+              <span>${formatCurrency(taxAmount)}</span>
+            </div>
+            <div class="summary-row summary-total">
+              <span>Total Amount:</span>
+              <span>${formatCurrency(totalAmount)}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Payment Terms -->
+        <div class="payment-terms">
+          <h4>Payment Terms:</h4>
+          <p>Payment is due within 14 days of invoice date. Late payments may be subject to a 1.5% monthly service charge.</p>
+          <p>Thank you for your business!</p>
+        </div>
+      </div>
+    `
   }
 
   const handleDownloadInvoice = () => {
-    // Implementation for PDF generation would go here
-    console.log('Downloading invoice as PDF...')
+    if (!invoiceSubJob || !selectedJobData || !selectedContractorData) {
+      toast.error('Invoice data not available')
+      return
+    }
+
+    try {
+      // Create new PDF document
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      
+      // Set font
+      pdf.setFont('helvetica')
+      
+      // Colors
+      const primaryColor: [number, number, number] = [59, 130, 246] // Blue
+      const textColor: [number, number, number] = [55, 65, 81] // Gray-700
+      const lightGray: [number, number, number] = [243, 244, 246] // Gray-100
+      
+      let yPosition = 20
+      
+      // Header
+      pdf.setFontSize(24)
+      pdf.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2])
+      pdf.text('INVOICE', 20, yPosition)
+      
+      // Invoice details
+      pdf.setFontSize(10)
+      pdf.setTextColor(textColor[0], textColor[1], textColor[2])
+      yPosition += 15
+      pdf.text(`Invoice #: ${invoiceSubJob.invoices[0]?.invoiceNumber || `INV-${invoiceSubJob.id}`}`, 20, yPosition)
+      yPosition += 5
+      pdf.text(`Issue Date: ${formatDate(invoiceSubJob.invoices[0]?.issueDate || new Date().toISOString())}`, 20, yPosition)
+      yPosition += 5
+      pdf.text(`Due Date: ${formatDate(invoiceSubJob.invoices[0]?.dueDate || new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString())}`, 20, yPosition)
+      
+      // Company details (right side)
+      pdf.setFontSize(12)
+      pdf.text('JDP Corporation', pageWidth - 20, 20, { align: 'right' })
+      pdf.setFontSize(10)
+      pdf.text('1234 Business Street', pageWidth - 20, 25, { align: 'right' })
+      pdf.text('City, State 12345', pageWidth - 20, 30, { align: 'right' })
+      pdf.text('Phone: (555) 123-4567', pageWidth - 20, 35, { align: 'right' })
+      pdf.text('Email: billing@jdpcorp.com', pageWidth - 20, 40, { align: 'right' })
+      
+      yPosition = 60
+      
+      // Bill To section
+      pdf.setFontSize(12)
+      pdf.text('Bill To:', 20, yPosition)
+      yPosition += 8
+      pdf.setFontSize(10)
+      pdf.text(selectedJobData.customer, 20, yPosition)
+      yPosition += 5
+      pdf.text(selectedJobData.location, 20, yPosition)
+      
+      // Job Details section
+      yPosition = 60
+      pdf.setFontSize(12)
+      pdf.text('Job Details:', pageWidth - 20, yPosition, { align: 'right' })
+      yPosition += 8
+      pdf.setFontSize(10)
+      pdf.text(`Job ID: ${selectedJobData.id}`, pageWidth - 20, yPosition, { align: 'right' })
+      yPosition += 5
+      pdf.text(`Sub-Job: ${invoiceSubJob.title}`, pageWidth - 20, yPosition, { align: 'right' })
+      yPosition += 5
+      pdf.text(`Contractor: ${selectedContractorData.name}`, pageWidth - 20, yPosition, { align: 'right' })
+      yPosition += 5
+      pdf.text(`Completion: ${invoiceSubJob.completedDate ? formatDate(invoiceSubJob.completedDate) : 'In Progress'}`, pageWidth - 20, yPosition, { align: 'right' })
+      
+      yPosition = 100
+      
+      // Materials Used section
+      pdf.setFontSize(12)
+      pdf.text('Materials Used', 20, yPosition)
+      yPosition += 10
+      
+      // Table header
+      pdf.setFillColor(lightGray[0], lightGray[1], lightGray[2])
+      pdf.rect(20, yPosition - 5, pageWidth - 40, 8, 'F')
+      pdf.setFontSize(10)
+      pdf.text('SKU', 22, yPosition)
+      pdf.text('Description', 50, yPosition)
+      pdf.text('Qty Used', 120, yPosition)
+      pdf.text('Unit Price', 140, yPosition)
+      pdf.text('Total', pageWidth - 30, yPosition, { align: 'right' })
+      yPosition += 8
+      
+      // Materials data
+      const materialsUsed = invoiceSubJob.orders.filter(order => order.quantityUsed > 0)
+      let totalMaterialCost = 0
+      
+      materialsUsed.forEach((order) => {
+        const total = order.unitPrice * order.quantityUsed
+        totalMaterialCost += total
+        
+        pdf.text(order.sku, 22, yPosition)
+        pdf.text(order.name, 50, yPosition)
+        pdf.text(order.quantityUsed.toString(), 120, yPosition)
+        pdf.text(`$${order.unitPrice.toFixed(2)}`, 140, yPosition)
+        pdf.text(`$${total.toFixed(2)}`, pageWidth - 30, yPosition, { align: 'right' })
+        yPosition += 6
+        
+        // Check if we need a new page
+        if (yPosition > pageHeight - 50) {
+          pdf.addPage()
+          yPosition = 20
+        }
+      })
+      
+      yPosition += 10
+      
+      // Labor section
+      pdf.setFontSize(12)
+      pdf.text('Labor', 20, yPosition)
+      yPosition += 10
+      
+      // Labor table header
+      pdf.setFillColor(lightGray[0], lightGray[1], lightGray[2])
+      pdf.rect(20, yPosition - 5, pageWidth - 40, 8, 'F')
+      pdf.setFontSize(10)
+      pdf.text('Labor Name', 22, yPosition)
+      pdf.text('Date', 80, yPosition)
+      pdf.text('Hours', 110, yPosition)
+      pdf.text('Rate', 130, yPosition)
+      pdf.text('Total', pageWidth - 30, yPosition, { align: 'right' })
+      yPosition += 8
+      
+      // Labor data
+      const approvedTimesheets = invoiceSubJob.timesheets.filter(ts => ts.approved)
+      let totalLaborCost = 0
+      
+      approvedTimesheets.forEach((timesheet) => {
+        totalLaborCost += timesheet.totalAmount
+        
+        pdf.text(timesheet.laborName, 22, yPosition)
+        pdf.text(formatDate(timesheet.date), 80, yPosition)
+        pdf.text(`${timesheet.hoursWorked}h`, 110, yPosition)
+        pdf.text(`$${timesheet.hourlyRate.toFixed(2)}/h`, 130, yPosition)
+        pdf.text(`$${timesheet.totalAmount.toFixed(2)}`, pageWidth - 30, yPosition, { align: 'right' })
+        yPosition += 6
+        
+        // Check if we need a new page
+        if (yPosition > pageHeight - 50) {
+          pdf.addPage()
+          yPosition = 20
+        }
+      })
+      
+      yPosition += 20
+      
+      // Invoice summary
+      const subtotal = totalMaterialCost + totalLaborCost
+      const taxRate = 0.08
+      const taxAmount = subtotal * taxRate
+      const totalAmount = subtotal + taxAmount
+      
+      // Summary box
+      const summaryWidth = 80
+      const summaryX = pageWidth - summaryWidth - 20
+      
+      pdf.setFillColor(lightGray[0], lightGray[1], lightGray[2])
+      pdf.rect(summaryX, yPosition - 5, summaryWidth, 35, 'F')
+      
+      pdf.setFontSize(10)
+      pdf.text('Materials Subtotal:', summaryX + 5, yPosition)
+      pdf.text(`$${totalMaterialCost.toFixed(2)}`, summaryX + summaryWidth - 5, yPosition, { align: 'right' })
+      yPosition += 6
+      
+      pdf.text('Labor Subtotal:', summaryX + 5, yPosition)
+      pdf.text(`$${totalLaborCost.toFixed(2)}`, summaryX + summaryWidth - 5, yPosition, { align: 'right' })
+      yPosition += 6
+      
+      pdf.text('Subtotal:', summaryX + 5, yPosition)
+      pdf.text(`$${subtotal.toFixed(2)}`, summaryX + summaryWidth - 5, yPosition, { align: 'right' })
+      yPosition += 6
+      
+      pdf.text('Tax (8%):', summaryX + 5, yPosition)
+      pdf.text(`$${taxAmount.toFixed(2)}`, summaryX + summaryWidth - 5, yPosition, { align: 'right' })
+      yPosition += 6
+      
+      pdf.setFontSize(12)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('Total Amount:', summaryX + 5, yPosition)
+      pdf.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2])
+      pdf.text(`$${totalAmount.toFixed(2)}`, summaryX + summaryWidth - 5, yPosition, { align: 'right' })
+      
+      yPosition += 20
+      
+      // Payment terms
+      pdf.setTextColor(textColor[0], textColor[1], textColor[2])
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(10)
+      pdf.text('Payment Terms:', 20, yPosition)
+      yPosition += 6
+      pdf.text('Payment is due within 14 days of invoice date. Late payments may be subject to a 1.5% monthly service charge.', 20, yPosition)
+      yPosition += 6
+      pdf.text('Thank you for your business!', 20, yPosition)
+      
+      // Generate filename
+      const invoiceNumber = invoiceSubJob.invoices[0]?.invoiceNumber || `INV-${invoiceSubJob.id}`
+      const filename = `${invoiceNumber}_${selectedJobData.customer.replace(/\s+/g, '_')}.pdf`
+      
+      // Download the PDF
+      pdf.save(filename)
+      
+      toast.success('Invoice PDF downloaded successfully!')
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      toast.error('Failed to generate PDF. Please try again.')
+    }
   }
 
   const handleSendInvoice = () => {
@@ -1659,7 +2671,188 @@ export function ContractorListingPage() {
       </div>
 
       {/* Right Content - Job Details */}
-      <div className="flex-1 bg-white overflow-auto">
+      <div className="flex-1 bg-white">
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex justify-end">
+            <Button 
+              className="gap-2 text-white" 
+              onClick={() => setShowCreateContractModal(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Create Contract
+            </Button>
+          </div>
+        </div>
+
+        {/* Contractor Listing Table */}
+        <div className="p-6 space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-medium text-gray-900">Contractors</h2>
+              <p className="text-sm text-gray-600 mt-1">Manage your contractors and their information</p>
+            </div>
+          </div>
+
+          {/* Filters and Search */}
+          
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    placeholder="Search contractors..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleSort('contractor_name')}
+                    className="gap-2"
+                  >
+                    <ArrowUpAZ className="h-4 w-4" />
+                    A-Z
+                  </Button>
+                </div>
+              </div>  
+
+          {/* Contractors Table */}
+          <Card>
+            <CardContent className="p-0">
+              {isLoadingContractors ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground">Loading contractors...</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Contractor Name</TableHead>
+                        <TableHead>Company</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>Address</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {displayContractors.length > 0 ? (
+                        displayContractors.map((contractor) => (
+                          <TableRow key={contractor.id}>
+                            <TableCell className="font-medium">
+                              {contractor.contractor_name}
+                            </TableCell>
+                            <TableCell>{contractor.company_name || '-'}</TableCell>
+                            <TableCell>{contractor.email}</TableCell>
+                            <TableCell>{contractor.phone}</TableCell>
+                            <TableCell className="max-w-xs truncate">
+                              {contractor.address || '-'}
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                className={
+                                  contractor.status === 'active' 
+                                    ? 'bg-green-100 text-green-800 border-green-200' 
+                                    : 'bg-red-100 text-red-800 border-red-200'
+                                }
+                              >
+                                {contractor.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => handleViewContractor(contractor.id)}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => handleEditContractor(contractor.id)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => handleDeleteContractor(contractor)}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-8">
+                            <div className="text-center">
+                              <User className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                              <h3 className="text-lg font-medium text-gray-900 mb-2">No contractors found</h3>
+                              <p className="text-gray-500">Get started by creating your first contractor.</p>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Pagination Controls */}
+          {totalContractors > itemsPerPage && (
+            <div className="flex items-center justify-between px-4 py-3 border-t">
+              <div className="text-sm text-muted-foreground">
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalContractors)} of {totalContractors} contractors
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1 || isLoadingContractors}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm">
+                  Page {currentPage} of {Math.ceil(totalContractors / itemsPerPage)}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage >= Math.ceil(totalContractors / itemsPerPage) || isLoadingContractors}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {selectedJobData && selectedContractorData ? (
           <div className="p-6 space-y-6">
             {/* Header */}
@@ -1805,6 +2998,202 @@ export function ContractorListingPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Create Contract Modal */}
+      <Dialog open={showCreateContractModal} onOpenChange={setShowCreateContractModal}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"> 
+              {isViewMode ? 'View Contractor' : isEditMode ? 'Edit Contractor' : 'Create New Contractor'}
+            </DialogTitle>
+            <DialogDescription>
+              {isViewMode ? 'View contractor information and details.' : isEditMode ? 'Update contractor information and status.' : 'Add a new contractor to the system with their contact information and status.'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-4">
+            {/* Contractor Name */}
+            <div className="space-y-2">
+              <Label htmlFor="contractor_name" className="text-sm font-medium">
+                Contractor Name *
+              </Label>
+              <Input
+                id="contractor_name"
+                value={contractFormData.contractor_name}
+                onChange={(e) => handleInputChange('contractor_name', e.target.value)}
+                placeholder="Enter contractor's name"
+                disabled={isViewMode}
+                className={validationErrors.contractor_name ? 'border-red-500 focus:border-red-500' : ''}
+              />
+              {validationErrors.contractor_name && (
+                <p className="text-sm text-red-600">{validationErrors.contractor_name}</p>
+              )}
+            </div>
+
+            {/* Email */}
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-sm font-medium">
+                Email Address *
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={contractFormData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                placeholder="Enter email address"
+                disabled={isViewMode}
+                className={validationErrors.email ? 'border-red-500 focus:border-red-500' : ''}
+              />
+              {validationErrors.email && (
+                <p className="text-sm text-red-600">{validationErrors.email}</p>
+              )}
+            </div>
+
+            {/* Phone Number */}
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="text-sm font-medium">
+                Phone Number *
+              </Label>
+              <Input
+                id="phone"
+                value={contractFormData.phone}
+                onChange={(e) => handleInputChange('phone', e.target.value)}
+                placeholder="Enter 10-digit phone number"
+                disabled={isViewMode}
+                className={validationErrors.phone ? 'border-red-500 focus:border-red-500' : ''}
+              />
+              {validationErrors.phone && (
+                <p className="text-sm text-red-600">{validationErrors.phone}</p>
+              )}
+            </div>
+
+            <div>
+                  <Label className="mb-2" htmlFor="company">Company</Label>
+                  <Input
+                    id="company"
+                    value={contractFormData.company_name}
+                    onChange={(e) => handleInputChange('company_name', e.target.value)}
+                    placeholder="Enter company name"
+                    disabled={isViewMode}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+            {/* address */}
+            <div className="space-y-2">
+              <Label htmlFor="address" className="text-sm font-medium">
+              Address
+              </Label>
+              <Textarea
+                id="address"
+                value={contractFormData.address}
+                onChange={(e) => handleInputChange('address', e.target.value)}
+                placeholder="Enter contractor's address"
+                disabled={isViewMode}
+                rows={3}
+              />
+            </div>
+
+            {/* Status */}
+            <div className="space-y-2">
+              <Label htmlFor="status" className="text-sm font-medium">
+                Status
+              </Label>
+              <Select
+                value={contractFormData.status}
+                onValueChange={(value) => handleInputChange('status', value)}
+                disabled={isViewMode}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            {isViewMode ? (
+              <>
+                <Button 
+                  variant="outline" 
+                  onClick={handleCloseModal}
+                >
+                  Close
+                </Button>
+                <Button 
+                  onClick={handleSwitchToEdit}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  <Edit className="h-4 w-4 mr-1" />
+                  Edit Contractor
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button 
+                  variant="outline" 
+                  onClick={handleCloseModal}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleCreateContract}
+                  disabled={isSubmitting}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      {isEditMode ? 'Updating...' : 'Creating...'}
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-1" />
+                      {isEditMode ? 'Update Contractor' : 'Create Contractor'}
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Contractor</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{contractorToDelete?.contractor_name}</strong>? 
+              This action cannot be undone and will permanently remove the contractor from the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteContractor}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isDeleting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Deleting...
+                </>
+              ) : (
+                'Delete Contractor'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

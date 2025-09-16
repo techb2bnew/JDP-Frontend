@@ -258,7 +258,7 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
       // Prepare payload according to API requirements
       const payload = {
         full_name: formData.full_name,
-        email: formData.email,
+        email: formData.email.toLowerCase(),
         phone: formData.phone,
         dob: formData.dob,
         address: formData.address,
@@ -372,7 +372,7 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
       // Prepare payload according to API requirements
       const payload = {
         full_name: formData.full_name,
-        email: formData.email,
+        email: formData.email.toLowerCase(),
         phone: formData.phone,
         dob: formData.dob,
         address: formData.address,
@@ -482,7 +482,7 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
       certifications: [],
       skills: [],
       notes: '',
-      role: 'Labor'
+      role: ''
     })
     setValidationErrors({})
   }
@@ -1069,7 +1069,13 @@ const fetchLaborById = async (id: string) => {
             Export
           </Button>
           {canCreateLabour && (
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+              setIsCreateDialogOpen(open);
+              if (open) {
+                resetForm();
+                setValidationErrors({});
+              }
+            }}>
               <DialogTrigger asChild>
                 <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2">
                   <Plus className="h-4 w-4" />
@@ -1346,14 +1352,26 @@ const fetchLaborById = async (id: string) => {
       )}
 
       {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+        setIsEditDialogOpen(open);
+        if (!open) {
+          setEditingLabor(null);
+          resetForm();
+          setValidationErrors({});
+        }
+      }}>
         <DialogContent className="max-w-4xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Edit Labor Worker</DialogTitle>
           </DialogHeader>
           {renderForm()}
           <div className="flex justify-end gap-3 mt-6">
-            <Button variant="outline" onClick={() => {setIsEditDialogOpen(false); resetForm();}}>
+            <Button variant="outline" onClick={() => {
+              setIsEditDialogOpen(false);
+              setEditingLabor(null);
+              resetForm();
+              setValidationErrors({});
+            }}>
               Cancel
             </Button>
             <Button onClick={handleUpdate} className="bg-primary text-white hover:bg-[#0090e6]">

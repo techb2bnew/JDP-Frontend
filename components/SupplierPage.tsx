@@ -205,7 +205,7 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
       // Prepare payload according to API requirements
       const payload = {
         full_name: formData.fullName,
-        email: formData.email,
+        email: formData.email.toLowerCase(),
         phone: formData.phone,
         role: formData.role,
         status: formData.status === 'active' ? 'active' : formData.status === 'inactive' ? 'inactive' : formData.status === 'pending' ? 'pending' : 'suspended',
@@ -404,7 +404,7 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
       // Prepare payload according to API requirements
       const payload = {
         full_name: formData.fullName,
-        email: formData.email,
+        email: formData.email.toLowerCase(),
         phone: formData.phone,
         role: formData.role,
         status: formData.status === 'active' ? 'active' : formData.status === 'inactive' ? 'inactive' : formData.status === 'pending' ? 'pending' : 'suspended',

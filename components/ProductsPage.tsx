@@ -1065,17 +1065,17 @@ export function ProductsPage() {
                     <TableCell>
                       <div className="flex gap-1">
                         {hasPermission('products', 'view') && (
-                          <Button variant="ghost" size="sm" onClick={() => handleAction('view', product)}>
+                          <Button variant="outline" size="sm" onClick={() => handleAction('view', product)}>
                             <Eye className="h-3 w-3" />
                           </Button>
                         )}
                         {hasPermission('products', 'edit') && (
-                          <Button variant="ghost" size="sm" onClick={() => handleAction('edit', product)}>
+                          <Button variant="outline" size="sm" onClick={() => handleAction('edit', product)}>
                             <Edit className="h-3 w-3" />
                           </Button>
                         )}
                         {hasPermission('products', 'delete') && (
-                          <Button variant="ghost" size="sm" onClick={() => handleAction('delete', product)}>
+                          <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => handleAction('delete', product)}>
                             <Trash2 className="h-3 w-3" />
                           </Button>
                         )}
@@ -1122,7 +1122,7 @@ export function ProductsPage() {
 
       {/* Product Modal (Add/Edit/View) */}
       <Dialog open={showProductModal} onOpenChange={setShowProductModal}>
-        <DialogContent className="max-w-2xl sm:max-w-[700px] max-h-[90vh] overflow-auto">
+        <DialogContent className="max-w-2xl   max-h-[90vh] overflow-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Package className="h-5 w-5 text-primary" />

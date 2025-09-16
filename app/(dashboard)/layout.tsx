@@ -38,11 +38,11 @@ export default function DashboardLayout({
       
       try {
         const authData = typeof window !== 'undefined' ? localStorage.getItem('jdp_auth') : null
-        console.log('Auth data from localStorage:', authData);
+        // console.log('Auth data from localStorage:', authData);
         
         // If we're on dashboard and no auth data, redirect to login
         if (pathname === '/dashboard' && !authData) {
-          console.log('On dashboard but no auth data, redirecting to login');
+          // console.log('On dashboard but no auth data, redirecting to login');
           setIsLoading(false)
           setTimeout(() => {
             router.push('/')
@@ -52,21 +52,21 @@ export default function DashboardLayout({
         
         if (authData) {
           const parsed = JSON.parse(authData)
-          console.log('Parsed auth data:', parsed);
+          // console.log('Parsed auth data:', parsed);
           
           // Check if all required fields exist and token is not expired
           if (parsed.user && parsed.token && parsed.expires && parsed.expires > Date.now()) {
-            console.log('✅ Valid authentication found');
+            // console.log('✅ Valid authentication found');
             setIsAuthenticated(true)
             setIsLoading(false)
             return
           } else {
-            console.log('❌ Invalid or expired authentication data');
-            console.log('User:', parsed.user);
-            console.log('Token:', parsed.token ? 'Present' : 'Missing');
-            console.log('Expires:', parsed.expires);
-            console.log('Current time:', Date.now());
-            console.log('Is expired:', parsed.expires ? parsed.expires <= Date.now() : 'No expiry');
+            // console.log('❌ Invalid or expired authentication data');
+            // console.log('User:', parsed.user);
+            // console.log('Token:', parsed.token ? 'Present' : 'Missing');
+            // console.log('Expires:', parsed.expires);
+            // console.log('Current time:', Date.now());
+            // console.log('Is expired:', parsed.expires ? parsed.expires <= Date.now() : 'No expiry');
             
             // Clear invalid data
             if (typeof window !== 'undefined') {
@@ -74,12 +74,12 @@ export default function DashboardLayout({
             }
           }
         } else {
-          console.log('❌ No authentication data found');
-          console.log('localStorage keys:', typeof window !== 'undefined' ? Object.keys(localStorage) : 'Not available');
+          // console.log('❌ No authentication data found');
+          // console.log('localStorage keys:', typeof window !== 'undefined' ? Object.keys(localStorage) : 'Not available');
           
           // Clear all cookies when no auth data found
           if (typeof window !== 'undefined') {
-            console.log('Clearing all cookies...');
+            // console.log('Clearing all cookies...');
             // Clear auth-related cookies
             document.cookie = 'auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
             document.cookie = 'jdp_auth=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
@@ -206,11 +206,11 @@ export default function DashboardLayout({
   }
   const isSuperDashboardPage = pathname === '/superDashboard';
 
-  console.log('=== DASHBOARD LAYOUT DEBUG ===');
-  console.log('Pathname:', pathname);
-  console.log('Auth data:', authData);
-  console.log('Is super admin:', isSuperAdmin);
-  console.log('Is superDashboard page:', isSuperDashboardPage);
+  // console.log('=== DASHBOARD LAYOUT DEBUG ===');
+  // console.log('Pathname:', pathname);
+  // console.log('Auth data:', authData);
+  // console.log('Is super admin:', isSuperAdmin);
+  // console.log('Is superDashboard page:', isSuperDashboardPage);
 
   // For super admin on superDashboard page, show only the content without sidebar/header
   if (isSuperAdmin && isSuperDashboardPage) {

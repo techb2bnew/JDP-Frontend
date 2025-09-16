@@ -147,9 +147,9 @@ export const clearAuthData = async (): Promise<void> => {
     document.cookie = `${cookieName}=; expires=${now.toUTCString()}; path=/; domain=${window.location.hostname};`
   })
   
-  console.log('Auth data cleared. Current cookies:', document.cookie)
-  console.log('localStorage cleared. Remaining items:', Object.keys(localStorage))
-  console.log('sessionStorage cleared. Remaining items:', Object.keys(sessionStorage))
+  // console.log('Auth data cleared. Current cookies:', document.cookie)
+  // console.log('localStorage cleared. Remaining items:', Object.keys(localStorage))
+  // console.log('sessionStorage cleared. Remaining items:', Object.keys(sessionStorage))
 }
 
 /**

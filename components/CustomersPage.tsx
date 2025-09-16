@@ -188,7 +188,7 @@ export function CustomersPage() {
       const payload = {
         customer_name: customerFormData.name,
         company_name: customerFormData.company || '',
-        email: customerFormData.email,
+        email: customerFormData.email.toLowerCase(),
         phone: customerFormData.phone || '',
         contact_person: customerFormData.contactPerson || '',
         address: customerFormData.address || '',
@@ -320,7 +320,7 @@ export function CustomersPage() {
       const payload = {
         customer_name: customerFormData.name,
         company_name: customerFormData.company || '',
-        email: customerFormData.email,
+        email: customerFormData.email.toLowerCase(),
         phone: customerFormData.phone || '',
         contact_person: customerFormData.contactPerson || '',
         address: customerFormData.address || '',
@@ -820,10 +820,15 @@ export function CustomersPage() {
                         </Button>
                       )}
                       {hasPermission('customers', 'delete') && (
-                        <Button variant="outline" size="icon" onClick={() => {
-                          setCustomerToDelete(customer);
-                          setShowDeleteAlert(true);
-                        }}>
+                        <Button 
+                          variant="outline" 
+                          size="icon" 
+                          onClick={() => {
+                            setCustomerToDelete(customer);
+                            setShowDeleteAlert(true);
+                          }}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       )}
@@ -884,7 +889,7 @@ export function CustomersPage() {
         }
         setShowAddCustomerModal(open);
       }}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {currentAction === 'add' ? 'Add New Customer' :
