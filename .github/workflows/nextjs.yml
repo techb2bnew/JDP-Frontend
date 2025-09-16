@@ -28,17 +28,11 @@ jobs:
           NODE_ENV: production
           NODE_OPTIONS: --max_old_space_size=4096
 
-      - name: Create deployment package
+      - name: Prepare deployment files
         run: |
-          # Sirf necessary files package karo
-          tar -czf deployment.tar.gz \
-            --exclude='.git' \
-            --exclude='node_modules' \
-            --exclude='.next/cache' \
-            --exclude='src' \
-            --exclude='*.md' \
-            --exclude='.env*' \
-            .
+          # Clean up unnecessary files before deployment
+          rm -rf .git .next/cache node_modules
+          echo "Deployment files ready"
 
       - name: Fix remote permissions
         uses: appleboy/ssh-action@v1.2.0
