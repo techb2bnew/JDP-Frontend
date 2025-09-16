@@ -21,14 +21,12 @@ jobs:
 
       - name: Install dependencies (bypass postinstall)
         run: |
-          # Package.json temporarily modify karke postinstall script remove karo
-          cp package.json package.json.backup
-          sed -i 's/"postinstall": "npm run type-check"//g' package.json
-          npm ci
+          # Environment variable use karke postinstall script disable karo
+          npm ci --ignore-scripts
           npm install --save-dev @types/node
-          # Restore original package.json
-          mv package.json.backup package.json
           echo "Dependencies installed without postinstall scripts"
+        env:
+          NPM_CONFIG_IGNORE_SCRIPTS: true
 
       - name: Build application (direct Next.js build)
         run: npx next build
