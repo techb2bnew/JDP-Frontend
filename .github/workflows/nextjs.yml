@@ -61,16 +61,10 @@ jobs:
           TARGET: /home/ec2-user/JDP-FRONTEND/
           ARGS: "-rlgoDzvc --chmod=Du=rwx,Dg=rx,Do=rx,Fu=rw,Fg=r,Fo=r --no-perms --no-owner --no-group --exclude=.next/cache --exclude=node_modules --exclude=.git --exclude=src"
 
-      - name: Install production dependencies on server
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY_LIVE }}
-          script: |
-            cd /home/ec2-user/JDP-FRONTEND/
-            # Sirf production dependencies install karo
-            npm ci --only=production
+      - name: Skip server dependencies (already built on GitHub Actions)
+        run: |
+          echo "Skipping server dependencies installation - already built on GitHub Actions"
+          echo "Built files will be deployed directly"
 
       - name: Restart application
         uses: appleboy/ssh-action@v1.2.0
