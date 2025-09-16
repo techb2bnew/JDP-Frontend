@@ -1,0 +1,84 @@
+name: Deploy Application
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.15.1'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application (GitHub Actions par)
+        run: npm run build
+        env:
+          NODE_ENV: production
+          NODE_OPTIONS: --max_old_space_size=4096
+
+      - name: Create deployment package
+        run: |
+          # Sirf necessary files package karo
+          tar -czf deployment.tar.gz \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='.next/cache' \
+            --exclude='src' \
+            --exclude='*.md' \
+            --exclude='.env*' \
+            .
+
+      - name: Fix remote permissions
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY_LIVE }}
+          script: |
+            # Correct path use karo
+            sudo chown -R ${{ secrets.SERVER_USER }}:${{ secrets.SERVER_USER }} /home/ec2-user/JDP-FRONTEND/
+            sudo chmod -R 755 /home/ec2-user/JDP-FRONTEND/
+
+      - name: Deploy via Rsync (sirf built files)
+        uses: easingthemes/ssh-deploy@main
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY_LIVE }}
+          REMOTE_HOST: ${{ secrets.SERVER_IP }}
+          REMOTE_USER: ${{ secrets.SERVER_USER }}
+          TARGET: /home/ec2-user/JDP-FRONTEND/
+          ARGS: "-rlgoDzvc --chmod=Du=rwx,Dg=rx,Do=rx,Fu=rw,Fg=r,Fo=r --no-perms --no-owner --no-group --exclude=.next/cache --exclude=node_modules --exclude=.git --exclude=src"
+
+      - name: Install production dependencies on server
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY_LIVE }}
+          script: |
+            cd /home/ec2-user/JDP-FRONTEND/
+            # Sirf production dependencies install karo
+            npm ci --only=production
+
+      - name: Restart application
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY_LIVE }}
+          script: |
+            cd /home/ec2-user/JDP-FRONTEND/
+            # PM2 se restart karo
+            pm2 reload JDP-FRONTEND || pm2 start "npm run start" --name JDP-FRONTEND
+            pm2 save
