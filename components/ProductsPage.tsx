@@ -54,6 +54,7 @@ import {
 } from 'lucide-react'
 import { Product, Branch } from '../types/product'
 import { globalApiCall } from '../utils/globalApiHandler'
+import { AutoSuggestInput } from './ui/auto-suggest-input'
 
 interface ProductFormData {
   name: string;
@@ -97,7 +98,6 @@ type FilterStatus = 'all' | 'active' | 'inactive' | 'draft';
 
 // Static productsData removed - now using API data from /products/getAllProducts
 // Remove static suppliersData - will be replaced with API data
-const categoriesData = ['Electrical', 'Construction Materials', 'Tools', 'Plumbing', 'Hardware']
 
 export function ProductsPage() {
   const { hasPermission } = usePermissions()
@@ -126,6 +126,8 @@ export function ProductsPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [productStats, setProductStats] = useState<any>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
+  const [categories, setCategories] = useState<string[]>(['Electrical', 'Construction Materials', 'Tools', 'Plumbing', 'Hardware']);
+  const [units, setUnits] = useState<string[]>(['piece', 'roll', 'box', 'pack', 'kg', 'meter', 'liter', 'set']);
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
 
   const [formData, setFormData] = useState<ProductFormData>({
@@ -388,6 +390,17 @@ export function ProductsPage() {
         
         setShowProductModal(false);
         resetForm();
+        
+        // Update categories if a new category was added
+        if (formData.category && !categories.includes(formData.category)) {
+          setCategories(prevCategories => [...prevCategories, formData.category].sort());
+        }
+        
+        // Update units if a new unit was added
+        if (formData.unit && !units.includes(formData.unit)) {
+          setUnits(prevUnits => [...prevUnits, formData.unit].sort());
+        }
+        
         // Refresh the products list and stats
         fetchProductsData(currentPage, itemsPerPage);
         fetchProductStats();
@@ -630,6 +643,7 @@ export function ProductsPage() {
           image: '', // Will be populated if image data is available in API
           description: apiProduct.description || '',
           sku: apiProduct.supplier_sku || '',
+          unit: apiProduct.unit || 'piece',
           createdDate: apiProduct.created_at ? new Date(apiProduct.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
           lastUpdated: apiProduct.updated_at ? new Date(apiProduct.updated_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
           minStockLevel: 0, // Default value, can be updated if available in API
@@ -639,6 +653,20 @@ export function ProductsPage() {
 
         setProducts(transformedProducts);
         setTotalProducts(responseData.data.pagination?.totalItems || transformedProducts.length);
+        
+        // Extract unique categories from products
+        const uniqueCategories = Array.from(new Set(transformedProducts.map((product:any) => product.category).filter(Boolean))) as string[];
+        setCategories(prevCategories => {
+          const combined = Array.from(new Set([...prevCategories, ...uniqueCategories]));
+          return combined.sort();
+        });
+        
+        // Extract unique units from products
+        const uniqueUnits = Array.from(new Set(transformedProducts.map((product:any) => product.unit).filter(Boolean))) as string[];
+        setUnits(prevUnits => {
+          const combined = Array.from(new Set([...prevUnits, ...uniqueUnits]));
+          return combined.sort();
+        });
       } else {
         console.error('Invalid products API response structure:', responseData);
         setProducts([]);
@@ -921,7 +949,7 @@ export function ProductsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {categoriesData.map((category) => (
+                  {categories.map((category) => (
                     <SelectItem key={category} value={category}>
                       {category}
                     </SelectItem>
@@ -1320,28 +1348,19 @@ export function ProductsPage() {
                         {/* <ListIcon className="h-4 w-4 text-blue-500" /> */}
                         Category *
                       </Label>
-                      <Select
+                      <AutoSuggestInput
+                        label=""
                         value={formData.category}
-                        onValueChange={(value) => {
+                        onChange={(value) => {
                           setFormData(prev => ({ ...prev, category: value }));
                           clearValidationError('category');
                         }}
-                        required
-                      >
-                        <SelectTrigger className={`mt-1 ${validationErrors.category ? 'border-red-500' : ''}`}>
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {categoriesData.map((category) => (
-                            <SelectItem key={category} value={category}>
-                              {category}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {validationErrors.category && (
-                        <p className="text-red-500 text-sm mt-1">{validationErrors.category}</p>
-                      )}
+                        suggestions={categories}
+                        placeholder="Enter category"
+                        error={validationErrors.category}
+                         
+                      />
+                      
                     </div>
                     <div>
                       <Label htmlFor="supplier" className="flex items-center gap-1 mb-2">
@@ -1504,8 +1523,20 @@ export function ProductsPage() {
                       )}
                     </div>
                     <div>
-                      <Label htmlFor="markupPercentage" className="flex items-center gap-1">
-                        {/* <PercentIcon className="h-4 w-4 text-blue-500" /> */}
+                      <Label htmlFor="unit" className="flex items-center gap-1 mb-2">
+                        {/* <RulerIcon className="h-4 w-4 text-blue-500" /> */}
+                        Unit
+                      </Label>
+                      <AutoSuggestInput
+                        label=""
+                        value={formData.unit}
+                        onChange={(value) => setFormData(prev => ({ ...prev, unit: value }))}
+                        suggestions={units}
+                        placeholder="Enter unit"
+                      />
+                    </div>
+                    {/* <div>
+                      <Label htmlFor="markupPercentage" className="flex items-center gap-1"> 
                         Markup Percentage *
                       </Label>
                       <div className="relative mt-2">
@@ -1528,7 +1559,7 @@ export function ProductsPage() {
                       {validationErrors.markupPercentage && (
                         <p className="text-red-500 text-sm mt-1">{validationErrors.markupPercentage}</p>
                       )}
-                    </div>
+                    </div> */}
                   </div>
                 </div>
 
@@ -1611,26 +1642,7 @@ export function ProductsPage() {
                         className="mt-1"
                       />
                     </div>
-                    <div>
-                      <Label htmlFor="unit" className="flex items-center gap-1 mb-2">
-                        {/* <RulerIcon className="h-4 w-4 text-blue-500" /> */}
-                        Unit
-                      </Label>
-                      <Select
-                        value={formData.unit}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, unit: value }))}
-                      >
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Select unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="piece">piece</SelectItem>
-                          <SelectItem value="roll">roll</SelectItem>
-                          <SelectItem value="box">box</SelectItem>
-                          <SelectItem value="pack">pack</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  
                     <div>
                       <Label htmlFor="status" className="flex items-center gap-1 mb-2">
                         Status
