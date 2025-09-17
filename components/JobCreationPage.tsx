@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Input } from './ui/input'
@@ -8,6 +8,9 @@ import { Textarea } from './ui/textarea'
 import { Checkbox } from './ui/checkbox'
 import { Badge } from './ui/badge'
 import { toast } from 'sonner'
+import { AutoScrollSelect } from './ui/AutoScrollSelect'
+import { AutoScrollMultiSelect } from './ui/AutoScrollMultiSelect'
+import { apiClient } from '../utils/api'
 import { 
   ArrowLeft, 
   ArrowRight,
@@ -62,34 +65,9 @@ interface JobCreationPageProps {
   onJobCreated: (job: Job) => void
 }
 
-const availableLeadLabor = [
-  'Mike Johnson',
-  'Sarah Davis',
-  'Robert Brown',
-  'Jennifer Wilson',
-  'Kevin Martinez',
-  'Amanda Taylor'
-]
+// Removed hardcoded arrays - now using API
 
-const availableLabor = [
-  'John Smith',
-  'David Wilson',
-  'Sarah Johnson',
-  'Mike Rodriguez',
-  'Tom Anderson',
-  'Lisa Chen',
-  'Emily Brown',
-  'Alex Miller'
-]
-
-const availableContractors = [
-  'Elite Electrical Services',
-  'Bright Solutions Ltd',
-  'Power Solutions Inc',
-  'Climate Control Pro',
-  'TechFlow Systems',
-  'ProElectric Group'
-]
+// Removed hardcoded contractors - now using API
 
 const commonMaterials = [
   'Electrical Panel',
@@ -110,6 +88,12 @@ const commonMaterials = [
 
 export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) {
   const [currentStep, setCurrentStep] = useState(1)
+  const [selectedCustomerName, setSelectedCustomerName] = useState('')
+  const [selectedContractorName, setSelectedContractorName] = useState('')
+  const [selectedLeadLaborNames, setSelectedLeadLaborNames] = useState<string[]>([])
+  const [selectedLaborNames, setSelectedLaborNames] = useState<string[]>([])
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+  const [isCreatingJob, setIsCreatingJob] = useState(false)
   const [formData, setFormData] = useState({
     // Step 1: Job Type
     type: '' as 'service-based' | 'contract-based' | '',
@@ -117,7 +101,9 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     // Step 2: Basic Details
     title: '',
     customer: '', // Only for service-based jobs
+    customerName: '', // Store customer name for display
     contractor: '', // For contract-based jobs in step 2, service-based in step 3
+    contractorName: '', // Store contractor name for display
     description: '',
     priority: 'medium' as 'low' | 'medium' | 'high',
     
@@ -160,6 +146,129 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     return `JOB-${year}-${random}`
   }
 
+  const clearValidationError = (field: string) => {
+    if (validationErrors[field]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors[field]
+        return newErrors
+      })
+    }
+  }
+
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
+
+  const validatePhone = (phone: string): boolean => {
+    const phoneRegex = /^\d{10}$/
+    return phoneRegex.test(phone.replace(/\D/g, ''))
+  }
+
+  const validateStep2 = (): boolean => {
+    const errors: Record<string, string> = {}
+
+    // Required fields validation
+    if (!formData.title.trim()) {
+      errors.title = 'Job title is required'
+    }
+    if (!formData.description.trim()) {
+      errors.description = 'Job description is required'
+    }
+    if (!formData.address.trim()) {
+      errors.address = 'Address is required'
+    }
+    if (!formData.cityZip.trim()) {
+      errors.cityZip = 'City & ZIP is required'
+    }
+
+    // Job type specific validation
+    if (formData.type === 'service-based' && !formData.customer) {
+      errors.customer = 'Customer selection is required for service-based jobs'
+    }
+    if (formData.type === 'contract-based' && !formData.contractor) {
+      errors.contractor = 'Contractor selection is required for contract-based jobs'
+    }
+
+    // Email validation (if provided)
+    if (formData.email && !validateEmail(formData.email)) {
+      errors.email = 'Please enter a valid email address'
+    }
+
+    // Phone validation (if provided)
+    if (formData.phone && !validatePhone(formData.phone)) {
+      errors.phone = 'Phone number must be exactly 10 digits'
+    }
+
+    // Bill to email validation (if provided and not same as address)
+    if (!formData.sameAsAddress && formData.billToEmail && !validateEmail(formData.billToEmail)) {
+      errors.billToEmail = 'Please enter a valid email address'
+    }
+
+    // Bill to phone validation (if provided and not same as address)
+    if (!formData.sameAsAddress && formData.billToPhone && !validatePhone(formData.billToPhone)) {
+      errors.billToPhone = 'Phone number must be exactly 10 digits'
+    }
+
+    setValidationErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const validateStep3 = (): boolean => {
+    const errors: Record<string, string> = {}
+
+    if (!formData.dueDate) {
+      errors.dueDate = 'Due date is required'
+    } else {
+      // Validate due date is not in the past
+      const today = new Date()
+      const dueDate = new Date(formData.dueDate)
+      today.setHours(0, 0, 0, 0) // Reset time to start of day for comparison
+      
+      if (dueDate < today) {
+        errors.dueDate = 'Due date cannot be in the past'
+      }
+      
+      // Validate due date is not too far in the future (optional business rule)
+      const maxFutureDate = new Date()
+      maxFutureDate.setFullYear(maxFutureDate.getFullYear() + 2) // 2 years from now
+      
+      if (dueDate > maxFutureDate) {
+        errors.dueDate = 'Due date cannot be more than 2 years in the future'
+      }
+    }
+
+    // Validate lead labor and labor assignment
+    if (formData.assignedLabor.length === 0 && formData.assignedLeadLabor.length === 0) {
+      errors.assignedLabor = 'Please assign at least one lead labor or labor'
+    } else {
+      // Additional validation: recommend having at least one lead labor for supervision
+      if (formData.assignedLeadLabor.length === 0 && formData.assignedLabor.length > 0) {
+        errors.assignedLeadLabor = 'It is recommended to assign at least one lead labor for supervision'
+      }
+    }
+
+    // Validate estimated hours if provided
+    if (formData.estimatedHours !== undefined && formData.estimatedHours < 0) {
+      errors.estimatedHours = 'Estimated hours cannot be negative'
+    }
+    if (formData.estimatedHours !== undefined && formData.estimatedHours > 1000) {
+      errors.estimatedHours = 'Estimated hours seems too high. Please verify the value.'
+    }
+
+    // Validate estimated cost if provided
+    if (formData.estimatedCost !== undefined && formData.estimatedCost < 0) {
+      errors.estimatedCost = 'Estimated cost cannot be negative'
+    }
+    if (formData.estimatedCost !== undefined && formData.estimatedCost > 1000000) {
+      errors.estimatedCost = 'Estimated cost seems too high. Please verify the value.'
+    }
+
+    setValidationErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
   const handleSameAsAddressChange = (checked: boolean) => {
     if (checked) {
       setFormData(prev => ({
@@ -170,6 +279,9 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
         billToPhone: prev.phone,
         billToEmail: prev.email
       }))
+      // Clear bill to validation errors when using same as address
+      clearValidationError('billToEmail')
+      clearValidationError('billToPhone')
     } else {
       setFormData(prev => ({
         ...prev,
@@ -189,33 +301,17 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     }
     
     if (currentStep === 2) {
-      // Validate required fields based on job type
-      if (!formData.title || !formData.description || !formData.address || !formData.cityZip) {
-        toast.error('Please fill in all required fields')
-        return
-      }
-      
-      if (formData.type === 'service-based' && !formData.customer) {
-        toast.error('Please enter customer name for service-based jobs')
-        return
-      }
-      
-      if (formData.type === 'contract-based' && !formData.contractor) {
-        toast.error('Please select a contractor for contract-based jobs')
+      if (!validateStep2()) {
+        toast.error('Please fix the validation errors before proceeding')
         return
       }
     }
     
     if (currentStep === 3) {
-      if (!formData.dueDate) {
-        toast.error('Please select a due date')
+      if (!validateStep3()) {
+        toast.error('Please fix the validation errors before proceeding')
         return
       }
-      if (formData.assignedLabor.length === 0 && formData.assignedLeadLabor.length === 0) {
-        toast.error('Please assign at least one lead labor or labor')
-        return
-      }
-      // For service-based jobs, contractor selection is optional in step 3
     }
     
     setCurrentStep(prev => Math.min(prev + 1, 5))
@@ -225,55 +321,145 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     setCurrentStep(prev => Math.max(prev - 1, 1))
   }
 
-  const handleCreate = () => {
-    const newJob: Job = {
-      id: generateJobId(),
-      title: formData.title,
-      type: formData.type as 'service-based' | 'contract-based',
-      status: 'pending',
-      assignedLeadLabor: formData.assignedLeadLabor,
-      assignedLabor: formData.assignedLabor,
-      contractor: formData.contractor || undefined,
-      customer: formData.type === 'service-based' ? formData.customer : undefined,
-      description: formData.description,
-      createdDate: new Date().toISOString().split('T')[0],
-      dueDate: formData.dueDate,
-      estimatedHours: formData.estimatedHours || undefined,
-      estimatedCost: formData.estimatedCost || undefined,
-      materials: formData.materials.length > 0 ? formData.materials : undefined,
-      address: formData.address,
-      cityZip: formData.cityZip,
-      phone: formData.phone,
-      email: formData.email,
-      billToAddress: formData.billToAddress,
-      billToCityZip: formData.billToCityZip,
-      billToPhone: formData.billToPhone,
-      billToEmail: formData.billToEmail,
-      sameAsAddress: formData.sameAsAddress,
-      priority: formData.priority,
-      billingStatus: 'pending'
+  const handleCreate = async () => {
+    setIsCreatingJob(true)
+    try {
+      // Prepare the API payload
+      const jobPayload = {
+        job_title: formData.title,
+        job_type: formData.type === 'service-based' ? 'service_based' : 'contract_based',
+        customer_id: formData.type === 'service-based' && formData.customer ? parseInt(formData.customer) : undefined,
+        contractor_id: formData.contractor ? parseInt(formData.contractor) : undefined,
+        description: formData.description,
+        priority: formData.priority,
+        address: formData.address,
+        city_zip: formData.cityZip,
+        phone: formData.phone || undefined,
+        email: formData.email || undefined,
+        bill_to_address: formData.billToAddress || undefined,
+        bill_to_city_zip: formData.billToCityZip || undefined,
+        bill_to_phone: formData.billToPhone || undefined,
+        bill_to_email: formData.billToEmail || undefined,
+        same_as_address: formData.sameAsAddress,
+        due_date: formData.dueDate,
+        estimated_hours: formData.estimatedHours || undefined,
+        estimated_cost: formData.estimatedCost || undefined,
+        assigned_lead_labor_ids: formData.assignedLeadLabor.length > 0 ? JSON.stringify(formData.assignedLeadLabor) : undefined,
+        assigned_labor_ids: formData.assignedLabor.length > 0 ? JSON.stringify(formData.assignedLabor) : undefined,
+        assigned_material_ids: formData.materials.length > 0 ? JSON.stringify(formData.materials) : undefined,
+        status: 'active'
+      }
+
+      console.log('Creating job with payload:', jobPayload)
+
+      // Call the API
+      const response = await apiClient.createJob(jobPayload)
+      console.log('Job created successfully:', response)
+
+      // Create the local job object for the callback
+      const newJob: Job = {
+        id: response.data?.id || generateJobId(),
+        title: formData.title,
+        type: formData.type as 'service-based' | 'contract-based',
+        status: 'pending',
+        assignedLeadLabor: formData.assignedLeadLabor,
+        assignedLabor: formData.assignedLabor,
+        contractor: formData.contractor || undefined,
+        customer: formData.type === 'service-based' ? formData.customer : undefined,
+        description: formData.description,
+        createdDate: new Date().toISOString().split('T')[0],
+        dueDate: formData.dueDate,
+        estimatedHours: formData.estimatedHours || undefined,
+        estimatedCost: formData.estimatedCost || undefined,
+        materials: formData.materials.length > 0 ? formData.materials : undefined,
+        address: formData.address,
+        cityZip: formData.cityZip,
+        phone: formData.phone,
+        email: formData.email,
+        billToAddress: formData.billToAddress,
+        billToCityZip: formData.billToCityZip,
+        billToPhone: formData.billToPhone,
+        billToEmail: formData.billToEmail,
+        sameAsAddress: formData.sameAsAddress,
+        priority: formData.priority,
+        billingStatus: 'pending'
+      }
+
+      toast.success('Job created successfully!')
+      onJobCreated(newJob)
+    } catch (error) {
+      console.error('Error creating job:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to create job')
+    } finally {
+      setIsCreatingJob(false)
+    }
+  }
+
+  const handleLeadLaborChange = (selectedIds: string[], selectedItems: any[]) => {
+    setFormData({
+      ...formData,
+      assignedLeadLabor: selectedIds
+    })
+    setSelectedLeadLaborNames(selectedItems.map(item => item.name))
+  }
+
+  const handleLaborChange = (selectedIds: string[], selectedItems: any[]) => {
+    setFormData({
+      ...formData,
+      assignedLabor: selectedIds
+    })
+    setSelectedLaborNames(selectedItems.map(item => item.name))
+  }
+
+  // Effect to restore selected names from formData when component mounts or formData changes
+  useEffect(() => {
+    // Restore customer name from formData
+    if (formData.customerName && !selectedCustomerName) {
+      setSelectedCustomerName(formData.customerName)
     }
 
-    onJobCreated(newJob)
-  }
+    // Restore contractor name from formData
+    if (formData.contractorName && !selectedContractorName) {
+      setSelectedContractorName(formData.contractorName)
+    }
+  }, [formData.customerName, formData.contractorName, selectedCustomerName, selectedContractorName])
 
-  const toggleLeadLabor = (leadLabor: string) => {
-    setFormData({
-      ...formData,
-      assignedLeadLabor: formData.assignedLeadLabor.includes(leadLabor)
-        ? formData.assignedLeadLabor.filter(l => l !== leadLabor)
-        : [...formData.assignedLeadLabor, leadLabor]
-    })
-  }
+  // Fallback effect to restore names from API if not in formData (for backward compatibility)
+  useEffect(() => {
+    const restoreSelectedNamesFromAPI = async () => {
+      // Restore customer name if customer is selected but name is not in formData
+      if (formData.customer && !formData.customerName && !selectedCustomerName) {
+        try {
+          const response = await apiClient.getCustomers(1, 100) // Get more items to find the selected one
+          const customer = response.data.find((c: any) => c.id === formData.customer)
+          if (customer) {
+            const customerName = customer.name || customer.customer_name || customer.company_name || ''
+            setFormData(prev => ({ ...prev, customerName }))
+            setSelectedCustomerName(customerName)
+          }
+        } catch (error) {
+          console.error('Error restoring customer name from API:', error)
+        }
+      }
 
-  const toggleLabor = (labor: string) => {
-    setFormData({
-      ...formData,
-      assignedLabor: formData.assignedLabor.includes(labor)
-        ? formData.assignedLabor.filter(l => l !== labor)
-        : [...formData.assignedLabor, labor]
-    })
-  }
+      // Restore contractor name if contractor is selected but name is not in formData
+      if (formData.contractor && !formData.contractorName && !selectedContractorName) {
+        try {
+          const response = await apiClient.getContractors(1, 100) // Get more items to find the selected one
+          const contractor = response.data.find((c: any) => c.id === formData.contractor)
+          if (contractor) {
+            const contractorName = contractor.name || contractor.contractor_name || contractor.company_name || ''
+            setFormData(prev => ({ ...prev, contractorName }))
+            setSelectedContractorName(contractorName)
+          }
+        } catch (error) {
+          console.error('Error restoring contractor name from API:', error)
+        }
+      }
+    }
+
+    restoreSelectedNamesFromAPI()
+  }, [formData.customer, formData.contractor, formData.customerName, formData.contractorName, selectedCustomerName, selectedContractorName])
 
   const toggleMaterial = (material: string) => {
     setFormData({
@@ -389,35 +575,63 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             <Input
               id="title"
               value={formData.title}
-              onChange={(e) => setFormData({...formData, title: e.target.value})}
+              onChange={(e) => {
+                setFormData({...formData, title: e.target.value})
+                clearValidationError('title')
+              }}
               placeholder="Enter job title"
+              className={validationErrors.title ? 'border-red-500' : ''}
+              required
             />
+            {validationErrors.title && (
+              <p className="text-red-500 text-sm">{validationErrors.title}</p>
+            )}
           </div>
 
           {/* Customer field only for service-based jobs, Contractor field for contract-based */}
           {formData.type === 'service-based' ? (
             <div className="space-y-2">
               <Label htmlFor="customer">Customer *</Label>
-              <Input
-                id="customer"
+              <AutoScrollSelect
                 value={formData.customer}
-                onChange={(e) => setFormData({...formData, customer: e.target.value})}
-                placeholder="Enter customer name"
+                onValueChange={(value, item) => {
+                  console.log('Customer selected:', { value, item, name: item?.name })
+                  const customerName = item?.name || item?.customer_name || item?.company_name || ''
+                  setFormData({...formData, customer: value, customerName: customerName})
+                  setSelectedCustomerName(customerName)
+                  clearValidationError('customer')
+                }}
+                placeholder="Select customer"
+                fetchData={apiClient.getCustomers}
+                displayField="name"
+                valueField="id"
+                className={validationErrors.customer ? 'border-red-500' : ''}
               />
+              {validationErrors.customer && (
+                <p className="text-red-500 text-sm">{validationErrors.customer}</p>
+              )}
             </div>
           ) : (
             <div className="space-y-2">
               <Label htmlFor="contractor">Contractor *</Label>
-              <Select value={formData.contractor} onValueChange={(value) => setFormData({...formData, contractor: value})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select contractor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableContractors.map((contractor) => (
-                    <SelectItem key={contractor} value={contractor}>{contractor}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <AutoScrollSelect
+                value={formData.contractor}
+                onValueChange={(value, item) => {
+                  console.log('Contractor selected:', { value, item, name: item?.name })
+                  const contractorName = item?.name || item?.contractor_name || item?.company_name || ''
+                  setFormData({...formData, contractor: value, contractorName: contractorName})
+                  setSelectedContractorName(contractorName)
+                  clearValidationError('contractor')
+                }}
+                placeholder="Select contractor"
+                fetchData={apiClient.getContractors}
+                displayField="name"
+                valueField="id"
+                className={validationErrors.contractor ? 'border-red-500' : ''}
+              />
+              {validationErrors.contractor && (
+                <p className="text-red-500 text-sm">{validationErrors.contractor}</p>
+              )}
             </div>
           )}
         </div>
@@ -427,10 +641,18 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
           <Textarea
             id="description"
             value={formData.description}
-            onChange={(e) => setFormData({...formData, description: e.target.value})}
+            onChange={(e) => {
+              setFormData({...formData, description: e.target.value})
+              clearValidationError('description')
+            }}
             placeholder="Describe the job requirements and scope"
             rows={4}
+            className={validationErrors.description ? 'border-red-500' : ''}
+            required
           />
+          {validationErrors.description && (
+            <p className="text-red-500 text-sm">{validationErrors.description}</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -466,9 +688,15 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                     newFormData.billToAddress = e.target.value
                   }
                   setFormData(newFormData)
+                  clearValidationError('address')
                 }}
                 placeholder="Enter street address"
+                className={validationErrors.address ? 'border-red-500' : ''}
+                required
               />
+              {validationErrors.address && (
+                <p className="text-red-500 text-sm">{validationErrors.address}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -482,9 +710,15 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                     newFormData.billToCityZip = e.target.value
                   }
                   setFormData(newFormData)
+                  clearValidationError('cityZip')
                 }}
                 placeholder="City, State ZIP"
+                className={validationErrors.cityZip ? 'border-red-500' : ''}
+                required
               />
+              {validationErrors.cityZip && (
+                <p className="text-red-500 text-sm">{validationErrors.cityZip}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -498,9 +732,14 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                     newFormData.billToPhone = e.target.value
                   }
                   setFormData(newFormData)
+                  clearValidationError('phone')
                 }}
-                placeholder="Phone number"
+                placeholder="Phone number (10 digits)"
+                className={validationErrors.phone ? 'border-red-500' : ''}
               />
+              {validationErrors.phone && (
+                <p className="text-red-500 text-sm">{validationErrors.phone}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -515,9 +754,14 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                     newFormData.billToEmail = e.target.value
                   }
                   setFormData(newFormData)
+                  clearValidationError('email')
                 }}
                 placeholder="Email address"
+                className={validationErrors.email ? 'border-red-500' : ''}
               />
+              {validationErrors.email && (
+                <p className="text-red-500 text-sm">{validationErrors.email}</p>
+              )}
             </div>
           </div>
         </div>
@@ -570,11 +814,17 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               <Input
                 id="billToPhone"
                 value={formData.billToPhone}
-                onChange={(e) => setFormData({...formData, billToPhone: e.target.value})}
-                placeholder="Phone number"
+                onChange={(e) => {
+                  setFormData({...formData, billToPhone: e.target.value})
+                  clearValidationError('billToPhone')
+                }}
+                placeholder="Phone number (10 digits)"
                 disabled={formData.sameAsAddress}
-                className={formData.sameAsAddress ? 'bg-gray-50' : ''}
+                className={`${formData.sameAsAddress ? 'bg-gray-50' : ''} ${validationErrors.billToPhone ? 'border-red-500' : ''}`}
               />
+              {validationErrors.billToPhone && (
+                <p className="text-red-500 text-sm">{validationErrors.billToPhone}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -583,11 +833,17 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                 id="billToEmail"
                 type="email"
                 value={formData.billToEmail}
-                onChange={(e) => setFormData({...formData, billToEmail: e.target.value})}
+                onChange={(e) => {
+                  setFormData({...formData, billToEmail: e.target.value})
+                  clearValidationError('billToEmail')
+                }}
                 placeholder="Email address"
                 disabled={formData.sameAsAddress}
-                className={formData.sameAsAddress ? 'bg-gray-50' : ''}
+                className={`${formData.sameAsAddress ? 'bg-gray-50' : ''} ${validationErrors.billToEmail ? 'border-red-500' : ''}`}
               />
+              {validationErrors.billToEmail && (
+                <p className="text-red-500 text-sm">{validationErrors.billToEmail}</p>
+              )}
             </div>
           </div>
         </div>
@@ -608,8 +864,17 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               id="dueDate"
               type="date"
               value={formData.dueDate}
-              onChange={(e) => setFormData({...formData, dueDate: e.target.value})}
+              min={new Date().toISOString().split('T')[0]} // Prevent selecting past dates
+              onChange={(e) => {
+                setFormData({...formData, dueDate: e.target.value})
+                clearValidationError('dueDate')
+              }}
+              className={validationErrors.dueDate ? 'border-red-500' : ''}
+              required
             />
+            {validationErrors.dueDate && (
+              <p className="text-red-500 text-sm">{validationErrors.dueDate}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -617,10 +882,18 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             <Input
               id="estimatedHours"
               type="number"
+              min="0"
               value={formData.estimatedHours || ''}
-              onChange={(e) => setFormData({...formData, estimatedHours: Number(e.target.value)})}
+              onChange={(e) => {
+                setFormData({...formData, estimatedHours: Number(e.target.value)})
+                clearValidationError('estimatedHours')
+              }}
               placeholder="0"
+              className={validationErrors.estimatedHours ? 'border-red-500' : ''}
             />
+            {validationErrors.estimatedHours && (
+              <p className="text-red-500 text-sm">{validationErrors.estimatedHours}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -628,10 +901,19 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             <Input
               id="estimatedCost"
               type="number"
+              min="0"
+              step="0.01"
               value={formData.estimatedCost || ''}
-              onChange={(e) => setFormData({...formData, estimatedCost: Number(e.target.value)})}
-              placeholder="0"
+              onChange={(e) => {
+                setFormData({...formData, estimatedCost: Number(e.target.value)})
+                clearValidationError('estimatedCost')
+              }}
+              placeholder="0.00"
+              className={validationErrors.estimatedCost ? 'border-red-500' : ''}
             />
+            {validationErrors.estimatedCost && (
+              <p className="text-red-500 text-sm">{validationErrors.estimatedCost}</p>
+            )}
           </div>
         </div>
 
@@ -639,17 +921,18 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
         {formData.type === 'service-based' && (
           <div className="space-y-2">
             <Label htmlFor="serviceContractor">Contractor (Optional)</Label>
-            <Select value={formData.contractor || 'none'} onValueChange={(value) => setFormData({...formData, contractor: value === 'none' ? '' : value})}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select contractor (optional)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No contractor</SelectItem>
-                {availableContractors.map((contractor) => (
-                  <SelectItem key={contractor} value={contractor}>{contractor}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <AutoScrollSelect
+              value={formData.contractor || ''}
+              onValueChange={(value, item) => {
+                const contractorName = item?.name || item?.contractor_name || item?.company_name || ''
+                setFormData({...formData, contractor: value, contractorName: contractorName})
+                setSelectedContractorName(contractorName)
+              }}
+              placeholder="Select contractor (optional)"
+              fetchData={apiClient.getContractors}
+              displayField="name"
+              valueField="id"
+            />
           </div>
         )}
 
@@ -660,41 +943,20 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             Assigned Lead Labor
           </Label>
           <p className="text-sm text-gray-600 mb-3">Select lead labor to assign to this job</p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {availableLeadLabor.map((leadLabor) => (
-              <div
-                key={leadLabor}
-                className={`
-                  p-3 border rounded-lg cursor-pointer transition-all
-                  ${formData.assignedLeadLabor.includes(leadLabor) 
-                    ? 'border-[#00A1FF] bg-[#E6F6FF]' 
-                    : 'border-gray-200 hover:border-gray-300'
-                  }
-                `}
-                onClick={() => toggleLeadLabor(leadLabor)}
-              >
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    checked={formData.assignedLeadLabor.includes(leadLabor)}
-                    onCheckedChange={() => toggleLeadLabor(leadLabor)}
-                  />
-                  <span className="text-sm font-medium">{leadLabor}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          {formData.assignedLeadLabor.length > 0 && (
-            <div className="mt-4">
-              <p className="text-sm text-gray-600 mb-2">Selected Lead Labor ({formData.assignedLeadLabor.length}):</p>
-              <div className="flex flex-wrap gap-2">
-                {formData.assignedLeadLabor.map((leadLabor) => (
-                  <Badge key={leadLabor} className="bg-[#E6F6FF] text-[#00A1FF] border-[#00A1FF]/20">
-                    {leadLabor}
-                  </Badge>
-                ))}
-              </div>
-            </div>
+          <AutoScrollMultiSelect
+            selectedValues={formData.assignedLeadLabor}
+            onSelectionChange={(selectedIds, selectedItems) => {
+              handleLeadLaborChange(selectedIds, selectedItems)
+              clearValidationError('assignedLabor')
+              clearValidationError('assignedLeadLabor')
+            }}
+            placeholder="Select lead labor"
+            fetchData={apiClient.getLeadLabor}
+            displayField="name"
+            valueField="id"
+          />
+          {validationErrors.assignedLeadLabor && (
+            <p className="text-red-500 text-sm mt-2">{validationErrors.assignedLeadLabor}</p>
           )}
         </div>
 
@@ -705,41 +967,19 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             Assigned Labor
           </Label>
           <p className="text-sm text-gray-600 mb-3">Select labor to assign to this job</p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {availableLabor.map((labor) => (
-              <div
-                key={labor}
-                className={`
-                  p-3 border rounded-lg cursor-pointer transition-all
-                  ${formData.assignedLabor.includes(labor) 
-                    ? 'border-[#00A1FF] bg-[#E6F6FF]' 
-                    : 'border-gray-200 hover:border-gray-300'
-                  }
-                `}
-                onClick={() => toggleLabor(labor)}
-              >
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    checked={formData.assignedLabor.includes(labor)}
-                    onCheckedChange={() => toggleLabor(labor)}
-                  />
-                  <span className="text-sm font-medium">{labor}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          {formData.assignedLabor.length > 0 && (
-            <div className="mt-4">
-              <p className="text-sm text-gray-600 mb-2">Selected Labor ({formData.assignedLabor.length}):</p>
-              <div className="flex flex-wrap gap-2">
-                {formData.assignedLabor.map((labor) => (
-                  <Badge key={labor} className="bg-[#E6F6FF] text-[#00A1FF] border-[#00A1FF]/20">
-                    {labor}
-                  </Badge>
-                ))}
-              </div>
-            </div>
+          <AutoScrollMultiSelect
+            selectedValues={formData.assignedLabor}
+            onSelectionChange={(selectedIds, selectedItems) => {
+              handleLaborChange(selectedIds, selectedItems)
+              clearValidationError('assignedLabor')
+            }}
+            placeholder="Select labor"
+            fetchData={apiClient.getLabor}
+            displayField="name"
+            valueField="id"
+          />
+          {validationErrors.assignedLabor && (
+            <p className="text-red-500 text-sm mt-2">{validationErrors.assignedLabor}</p>
           )}
         </div>
       </CardContent>
@@ -818,13 +1058,17 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                 {formData.type === 'service-based' && formData.customer && (
                   <div className="flex justify-between">
                     <span className="text-gray-600">Customer:</span>
-                    <span className="font-medium">{formData.customer}</span>
+                    <span className="font-medium">
+                      {formData.customerName || selectedCustomerName || `Customer ID: ${formData.customer}`}
+                    </span>
                   </div>
                 )}
                 {formData.contractor && (
                   <div className="flex justify-between">
                     <span className="text-gray-600">Contractor:</span>
-                    <span className="font-medium">{formData.contractor}</span>
+                    <span className="font-medium">
+                      {formData.contractorName || selectedContractorName || `Contractor ID: ${formData.contractor}`}
+                    </span>
                   </div>
                 )}
                 <div className="flex justify-between">
@@ -849,11 +1093,11 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             <div>
               <h4 className="font-medium text-[#2b2b2b] mb-2">Location Information</h4>
               <div className="space-y-2 text-sm">
-                <div>
+                <div className="flex justify-between">
                   <span className="text-gray-600">Address:</span>
                   <p className="font-medium">{formData.address}</p>
                 </div>
-                <div>
+                <div className="flex justify-between">
                   <span className="text-gray-600">City & Zip:</span>
                   <p className="font-medium">{formData.cityZip}</p>
                 </div>
@@ -931,9 +1175,9 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               <div>
                 <h4 className="font-medium text-[#2b2b2b] mb-2">Assigned Lead Labor ({formData.assignedLeadLabor.length})</h4>
                 <div className="flex flex-wrap gap-1">
-                  {formData.assignedLeadLabor.map((leadLabor) => (
-                    <Badge key={leadLabor} className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
-                      {leadLabor}
+                  {selectedLeadLaborNames.map((leadLaborName, index) => (
+                    <Badge key={formData.assignedLeadLabor[index]} className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                      {leadLaborName}
                     </Badge>
                   ))}
                 </div>
@@ -944,9 +1188,9 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               <div>
                 <h4 className="font-medium text-[#2b2b2b] mb-2">Assigned Labor ({formData.assignedLabor.length})</h4>
                 <div className="flex flex-wrap gap-1">
-                  {formData.assignedLabor.map((labor) => (
-                    <Badge key={labor} className="bg-gray-50 text-gray-700 border-gray-200 text-xs">
-                      {labor}
+                  {selectedLaborNames.map((laborName, index) => (
+                    <Badge key={formData.assignedLabor[index]} className="bg-gray-50 text-gray-700 border-gray-200 text-xs">
+                      {laborName}
                     </Badge>
                   ))}
                 </div>
@@ -1022,10 +1266,20 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
         ) : (
           <Button
             onClick={handleCreate}
-            className="bg-green-600 hover:bg-green-700 gap-2"
+            disabled={isCreatingJob}
+            className="bg-primary text-white hover:bg-[#0090e6] gap-2"
           >
-            <Check className="h-4 w-4" />
-            Create Job
+            {isCreatingJob ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Creating Job...
+              </>
+            ) : (
+              <>
+                <Check className="h-4 w-4" />
+                Create Job
+              </>
+            )}
           </Button>
         )}
       </div>

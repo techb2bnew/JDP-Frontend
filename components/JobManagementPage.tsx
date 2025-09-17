@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -11,8 +11,10 @@ import { JobCreationPage } from './JobCreationPage'
 import { TimesheetManagement } from './TimesheetManagement'
 import { InvoiceComparison } from './InvoiceComparison'
 import { JobApprovals } from './JobApprovals'
+import { LoadingSpinner } from './common/LoadingSpinner'
 import { toast } from 'sonner'
 import { usePermissions } from '../contexts/PermissionContext'
+import { apiClient } from '../utils/api'
 import { 
   Plus, 
   Search, 
@@ -32,9 +34,10 @@ interface Job {
   title: string
   type: 'service-based' | 'contract-based'
   status: 'pending' | 'in-progress' | 'completed' | 'cancelled'
+  assignedLeadLabor: string[]
   assignedLabor: string[]
   contractor?: string
-  customer: string
+  customer?: string
   description: string
   createdDate: string
   dueDate: string
@@ -43,93 +46,30 @@ interface Job {
   estimatedCost?: number
   actualCost?: number
   materials?: string[]
-  location: string
-  priority: 'low' | 'medium' | 'high'
+  address: string
+  cityZip: string
+  phone?: string
+  email?: string
+  billToAddress?: string
+  billToCityZip?: string
+  billToPhone?: string
+  billToEmail?: string
+  sameAsAddress: boolean
+  priority: 'low' | 'medium' | 'high' | 'urgent'
   billingStatus?: 'pending' | 'invoiced' | 'paid'
+  // Additional fields from API
+  customerName?: string
+  contractorName?: string
+  createdBy?: string
+  assignedLeadLaborDetails?: any[]
+  assignedLaborDetails?: any[]
+  assignedMaterialsDetails?: any[]
 }
-
-const initialJobs: Job[] = [
-  {
-    id: 'JOB-2025-001',
-    title: 'Electrical Panel Installation',
-    type: 'service-based',
-    status: 'in-progress',
-    assignedLabor: ['John Smith', 'David Wilson'],
-    contractor: 'Elite Electrical Services',
-    customer: 'ABC Corporation',
-    description: 'Install new electrical panel and upgrade wiring system',
-    createdDate: '2025-01-15',
-    dueDate: '2025-01-30',
-    estimatedHours: 40,
-    actualHours: 25,
-    estimatedCost: 5000,
-    actualCost: 3200,
-    materials: ['Electrical Panel', 'Copper Wire', 'Circuit Breakers'],
-    location: '123 Business Ave, New York',
-    priority: 'high',
-    billingStatus: 'pending'
-  },
-  {
-    id: 'JOB-2025-002',
-    title: 'Office Lighting Maintenance',
-    type: 'contract-based',
-    status: 'pending',
-    assignedLabor: ['Sarah Johnson'],
-    contractor: 'Bright Solutions Ltd',
-    customer: 'XYZ Office Complex',
-    description: 'Monthly maintenance of office lighting systems',
-    createdDate: '2025-01-18',
-    dueDate: '2025-02-15',
-    estimatedHours: 16,
-    estimatedCost: 1200,
-    materials: ['LED Bulbs', 'Ballasts'],
-    location: '456 Corporate Blvd, New York',
-    priority: 'medium',
-    billingStatus: 'pending'
-  },
-  {
-    id: 'JOB-2025-003',
-    title: 'Emergency Generator Setup',
-    type: 'service-based',
-    status: 'completed',
-    assignedLabor: ['Mike Rodriguez', 'Tom Anderson'],
-    contractor: 'Power Solutions Inc',
-    customer: 'Healthcare Center',
-    description: 'Install and configure emergency backup generator',
-    createdDate: '2025-01-10',
-    dueDate: '2025-01-25',
-    estimatedHours: 32,
-    actualHours: 30,
-    estimatedCost: 8500,
-    actualCost: 8200,
-    materials: ['Generator Unit', 'Transfer Switch', 'Fuel Tank'],
-    location: '789 Medical Drive, New York',
-    priority: 'high',
-    billingStatus: 'invoiced'
-  },
-  {
-    id: 'JOB-2025-004',
-    title: 'HVAC System Repair',
-    type: 'service-based',
-    status: 'pending',
-    assignedLabor: ['Lisa Chen'],
-    contractor: 'Climate Control Pro',
-    customer: 'Retail Plaza',
-    description: 'Repair and service HVAC system for retail space',
-    createdDate: '2025-01-20',
-    dueDate: '2025-02-05',
-    estimatedHours: 24,
-    estimatedCost: 3500,
-    materials: ['HVAC Parts', 'Filters', 'Refrigerant'],
-    location: '321 Shopping Center, New York',
-    priority: 'medium',
-    billingStatus: 'pending'
-  }
-]
 
 export function JobManagementPage() {
   const { hasPermission } = usePermissions()
-  const [jobs, setJobs] = useState<Job[]>(initialJobs)
+  const [jobs, setJobs] = useState<Job[]>([])
+  const [loading, setLoading] = useState(true)
   const [currentView, setCurrentView] = useState<'list' | 'details' | 'create' | 'timesheets' | 'invoices' | 'approvals'>('list')
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -138,15 +78,43 @@ export function JobManagementPage() {
   const [filterLabor, setFilterLabor] = useState<string>('all')
   const [filterPriority, setFilterPriority] = useState<string>('all')
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 6
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalJobs, setTotalJobs] = useState(0)
+  const itemsPerPage = 5
 
-  const uniqueLabor = Array.from(new Set(jobs.flatMap(job => job.assignedLabor)))
+  // Fetch jobs from API
+  const fetchJobs = async (page: number = 1) => {
+    try {
+      setLoading(true)
+      const response = await apiClient.getJobs(page, itemsPerPage)
+      setJobs(response.data)
+      setTotalPages(response.totalPages)
+      setTotalJobs(response.total)
+      setCurrentPage(page)
+    } catch (error) {
+      console.error('Error fetching jobs:', error)
+      toast.error('Failed to fetch jobs')
+    } finally {
+      setLoading(false)
+    }
+  }
 
+  // Load jobs on component mount
+  useEffect(() => {
+    fetchJobs(1)
+  }, [])
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    fetchJobs(page)
+  }
+
+  // Client-side filtering for search and other filters
   const filteredJobs = jobs.filter(job => {
     const matchesSearch = job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          job.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         job.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         job.contractor?.toLowerCase().includes(searchTerm.toLowerCase())
+                         job.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         job.contractorName?.toLowerCase().includes(searchTerm.toLowerCase())
     
     const matchesType = filterType === 'all' || job.type === filterType
     const matchesStatus = filterStatus === 'all' || job.status === filterStatus
@@ -156,12 +124,7 @@ export function JobManagementPage() {
     return matchesSearch && matchesType && matchesStatus && matchesLabor && matchesPriority
   })
 
-  const paginatedJobs = filteredJobs.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
-
-  const totalPages = Math.ceil(filteredJobs.length / itemsPerPage)
+  const uniqueLabor = Array.from(new Set(jobs.flatMap(job => job.assignedLaborDetails?.map(l => l.user?.full_name) || [])))
 
   const handleViewDetails = (jobId: string) => {
     setSelectedJobId(jobId)
@@ -170,6 +133,13 @@ export function JobManagementPage() {
 
   const handleCreateJob = () => {
     setCurrentView('create')
+  }
+
+  const handleJobCreated = (newJob: Job) => {
+    // Refresh the jobs list
+    fetchJobs(currentPage)
+    setCurrentView('list')
+    toast.success('Job created successfully!')
   }
 
   const handleEditJob = (job: Job) => {
@@ -236,6 +206,12 @@ export function JobManagementPage() {
 
   const getPriorityBadge = (priority: string) => {
     switch (priority) {
+      case 'urgent':
+        return (
+          <Badge className="bg-red-100 text-red-700 border-red-300 hover:bg-red-100">
+            Urgent
+          </Badge>
+        )
       case 'high':
         return (
           <Badge className="bg-red-50 text-red-600 border-red-200 hover:bg-red-50">
@@ -301,20 +277,25 @@ export function JobManagementPage() {
     return (
       <JobCreationPage 
         onBack={handleBackToList}
-        onJobCreated={(newJob) => {
-          setJobs([...jobs])
-          setCurrentView('list')
-          toast.success('Job created successfully')
-        }}
+        onJobCreated={handleJobCreated}
       />
     )
   }
+
+  // Transform jobs for other components that expect different interface
+  const transformedJobs = jobs.map(job => ({
+    ...job,
+    location: `${job.address}, ${job.cityZip}`,
+    customer: job.customerName || job.customer || 'Unknown Customer',
+    priority: job.priority === 'urgent' ? 'high' : job.priority,
+    assignedLabor: job.assignedLaborDetails?.map(l => l.user?.full_name || l.labor_code) || []
+  }))
 
   if (currentView === 'timesheets') {
     return (
       <TimesheetManagement 
         onBack={handleBackToList}
-        jobs={jobs}
+        jobs={transformedJobs}
       />
     )
   }
@@ -323,7 +304,7 @@ export function JobManagementPage() {
     return (
       <InvoiceComparison 
         onBack={handleBackToList}
-        jobs={jobs}
+        jobs={transformedJobs}
       />
     )
   }
@@ -332,7 +313,7 @@ export function JobManagementPage() {
     return (
       <JobApprovals 
         onBack={handleBackToList}
-        jobs={jobs}
+        jobs={transformedJobs}
       />
     )
   }
@@ -505,7 +486,7 @@ export function JobManagementPage() {
                 <SelectValue placeholder="Priority" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Priority</SelectItem>
+                <SelectItem value="all">All Priority</SelectItem> 
                 <SelectItem value="high">High</SelectItem>
                 <SelectItem value="medium">Medium</SelectItem>
                 <SelectItem value="low">Low</SelectItem>
@@ -521,8 +502,13 @@ export function JobManagementPage() {
       </Card>
 
       {/* Jobs Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {paginatedJobs.map((job) => (
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <LoadingSpinner />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {filteredJobs.map((job) => (
           <Card key={job.id} className="bg-white shadow-md border-0 hover:shadow-md transition-shadow">
             <CardHeader className="pb-4">
               <div className="flex items-start justify-between">
@@ -553,24 +539,26 @@ export function JobManagementPage() {
               <p className="text-sm text-gray-700">{job.description}</p>
               
               <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <User className="h-4 w-4 text-gray-400" />
-                  <span className="text-gray-600">Customer:</span>
-                  <span className="font-medium text-[#2b2b2b]">{job.customer}</span>
-                </div>
+                {job.customerName && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <User className="h-4 w-4 text-gray-400" />
+                    <span className="text-gray-600">Customer:</span>
+                    <span className="font-medium text-[#2b2b2b]">{job.customerName}</span>
+                  </div>
+                )}
                 
-                {job.contractor && (
+                {job.contractorName && (
                   <div className="flex items-center gap-2 text-sm">
                     <Users className="h-4 w-4 text-gray-400" />
                     <span className="text-gray-600">Contractor:</span>
-                    <span className="font-medium text-[#2b2b2b]">{job.contractor}</span>
+                    <span className="font-medium text-[#2b2b2b]">{job.contractorName}</span>
                   </div>
                 )}
                 
                 <div className="flex items-center gap-2 text-sm">
                   <MapPin className="h-4 w-4 text-gray-400" />
                   <span className="text-gray-600">Location:</span>
-                  <span className="font-medium text-[#2b2b2b]">{job.location}</span>
+                  <span className="font-medium text-[#2b2b2b]">{job.address}, {job.cityZip}</span>
                 </div>
                 
                 <div className="flex items-center gap-2 text-sm">
@@ -588,13 +576,26 @@ export function JobManagementPage() {
                 </div>
               </div>
 
-              {job.assignedLabor.length > 0 && (
+              {job.assignedLaborDetails && job.assignedLaborDetails.length > 0 && (
                 <div>
                   <p className="text-sm text-gray-600 mb-2">Assigned Labor:</p>
                   <div className="flex flex-wrap gap-1">
-                    {job.assignedLabor.map((labor, index) => (
+                    {job.assignedLaborDetails.map((labor, index) => (
                       <Badge key={index} className="bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-50">
-                        {labor}
+                        {labor.user?.full_name || labor.labor_code}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {job.assignedLeadLaborDetails && job.assignedLeadLaborDetails.length > 0 && (
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">Lead Labor:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {job.assignedLeadLaborDetails.map((leadLabor, index) => (
+                      <Badge key={index} className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-50">
+                        {leadLabor.user?.full_name || leadLabor.labor_code}
                       </Badge>
                     ))}
                   </div>
@@ -602,8 +603,9 @@ export function JobManagementPage() {
               )}
             </CardContent>
           </Card>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Empty State */}
       {filteredJobs.length === 0 && (
@@ -632,8 +634,8 @@ export function JobManagementPage() {
         <div className="flex items-center justify-center gap-2">
           <Button
             variant="outline"
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1 || loading}
           >
             Previous
           </Button>
@@ -642,7 +644,8 @@ export function JobManagementPage() {
             <Button
               key={page}
               variant={currentPage === page ? "default" : "outline"}
-              onClick={() => setCurrentPage(page)}
+              onClick={() => handlePageChange(page)}
+              disabled={loading}
               className={currentPage === page ? "bg-primary text-white hover:bg-[#0090e6]" : ""}
             >
               {page}
@@ -651,13 +654,18 @@ export function JobManagementPage() {
           
           <Button
             variant="outline"
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages || loading}
           >
             Next
           </Button>
         </div>
       )}
+
+      {/* Results Info */}
+      <div className="text-center text-sm text-gray-600">
+        Showing {jobs.length} of {totalJobs} jobs
+      </div>
     </div>
   )
 }
