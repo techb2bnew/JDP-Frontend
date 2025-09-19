@@ -5,6 +5,7 @@ import { Input } from './ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog'
 import { ActionButtonsPopup } from './ActionButtonsPopup'
 import { JobDetailsPage } from './JobDetailsPage'
 import { JobCreationPage } from './JobCreationPage'
@@ -80,6 +81,20 @@ export function JobManagementPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalJobs, setTotalJobs] = useState(0)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [jobToDelete, setJobToDelete] = useState<string | null>(null)
+  const [jobStats, setJobStats] = useState({
+    total: 0,
+    active: 0,
+    completed: 0,
+    draft: 0,
+    pending: 0,
+    totalRevenue: '0.00',
+    activePercentage: '0.0',
+    completedPercentage: '0.0',
+    draftPercentage: '0.0',
+    pendingPercentage: '0.0'
+  })
   const itemsPerPage = 5
 
   // Fetch jobs from API
@@ -99,9 +114,21 @@ export function JobManagementPage() {
     }
   }
 
-  // Load jobs on component mount
+  // Fetch job statistics from API
+  const fetchJobStats = async () => {
+    try {
+      const stats = await apiClient.getJobStats()
+      setJobStats(stats)
+    } catch (error) {
+      console.error('Error fetching job statistics:', error)
+      // Don't show toast error for stats as it's not critical
+    }
+  }
+
+  // Load jobs and stats on component mount
   useEffect(() => {
     fetchJobs(1)
+    fetchJobStats()
   }, [])
 
   // Handle page change
@@ -126,9 +153,25 @@ export function JobManagementPage() {
 
   const uniqueLabor = Array.from(new Set(jobs.flatMap(job => job.assignedLaborDetails?.map(l => l.user?.full_name) || [])))
 
-  const handleViewDetails = (jobId: string) => {
-    setSelectedJobId(jobId)
-    setCurrentView('details')
+  const handleViewDetails = async (jobId: string) => {
+    try {
+      setLoading(true)
+      // Fetch the latest job details from API
+      const jobDetails = await apiClient.getJobById(jobId)
+      
+      // Update the jobs array with the fetched job details
+      setJobs(prevJobs => 
+        prevJobs.map(j => j.id === jobId ? jobDetails : j)
+      )
+      
+      setSelectedJobId(jobId)
+      setCurrentView('details')
+    } catch (error) {
+      console.error('Error fetching job details:', error)
+      toast.error('Failed to load job details')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleCreateJob = () => {
@@ -136,21 +179,63 @@ export function JobManagementPage() {
   }
 
   const handleJobCreated = (newJob: Job) => {
-    // Refresh the jobs list
+    // Refresh the jobs list and stats
     fetchJobs(currentPage)
+    fetchJobStats()
     setCurrentView('list')
     toast.success('Job created successfully!')
   }
 
-  const handleEditJob = (job: Job) => {
-    setSelectedJobId(job.id)
-    setCurrentView('details')
-    toast.success(`Editing job: ${job.title}`)
+  const handleEditJob = async (job: Job) => {
+    try {
+      setLoading(true)
+      // Fetch the latest job details from API
+      const jobDetails = await apiClient.getJobById(job.id)
+      
+      // Update the jobs array with the fetched job details
+      setJobs(prevJobs => 
+        prevJobs.map(j => j.id === job.id ? jobDetails : j)
+      )
+      
+      setSelectedJobId(job.id)
+      setCurrentView('details')
+      toast.success(`Editing job: ${jobDetails.title}`)
+    } catch (error) {
+      console.error('Error fetching job details:', error)
+      toast.error('Failed to load job details')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleDeleteJob = (jobId: string) => {
-    setJobs(jobs.filter(job => job.id !== jobId))
-    toast.success('Job deleted successfully')
+    setJobToDelete(jobId)
+    setShowDeleteDialog(true)
+  }
+
+  const confirmDeleteJob = async () => {
+    if (!jobToDelete) return
+
+    try {
+      // Call the delete API
+      await apiClient.deleteJob(jobToDelete)
+      
+      // Remove the job from the local state and refresh stats
+      setJobs(jobs.filter(job => job.id !== jobToDelete))
+      fetchJobStats()
+      toast.success('Job deleted successfully')
+    } catch (error) {
+      console.error('Error deleting job:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to delete job')
+    } finally {
+      setShowDeleteDialog(false)
+      setJobToDelete(null)
+    }
+  }
+
+  const cancelDeleteJob = () => {
+    setShowDeleteDialog(false)
+    setJobToDelete(null)
   }
 
   const handleBackToList = () => {
@@ -373,7 +458,7 @@ export function JobManagementPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Jobs</p>
-                <p className="text-2xl font-medium text-[#2b2b2b]">{jobs.length}</p>
+                <p className="text-2xl font-medium text-[#2b2b2b]">{jobStats.total}</p>
               </div>
               <div className="w-12 h-12 bg-[#E6F6FF] rounded-lg flex items-center justify-center">
                 <FileText className="h-6 w-6 text-[#00A1FF]" />
@@ -386,10 +471,8 @@ export function JobManagementPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">In Progress</p>
-                <p className="text-2xl font-medium text-[#2b2b2b]">
-                  {jobs.filter(job => job.status === 'in-progress').length}
-                </p>
+                <p className="text-sm text-gray-600">Active</p>
+                <p className="text-2xl font-medium text-[#2b2b2b]">{jobStats.active}</p>
               </div>
               <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
                 <Clock className="h-6 w-6 text-blue-600" />
@@ -403,9 +486,7 @@ export function JobManagementPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Completed</p>
-                <p className="text-2xl font-medium text-[#2b2b2b]">
-                  {jobs.filter(job => job.status === 'completed').length}
-                </p>
+                <p className="text-2xl font-medium text-[#2b2b2b]">{jobStats.completed}</p>
               </div>
               <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
                 <CheckSquare className="h-6 w-6 text-green-600" />
@@ -420,7 +501,7 @@ export function JobManagementPage() {
               <div>
                 <p className="text-sm text-gray-600">Total Revenue</p>
                 <p className="text-2xl font-medium text-[#2b2b2b]">
-                  {formatCurrency(jobs.reduce((sum, job) => sum + (job.actualCost || job.estimatedCost || 0), 0))}
+                  {formatCurrency(parseFloat(jobStats.totalRevenue))}
                 </p>
               </div>
               <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
@@ -666,6 +747,26 @@ export function JobManagementPage() {
       <div className="text-center text-sm text-gray-600">
         Showing {jobs.length} of {totalJobs} jobs
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Job</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this job? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelDeleteJob}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteJob}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

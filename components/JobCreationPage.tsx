@@ -69,22 +69,6 @@ interface JobCreationPageProps {
 
 // Removed hardcoded contractors - now using API
 
-const commonMaterials = [
-  'Electrical Panel',
-  'Copper Wire (12 AWG)',
-  'Circuit Breakers',
-  'LED Bulbs',
-  'Ballasts',
-  'HVAC Parts',
-  'Filters',
-  'Refrigerant',
-  'Generator Unit',
-  'Transfer Switch',
-  'Fuel Tank',
-  'Conduit',
-  'Wire Nuts',
-  'Outlet Covers'
-]
 
 export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) {
   const [currentStep, setCurrentStep] = useState(1)
@@ -125,18 +109,14 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     assignedLeadLabor: [] as string[],
     assignedLabor: [] as string[],
     
-    // Step 4: Materials (Optional)
-    materials: [] as string[],
-    
-    // Step 5: Review
+    // Step 4: Review
   })
 
   const steps = [
     { id: 1, title: 'Job Type', icon: FileText },
     { id: 2, title: 'Job Details', icon: User },
     { id: 3, title: 'Resources', icon: Users },
-    { id: 4, title: 'Materials', icon: Package },
-    { id: 5, title: 'Review', icon: Check }
+    { id: 4, title: 'Review', icon: Check }
   ]
 
   const generateJobId = () => {
@@ -314,7 +294,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
       }
     }
     
-    setCurrentStep(prev => Math.min(prev + 1, 5))
+    setCurrentStep(prev => Math.min(prev + 1, 4))
   }
 
   const handlePrevious = () => {
@@ -346,7 +326,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
         estimated_cost: formData.estimatedCost || undefined,
         assigned_lead_labor_ids: formData.assignedLeadLabor.length > 0 ? JSON.stringify(formData.assignedLeadLabor) : undefined,
         assigned_labor_ids: formData.assignedLabor.length > 0 ? JSON.stringify(formData.assignedLabor) : undefined,
-        assigned_material_ids: formData.materials.length > 0 ? JSON.stringify(formData.materials) : undefined,
+        assigned_material_ids: undefined,
         status: 'active'
       }
 
@@ -357,36 +337,36 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
       console.log('Job created successfully:', response)
 
       // Create the local job object for the callback
-      const newJob: Job = {
+    const newJob: Job = {
         id: response.data?.id || generateJobId(),
-        title: formData.title,
-        type: formData.type as 'service-based' | 'contract-based',
-        status: 'pending',
-        assignedLeadLabor: formData.assignedLeadLabor,
-        assignedLabor: formData.assignedLabor,
-        contractor: formData.contractor || undefined,
-        customer: formData.type === 'service-based' ? formData.customer : undefined,
-        description: formData.description,
-        createdDate: new Date().toISOString().split('T')[0],
-        dueDate: formData.dueDate,
-        estimatedHours: formData.estimatedHours || undefined,
-        estimatedCost: formData.estimatedCost || undefined,
-        materials: formData.materials.length > 0 ? formData.materials : undefined,
-        address: formData.address,
-        cityZip: formData.cityZip,
-        phone: formData.phone,
-        email: formData.email,
-        billToAddress: formData.billToAddress,
-        billToCityZip: formData.billToCityZip,
-        billToPhone: formData.billToPhone,
-        billToEmail: formData.billToEmail,
-        sameAsAddress: formData.sameAsAddress,
-        priority: formData.priority,
-        billingStatus: 'pending'
-      }
+      title: formData.title,
+      type: formData.type as 'service-based' | 'contract-based',
+      status: 'pending',
+      assignedLeadLabor: formData.assignedLeadLabor,
+      assignedLabor: formData.assignedLabor,
+      contractor: formData.contractor || undefined,
+      customer: formData.type === 'service-based' ? formData.customer : undefined,
+      description: formData.description,
+      createdDate: new Date().toISOString().split('T')[0],
+      dueDate: formData.dueDate,
+      estimatedHours: formData.estimatedHours || undefined,
+      estimatedCost: formData.estimatedCost || undefined,
+        materials: undefined,
+      address: formData.address,
+      cityZip: formData.cityZip,
+      phone: formData.phone,
+      email: formData.email,
+      billToAddress: formData.billToAddress,
+      billToCityZip: formData.billToCityZip,
+      billToPhone: formData.billToPhone,
+      billToEmail: formData.billToEmail,
+      sameAsAddress: formData.sameAsAddress,
+      priority: formData.priority,
+      billingStatus: 'pending'
+    }
 
       toast.success('Job created successfully!')
-      onJobCreated(newJob)
+    onJobCreated(newJob)
     } catch (error) {
       console.error('Error creating job:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to create job')
@@ -461,14 +441,6 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     restoreSelectedNamesFromAPI()
   }, [formData.customer, formData.contractor, formData.customerName, formData.contractorName, selectedCustomerName, selectedContractorName])
 
-  const toggleMaterial = (material: string) => {
-    setFormData({
-      ...formData,
-      materials: formData.materials.includes(material)
-        ? formData.materials.filter(m => m !== material)
-        : [...formData.materials, material]
-    })
-  }
 
   const renderStepIndicator = () => (
     <div className="flex items-center justify-center mb-8">
@@ -986,55 +958,8 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     </Card>
   )
 
-  const renderStep4 = () => (
-    <Card className="bg-white shadow-md border-0">
-      <CardHeader>
-        <CardTitle>Materials (Optional)</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <p className="text-gray-600">Select materials that will be needed for this job. You can add more materials later.</p>
-        
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {commonMaterials.map((material) => (
-            <div
-              key={material}
-              className={`
-                p-3 border rounded-lg cursor-pointer transition-all
-                ${formData.materials.includes(material) 
-                  ? 'border-[#00A1FF] bg-[#E6F6FF]' 
-                  : 'border-gray-200 hover:border-gray-300'
-                }
-              `}
-              onClick={() => toggleMaterial(material)}
-            >
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  checked={formData.materials.includes(material)}
-                  onCheckedChange={() => toggleMaterial(material)}
-                />
-                <span className="text-sm font-medium">{material}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-        
-        {formData.materials.length > 0 && (
-          <div>
-            <p className="text-sm text-gray-600 mb-2">Selected Materials ({formData.materials.length}):</p>
-            <div className="flex flex-wrap gap-2">
-              {formData.materials.map((material) => (
-                <Badge key={material} className="bg-[#E6F6FF] text-[#00A1FF] border-[#00A1FF]/20">
-                  {material}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  )
 
-  const renderStep5 = () => (
+  const renderStep4 = () => (
     <Card className="bg-white shadow-md border-0">
       <CardHeader>
         <CardTitle>Review Job Details</CardTitle>
@@ -1197,18 +1122,6 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               </div>
             )}
 
-            {formData.materials.length > 0 && (
-              <div>
-                <h4 className="font-medium text-[#2b2b2b] mb-2">Selected Materials ({formData.materials.length})</h4>
-                <div className="flex flex-wrap gap-1">
-                  {formData.materials.map((material) => (
-                    <Badge key={material} className="bg-gray-50 text-gray-700 border-gray-200 text-xs">
-                      {material}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </CardContent>
@@ -1240,7 +1153,6 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
         {currentStep === 2 && renderStep2()}
         {currentStep === 3 && renderStep3()}
         {currentStep === 4 && renderStep4()}
-        {currentStep === 5 && renderStep5()}
       </div>
 
       {/* Navigation */}
@@ -1255,7 +1167,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
           Previous
         </Button>
 
-        {currentStep < 5 ? (
+        {currentStep < 4 ? (
           <Button
             onClick={handleNext}
             className="bg-primary text-white hover:bg-[#0090e6] gap-2"
@@ -1276,8 +1188,8 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               </>
             ) : (
               <>
-                <Check className="h-4 w-4" />
-                Create Job
+            <Check className="h-4 w-4" />
+            Create Job
               </>
             )}
           </Button>

@@ -175,6 +175,81 @@ export const apiClient = {
   },
 
   // Jobs
+  getJobById: async (jobId: string) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${apiBaseUrl}/job/getJobById/${jobId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to fetch job details')
+    }
+
+    const result = await response.json()
+    console.log('Job Details API Response:', result)
+
+    if (!result.data) {
+      console.error('Job Details API: Unexpected response structure:', result)
+      throw new Error('Invalid job data received')
+    }
+
+    const job = result.data
+
+    // Transform the API response to match our Job interface
+    const transformedJob = {
+      id: job.id.toString(),
+      title: job.job_title,
+      type: (job.job_type === 'service_based' ? 'service-based' : 'contract-based') as 'service-based' | 'contract-based',
+      status: (job.status === 'active' ? 'pending' : job.status === 'in_progress' ? 'in-progress' : job.status) as 'pending' | 'in-progress' | 'completed' | 'cancelled',
+      assignedLeadLabor: job.assigned_lead_labor ? job.assigned_lead_labor.map((ll: any) => ll.id.toString()) : [],
+      assignedLabor: job.assigned_labor ? job.assigned_labor.map((l: any) => l.user?.full_name || l.labor_code) : [],
+      contractor: job.contractor_id ? job.contractor_id.toString() : undefined,
+      customer: job.customer_id ? job.customer_id.toString() : undefined,
+      description: job.description,
+      createdDate: job.created_at ? job.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+      dueDate: job.due_date,
+      estimatedHours: job.estimated_hours,
+      estimatedCost: job.estimated_cost,
+      actualCost: job.estimated_cost, // Use estimated cost as actual cost for now
+      materials: job.assigned_material_ids ? JSON.parse(job.assigned_material_ids) : [],
+      address: job.address,
+      cityZip: job.city_zip,
+      location: `${job.address}, ${job.city_zip}`, // Add location field for JobDetailsPage
+      phone: job.phone,
+      email: job.email,
+      billToAddress: job.bill_to_address,
+      billToCityZip: job.bill_to_city_zip,
+      billToPhone: job.bill_to_phone,
+      billToEmail: job.bill_to_email,
+      sameAsAddress: job.same_as_address,
+      priority: job.priority as 'low' | 'medium' | 'high' | 'urgent',
+      billingStatus: 'pending' as 'pending' | 'invoiced' | 'paid',
+      // Additional fields from API
+      customerName: job.customer?.customer_name || job.customer?.company_name,
+      contractorName: job.contractor?.contractor_name || job.contractor?.company_name,
+      createdBy: job.created_by_user?.full_name,
+      assignedLeadLaborDetails: job.assigned_lead_labor || [],
+      assignedLaborDetails: job.assigned_labor || [],
+      assignedMaterialsDetails: job.assigned_materials || [],
+      customLabor: job.custom_labor || []
+    }
+
+    console.log('Transformed job details:', transformedJob)
+    console.log('Location field:', transformedJob.location)
+    return transformedJob
+  },
+
   getJobs: async (page: number = 1, limit: number = 5) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
     const token = getAuthToken()
@@ -217,7 +292,7 @@ export const apiClient = {
         type: job.job_type === 'service_based' ? 'service-based' : 'contract-based',
         status: job.status === 'active' ? 'pending' : job.status === 'in_progress' ? 'in-progress' : job.status,
         assignedLeadLabor: job.assigned_lead_labor ? job.assigned_lead_labor.map((ll: any) => ll.id.toString()) : [],
-        assignedLabor: job.assigned_labor ? job.assigned_labor.map((l: any) => l.id.toString()) : [],
+        assignedLabor: job.assigned_labor ? job.assigned_labor.map((l: any) => l.user?.full_name || l.labor_code) : [],
         contractor: job.contractor_id ? job.contractor_id.toString() : undefined,
         customer: job.customer_id ? job.customer_id.toString() : undefined,
         description: job.description,
@@ -225,9 +300,11 @@ export const apiClient = {
         dueDate: job.due_date,
         estimatedHours: job.estimated_hours,
         estimatedCost: job.estimated_cost,
+        actualCost: job.estimated_cost, // Use estimated cost as actual cost for now
         materials: job.assigned_material_ids ? JSON.parse(job.assigned_material_ids) : [],
         address: job.address,
         cityZip: job.city_zip,
+        location: `${job.address}, ${job.city_zip}`, // Add location field for JobDetailsPage
         phone: job.phone,
         email: job.email,
         billToAddress: job.bill_to_address,
@@ -243,7 +320,8 @@ export const apiClient = {
         createdBy: job.created_by_user?.full_name,
         assignedLeadLaborDetails: job.assigned_lead_labor || [],
         assignedLaborDetails: job.assigned_labor || [],
-        assignedMaterialsDetails: job.assigned_materials || []
+        assignedMaterialsDetails: job.assigned_materials || [],
+        customLabor: job.custom_labor || []
       })),
       totalPages: result.data.pagination?.totalPages || 1,
       currentPage: result.data.pagination?.page || 1,
@@ -255,17 +333,118 @@ export const apiClient = {
   },
 
 
-  updateJob: async (jobId: string, jobData: any) => {
-    return authenticatedFetch(`/jobs/${jobId}`, {
-      method: 'PUT',
+  updateJob: async (jobId: string, jobData: {
+    job_title: string,
+    job_type: string,
+    customer_id?: number,
+    contractor_id?: number,
+    description: string,
+    priority: string,
+    address: string,
+    city_zip: string,
+    phone?: string,
+    email?: string,
+    bill_to_address?: string,
+    bill_to_city_zip?: string,
+    bill_to_phone?: string,
+    bill_to_email?: string,
+    same_as_address: boolean,
+    due_date: string,
+    estimated_hours?: number,
+    estimated_cost?: number,
+    assigned_lead_labor_ids?: string,
+    assigned_labor_ids?: string,
+    assigned_material_ids?: string,
+    status: string
+  }) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${apiBaseUrl}/job/updateJob/${jobId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
       body: JSON.stringify(jobData),
     })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to update job')
+    }
+
+    return response.json()
   },
 
   deleteJob: async (jobId: string) => {
-    return authenticatedFetch(`/jobs/${jobId}`, {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${apiBaseUrl}/job/deleteJob/${jobId}`, {
       method: 'DELETE',
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+      },
     })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to delete job')
+    }
+
+    return response.json()
+  },
+
+  getJobStats: async () => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${apiBaseUrl}/job/getJobStats/stats`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to fetch job statistics')
+    }
+
+    const result = await response.json()
+    console.log('Job Stats API Response:', result)
+
+    if (!result.data) {
+      console.error('Job Stats API: Unexpected response structure:', result)
+      return {
+        total: 0,
+        active: 0,
+        completed: 0,
+        draft: 0,
+        pending: 0,
+        totalRevenue: '0.00',
+        activePercentage: '0.0',
+        completedPercentage: '0.0',
+        draftPercentage: '0.0',
+        pendingPercentage: '0.0'
+      }
+    }
+
+    return result.data
   },
 
   // Profiles
@@ -833,6 +1012,150 @@ export const apiClient = {
     }
 
     return response.json()
+  },
+
+  // Roles API
+  getRoles: async () => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+    const response = await fetch(`${apiBaseUrl}/permissions/roles-with-permissions`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to fetch roles')
+    }
+    const result = await response.json()
+    console.log('Roles API Response:', result)
+    if (!result.success || !result.data) {
+      console.error('Roles API: Unexpected response structure:', result)
+      return []
+    }
+    // Transform API response to match component's expected format
+    const transformedRoles = result.data.map((apiRole: any) => ({
+      id: apiRole.id.toString(),
+      roleName: apiRole.role_name || '',
+      roleType: apiRole.role_type || '',
+      permissions: apiRole.permissions || []
+    }))
+    return transformedRoles
+  },
+
+  // Labor Time Log APIs
+  createLaborTimeLog: async (timeLogData: {
+    job_id: string,
+    labor_id: string,
+    full_name: string,
+    email: string,
+    role: string,
+    hours_worked: number,
+    hourly_rate: number,
+    notes: string,
+    date_of_joining: string,
+    is_custom: boolean
+  }) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+    const response = await fetch(`${apiBaseUrl}/labor/createLabor`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(timeLogData),
+    })
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to create labor time log')
+    }
+    return response.json()
+  }, 
+
+  updateLaborTimeLog: async (timeLogId: string, timeLogData: {
+    job_id: string,
+    labor_id: string,
+    full_name: string,
+    email: string,
+    role: string,
+    hours_worked: number,
+    hourly_rate: number,
+    notes: string,
+    date_of_joining: string,
+    is_custom: boolean
+  }) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+    const response = await fetch(`${apiBaseUrl}/labor/updateLabor/${timeLogId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(timeLogData),
+    })
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to update labor time log')
+    }
+    return response.json()
+  },
+
+  deleteLaborTimeLog: async (timeLogId: string) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+    const response = await fetch(`${apiBaseUrl}/labor/deleteLabor/${timeLogId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to delete labor time log')
+    }
+    return response.json()
+  },
+
+  getLaborById: async (laborId: string) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+    const response = await fetch(`${apiBaseUrl}/labor/getLaborById/${laborId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to fetch labor details')
+    }
+    const result = await response.json()
+    console.log('Labor Details API Response:', result)
+    if (!result.success || !result.data) {
+      console.error('Labor Details API: Unexpected response structure:', result)
+      throw new Error('Invalid labor data received')
+    }
+    return result.data
   },
 
   // Logout
