@@ -3,16 +3,16 @@
 import { useState } from "react"
 import { useRouter } from 'next/navigation'
 import { Button } from "../ui/button"
-import { 
-  LayoutDashboard, 
-  BarChart3, 
-  Package, 
-  ShoppingCart, 
-  FileText, 
-  Users, 
-  Briefcase, 
-  MapPin, 
-  UserCheck, 
+import {
+  LayoutDashboard,
+  BarChart3,
+  Package,
+  ShoppingCart,
+  FileText,
+  Users,
+  Briefcase,
+  MapPin,
+  UserCheck,
   Settings,
   ChevronDown,
   ChevronRight,
@@ -22,7 +22,7 @@ import {
 } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { LogoutConfirmationDialog } from "../LogoutConfirmationDialog"
-import { usePermissions } from "../../contexts/PermissionContext" 
+import { usePermissions } from "../../contexts/PermissionContext"
 interface SidebarProps {
   currentPath: string
   onLogout: () => void
@@ -46,7 +46,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
     },
     {
       id: "analytics",
-      name: "Analytics", 
+      name: "Analytics",
       icon: BarChart3,
       href: "/analytics",
       description: "Reports, performance charts, and usage stats",
@@ -149,7 +149,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       icon: Users,
       href: "/role",
       description: "Role & Permission",
-      module: "settings",
+      module: "role_permission",
       requiredActions: ["view", "create", "edit", "delete"]
     }
   ]
@@ -201,11 +201,11 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
     <>
       <aside className="w-64 bg-sidebar border-r border-sidebar-border flex flex-col animate-fade-in shadow-sm">
         <div className="p-5 border-b border-sidebar-border bg-gradient-to-r from-sidebar to-sidebar-accent/20">
-          <div className="flex items-center justify-center space-x-3"> 
+          <div className="flex items-center justify-center space-x-3">
             <div className="text-center">
-            <img src='/assets/logos/logo-jdp.png' alt="logo" className='w-[140px] ' />
+              <img src='/assets/logos/logo-jdp.png' alt="logo" className='w-[140px] ' />
               <p className="font-semibold text-md pt-3">JDP Electrical Services</p>
-             </div>
+            </div>
           </div>
         </div>
 
@@ -222,8 +222,8 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
                 onClick={() => router.push(item.href)}
                 className={cn(
                   "w-full justify-start text-left sidebar-item h-10",
-                  active 
-                    ? "bg-primary text-primary-foreground shadow-sm" 
+                  active
+                    ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 )}
                 title={item.description}
