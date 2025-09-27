@@ -12,15 +12,19 @@ import { Plus, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { Invoice, InvoiceItem, LaborEntry, AdditionalCost } from '../../types/invoice'
 import { customersData, jobsData } from '../../data/invoiceData'
+import { apiClient } from '../../utils/api'
+import { toast } from 'sonner'
 // import { formatCurrency, formatDate } from '../../utils/invoiceUtils'
 
 interface NewInvoiceDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSave: (invoice: Partial<Invoice>) => void
+  customers: any[];
+  job: any[];
 }
 
-export const NewInvoiceDialog = ({ open, onOpenChange, onSave }: NewInvoiceDialogProps) => {
+export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, job }: NewInvoiceDialogProps) => {
   const [currentStep, setCurrentStep] = useState(1)
   const [newInvoice, setNewInvoice] = useState<Partial<Invoice>>({
     customerId: '',
@@ -170,6 +174,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave }: NewInvoiceDialo
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="customer">Customer</Label>
+                
                 <Select 
                   value={newInvoice.customerId} 
                   onValueChange={(value) => setNewInvoice(prev => ({ ...prev, customerId: value }))}
@@ -177,20 +182,25 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave }: NewInvoiceDialo
                   <SelectTrigger>
                     <SelectValue placeholder="Select Customer" />
                   </SelectTrigger>
+                    
                   <SelectContent>
-                    {customersData.map((customer) => (
+                    {customers.map((customer) => (
                       <SelectItem key={customer.id} value={customer.id}>
                         {customer.name}
-                      </SelectItem>
+                      </SelectItem> 
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="job">Job</Label>
-                <Select 
-                  value={newInvoice.jobId} 
-                  onValueChange={(value) => setNewInvoice(prev => ({ ...prev, jobId: value }))}
+                <div className="flex items-center gap-2 border rounded-md px-3 py-2">
+                  <p className="text-sm font-medium">
+                    {job?.title}
+                  </p>
+                </div>
+                {/* <Select 
+                  value={job.title} 
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select Job" />
@@ -202,7 +212,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave }: NewInvoiceDialo
                       </SelectItem>
                     ))}
                   </SelectContent>
-                </Select>
+                </Select> */}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="type">Invoice Type</Label>
@@ -425,7 +435,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave }: NewInvoiceDialo
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Customer</p>
-                      <p className="font-medium">{customersData.find(c => c.id === newInvoice.customerId)?.name}</p>
+                      {/* <p className="font-medium">{customersData.find(c => c.id === newInvoice.customerId)?.name}</p> */}
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Job</p>

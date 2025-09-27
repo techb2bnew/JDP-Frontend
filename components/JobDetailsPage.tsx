@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import { AutoScrollMultiSelect } from './ui/AutoScrollMultiSelect'
 import {
   ArrowLeft,
   Edit,
@@ -42,6 +43,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog'
+import { globalApiCall } from '../utils/globalApiHandler';
+import { Product, Branch } from '../types/product';
+import { NewInvoiceDialog } from './invoices/NewInvoiceDialog'
+
 // Sample data structure - replace with your actual data
 const sampleJobData = {
   "job": {
@@ -166,19 +173,334 @@ const sampleJobData = {
   ]
 }
 
+interface ProjectSummary {
+  estimate: number
+  actualCost: number
+  laborCost: number
+  materialsCost: number
+  message: string
+  success: boolean
+}
+
+interface Metric {
+  value: number
+  unit: string
+  color: string
+}
+
+interface DashboardMetrics {
+  totalHoursWorked?: Metric
+  totalMaterialUsed?: Metric
+  totalLabourEntries?: Metric
+  numberOfInvoices?: Metric
+}
+
 interface JobDetailsPageProps {
   jobId: string
   onBack: () => void
   jobs: any[]
   setJobs: (jobs: any[]) => void
+  projectSummary: ProjectSummary | null
+  setProjectSummary:(projectSummary: any[]) => void
+  dashboardMetrics: DashboardMetrics | null
+  setDashboardMetrics: (projectSummary: any[]) => void
+  onReload?: () => void
 }
 
-export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageProps) {
+interface Supplier {
+  id: number;
+  company_name: string;
+  contact_person: string;
+  supplier_code: string;
+  user_id: number;
+}
+
+export function JobDetailsPage({ jobId, onBack, jobs, setJobs, projectSummary, setProjectSummary, dashboardMetrics, setDashboardMetrics, onReload }: JobDetailsPageProps) {
   // Find the job from your jobs array or use sample data
   const job = jobs.find(j => j.id === jobId) || sampleJobData.job
-  
-  // Use real job data for materials, timeLogs, and invoices
+ 
+  //Jyoti
+
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null)
+  const [selectedLabor, setSelectedLabor] = useState<{ [jobId: string]: string[] }>({});
+  const [open, setOpen] = useState(false);
+
+  const [selectedLeadLabor, setSelectedLeadLabor] = useState<{ [jobId: string]: string[] }>({});
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  const[customers, setCustomers] = useState([])
+  const resetMaterialForm = () => {
+    setMaterialFormData({
+      name: '',
+      supplier: '',
+      sku: '',
+      quantity: 0,
+      unit: '',
+      unitCost: 0
+    });
+    setMaterialValidationErrors({});
+  };
+
+// For storing validation errors
+const [materialValidationErrors, setMaterialValidationErrors] = useState<Record<string, string>>({});
+
+
+
+  const clearValidationError = (field: string) => {
+    if (validationErrors[field]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors[field]
+        return newErrors
+      })
+    }
+  }
+  const handleChangeLabor = (
+    jobId: string,
+    selectedIds: string[],
+    selectedItems: any[]
+  ) => {
+    setSelectedLabor((prev) => ({
+      ...prev,
+      [jobId]: selectedIds, // or selectedItems, depending on what you want to store
+    }));
+  };
+
+  const handleChangeLead = (
+    jobId: string,
+    selectedIds: string[],
+    selectedItems: any[]
+  ) => {
+    setSelectedLeadLabor((prev) => ({
+      ...prev,
+      [jobId]: selectedIds,
+    }));
+
+    // Optionally handle selectedItems too
+  };
+
+const fetchProductsData = async () => {
+    try {
+      setIsLoadingProducts(true);
+
+      // Fetch the latest job details from API
+      const jobDetails = await apiClient.getJobById(jobId);
+
+      // Update the jobs array with the fetched job details
+      setJobs(prevJobs =>
+        prevJobs.map(j => (j.id === jobId ? jobDetails : j))
+      );
+    } catch (error) {
+      console.error('Error fetching job details:', error);
+      toast.error('Failed to load job details');
+    } finally {
+      setIsLoadingProducts(false); // ✅ stop loading
+    }
+};
+
+const handleDeleteProduct = async () => {
+  if (!productToDelete) return;
+
+  try {
+    setIsLoading(true); // Global loading for delete action
+    
+    const token = localStorage.getItem("jdp_auth")
+      ? JSON.parse(localStorage.getItem("jdp_auth")!).token
+      : null;
+
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const response = await fetch(
+        `${apiBaseUrl}/products/deleteProduct/${productToDelete.id}`,
+        { method: "DELETE", headers }
+      );
+
+      const responseData = await response.json();
+      console.log("Product deletion response:", responseData);
+
+      if (responseData.success) {
+        if (typeof window !== "undefined") {
+          const { toast } = await import("sonner");
+          toast.success("Product deleted successfully!");
+        }
+
+        // Close dialog and reset state
+        setShowDeleteAlert(false);
+        setProductToDelete(null);
+        
+      // Optional: Refetch data to ensure sync with server
+      await fetchProductsData();
+      onReload();
+      } else {
+        throw new Error(responseData.message || "Failed to delete product");
+      }
+  } catch (error) {
+    console.error("Error deleting product:", error);
+    if (typeof window !== "undefined") {
+      const { toast } = await import("sonner");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete product"
+      );
+    }
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+const handleAction = (action: string, material: any) => {
+  if (action === 'delete') {
+    setProductToDelete(material);
+    setShowDeleteAlert(true);
+  }
+  // Add other actions here if needed
+};
+
+  useEffect(() => {
+    const initialSelection: { [jobId: string]: string[] } = {};
+    const initialLabor: { [jobId: string]: string[] } = {};
+
+    jobs.forEach((job) => {
+      // Wrap assigned lead labor codes in arrays for multi-select
+      const assignedLeadLaborCodes = job.assignedLeadLaborDetails?.map(
+        (labor: any) => labor.user.full_name
+      ) || [];
+      initialSelection[job.id] = assignedLeadLaborCodes;
+
+      // Similarly for assigned labor
+      console.log('job.assignedLaborDetails', job.assignedLaborDetails);
+      const assignedLaborCodes = job.assignedLaborDetails?.map(
+        (labor: any) => labor.user.full_name
+        
+      ) || [];
+      initialLabor[job.id] = assignedLaborCodes;
+      console.log('initialLabor', initialLabor);
+    });
+
+    setSelectedLeadLabor(initialSelection);
+    setSelectedLabor(initialLabor); // ✅ Keep this
+  }, [jobs]);
+
+  useEffect(() => {
+    fetchProductsData(); // Fetch products for current page
+  }, []);
+
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+  const fetchData = async () => {
+
+
+    try {
+      const response = await globalApiCall(`${apiBaseUrl}/suppliers/getAllSuppliers`, {
+        method: 'GET'
+      });
+      
+      return await response.json();
+    } catch (error) {
+      // Token revocation is automatically handled
+      // Only handle other errors here
+      if (!(error instanceof Error && error.message?.includes('Session expired'))) {
+        console.error('Other error:', error);
+      }
+    }
+  }
+  useEffect(() => {
+    const loadSuppliers = async () => {
+      const data = await fetchData(); 
+      console.log("Suppliersss", data.data, data.data.data[0]);
+      if (data?.data) {
+        setSuppliers(data.data.data);
+      }
+      console.log('suppiersSet', suppliers);
+    };
+
+    loadSuppliers();
+  }, []);
+
+const handleSaveProduct = async () => {
+  // ✅ Run validation first
+  const errors: Record<string, string> = {};
+
+  if (!materialFormData.name?.trim()) {
+    errors.name = "Product name is required";
+  }
+  if (!materialFormData.supplier) {
+    errors.supplier = "Supplier is required";
+  }
+  if (!materialFormData.sku?.trim()) {
+    errors.sku = "Supplier SKU is required";
+  }
+  if (materialFormData.quantity <= 0) {
+    errors.quantity = "Quantity must be greater than 0";
+  }
+  if (!materialFormData.unit?.trim()) {
+    errors.unit = "Unit is required";
+  }
+  if (materialFormData.unitCost <= 0) {
+    errors.unitCost = "Unit cost must be greater than 0";
+  }
+
+  if (Object.keys(errors).length > 0) {
+    setMaterialValidationErrors(errors);
+    toast.error("Please fix the validation errors");
+    return;
+  }
+
+  try {
+    const payload = {
+      product_name: materialFormData.name,
+      supplier_id: Number(materialFormData.supplier),
+      supplier_sku: materialFormData.sku,
+      jdp_sku: `JDP-${materialFormData.sku}`,
+      stock_quantity: materialFormData.quantity,
+      unit: materialFormData.unit.toLowerCase(),
+      job_id: jobId,
+      is_custom: true,
+      unit_cost: materialFormData.unitCost,
+    };
+
+    await globalApiCall(`${apiBaseUrl}/products/createProduct`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    toast.success("Product created successfully!");
+    setShowAddMaterialModal(false);
+    resetMaterialForm(); // <- same like resetTimeLogForm
+    await fetchProductsData();
+    onReload();
+    // window.location.reload();
+    // await refreshJobData(); // refresh product/job details after create
+  } catch (error) {
+    console.error("Error creating product:", error);
+    toast.error(error instanceof Error ? error.message : "Failed to create product");
+  }
+};
+
+
+
+  const fetchAllCustomers = async() => {
+    try {
+      setIsLoading(true)
+      const customers = await apiClient.getCustomers()
+      console.log('customers', customers);
+      setCustomers(customers.data);
+
+    } catch (error) {
+      console.error('Error fetching dashboard metrics:', error)
+      toast.error('Failed to load Dashboard Metrics')
+    }finally {
+      setIsLoading(false)
+    }
+  }
+
+  //Jyoti
+
   const materials = job.assignedMaterialsDetails || sampleJobData.materials
+
   const timeLogs = sampleJobData.timeLogs // Keep sample data for now as we don't have time logs API
   const invoices = sampleJobData.invoices // Keep sample data for now as we don't have invoices API
 
@@ -266,8 +588,6 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     });
     setIsEditing(false);
   };
-
-  
 
   const validateTimeLogForm = () => {
     const errors: Record<string, string> = {};
@@ -593,6 +913,16 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     }).format(amount)
   }
 
+  const formatDate = (input: string | Date): string => {
+  const date = input instanceof Date ? input : new Date(input);
+
+  return date.toLocaleDateString("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+  });
+}
+
   type StatusType = 'in-progress' | 'sent' | 'paid' | 'approved' | 'pending';
 
   const getStatusBadge = (status: string) => {
@@ -622,6 +952,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       </span>
     )
   }
+
+
+  console.log("Assigned Lead Labor Details:", jobs);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -674,8 +1007,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-blue-600">Total Hours Worked</p>
-                  <p className="text-2xl font-bold text-blue-900">{totalHours}</p>
-                  <p className="text-xs text-blue-600">hours</p>
+                  <p className="text-2xl font-bold text-blue-900">{dashboardMetrics?.totalHoursWorked?.value}</p>
+                  <p className="text-xs text-blue-600">{dashboardMetrics?.totalHoursWorked?.unit}</p>
                 </div>
                 <Clock className="h-8 w-8 text-blue-600" />
               </div>
@@ -686,9 +1019,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-green-600">Total Material Used</p>
-                  <p className="text-2xl font-bold text-green-900">{totalMaterialItems}</p>
-                  <p className="text-xs text-green-600">items</p>
+                  <p className="text-sm font-medium text-green-600">Total Product Used</p>
+                  <p className="text-2xl font-bold text-green-900">{dashboardMetrics?.totalMaterialUsed?.value}</p>
+                  <p className="text-xs text-green-600">{dashboardMetrics?.totalMaterialUsed?.unit}</p>
                 </div>
                 <Package className="h-8 w-8 text-green-600" />
               </div>
@@ -700,8 +1033,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-purple-600">Total Labour Entries</p>
-                  <p className="text-2xl font-bold text-purple-900">{totalLaborEntries}</p>
-                  <p className="text-xs text-purple-600">entries</p>
+                  <p className="text-2xl font-bold text-purple-900">{dashboardMetrics?.totalLabourEntries?.value}</p>
+                  <p className="text-xs text-purple-600">{dashboardMetrics?.totalLabourEntries?.unit}</p>
                 </div>
                 <Users className="h-8 w-8 text-purple-600" />
               </div>
@@ -713,8 +1046,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-orange-600">Number of Invoices</p>
-                  <p className="text-2xl font-bold text-orange-900">{totalInvoices}</p>
-                  <p className="text-xs text-orange-600">invoices</p>
+                  <p className="text-2xl font-bold text-orange-900">{dashboardMetrics?.numberOfInvoices?.value}</p>
+                  <p className="text-xs text-orange-600">{dashboardMetrics?.numberOfInvoices?.unit}</p>
                 </div>
                 <FileText className="h-8 w-8 text-orange-600" />
               </div>
@@ -860,7 +1193,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                 </div>
 
                 {/* Assigned Labor Section */}
-                {job.assignedLaborDetails && job.assignedLaborDetails.length > 0 && (
+                {/* {job.assignedLaborDetails && job.assignedLaborDetails.length > 0 && (
                   <div>
                     <p className="text-sm text-gray-600 mb-2">Assigned Labor</p>
                     <div className="space-y-2">
@@ -881,10 +1214,30 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                       ))}
                     </div>
                   </div>
-                )}
+                )} */}
+                  
+                  {/* Jyoti */}
+                  {/* Labor Selection */}
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">Labor</p>
+                  <AutoScrollMultiSelect
+                    selectedValues={selectedLabor[job.id] || []}
+                    onSelectionChange={(selectedIds, selectedItems) => {
+                      handleChangeLabor(job.id, selectedIds, selectedItems);
+                      clearValidationError('assignedLabor');
+                    }}
+                    placeholder="Select labor"
+                    fetchData={apiClient.getLabor}
+                    displayField="name"
+                    valueField="name"
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Jyoti */}
 
                 {/* Assigned Lead Labor Section */}
-                {job.assignedLeadLaborDetails && job.assignedLeadLaborDetails.length > 0 && (
+                {/* {job.assignedLeadLaborDetails && job.assignedLeadLaborDetails.length > 0 && (
                   <div>
                     <p className="text-sm text-gray-600 mb-2">Lead Labor</p>
                     <div className="space-y-2">
@@ -905,7 +1258,29 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                       ))}
                     </div>
                   </div>
-                )}
+                )} */}
+
+                
+                {/* Jyoti */}
+                {/* Lead Labor Selection */}
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">Lead Labor</p>
+                  <AutoScrollMultiSelect
+                    selectedValues={selectedLeadLabor[job.id] || []}
+                    onSelectionChange={(selectedIds, selectedItems) => {
+                      handleChangeLead(job.id, selectedIds, selectedItems);
+                      clearValidationError('assignedLabor');
+                      clearValidationError('assignedLeadLabor');
+                    }}
+                    placeholder="Select lead labor"
+                    fetchData={apiClient.getLeadLabor}
+                    displayField="name"
+                    valueField="name"
+                    className="w-full"
+                  />
+                </div>
+                {/* Jyoti */}
+
               </CardContent>
               <CardFooter>
                 {isEditing && (
@@ -930,10 +1305,17 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                   <FileText className="h-5 w-5" />
                   Transaction History
                 </CardTitle>
-                <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowAddInvoiceModal(true)}>
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => {setOpen(true); fetchAllCustomers();}}>
                   <Plus className="h-4 w-4" />
                   Add Invoice
                 </Button>
+                <NewInvoiceDialog
+                  open={open}
+                  onOpenChange={setOpen}
+                  onSave={handleSave}
+                  customers={customers}
+                  job={job}
+                />
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -980,7 +1362,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                             <Printer className="h-3 w-3" />
                             Print
                           </Button>
-                          <Button variant="outline" size="sm" className="gap-1">
+                          <Button variant="outline" size="sm" className="gap-1" >
                             <Trash2 className="h-3 w-3 text-red-600" />
                           </Button>
                         </div>
@@ -993,50 +1375,113 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
             {/* Material Usage */}
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  Material Usage
-                </CardTitle>
-                <div className="flex items-center gap-4">
-                  <span className="text-sm text-gray-600">
-                    Total Cost: <span className="font-semibold">{formatCurrency(totalMaterialCost)}</span>
-                  </span>
-                  <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowAddMaterialModal(true)}>
-                    <Plus className="h-4 w-4" />
-                    Add Material
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {materials.map((material: any) => (
-                    <div key={material.id} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                      <div className="flex items-center gap-4">
-                        <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
-                          <Package className="h-5 w-5 text-blue-700" />
-                        </div>
-                        <div>
-                          <h4 className="font-medium">{material.product_name || material.name}</h4>
-                          <p className="text-xs text-gray-600">
-                            {material.supplier?.company_name || material.supplier} • SKU: {material.supplier_sku || material.jdp_sku} • {material.unit}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="font-semibold">{formatCurrency(material.unit_cost || material.totalCost || 0)}</p>
-                          <p className="text-sm text-gray-600">{material.stock_quantity || material.quantity || 0} {material.unit}</p>
-                        </div>
-                        <Button variant="outline" size="sm" className="gap-1">
-                          <Trash2 className="h-3 w-3 text-red-600" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+  <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
+    <CardTitle className="flex items-center gap-2">
+      <Package className="h-5 w-5" />
+      Product Usage
+      {isLoadingProducts && (
+        <div className="h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin ml-2"></div>
+      )}
+    </CardTitle>
+    <div className="flex items-center gap-4">
+      <span className="text-sm text-gray-600">
+        Total Cost: <span className="font-semibold">{formatCurrency(totalMaterialCost)}</span>
+      </span>
+      <Button 
+        variant="outline" 
+        size="sm" 
+        className="gap-2" 
+        onClick={() => setShowAddMaterialModal(true)}
+        disabled={isLoadingProducts}
+      >
+        <Plus className="h-4 w-4" />
+        Add Product
+      </Button>
+    </div>
+  </CardHeader>
+  <CardContent>
+    {isLoadingProducts ? (
+      // Loading skeleton
+      <div className="space-y-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="flex items-center justify-between p-4 bg-gray-100 rounded-lg animate-pulse">
+            <div className="flex items-center gap-4">
+              <div className="h-10 w-10 bg-gray-300 rounded-lg"></div>
+              <div>
+                <div className="h-4 w-32 bg-gray-300 rounded mb-2"></div>
+                <div className="h-3 w-24 bg-gray-300 rounded"></div>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <div className="h-4 w-16 bg-gray-300 rounded mb-2"></div>
+                <div className="h-3 w-12 bg-gray-300 rounded"></div>
+              </div>
+              <div className="h-8 w-8 bg-gray-300 rounded"></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : materials.length === 0 ? (
+      // Empty state
+      <div className="text-center py-8">
+        <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <p className="text-gray-600 mb-2">No products found</p>
+        <Button 
+          variant="outline" 
+          onClick={() => setShowAddMaterialModal(true)}
+          className="gap-2"
+        >
+          <Plus className="h-4 w-4" />
+          Add First Product
+        </Button>
+      </div>
+    ) : (
+      // Products list
+      <div className="space-y-4">
+        {job.assignedMaterialsDetails.map((material: any) => (
+          <div 
+            key={material.id} 
+            className={`flex items-center justify-between p-4 bg-blue-50 rounded-lg transition-opacity ${
+              isLoading && productToDelete?.id === material.id ? 'opacity-50' : ''
+            }`}
+          >
+            <div className="flex items-center gap-4">
+              <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
+                <Package className="h-5 w-5 text-blue-700" />
+              </div>
+              <div>
+                <h4 className="font-medium">{material.product_name || material.name}</h4>
+                <p className="text-xs text-gray-600">
+                  {material.supplier?.company_name || material.supplier}     SKU: {material.supplier_sku || material.jdp_sku}    {formatDate(material.created_at)}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="font-semibold">{formatCurrency(material.unit_cost || material.totalCost || 0)}</p>
+                <p className="text-sm text-gray-600">{material.stock_quantity || material.quantity || 0} {material.unit}</p>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-1" 
+                onClick={() => handleAction('delete', material)}
+                disabled={isLoading}
+              >
+                {isLoading && productToDelete?.id === material.id ? (
+                  <div className="h-3 w-3 border border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Trash2 className="h-3 w-3 text-red-600" />
+                )}
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </CardContent>
+</Card>
 
             {/* Labour & Time Logs */}
             <Card>
@@ -1191,24 +1636,24 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                 <div className="space-y-4">
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Job Estimate</span>
-                    <span className="font-medium">{formatCurrency(job.estimatedCost)}</span>
+                    <span className="font-medium">{formatCurrency(projectSummary?.estimate)}</span>
                   </div>
 
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Materials Cost</span>
-                    <span className="font-medium">{formatCurrency(totalMaterialCost)}</span>
+                    <span className="text-sm text-gray-600">Products Cost</span>
+                    <span className="font-medium">{formatCurrency(projectSummary?.materialsCost)}</span>
                   </div>
 
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Labor Cost</span>
-                    <span className="font-medium">{formatCurrency(totalLaborCost)}</span>
+                    <span className="font-medium">{formatCurrency(projectSummary?.laborCost)}</span>
                   </div>
 
                   <hr />
 
                   <div className="flex justify-between">
                     <span className="font-medium">Actual Project Cost</span>
-                    <span className="font-bold text-lg">{formatCurrency(job.actualCost)}</span>
+                    <span className="font-bold text-lg">{formatCurrency(projectSummary?.actualCost)}</span>
                   </div>
                 </div> 
               </CardContent>
@@ -1312,17 +1757,20 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       <Dialog open={showAddMaterialModal} onOpenChange={setShowAddMaterialModal}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Add Material</DialogTitle>
+            <DialogTitle>Add Product</DialogTitle>
             <DialogDescription>Add a new material to this job</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className='grid grid-cols-2 gap-2'>
               <div>
-                <Label className="mb-2">Material Name</Label>
+                <Label className="mb-2">Product Name</Label>
                 <Input
                   value={materialFormData.name}
                   onChange={(e) => setMaterialFormData({ ...materialFormData, name: e.target.value })}
                 />
+                {materialValidationErrors.name && (
+                  <p className="text-red-500 text-sm mt-1">{materialValidationErrors.name}</p>
+                )}
               </div>
               <div>
                 <Label className="mb-2">SKU</Label>
@@ -1330,6 +1778,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                   value={materialFormData.sku}
                   onChange={(e) => setMaterialFormData({ ...materialFormData, sku: e.target.value })}
                 />
+                {materialValidationErrors.sku && (
+                  <p className="text-red-500 text-sm mt-1">{materialValidationErrors.sku}</p>
+                )}
               </div>
 
             </div>
@@ -1338,9 +1789,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                 <Label className="mb-2">Quantity</Label>
                 <Input
                   type="number"
-                  value={materialFormData.quantity}
-                  onChange={(e) => setMaterialFormData({ ...materialFormData, quantity: Number(e.target.value) })}
+                  value={materialFormData.quantity === 0 ? "" : materialFormData.quantity}
+                  onChange={(e) => setMaterialFormData({ ...materialFormData, quantity: e.target.value === "" ? 0 : Number(e.target.value) })}
                 />
+                {materialValidationErrors.quantity && (
+                  <p className="text-red-500 text-sm mt-1">{materialValidationErrors.quantity}</p>
+                )}
               </div>
               <div>
                 <Label className="mb-2">Unit</Label>
@@ -1358,6 +1812,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                     <SelectItem value="Roll">Roll</SelectItem>
                   </SelectContent>
                 </Select>
+                {materialValidationErrors.unit && (
+                  <p className="text-red-500 text-sm mt-1">{materialValidationErrors.unit}</p>
+                )}
               </div>
 
 
@@ -1368,16 +1825,40 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                 <Label className="mb-2">Unit Cost</Label>
                 <Input
                   type="number"
-                  value={materialFormData.unitCost}
-                  onChange={(e) => setMaterialFormData({ ...materialFormData, unitCost: Number(e.target.value) })}
+                  value={materialFormData.unitCost === 0 ? "" : materialFormData.unitCost}
+                  onChange={(e) => setMaterialFormData({ ...materialFormData, unitCost: e.target.value === "" ? 0 : Number(e.target.value) })}
                 />
+                {materialValidationErrors.unitCost && (
+                  <p className="text-red-500 text-sm mt-1">{materialValidationErrors.unitCost}</p>
+                )}
               </div>
               <div>
                 <Label className="mb-2">Supplier</Label>
-                <Input
+                
+                {/* <Input
                   value={materialFormData.supplier}
                   onChange={(e) => setMaterialFormData({ ...materialFormData, supplier: e.target.value })}
-                />
+                /> */}
+                
+                {/* Jyoti */}
+                <select
+                  value={materialFormData.supplier}
+                  onChange={(e) =>
+                    setMaterialFormData({ ...materialFormData, supplier: e.target.value })
+                  }
+                >
+                  <option value="">Select Supplier</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.contact_person} 
+                    </option>
+                  ))}
+                </select>
+                {materialValidationErrors.supplier && (
+                  <p className="text-red-500 text-sm mt-1">{materialValidationErrors.supplier}</p>
+                )}
+                {/* Jyoti */}
+
               </div>
             </div>
             <div className='bg-blue-100 p-3 border border-blue-300 rounded flex items-center gap-2'>
@@ -1389,12 +1870,40 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
             <Button variant="outline" onClick={() => setShowAddMaterialModal(false)}>
               Cancel
             </Button>
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => {
+            {/* <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => {
               // Save logic here
               setShowAddMaterialModal(false);
             }}>
               Add Material
+            </Button> */}
+            {/* Jyoti */}
+            <Button
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              // onClick={async () => {
+              //   const result = await createProduct(materialFormData);
+
+              //   if (result?.success) {
+              //     setShowAddMaterialModal(false);
+              //     setMaterialFormData({
+              //       name: '',
+              //       quantity: 0,
+              //       unitCost: 0,
+              //       sku: '',
+              //       unit: 'Pieces',
+              //       supplier: ''
+              //     });
+              //     await fetchProductsData();
+              //     console.log("✅ Product created:", result);
+              //   } else {
+              //     console.error("❌ Failed to create product", result);
+              //   }
+              // }}
+              onClick={async () => handleSaveProduct()}
+            >
+
+              Add Material
             </Button>
+            {/* Jyoti */}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1613,6 +2122,34 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           </div>
         </DialogContent>
       </Dialog>
+      {/* Delete Confirmation */}
+      <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>Are you sure you want to delete this product?</AlertDialogTitle>
+      <AlertDialogDescription>
+        This action cannot be undone. This will permanently delete the product "{productToDelete?.product_name}" from your inventory.
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
+      <AlertDialogAction 
+        onClick={handleDeleteProduct} 
+        disabled={isLoading}
+        className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+      >
+        {isLoading ? (
+          <div className="flex items-center gap-2">
+            <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            Deleting...
+          </div>
+        ) : (
+          'Delete Product'
+        )}
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
     </div>
   )
 }

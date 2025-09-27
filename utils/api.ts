@@ -333,6 +333,109 @@ export const apiClient = {
   },
 
 
+  getProjectSummary: async (selectedJobId: string | number) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${apiBaseUrl}/job/getProjectSummary/${selectedJobId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to fetch jobs')
+    }
+
+
+    const result = await response.json()
+    console.log('Project Summary API Response:', result)
+
+    if (!result.data || !result.data.projectSummary) {
+      console.error('Project Summary API: Unexpected response structure:', result)
+      return {
+        data: [],
+      }
+    }
+
+    // Transform the API response to match our Job interface
+    const projectSummary = result.data?.projectSummary || {};
+
+    const transformedData = {
+      data: {
+        estimate: projectSummary?.jobEstimate || 0,
+        actualCost: projectSummary?.actualProjectCost || 0,
+        laborCost: projectSummary?.laborCost || 0,
+        materialsCost: projectSummary?.materialsCost || 0,
+        message: result.message || '',
+        success: result.success || false,
+      }
+    }
+
+
+    console.log('Transformed project Summary data:', transformedData)
+    return transformedData
+  },
+   
+  getDashboardMetrics: async (selectedJobId: string | number) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${apiBaseUrl}/job/getJobDashboard/${selectedJobId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to fetch job dashboard')
+    }
+
+
+    const result = await response.json()
+    console.log('Dashboard Matrics API Response:', result)
+
+    if (!result.data || !result.data.dashboardMetrics) {
+      console.error('Dashboard Matrics API: Unexpected response structure:', result)
+      return {
+        data: [],
+      }
+    }
+
+    // Transform the API response to match our Job interface
+    const dashboardMetrics = result.data?.dashboardMetrics || {};
+
+    const transformedData = {
+      data: {
+        numberOfInvoices: dashboardMetrics?.numberOfInvoices || [],
+        totalHoursWorked: dashboardMetrics?.totalHoursWorked || [],
+        totalLabourEntries: dashboardMetrics?.totalLabourEntries || [],
+        totalMaterialUsed: dashboardMetrics?.totalMaterialUsed || [],
+        message: result.message || '',
+        success: result.success || false,
+      }
+    }
+
+
+    console.log('Transformed Dashboard Matrics data:', transformedData)
+    return transformedData
+  },
+
+
   updateJob: async (jobId: string, jobData: {
     job_title: string,
     job_type: string,
@@ -881,6 +984,7 @@ export const apiClient = {
 
   // Lead Labor
   getLeadLabor: async (page: number = 1, limit: number = 10) => {
+    console.log('Jyoti');
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
     const token = getAuthToken()
     
@@ -902,9 +1006,9 @@ export const apiClient = {
     }
 
     const result = await response.json()
-    
     // Transform the response to match the expected structure
     // The API returns: result.data.data (array) and result.data.pagination
+
     return {
       data: result.data.data.map((leadLabor: any) => ({
         id: leadLabor.id,
@@ -920,6 +1024,7 @@ export const apiClient = {
       totalPages: result.data.pagination.totalPages,
       currentPage: result.data.pagination.currentPage
     }
+
   },
 
   // Labor

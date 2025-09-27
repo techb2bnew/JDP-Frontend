@@ -149,7 +149,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       icon: Users,
       href: "/role",
       description: "Role & Permission",
-      module: "role_permission",
+      module: "role_permission ",
       requiredActions: ["view", "create", "edit", "delete"]
     }
   ]

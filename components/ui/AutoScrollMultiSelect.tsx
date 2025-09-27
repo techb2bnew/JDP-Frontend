@@ -6,6 +6,7 @@ import { LoadingSpinner } from '../common/LoadingSpinner'
 import { ChevronDown, X } from 'lucide-react'
 
 interface AutoScrollMultiSelectProps {
+  
   selectedValues: string[]
   onSelectionChange: (selectedIds: string[], selectedItems: any[]) => void
   placeholder: string

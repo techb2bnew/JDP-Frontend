@@ -16,6 +16,7 @@ import { LoadingSpinner } from './common/LoadingSpinner'
 import { toast } from 'sonner'
 import { usePermissions } from '../contexts/PermissionContext'
 import { apiClient } from '../utils/api'
+import { NewInvoiceDialog } from './invoices/NewInvoiceDialog'
 import { 
   Plus, 
   Search, 
@@ -65,11 +66,41 @@ interface Job {
   assignedLeadLaborDetails?: any[]
   assignedLaborDetails?: any[]
   assignedMaterialsDetails?: any[]
+  leadLabors?:any[]
 }
+
+// Define a type for project summary
+interface ProjectSummary {
+  estimate: number
+  actualCost: number
+  laborCost: number
+  materialsCost: number
+  message: string
+  success: boolean
+}
+
+interface Metric {
+  value: number
+  unit: string
+  color: string
+}
+
+interface DashboardMatrics {
+  totalHoursWorked?: Metric
+  totalMaterialUsed?: Metric
+  totalLabourEntries?: Metric
+  numberOfInvoices?: Metric
+}
+
+
 
 export function JobManagementPage() {
   const { hasPermission } = usePermissions()
   const [jobs, setJobs] = useState<Job[]>([])
+  const [projectSummary, setProjectSummary] = useState<ProjectSummary | null>(null)
+  const [dashboardMetrics, setDashboardMetrics] = useState<DashboardMatrics | null>(null)
+  const [leadLabors, setLeadLabors] = useState<Job[]>([])
+  const [labors, setLabors] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
   const [currentView, setCurrentView] = useState<'list' | 'details' | 'create' | 'timesheets' | 'invoices' | 'approvals'>('list')
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
@@ -114,6 +145,90 @@ export function JobManagementPage() {
     }
   }
 
+  //Fetch project Summary
+  const [reloadKey, setReloadKey] = useState(0);
+  const handleReloadJobDetails = () => {
+    setReloadKey(prev => prev + 1);
+  };
+  //Jyoti
+  
+  const fetchProjectSummary = async (selectedJobId: string | number ) => {
+    if (selectedJobId == null) return // skip when no job is selected
+    try {
+      setLoading(true)
+      const response = await apiClient.getProjectSummary(selectedJobId)
+      console.log('testing project Summary', response.data);
+      setProjectSummary(response.data)
+      
+    } catch (error) {
+      console.error('Error fetching jobs:', error)
+      toast.error('Failed to fetch jobs')
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+   const fetchDashboardMetrics = async(jobId: string) => {
+    try {
+      setLoading(true)
+      const dashboardMetrics = await apiClient.getDashboardMetrics(jobId)
+      console.log('dashboardMetrics', dashboardMetrics);
+
+      setDashboardMetrics({
+        numberOfInvoices: dashboardMetrics.data.numberOfInvoices,
+        totalHoursWorked: dashboardMetrics.data.totalHoursWorked,
+        totalLabourEntries: dashboardMetrics.data.totalLabourEntries,
+        totalMaterialUsed: dashboardMetrics.data.totalMaterialUsed,
+      });
+
+
+    } catch (error) {
+      console.error('Error fetching dashboard metrics:', error)
+      toast.error('Failed to load Dashboard Metrics')
+    }finally {
+      setLoading(false)
+    }
+  }
+
+  const onActionTrigger = async() => {
+    await Promise.all([fetchDashboardMetrics(), fetchProjectSummary()]);
+  }
+
+  const fetchLeadLabors = async (page: number = 1) => {
+    try {
+      setLoading(true)
+
+      // Fetch data using the updated API client method
+      const response = await apiClient.getLeadLabor(page, itemsPerPage)
+      // Set the transfor med data
+      setLeadLabors(response.data)
+    } catch (error: any) {
+      console.error('Error fetching lead labors:', error)
+      toast.error(error.message || 'Failed to fetch lead labors')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchLabors = async (page: number = 1) => {
+    try {
+      setLoading(true)
+
+      // Fetch data using the updated API client method
+      const response = await apiClient.getLabor(page, itemsPerPage)
+      console.log('Labors', response.data);
+      // Set the transfor med data
+      setLabors(response.data)
+    } catch (error: any) {
+      console.error('Error fetching labors:', error)
+      toast.error(error.message || 'Failed to fetch labors')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  //Jyoti
+
   // Fetch job statistics from API
   const fetchJobStats = async () => {
     try {
@@ -129,6 +244,8 @@ export function JobManagementPage() {
   useEffect(() => {
     fetchJobs(1)
     fetchJobStats()
+    fetchLeadLabors()
+    fetchLabors()
   }, [])
 
   // Handle page change
@@ -158,7 +275,7 @@ export function JobManagementPage() {
       setLoading(true)
       // Fetch the latest job details from API
       const jobDetails = await apiClient.getJobById(jobId)
-      
+      console.log('jobDetailsjobDetails', jobDetails);
       // Update the jobs array with the fetched job details
       setJobs(prevJobs => 
         prevJobs.map(j => j.id === jobId ? jobDetails : j)
@@ -350,10 +467,16 @@ export function JobManagementPage() {
   if (currentView === 'details' && selectedJobId) {
     return (
       <JobDetailsPage 
+        key={reloadKey}
         jobId={selectedJobId} 
         onBack={handleBackToList}
         jobs={jobs}
         setJobs={setJobs}
+        projectSummary={projectSummary}
+        setProjectSummary={setProjectSummary}
+        dashboardMetrics={dashboardMetrics}
+        setDashboardMetrics={setDashboardMetrics}
+        onReload={onActionTrigger} 
       />
     )
   }
@@ -605,7 +728,7 @@ export function JobManagementPage() {
                   </div>
                 </div>
                 <ActionButtonsPopup
-                  onView={() => handleViewDetails(job.id)}
+                  onView={() => {handleViewDetails(job.id); fetchDashboardMetrics(job.id); fetchProjectSummary(job.id)}}
                   onEdit={() => handleEditJob(job)}
                   onDelete={() => handleDeleteJob(job.id)}
                   itemName={job.title}
