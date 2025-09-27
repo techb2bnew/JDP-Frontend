@@ -383,7 +383,55 @@ export const apiClient = {
     console.log('Transformed project Summary data:', transformedData)
     return transformedData
   },
-   
+
+
+  createEstimate : async (estimateData: {
+    job_id: number,
+    estimate_title: string,
+    customer_id: number,
+    priority: string,
+    valid_until: string,
+    location: string,
+    description: string,
+    service_type: string,
+    email_address: string,
+    estimate_date: string,
+    materials_cost: number,
+    labor_cost: number,
+    tax_percentage: number,
+    invoice_type:string,
+    issue_date:string,
+    due_date: string,
+    additional_cost: {
+      description: string,
+      amount: number
+    }
+  }) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+    
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${apiBaseUrl}/estimates/createEstimate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(estimateData),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to create estimate')
+    }
+
+    return response.json()
+  },
+
+
   getDashboardMetrics: async (selectedJobId: string | number) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
     const token = getAuthToken()
@@ -432,6 +480,115 @@ export const apiClient = {
 
 
     console.log('Transformed Dashboard Matrics data:', transformedData)
+    return transformedData
+  },
+
+
+  getEstimatesByJob: async (selectedJobId: string | number) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${apiBaseUrl}/estimates/getEstimatesByJob/${selectedJobId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to fetch estimates by Job')
+    }
+
+
+    const result = await response.json()
+    console.log('Estimates by Job API Response:', result)
+
+    if (!result.data || !result.data.estimates) {
+      console.error('Estimates by Job API: Unexpected response structure:', result)
+      return {
+        data: [],
+      }
+    }
+
+    // Transform the API response to match our Job interface
+    const estimates = result.data?.estimates || {};
+
+    const transformedData = {
+      data: {
+       estimates: estimates,
+        message: result.message || '',
+        success: result.success || false,
+      }
+    }
+
+
+    console.log('Transformed Estimates data:', transformedData)
+    return transformedData
+  },
+
+  getEstimateById: async (selectedJobId: string | number) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${apiBaseUrl}/estimates/getEstimateById/${selectedJobId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to fetch estimates')
+    }
+
+
+    const result = await response.json()
+    console.log('Estimates API Response:', result)
+
+    if (!result.data || !result.data.invoice_details) {
+      console.error('Estimates API: Unexpected response structure:', result)
+      return {
+        data: [],
+      }
+    }
+
+    // Transform the API response to match our Job interface
+    const estimates = result.data || {};
+
+    const transformedData = {
+      data: {
+        id: estimates.id,
+        customer_id: estimates.customer_id,
+        job_id: estimates.job_id,
+        invoice_number: estimates.invoice_number,
+        invoice_type: estimates.invoice_type,
+        due_date: estimates.due_date,
+        issue_date: estimates.issue_date,
+        status: estimates.status,
+        description: estimates.description,
+        additional_costs: estimates.additional_costs,
+        labor_cost: estimates.labor_cost,
+        subtotal: estimates.subtotal,
+        total_amount: estimates.total_amount,
+        message: result.message || '',
+        success: result.success || false,
+      }
+    }
+
+
+    console.log('Transformed Estimates data:', transformedData)
     return transformedData
   },
 

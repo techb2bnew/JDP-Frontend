@@ -71,12 +71,12 @@ interface Job {
 
 // Define a type for project summary
 interface ProjectSummary {
-  estimate: number
-  actualCost: number
-  laborCost: number
-  materialsCost: number
-  message: string
-  success: boolean
+  estimate?: number
+  actualCost?: number
+  laborCost?: number
+  materialsCost?: number
+  message?: string
+  success?: boolean
 }
 
 interface Metric {
@@ -92,6 +92,28 @@ interface DashboardMatrics {
   numberOfInvoices?: Metric
 }
 
+// Individual estimate interface
+interface Estimate {
+  id: string;
+  customer_id: string;
+  job_id: string;
+  invoice_number: string;
+  invoice_type: string;
+  due_date: string;
+  issue_date: string;
+  status: string;
+  description: string;
+  additional_costs: string;
+  labor_cost: string;
+  subtotal: string;
+  total_amount: string;
+}
+
+interface EstimatesResponse {
+  data: {
+    estimates: Estimate[];
+  };
+}
 
 
 export function JobManagementPage() {
@@ -99,6 +121,21 @@ export function JobManagementPage() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [projectSummary, setProjectSummary] = useState<ProjectSummary | null>(null)
   const [dashboardMetrics, setDashboardMetrics] = useState<DashboardMatrics | null>(null)
+  const [estimates, setEstimates] = useState<EstimatesResponse | null >({
+    id: '',
+    customer_id: '',
+    job_id: '',
+    invoice_number: '',
+    invoice_type:'',
+    due_date:'',
+    issue_date:'',
+    status:'',
+    description: '',
+    additional_costs: '',
+    labor_cost: '',
+    subtotal: '',
+    total_amount: '',
+  })
   const [leadLabors, setLeadLabors] = useState<Job[]>([])
   const [labors, setLabors] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
@@ -168,7 +205,7 @@ export function JobManagementPage() {
     }
   }
   
-   const fetchDashboardMetrics = async(jobId: string) => {
+  const fetchDashboardMetrics = async(jobId: string) => {
     try {
       setLoading(true)
       const dashboardMetrics = await apiClient.getDashboardMetrics(jobId)
@@ -190,8 +227,54 @@ export function JobManagementPage() {
     }
   }
 
+  const fetchEstimateById = async(jobId: string) => {
+    try {
+      setLoading(true)
+      const estimates = await apiClient.getEstimateById(jobId)
+      console.log('Estimates:', estimates);
+
+      //Code is left
+      // setEstimates({
+      //   id: estimates.data.id,
+      //   customer_id: estimates.data.customer_id,
+      //   job_id: estimates.data.job_id,
+      //   invoice_number: estimates.data.invoice_number,
+      //   invoice_type:estimates.data.invoice_type,
+      //   due_date:estimates.data.due_date,
+      //   issue_date:estimates.data.issue_date,
+      //   status:estimates.data.status,
+      //   description: estimates.data.description,
+      //   additional_costs: estimates.data.additional_costs,
+      //   labor_cost: estimates.data.labor_cost,
+      //   subtotal: estimates.data.subtotal,
+      //   total_amount: estimates.data.total_amount
+      // })
+
+
+
+    } catch (error) {
+      console.error('Error fetching estimates:', error)
+      toast.error('Failed to load Estimates')
+    }finally {
+      setLoading(false)
+    }
+  }
+  const fetchEstimates = async(jobId: string) => {
+    try {
+      setLoading(true);
+      const estimates = await apiClient.getEstimatesByJob(jobId);
+      console.log('Estimates:', estimates);
+      setEstimates(estimates.data.estimates);
+    } catch (error) {
+      console.error('Error fetching estimates:', error);
+      toast.error('Failed to load Estimates');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const onActionTrigger = async() => {
-    await Promise.all([fetchDashboardMetrics(), fetchProjectSummary()]);
+    await Promise.all([fetchDashboardMetrics(selectedJobId), fetchProjectSummary(selectedJobId), fetchEstimates(selectedJobId)]);
   }
 
   const fetchLeadLabors = async (page: number = 1) => {
@@ -246,6 +329,7 @@ export function JobManagementPage() {
     fetchJobStats()
     fetchLeadLabors()
     fetchLabors()
+    fetchEstimates('30')
   }, [])
 
   // Handle page change
@@ -473,9 +557,8 @@ export function JobManagementPage() {
         jobs={jobs}
         setJobs={setJobs}
         projectSummary={projectSummary}
-        setProjectSummary={setProjectSummary}
         dashboardMetrics={dashboardMetrics}
-        setDashboardMetrics={setDashboardMetrics}
+        estimates={estimates}
         onReload={onActionTrigger} 
       />
     )

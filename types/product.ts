@@ -34,6 +34,7 @@ export interface Product {
     width: number
     height: number
   }
+  product_name: string
 }
 
 export interface ProductFormData {

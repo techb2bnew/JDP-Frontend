@@ -22,6 +22,9 @@ export interface InvoiceItem {
   quantity: number
   unitPrice: number
   total: number
+  name: string
+  unit: string
+  supplier: string
 }
 
 export interface LaborEntry {
@@ -31,6 +34,9 @@ export interface LaborEntry {
   hourlyRate: number
   total: number
   description: string
+  laborEmail: string
+  laborRole: string
+  date: string
 }
 
 export interface AdditionalCost {
@@ -43,14 +49,14 @@ export interface Invoice {
   invoiceNumber: string
   customerId: string
   customerName: string
-  jobId: string
+  jobId: string | number
   jobTitle: string
-  type: 'proposed' | 'roughen' | 'progressive' | 'final'
+  type: 'proposed' | 'estimate' | 'progressive' | 'final'
   issueDate: string
   dueDate: string
   items: InvoiceItem[]
   labor: LaborEntry[]
-  additionalCosts: AdditionalCost[]
+  additionalCosts: AdditionalCost // Single object as per your requirement
   subtotal: number
   taxRate: number
   taxAmount: number

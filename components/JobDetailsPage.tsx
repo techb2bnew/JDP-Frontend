@@ -195,16 +195,31 @@ interface DashboardMetrics {
   numberOfInvoices?: Metric
 }
 
+interface Estimates {
+  id: string,
+  customer_id: string,
+  job_id: string,
+  invoice_number: string,
+  invoice_type:string,
+  due_date:string,
+  issue_date:string,
+  status:string,
+  description:string,
+  additional_costs: string,
+  labor_cost: string,
+  subtotal: string,
+  total_amount: string,
+}
+
 interface JobDetailsPageProps {
   jobId: string
   onBack: () => void
   jobs: any[]
   setJobs: (jobs: any[]) => void
-  projectSummary: ProjectSummary | null
-  setProjectSummary:(projectSummary: any[]) => void
+  projectSummary: ProjectSummary 
   dashboardMetrics: DashboardMetrics | null
-  setDashboardMetrics: (projectSummary: any[]) => void
-  onReload?: () => void
+  estimates: Estimates | null
+  onReload: () => void
 }
 
 interface Supplier {
@@ -215,7 +230,7 @@ interface Supplier {
   user_id: number;
 }
 
-export function JobDetailsPage({ jobId, onBack, jobs, setJobs, projectSummary, setProjectSummary, dashboardMetrics, setDashboardMetrics, onReload }: JobDetailsPageProps) {
+export function JobDetailsPage({ jobId, onBack, jobs, setJobs, projectSummary, dashboardMetrics, estimates, onReload }: JobDetailsPageProps) {
   // Find the job from your jobs array or use sample data
   const job = jobs.find(j => j.id === jobId) || sampleJobData.job
  
@@ -230,7 +245,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, projectSummary, s
   const [selectedLeadLabor, setSelectedLeadLabor] = useState<{ [jobId: string]: string[] }>({});
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
-  const[customers, setCustomers] = useState([])
+  const[customers, setCustomers] = useState([]);
+  
   const resetMaterialForm = () => {
     setMaterialFormData({
       name: '',
@@ -289,9 +305,9 @@ const fetchProductsData = async () => {
       const jobDetails = await apiClient.getJobById(jobId);
 
       // Update the jobs array with the fetched job details
-      setJobs(prevJobs =>
-        prevJobs.map(j => (j.id === jobId ? jobDetails : j))
-      );
+      const updatedJobs = jobs.map(j => j.id === jobId ? jobDetails : j);
+      setJobs(updatedJobs);
+      
     } catch (error) {
       console.error('Error fetching job details:', error);
       toast.error('Failed to load job details');
@@ -472,8 +488,7 @@ const handleSaveProduct = async () => {
     resetMaterialForm(); // <- same like resetTimeLogForm
     await fetchProductsData();
     onReload();
-    // window.location.reload();
-    // await refreshJobData(); // refresh product/job details after create
+ 
   } catch (error) {
     console.error("Error creating product:", error);
     toast.error(error instanceof Error ? error.message : "Failed to create product");
@@ -502,7 +517,7 @@ const handleSaveProduct = async () => {
   const materials = job.assignedMaterialsDetails || sampleJobData.materials
 
   const timeLogs = sampleJobData.timeLogs // Keep sample data for now as we don't have time logs API
-  const invoices = sampleJobData.invoices // Keep sample data for now as we don't have invoices API
+  const invoices = estimates || sampleJobData.invoices // Keep sample data for now as we don't have invoices API
 
   // Calculate totals using real job data
   const totalMaterialCost = materials.reduce((sum: number, material: any) => sum + (material.unit_cost || material.totalCost || 0), 0)
@@ -589,6 +604,9 @@ const handleSaveProduct = async () => {
     setIsEditing(false);
   };
 
+  const handleInvoiceDelete = () =>{
+
+  }
   const validateTimeLogForm = () => {
     const errors: Record<string, string> = {};
 
@@ -1314,7 +1332,9 @@ const handleSaveProduct = async () => {
                   onOpenChange={setOpen}
                   onSave={handleSave}
                   customers={customers}
+                  roles={roles}
                   job={job}
+                  suppliers={suppliers}
                 />
               </CardHeader>
               <CardContent>
@@ -1327,8 +1347,8 @@ const handleSaveProduct = async () => {
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h4 className="font-medium">{invoice.type}</h4>
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${invoice.type === 'Estimate' ? 'bg-blue-100 text-blue-800' :
+                            <h4 className="font-medium">{invoice.invoice_type}</h4>
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${invoice.invoice_type === 'estimate' ? 'bg-blue-100 text-blue-800' :
                               invoice.type === 'Proposal Invoice' ? 'bg-purple-100 text-purple-800' :
                                 invoice.type === 'Progressive Invoice' ? 'bg-orange-100 text-orange-800' :
                                   'bg-green-100 text-green-800'
@@ -1338,13 +1358,13 @@ const handleSaveProduct = async () => {
                           </div>
                           <p className="text-sm text-gray-600">{invoice.description}</p>
                           <p className="text-xs text-gray-500">
-                            #{invoice.id} • Created: {invoice.createdDate} • Due: {invoice.dueDate}
+                            #{invoice.invoice_number} • Created: {invoice.issue_date} • Due: {invoice.due_date}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="text-right">
-                          <p className="font-semibold mb-1">{formatCurrency(invoice.amount)}</p>
+                          <p className="font-semibold mb-1">{formatCurrency(invoice.total_amount)}</p>
                           <span>
                             {getStatusBadge(job.status)}
                           </span>
@@ -1362,7 +1382,7 @@ const handleSaveProduct = async () => {
                             <Printer className="h-3 w-3" />
                             Print
                           </Button>
-                          <Button variant="outline" size="sm" className="gap-1" >
+                          <Button variant="outline" size="sm" className="gap-1" onClick = {() => {handleInvoiceDelete(invoice)}}>
                             <Trash2 className="h-3 w-3 text-red-600" />
                           </Button>
                         </div>
@@ -1867,7 +1887,7 @@ const handleSaveProduct = async () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddMaterialModal(false)}>
+            <Button variant="outline" onClick={() => {resetMaterialForm(); setShowAddMaterialModal(false)}}>
               Cancel
             </Button>
             {/* <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => {
@@ -2060,7 +2080,7 @@ const handleSaveProduct = async () => {
               Invoice Details
             </DialogTitle>
             <DialogDescription className="text-sm font-semibold">
-              {selectedInvoice?.type} - {selectedInvoice?.id}
+              {selectedInvoice?.invoice_type} - {selectedInvoice?.invoice_number}
             </DialogDescription>
           </DialogHeader>
 
@@ -2072,15 +2092,15 @@ const handleSaveProduct = async () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-600">Type</p>
-                  <p className="font-medium">{selectedInvoice?.type}</p>
+                  <p className="font-medium">{selectedInvoice?.invoice_type}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Number</p>
-                  <p className="font-medium">{selectedInvoice?.id}</p>
+                  <p className="font-medium">{selectedInvoice?.invoice_number}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Amount</p>
-                  <p className="font-medium">{formatCurrency(selectedInvoice?.amount || 0)}</p>
+                  <p className="font-medium">{formatCurrency(selectedInvoice?.total_amount || 0)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Status</p>
@@ -2092,11 +2112,11 @@ const handleSaveProduct = async () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-600">Created Date</p>
-                <p className="font-medium">{selectedInvoice?.createdDate}</p>
+                <p className="font-medium">{selectedInvoice?.issue_date}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Due Date</p>
-                <p className="font-medium">{selectedInvoice?.dueDate}</p>
+                <p className="font-medium">{selectedInvoice?.due_date}</p>
               </div>
             </div>
             {/* Description */}

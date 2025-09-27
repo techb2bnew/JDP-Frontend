@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -14,35 +14,47 @@ import { Invoice, InvoiceItem, LaborEntry, AdditionalCost } from '../../types/in
 import { customersData, jobsData } from '../../data/invoiceData'
 import { apiClient } from '../../utils/api'
 import { toast } from 'sonner'
-// import { formatCurrency, formatDate } from '../../utils/invoiceUtils'
 
 interface NewInvoiceDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSave: (invoice: Partial<Invoice>) => void
   customers: any[];
-  job: any[];
+  roles: any [];
+  job: {
+    id: number;
+    title: string;
+  };
+  suppliers: any[]
 }
 
-export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, job }: NewInvoiceDialogProps) => {
+export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, roles, job, suppliers }: NewInvoiceDialogProps) => {
+  const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1)
   const [newInvoice, setNewInvoice] = useState<Partial<Invoice>>({
     customerId: '',
-    jobId: '',
-    type: 'proposed',
+    jobId: 0,
+    type: 'estimate',
     issueDate: format(new Date(), 'yyyy-MM-dd'),
     dueDate: format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
     items: [],
     labor: [],
-    additionalCosts: [],
+    additionalCosts: { description: '', amount: 0 }, // Changed to single object
     notes: '',
-    taxRate: 0.08
+    taxRate: 0.08,
+    invoiceNumber:''
   })
+
+  useEffect(() => {
+    if (job?.id) {
+      setNewInvoice(prev => ({ ...prev, jobId: job.id }));
+    }
+  }, [job]);
 
   const calculateSubtotal = () => {
     const itemsTotal = newInvoice.items?.reduce((sum, item) => sum + item.total, 0) || 0
     const laborTotal = newInvoice.labor?.reduce((sum, labor) => sum + labor.total, 0) || 0
-    const additionalTotal = newInvoice.additionalCosts?.reduce((sum, cost) => sum + cost.amount, 0) || 0
+    const additionalTotal = newInvoice.additionalCosts?.amount || 0
     return itemsTotal + laborTotal + additionalTotal
   }
 
@@ -50,10 +62,13 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, job }:
     const newItem: InvoiceItem = {
       id: `ITEM-${Date.now()}`,
       sku: '',
+      name: '',
       description: '',
       quantity: 1,
       unitPrice: 0,
-      total: 0
+      total: 0,
+      unit:'pieces',
+      supplier: ''
     }
     setNewInvoice(prev => ({
       ...prev,
@@ -83,10 +98,13 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, job }:
     const newLabor: LaborEntry = {
       id: `LAB-${Date.now()}`,
       laborName: '',
+      laborEmail:'',
       hours: 0,
       hourlyRate: 0,
       total: 0,
-      description: ''
+      description: '',
+      laborRole: '',
+      date: format(new Date(), 'yyyy-MM-dd')
     }
     setNewInvoice(prev => ({
       ...prev,
@@ -112,43 +130,198 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, job }:
     }))
   }
 
-  const addAdditionalCost = () => {
-    setNewInvoice(prev => ({
-      ...prev,
-      additionalCosts: [...(prev.additionalCosts || []), { description: '', amount: 0 }]
-    }))
+  // Updated to handle single additional cost object
+const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
+  setNewInvoice(prev => ({
+    ...prev,
+    additionalCosts: { 
+      description: prev.additionalCosts?.description || '',
+      amount: prev.additionalCosts?.amount || 0,
+      [field]: value 
+    }
+  }))
+}
+
+  const calculateTotalMaterialsCost = () => {
+    return (newInvoice.items || []).reduce((sum, item) => sum + (item.total || 0), 0);
+  };
+
+  const calculateTotalLaborCost = () => {
+    return (newInvoice.labor || []).reduce((sum, entry) => sum + (entry.total || 0), 0);
+  };
+
+  const calculateTotalAdditionalCost = () => {
+    return newInvoice.additionalCosts?.amount || 0;
+  };
+
+  // Get selected customer for email
+  const getSelectedCustomerEmail = () => {
+    const selectedCustomer = customers.find(c => c.id.toString() === newInvoice.customerId);
+    return selectedCustomer?.email || "customer@example.com";
+  };
+
+  const validateFormData = () => {
+    const errors: string[] = [];
+    
+    if (!newInvoice.customerId) {
+      errors.push("Customer is required");
+    }
+    
+    if (!newInvoice.jobId) {
+      errors.push("Job is required");
+    }
+    
+    if (!newInvoice.type) {
+      errors.push("Invoice type is required");
+    }
+    
+    if (!newInvoice.issueDate) {
+      errors.push("Issue date is required");
+    }
+    
+    if (!newInvoice.dueDate) {
+      errors.push("Due date is required");
+    }
+
+    return errors;
+  };
+
+  const saveInvoiceData = async () => {
+    try {
+      setLoading(true);
+
+      // Validate form data
+      const validationErrors = validateFormData();
+      if (validationErrors.length > 0) {
+        toast.error(`Validation errors: ${validationErrors.join(', ')}`);
+        return false;
+      }
+
+      // Calculate totals
+      const materialsTotal = calculateTotalMaterialsCost();
+      const laborTotal = calculateTotalLaborCost();
+      const additionalTotal = calculateTotalAdditionalCost();
+      const subtotal = materialsTotal + laborTotal + additionalTotal;
+      const taxAmount = subtotal * (newInvoice.taxRate || 0);
+      const totalAmount = subtotal + taxAmount;
+
+      // Ensure we have at least default additional cost
+      const additionalCost = newInvoice.additionalCosts?.description || newInvoice.additionalCosts?.amount
+        ? newInvoice.additionalCosts
+        : { description: 'No additional costs', amount: 0 };
+
+      const payload = {
+        estimate_title: `${newInvoice.type?.charAt(0).toUpperCase()}${newInvoice.type?.slice(1)} Invoice - ${job?.title || 'Project'}`,
+        customer_id: Number(newInvoice.customerId),
+        job_id: Number(newInvoice.jobId),
+        priority: "medium",
+        valid_until: newInvoice.dueDate || format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
+        location: "Project Location", // You may want to make this dynamic
+        description: newInvoice.notes || `${newInvoice.type || 'Proposed'} invoice for ${job?.title || 'project'}`,
+        service_type: "service_based",
+        email_address: getSelectedCustomerEmail(),
+        estimate_date: newInvoice.issueDate || format(new Date(), 'yyyy-MM-dd'),
+        
+        // Financial calculations
+        materials_cost: materialsTotal,
+        labor_cost: laborTotal,
+        additional_costs: additionalTotal,
+        subtotal: subtotal,
+        tax_percentage: (newInvoice.taxRate || 0) * 100,
+        tax_amount: taxAmount,
+        total_amount: totalAmount,
+        
+        // Invoice specific fields
+        status: "draft",
+        invoice_type: newInvoice.type || 'estimate',
+        invoice_number: `INV-${format(new Date(), 'yyyy')}-${Date.now().toString().slice(-6)}`, // Generate invoice number
+        issue_date: newInvoice.issueDate || format(new Date(), 'yyyy-MM-dd'),
+        due_date: newInvoice.dueDate || format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
+        
+        // Additional cost object
+        additional_cost: additionalCost,
+        
+        // Custom labor array
+        custom_labor: (newInvoice.labor || []).map(labor => ({
+          full_name: labor.laborName,
+          email: labor.laborEmail,
+          hours_worked: labor.hours,
+          hourly_rate: labor.hourlyRate,
+          job_id: Number(newInvoice.jobId),
+          is_custom: true,
+          // role: labor.laborRole,
+          // date: labor.date,
+          // description: labor.description
+        })),
+        
+        // Custom products array
+        custom_products: (newInvoice.items || []).map(item => ({
+          product_name: item.name,
+          supplier_id: item.supplier, // You may want to make this dynamic
+          supplier_sku: item.sku,
+          jdp_sku: `JDP-${item.sku}`,
+          stock_quantity: item.quantity,
+          unit: "pieces", // You may want to make this dynamic
+          job_id: newInvoice.jobId?.toString(),
+          is_custom: true,
+          unit_cost: item.unitPrice,
+          // description: item.description
+        }))
+      };
+
+      console.log('Sending payload:', payload); // For debugging
+
+      const response = await apiClient.createEstimate(payload);
+      console.log('Invoice saved successfully:', response);
+      toast.success('Invoice saved successfully!');
+      return true;
+    } catch (error: any) {
+      console.error('Error creating estimate:', error);
+      
+      // More detailed error handling
+      let errorMessage = 'Error creating estimate';
+      
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
+      toast.error(errorMessage);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    const success = await saveInvoiceData();
+    
+    if (success) {
+      onSave(newInvoice);
+      
+      // Reset form
+      setNewInvoice({
+        customerId: '',
+        jobId: 0,
+        type: 'estimate',
+        issueDate: format(new Date(), 'yyyy-MM-dd'),
+        dueDate: format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
+        items: [],
+        labor: [],
+        additionalCosts: { description: '', amount: 0 },
+        notes: '',
+        taxRate: 0.08
+      });
+      
+      setCurrentStep(1);
+      onOpenChange(false);
+    }
   }
 
-  const updateAdditionalCost = (index: number, field: 'description' | 'amount', value: any) => {
-    const updatedCosts = [...(newInvoice.additionalCosts || [])]
-    updatedCosts[index] = { ...updatedCosts[index], [field]: value }
-    setNewInvoice(prev => ({ ...prev, additionalCosts: updatedCosts }))
-  }
-
-  const removeAdditionalCost = (index: number) => {
-    setNewInvoice(prev => ({
-      ...prev,
-      additionalCosts: prev.additionalCosts?.filter((_, i) => i !== index)
-    }))
-  }
-
-  const handleSave = () => {
-    onSave(newInvoice)
-    setNewInvoice({
-      customerId: '',
-      jobId: '',
-      type: 'proposed',
-      issueDate: format(new Date(), 'yyyy-MM-dd'),
-      dueDate: format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
-      items: [],
-      labor: [],
-      additionalCosts: [],
-      notes: '',
-      taxRate: 0.08
-    })
-    setCurrentStep(1)
-    onOpenChange(false)
-  }
+  const subtotal = calculateSubtotal();
+  const taxAmount = subtotal * (newInvoice.taxRate || 0);
+  const totalAmount = subtotal + taxAmount;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -173,8 +346,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, job }:
           <TabsContent value="step-1" className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="customer">Customer</Label>
-                
+                <Label htmlFor="customer">Customer *</Label>
                 <Select 
                   value={newInvoice.customerId} 
                   onValueChange={(value) => setNewInvoice(prev => ({ ...prev, customerId: value }))}
@@ -182,10 +354,9 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, job }:
                   <SelectTrigger>
                     <SelectValue placeholder="Select Customer" />
                   </SelectTrigger>
-                    
                   <SelectContent>
                     {customers.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
+                      <SelectItem key={customer.id} value={customer.id.toString()}>
                         {customer.name}
                       </SelectItem> 
                     ))}
@@ -193,29 +364,16 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, job }:
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="job">Job</Label>
-                <div className="flex items-center gap-2 border rounded-md px-3 py-2">
-                  <p className="text-sm font-medium">
-                    {job?.title}
-                  </p>
-                </div>
-                {/* <Select 
-                  value={job.title} 
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Job" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {jobsData.filter(job => !newInvoice.customerId || job.customerId === newInvoice.customerId).map((job) => (
-                      <SelectItem key={job.id} value={job.id}>
-                        {job.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select> */}
+                <Label htmlFor="job">Job *</Label>
+                <Input 
+                  type="text" 
+                  value={job?.title || ''} 
+                  disabled
+                  placeholder="No job selected"
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="type">Invoice Type</Label>
+                <Label htmlFor="type">Invoice Type *</Label>
                 <Select 
                   value={newInvoice.type} 
                   onValueChange={(value: any) => setNewInvoice(prev => ({ ...prev, type: value }))}
@@ -225,11 +383,21 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, job }:
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="proposed">Proposed</SelectItem>
+                    <SelectItem value="estimate">Estimate</SelectItem>
                     <SelectItem value="roughen">Roughen</SelectItem>
                     <SelectItem value="progressive">Progressive</SelectItem>
                     <SelectItem value="final">Final</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Invoice Number</Label>
+                <Input 
+                  value={newInvoice.invoiceNumber || ''} 
+                  onChange={(e) => setNewInvoice(prev => ({ ...prev, invoiceNumber: e.target.value }))}
+                  placeholder="EST-2024-002"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="taxRate">Tax Rate (%)</Label>
@@ -242,7 +410,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, job }:
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="issueDate">Issue Date</Label>
+                <Label htmlFor="issueDate">Issue Date *</Label>
                 <Input 
                   type="date" 
                   value={newInvoice.issueDate} 
@@ -250,7 +418,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, job }:
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="dueDate">Due Date</Label>
+                <Label htmlFor="dueDate">Due Date *</Label>
                 <Input 
                   type="date" 
                   value={newInvoice.dueDate} 
@@ -273,6 +441,14 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, job }:
                 <Card key={item.id}>
                   <CardContent className="p-4">
                     <div className="grid grid-cols-3 gap-4">
+                       <div className="space-y-2">
+                          <Label>Product Name</Label>
+                          <Input
+                            value={item.name}
+                            onChange={(e) => updateInvoiceItem(index, 'name', e.target.value)}
+                            placeholder="Product name"
+                          />
+                        </div>
                       <div className="space-y-2">
                         <Label>SKU</Label>
                         <Input 
@@ -281,14 +457,47 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, job }:
                           placeholder="SKU-001"
                         />
                       </div>
-                      <div className="space-y-2">
+                      <div>
+                        <Label className="mb-2">Unit</Label>
+                        <Select
+                          value={item.unit || 'pieces'}
+                          onValueChange={(value) => updateInvoiceItem(index, 'unit', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select unit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pieces">Pieces</SelectItem>
+                            <SelectItem value="feet">Feet</SelectItem>
+                            <SelectItem value="box">Box</SelectItem>
+                            <SelectItem value="roll">Roll</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                        <div>
+                          <Label className="mb-2">Supplier</Label>
+                          <select
+                            value={item.supplier || ''}
+                            onChange={(e) => updateInvoiceItem(index, 'supplier', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="">Select Supplier</option>
+                            {suppliers.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.contact_person} 
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      {/* <div className="space-y-2">
                         <Label>Description</Label>
                         <Input 
                           value={item.description} 
                           onChange={(e) => updateInvoiceItem(index, 'description', e.target.value)}
                           placeholder="Item description"
                         />
-                      </div>
+                      </div> */}
                       <div className="space-y-2">
                         <Label>Quantity</Label>
                         <Input 
@@ -307,9 +516,10 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, job }:
                         />
                       </div>
                       <div className="space-y-2">
+
                         <Label>Total</Label>
                         <div className="flex items-center gap-2">
-                          <Input value='342' readOnly />
+                          <Input value={(item.quantity * item.unitPrice).toFixed(2)} readOnly />
                           <Button variant="outline" size="sm" onClick={() => removeInvoiceItem(index)}>
                             <Trash2 className="w-3 h-3" />
                           </Button>
@@ -336,23 +546,53 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, job }:
                   <CardContent className="p-4">
                     <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
-                        <Label>Labor Name</Label>
+                        <Label>Full Name</Label>
                         <Input 
                           value={labor.laborName} 
                           onChange={(e) => updateLaborEntry(index, 'laborName', e.target.value)}
                           placeholder="Worker name"
                         />
                       </div>
-                      <div className="space-y-2">
-                        <Label>Description</Label>
-                        <Input 
-                          value={labor.description} 
-                          onChange={(e) => updateLaborEntry(index, 'description', e.target.value)}
-                          placeholder="Work description"
-                        />
+                      <div>
+                        <Label className="mb-2">Email </Label>
+                        <Input
+                          type="email"
+                          value={labor.laborEmail}
+                          onChange={(e) => updateLaborEntry(index, 'laborEmail', e.target.value)}
+                          placeholder="Enter email address"
+                        />                       
                       </div>
+                      
+                      {/* <div>
+                        <Label className="mb-2">Role </Label>
+                        <Select 
+                          value={labor.laborRole} 
+                          onValueChange={(value) => updateLaborEntry(index, 'laborRole', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {roles.map((role) => (
+                              <SelectItem key={role.id} value={role.roleName}>
+                                {role.roleName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div> */}
+
+                      {/* <div className="space-y-2">
+                        <Label htmlFor="issueDate">Date</Label>
+                        <Input 
+                          type="date" 
+                          value={labor.date} 
+                          onChange={(e) => updateLaborEntry(index, 'date', e.target.value)}
+                        />
+                      </div>      */}
+
                       <div className="space-y-2">
-                        <Label>Hours</Label>
+                        <Label>Hours Worked</Label>
                         <Input 
                           type="number" 
                           step="0.5"
@@ -369,10 +609,21 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, job }:
                           onChange={(e) => updateLaborEntry(index, 'hourlyRate', parseFloat(e.target.value) || 0)}
                         />
                       </div>
+
+                       {/* <div className="space-y-2">
+                        <Label>Description</Label>
+                        <Textarea
+                          value={labor.description}
+                          onChange={(e) => updateLaborEntry(index, 'description', e.target.value)}
+                          placeholder="Describe the work performed"
+                          rows={3}
+                        />
+                      </div> */}
+
                       <div className="space-y-2">
                         <Label>Total</Label>
                         <div className="flex items-center gap-2">
-                          <Input value='2323' readOnly />
+                          <Input value={(labor.hours * labor.hourlyRate).toFixed(2)} readOnly />
                           <Button variant="outline" size="sm" onClick={() => removeLaborEntry(index)}>
                             <Trash2 className="w-3 h-3" />
                           </Button>
@@ -387,44 +638,32 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, job }:
 
           <TabsContent value="step-4" className="space-y-4">
             <div className="flex justify-between items-center">
-              <h3 className="text-lg font-medium">Additional Costs</h3>
-              <Button onClick={addAdditionalCost} variant="outline" size="sm">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Cost
-              </Button>
+              <h3 className="text-lg font-medium">Additional Cost</h3>
             </div>
-            <div className="space-y-3">
-              {newInvoice.additionalCosts?.map((cost, index) => (
-                <Card key={index}>
-                  <CardContent className="p-4">
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2 col-span-2">
-                        <Label>Description</Label>
-                        <Input 
-                          value={cost.description} 
-                          onChange={(e) => updateAdditionalCost(index, 'description', e.target.value)}
-                          placeholder="Cost description"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Amount</Label>
-                        <div className="flex items-center gap-2">
-                          <Input 
-                            type="number" 
-                            step="0.01"
-                            value={cost.amount} 
-                            onChange={(e) => updateAdditionalCost(index, 'amount', parseFloat(e.target.value) || 0)}
-                          />
-                          <Button variant="outline" size="sm" onClick={() => removeAdditionalCost(index)}>
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )) || <p className="text-center text-muted-foreground py-8">No additional costs added yet</p>}
-            </div>
+            <Card>
+              <CardContent className="p-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Description</Label>
+                    <Input 
+                      value={newInvoice.additionalCosts?.description || ''} 
+                      onChange={(e) => updateAdditionalCost('description', e.target.value)}
+                      placeholder="Additional cost description"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Amount</Label>
+                    <Input 
+                      type="number" 
+                      step="0.01"
+                      value={newInvoice.additionalCosts?.amount || 0} 
+                      onChange={(e) => updateAdditionalCost('amount', parseFloat(e.target.value) || 0)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="step-5" className="space-y-4">
@@ -435,11 +674,13 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, job }:
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Customer</p>
-                      {/* <p className="font-medium">{customersData.find(c => c.id === newInvoice.customerId)?.name}</p> */}
+                      <p className="font-medium">
+                        {customers.find(c => c.id.toString() === newInvoice.customerId)?.name || 'Not selected'}
+                      </p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Job</p>
-                      <p className="font-medium">{jobsData.find(j => j.id === newInvoice.jobId)?.title}</p>
+                      <p className="font-medium">{job?.title || 'Not selected'}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Type</p>
@@ -447,36 +688,36 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, job }:
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Due Date</p>
-                      <p className="font-medium">423432</p>
+                      <p className="font-medium">{newInvoice.dueDate}</p>
                     </div>
                   </div>
                   <Separator />
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span>Items Total:</span>
-                      <span>234</span>
+                      <span>${calculateTotalMaterialsCost().toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Labor Total:</span>
-                      <span>324</span>
+                      <span>${calculateTotalLaborCost().toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Additional Costs:</span>
-                      <span>33</span>
+                      <span>${calculateTotalAdditionalCost().toFixed(2)}</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between">
                       <span>Subtotal:</span>
-                      <span>654</span>
+                      <span>${subtotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Tax ({((newInvoice.taxRate || 0) * 100).toFixed(1)}%):</span>
-                      <span>44</span>
+                      <span>${taxAmount.toFixed(2)}</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between font-semibold text-lg">
                       <span>Total Amount:</span>
-                      <span className="text-primary">44</span>
+                      <span className="text-primary">${totalAmount.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -511,8 +752,12 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, job }:
                 Next
               </Button>
             ) : (
-              <Button onClick={handleSave} className="bg-primary text-primary-foreground hover:bg-primary/90">
-                Save Invoice
+              <Button 
+                onClick={handleSave} 
+                disabled={loading}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                {loading ? 'Saving...' : 'Save Invoice'}
               </Button>
             )}
           </div>
