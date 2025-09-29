@@ -431,6 +431,28 @@ export const apiClient = {
     return response.json()
   },
 
+  deleteEstimate: async (estimateId: string) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${apiBaseUrl}/estimates/deleteEstimate/${estimateId}`, {
+      method: 'DELETE',
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+
+    if (!response.status) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to delete estimate')
+    }
+
+    return response.json()
+  },
 
   getDashboardMetrics: async (selectedJobId: string | number) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL

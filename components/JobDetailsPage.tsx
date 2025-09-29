@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { apiClient } from '../utils/api'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -48,6 +48,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { globalApiCall } from '../utils/globalApiHandler';
 import { Product, Branch } from '../types/product';
 import { NewInvoiceDialog } from './invoices/NewInvoiceDialog'
+import { LoadingSpinner } from './common/LoadingSpinner'
 
 // Sample data structure - replace with your actual data
 const sampleJobData = {
@@ -239,12 +240,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, projectSummary, d
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null)
+  const [deleteType, setDeleteType] = useState<string | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<any>(null);
   const [selectedLabor, setSelectedLabor] = useState<{ [jobId: string]: string[] }>({});
   const [open, setOpen] = useState(false);
 
   const [selectedLeadLabor, setSelectedLeadLabor] = useState<{ [jobId: string]: string[] }>({});
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
-  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const[customers, setCustomers] = useState([]);
   
   const resetMaterialForm = () => {
@@ -261,7 +263,6 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, projectSummary, d
 
 // For storing validation errors
 const [materialValidationErrors, setMaterialValidationErrors] = useState<Record<string, string>>({});
-
 
 
   const clearValidationError = (field: string) => {
@@ -299,7 +300,7 @@ const [materialValidationErrors, setMaterialValidationErrors] = useState<Record<
 
 const fetchProductsData = async () => {
     try {
-      setIsLoadingProducts(true);
+      setIsLoading(true);
 
       // Fetch the latest job details from API
       const jobDetails = await apiClient.getJobById(jobId);
@@ -312,12 +313,12 @@ const fetchProductsData = async () => {
       console.error('Error fetching job details:', error);
       toast.error('Failed to load job details');
     } finally {
-      setIsLoadingProducts(false); // ✅ stop loading
+      setIsLoading(false);
     }
 };
 
 const handleDeleteProduct = async () => {
-  if (!productToDelete) return;
+  if (!itemToDelete) return;
 
   try {
     setIsLoading(true); // Global loading for delete action
@@ -330,7 +331,7 @@ const handleDeleteProduct = async () => {
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
       const response = await fetch(
-        `${apiBaseUrl}/products/deleteProduct/${productToDelete.id}`,
+        `${apiBaseUrl}/products/deleteProduct/${itemToDelete.id}`,
         { method: "DELETE", headers }
       );
 
@@ -345,11 +346,11 @@ const handleDeleteProduct = async () => {
 
         // Close dialog and reset state
         setShowDeleteAlert(false);
-        setProductToDelete(null);
-        
-      // Optional: Refetch data to ensure sync with server
-      await fetchProductsData();
-      onReload();
+        // setProductToDelete(null);
+        setItemToDelete(null);
+        await fetchProductsData();
+        onReload();
+        setIsLoading(false);
       } else {
         throw new Error(responseData.message || "Failed to delete product");
       }
@@ -366,9 +367,32 @@ const handleDeleteProduct = async () => {
   }
 };
 
-const handleAction = (action: string, material: any) => {
+const handleDeleteInvoice = async() => {
+  if (!itemToDelete) return;
+  try {
+    setIsLoading(true);
+    const response = await apiClient.deleteEstimate(itemToDelete.id);
+    console.log('Testing invoice response:', response);
+    if(response.success){
+      toast.success('Estimate deleted successfuly!');
+      onReload();
+      setIsLoading(false);
+    }
+  } catch (error) {
+    toast.error('Failed to delete estimate');
+  }finally {
+    console.log('Failed to delete estimate');
+    setIsLoading(false);
+  }
+
+
+}
+
+const handleAction = (action: string, type: string, item: any) => {
   if (action === 'delete') {
-    setProductToDelete(material);
+    // setProductToDelete(item);
+    setItemToDelete(item);
+    setDeleteType(type); 
     setShowDeleteAlert(true);
   }
   // Add other actions here if needed
@@ -477,17 +501,20 @@ const handleSaveProduct = async () => {
       unit_cost: materialFormData.unitCost,
     };
 
-    await globalApiCall(`${apiBaseUrl}/products/createProduct`, {
+
+    const response = await globalApiCall(`${apiBaseUrl}/products/createProduct`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
 
+    console.log('inside ti',response);
     toast.success("Product created successfully!");
     setShowAddMaterialModal(false);
     resetMaterialForm(); // <- same like resetTimeLogForm
-    await fetchProductsData();
     onReload();
+    await fetchProductsData();
+    setIsLoading(false);
  
   } catch (error) {
     console.error("Error creating product:", error);
@@ -604,9 +631,6 @@ const handleSaveProduct = async () => {
     setIsEditing(false);
   };
 
-  const handleInvoiceDelete = () =>{
-
-  }
   const validateTimeLogForm = () => {
     const errors: Record<string, string> = {};
 
@@ -889,7 +913,7 @@ const handleSaveProduct = async () => {
   }, [jobId]);
 
   const [invoiceFormData, setInvoiceFormData] = useState({
-    type: 'Estimate',
+    type: 'estimate',
     dueDate: '',
     description: '',
     amount: 0
@@ -1019,691 +1043,650 @@ const handleSaveProduct = async () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card className="bg-blue-50 border-blue-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-blue-600">Total Hours Worked</p>
-                  <p className="text-2xl font-bold text-blue-900">{dashboardMetrics?.totalHoursWorked?.value}</p>
-                  <p className="text-xs text-blue-600">{dashboardMetrics?.totalHoursWorked?.unit}</p>
+        {isLoading ? (
+          <div className="flex justify-center items-center py-12">
+            <LoadingSpinner />
+          </div>
+        ): (
+          <>
+            {/* Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <Card className="bg-blue-50 border-blue-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-blue-600">Total Hours Worked</p>
+                    <p className="text-2xl font-bold text-blue-900">{dashboardMetrics?.totalHoursWorked?.value}</p>
+                    <p className="text-xs text-blue-600">{dashboardMetrics?.totalHoursWorked?.unit}</p>
+                  </div>
+                  <Clock className="h-8 w-8 text-blue-600" />
                 </div>
-                <Clock className="h-8 w-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-green-50 border-green-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-green-600">Total Product Used</p>
-                  <p className="text-2xl font-bold text-green-900">{dashboardMetrics?.totalMaterialUsed?.value}</p>
-                  <p className="text-xs text-green-600">{dashboardMetrics?.totalMaterialUsed?.unit}</p>
+            <Card className="bg-green-50 border-green-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-green-600">Total Product Used</p>
+                    <p className="text-2xl font-bold text-green-900">{dashboardMetrics?.totalMaterialUsed?.value}</p>
+                    <p className="text-xs text-green-600">{dashboardMetrics?.totalMaterialUsed?.unit}</p>
+                  </div>
+                  <Package className="h-8 w-8 text-green-600" />
                 </div>
-                <Package className="h-8 w-8 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-purple-50 border-purple-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-purple-600">Total Labour Entries</p>
-                  <p className="text-2xl font-bold text-purple-900">{dashboardMetrics?.totalLabourEntries?.value}</p>
-                  <p className="text-xs text-purple-600">{dashboardMetrics?.totalLabourEntries?.unit}</p>
+            <Card className="bg-purple-50 border-purple-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-purple-600">Total Labour Entries</p>
+                    <p className="text-2xl font-bold text-purple-900">{dashboardMetrics?.totalLabourEntries?.value}</p>
+                    <p className="text-xs text-purple-600">{dashboardMetrics?.totalLabourEntries?.unit}</p>
+                  </div>
+                  <Users className="h-8 w-8 text-purple-600" />
                 </div>
-                <Users className="h-8 w-8 text-purple-600" />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-orange-50 border-orange-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-orange-600">Number of Invoices</p>
-                  <p className="text-2xl font-bold text-orange-900">{dashboardMetrics?.numberOfInvoices?.value}</p>
-                  <p className="text-xs text-orange-600">{dashboardMetrics?.numberOfInvoices?.unit}</p>
+            <Card className="bg-orange-50 border-orange-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-orange-600">Number of Invoices</p>
+                    <p className="text-2xl font-bold text-orange-900">{dashboardMetrics?.numberOfInvoices?.value}</p>
+                    <p className="text-xs text-orange-600">{dashboardMetrics?.numberOfInvoices?.unit}</p>
+                  </div>
+                  <FileText className="h-8 w-8 text-orange-600" />
                 </div>
-                <FileText className="h-8 w-8 text-orange-600" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Job Details */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Job Details Card */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Job Details
-                </CardTitle>
-                {!isEditing && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                    onClick={() => setIsEditing(true)}
-                  >
-                    <Edit className="h-4 w-4" />
-                    Edit
-                  </Button>
-                )}
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className={`flex items-center gap-3 ${!isEditing ? 'bg-[#f2f0f0] p-3 rounded-md' : ''}`}>
-                      {!isEditing && (
-                        <Users className="h-4 w-4 text-black-600" />
-                      )}
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-600"> {isEditing ? "Job Title" : "Customer"}</p>
-                        {isEditing ? (
-                          <Input
-                            value={editedJob.title}
-                            onChange={(e) => setEditedJob({ ...editedJob, title: e.target.value })}
-                          />
-                        ) : (
-                          <p className="font-medium">{job.customerName || 'No customer assigned'}</p>
+              </CardContent>
+            </Card>
+            </div>
+            {/* Main Content */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left Column - Job Details */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Job Details Card */}
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Job Details
+                    </CardTitle>
+                    {!isEditing && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => setIsEditing(true)}
+                      >
+                        <Edit className="h-4 w-4" />
+                        Edit
+                      </Button>
+                    )}
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div className={`flex items-center gap-3 ${!isEditing ? 'bg-[#f2f0f0] p-3 rounded-md' : ''}`}>
+                          {!isEditing && (
+                            <Users className="h-4 w-4 text-black-600" />
+                          )}
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-600"> {isEditing ? "Job Title" : "Customer"}</p>
+                            {isEditing ? (
+                              <Input
+                                value={editedJob.title}
+                                onChange={(e) => setEditedJob({ ...editedJob, title: e.target.value })}
+                              />
+                            ) : (
+                              <p className="font-medium">{job.customerName || 'No customer assigned'}</p>
+                            )}
+                          </div>
+                        </div>
+                        {!isEditing && (
+                          <div className={`flex items-center gap-3 ${!isEditing ? 'bg-[#dae8ff80] p-3 rounded-md' : ''}`}>
+                            <Clock className="h-4 w-4 text-black-600" />
+                            <div className="flex-1">
+                              <p className="text-sm text-gray-600">Start Date</p>
+                              {isEditing ? (
+                                <Input
+                                  value={editedJob.startDate}
+                                  onChange={(e) => setEditedJob({ ...editedJob, startDate: e.target.value })}
+                                />
+                              ) : (
+                                <p className="font-medium">{editedJob.startDate}</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {!isEditing && (
+                          <div className={`flex items-center gap-3 ${!isEditing ? 'bg-[#bbf7d021] p-3 rounded-md' : ''}`}>
+                            <MapPin className="h-4 w-4 text-black-600" />
+                            <div className="flex-1">
+                              <p className="text-sm text-gray-600">Location</p>
+                              <p className="font-medium">{editedJob.location}</p>
+                            </div>
+                          </div>
                         )}
                       </div>
-                    </div>
-                    {!isEditing && (
-                      <div className={`flex items-center gap-3 ${!isEditing ? 'bg-[#dae8ff80] p-3 rounded-md' : ''}`}>
-                        <Clock className="h-4 w-4 text-black-600" />
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-600">Start Date</p>
+
+                      <div className="space-y-4">
+                        <div className={`flex-1 ${!isEditing ? 'bg-[#dbdaff30] p-3 rounded-md' : ''}`}>
+                          <p className="text-sm text-gray-600">Job Type</p>
                           {isEditing ? (
-                            <Input
-                              value={editedJob.startDate}
-                              onChange={(e) => setEditedJob({ ...editedJob, startDate: e.target.value })}
-                            />
+                            <Select
+                              value={editedJob.priority}
+                              onValueChange={(value) => setEditedJob({ ...editedJob, priority: value })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select priority" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="High">Service-based</SelectItem>
+                                <SelectItem value="Medium">Contract-based</SelectItem>
+                                <SelectItem value="Low">Maintenance</SelectItem>
+                              </SelectContent>
+                            </Select>
+
+                            // <Input
+                            //   value={editedJob.type}
+                            //   onChange={(e) => setEditedJob({ ...editedJob, type: e.target.value })}
+                            // />
                           ) : (
-                            <p className="font-medium">{editedJob.startDate}</p>
+                            <p className="font-medium">{editedJob.type}</p>
                           )}
                         </div>
-                      </div>
-                    )}
-                    {!isEditing && (
-                      <div className={`flex items-center gap-3 ${!isEditing ? 'bg-[#bbf7d021] p-3 rounded-md' : ''}`}>
-                        <MapPin className="h-4 w-4 text-black-600" />
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-600">Location</p>
-                          <p className="font-medium">{editedJob.location}</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className={`flex-1 ${!isEditing ? 'bg-[#dbdaff30] p-3 rounded-md' : ''}`}>
-                      <p className="text-sm text-gray-600">Job Type</p>
-                      {isEditing ? (
-                        <Select
-                          value={editedJob.priority}
-                          onValueChange={(value) => setEditedJob({ ...editedJob, priority: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select priority" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="High">Service-based</SelectItem>
-                            <SelectItem value="Medium">Contract-based</SelectItem>
-                            <SelectItem value="Low">Maintenance</SelectItem>
-                          </SelectContent>
-                        </Select>
-
-                        // <Input
-                        //   value={editedJob.type}
-                        //   onChange={(e) => setEditedJob({ ...editedJob, type: e.target.value })}
-                        // />
-                      ) : (
-                        <p className="font-medium">{editedJob.type}</p>
-                      )}
-                    </div>
-                    {!isEditing && (
-                      <div className={`flex-1 ${!isEditing ? 'bg-[#fff7ed8c] p-3 rounded-md' : ''}`}>
-                        <p className="text-sm text-gray-600">Job Estimate</p>
-                        <p className="font-medium">{formatCurrency(job.estimatedCost)}</p>
-                      </div>
-                    )}
-                    {!isEditing && (
-
-                      <div className={`flex-1 ${!isEditing ? 'bg-[#9f6b290d] p-3 rounded-md' : ''}`}>
-                        <p className="text-sm text-gray-600">Priority</p>
-                        <span className="inline-block px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          {editedJob.priority}
-                        </span>
-                      </div>
-                    )}
-
-                  </div>
-                </div>
-                {isEditing && (
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-600">Location</p>
-                      <Input
-                        value={editedJob.location}
-                        onChange={(e) => setEditedJob({ ...editedJob, location: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <p className="text-sm text-gray-600 mb-2">Description</p>
-                  {isEditing ? (
-                    <Textarea
-                      value={editedJob.description}
-                      onChange={(e) => setEditedJob({ ...editedJob, description: e.target.value })}
-                    />
-                  ) : (
-                    <p className="text-sm bg-gray-100 p-3 rounded-md">{editedJob.description}</p>
-                  )}
-                </div>
-
-                {/* Assigned Labor Section */}
-                {/* {job.assignedLaborDetails && job.assignedLaborDetails.length > 0 && (
-                  <div>
-                    <p className="text-sm text-gray-600 mb-2">Assigned Labor</p>
-                    <div className="space-y-2">
-                      {job.assignedLaborDetails.map((labor: any, index: number) => (
-                        <div key={index} className="bg-gray-100 p-3 rounded-md">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium text-sm">{labor.user?.full_name || labor.labor_code}</p>
-                              <p className="text-xs text-gray-600">{labor.trade} - {labor.experience}</p>
-                              <p className="text-xs text-gray-500">Code: {labor.labor_code}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm font-medium">${labor.hourly_rate || 0}/hr</p>
-                              <p className="text-xs text-gray-600">{labor.availability}</p>
-                            </div>
+                        {!isEditing && (
+                          <div className={`flex-1 ${!isEditing ? 'bg-[#fff7ed8c] p-3 rounded-md' : ''}`}>
+                            <p className="text-sm text-gray-600">Job Estimate</p>
+                            <p className="font-medium">{formatCurrency(job.estimatedCost)}</p>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )} */}
-                  
-                  {/* Jyoti */}
-                  {/* Labor Selection */}
-                <div>
-                  <p className="text-sm text-gray-600 mb-2">Labor</p>
-                  <AutoScrollMultiSelect
-                    selectedValues={selectedLabor[job.id] || []}
-                    onSelectionChange={(selectedIds, selectedItems) => {
-                      handleChangeLabor(job.id, selectedIds, selectedItems);
-                      clearValidationError('assignedLabor');
-                    }}
-                    placeholder="Select labor"
-                    fetchData={apiClient.getLabor}
-                    displayField="name"
-                    valueField="name"
-                    className="w-full"
-                  />
-                </div>
+                        )}
+                        {!isEditing && (
 
-                {/* Jyoti */}
-
-                {/* Assigned Lead Labor Section */}
-                {/* {job.assignedLeadLaborDetails && job.assignedLeadLaborDetails.length > 0 && (
-                  <div>
-                    <p className="text-sm text-gray-600 mb-2">Lead Labor</p>
-                    <div className="space-y-2">
-                      {job.assignedLeadLaborDetails.map((leadLabor: any, index: number) => (
-                        <div key={index} className="bg-blue-50 p-3 rounded-md border border-blue-200">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium text-sm text-blue-900">{leadLabor.user?.full_name || leadLabor.labor_code}</p>
-                              <p className="text-xs text-blue-700">{leadLabor.department} - {leadLabor.specialization}</p>
-                              <p className="text-xs text-blue-600">Code: {leadLabor.labor_code}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm font-medium text-blue-900">{leadLabor.trade}</p>
-                              <p className="text-xs text-blue-600">{leadLabor.experience}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )} */}
-
-                
-                {/* Jyoti */}
-                {/* Lead Labor Selection */}
-                <div>
-                  <p className="text-sm text-gray-600 mb-2">Lead Labor</p>
-                  <AutoScrollMultiSelect
-                    selectedValues={selectedLeadLabor[job.id] || []}
-                    onSelectionChange={(selectedIds, selectedItems) => {
-                      handleChangeLead(job.id, selectedIds, selectedItems);
-                      clearValidationError('assignedLabor');
-                      clearValidationError('assignedLeadLabor');
-                    }}
-                    placeholder="Select lead labor"
-                    fetchData={apiClient.getLeadLabor}
-                    displayField="name"
-                    valueField="name"
-                    className="w-full"
-                  />
-                </div>
-                {/* Jyoti */}
-
-              </CardContent>
-              <CardFooter>
-                {isEditing && (
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="gap-1" onClick={handleCancel}>
-                      <X className="h-4 w-4" />
-                      Cancel
-                    </Button>
-                    <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleSave}>
-                      <Check className="h-4 w-4" />
-                      Save
-                    </Button>
-                  </div>
-                )}
-              </CardFooter>
-            </Card>
-
-            {/* Transaction History */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Transaction History
-                </CardTitle>
-                <Button variant="outline" size="sm" className="gap-2" onClick={() => {setOpen(true); fetchAllCustomers();}}>
-                  <Plus className="h-4 w-4" />
-                  Add Invoice
-                </Button>
-                <NewInvoiceDialog
-                  open={open}
-                  onOpenChange={setOpen}
-                  onSave={handleSave}
-                  customers={customers}
-                  roles={roles}
-                  job={job}
-                  suppliers={suppliers}
-                />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {invoices.map((invoice) => (
-                    <div key={invoice.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center gap-4">
-                        <div className="h-10 w-10 bg-gray-200 rounded-lg flex items-center justify-center">
-                          <FileText className="h-5 w-5 text-gray-700" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-medium">{invoice.invoice_type}</h4>
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${invoice.invoice_type === 'estimate' ? 'bg-blue-100 text-blue-800' :
-                              invoice.type === 'Proposal Invoice' ? 'bg-purple-100 text-purple-800' :
-                                invoice.type === 'Progressive Invoice' ? 'bg-orange-100 text-orange-800' :
-                                  'bg-green-100 text-green-800'
-                              }`}>
-                              {invoice.type}
+                          <div className={`flex-1 ${!isEditing ? 'bg-[#9f6b290d] p-3 rounded-md' : ''}`}>
+                            <p className="text-sm text-gray-600">Priority</p>
+                            <span className="inline-block px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              {editedJob.priority}
                             </span>
                           </div>
-                          <p className="text-sm text-gray-600">{invoice.description}</p>
-                          <p className="text-xs text-gray-500">
-                            #{invoice.invoice_number} • Created: {invoice.issue_date} • Due: {invoice.due_date}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="font-semibold mb-1">{formatCurrency(invoice.total_amount)}</p>
-                          <span>
-                            {getStatusBadge(job.status)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" className="gap-1"
-                            onClick={() => {
-                              setSelectedInvoice(invoice);
-                              setShowInvoiceModal(true);
-                            }}>
-                            <Eye className="h-3 w-3" />
-                            View
-                          </Button>
-                          <Button variant="outline" size="sm" className="gap-1">
-                            <Printer className="h-3 w-3" />
-                            Print
-                          </Button>
-                          <Button variant="outline" size="sm" className="gap-1" onClick = {() => {handleInvoiceDelete(invoice)}}>
-                            <Trash2 className="h-3 w-3 text-red-600" />
-                          </Button>
-                        </div>
+                        )}
+
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Material Usage */}
-            <Card>
-  <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
-    <CardTitle className="flex items-center gap-2">
-      <Package className="h-5 w-5" />
-      Product Usage
-      {isLoadingProducts && (
-        <div className="h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin ml-2"></div>
-      )}
-    </CardTitle>
-    <div className="flex items-center gap-4">
-      <span className="text-sm text-gray-600">
-        Total Cost: <span className="font-semibold">{formatCurrency(totalMaterialCost)}</span>
-      </span>
-      <Button 
-        variant="outline" 
-        size="sm" 
-        className="gap-2" 
-        onClick={() => setShowAddMaterialModal(true)}
-        disabled={isLoadingProducts}
-      >
-        <Plus className="h-4 w-4" />
-        Add Product
-      </Button>
-    </div>
-  </CardHeader>
-  <CardContent>
-    {isLoadingProducts ? (
-      // Loading skeleton
-      <div className="space-y-4">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="flex items-center justify-between p-4 bg-gray-100 rounded-lg animate-pulse">
-            <div className="flex items-center gap-4">
-              <div className="h-10 w-10 bg-gray-300 rounded-lg"></div>
-              <div>
-                <div className="h-4 w-32 bg-gray-300 rounded mb-2"></div>
-                <div className="h-3 w-24 bg-gray-300 rounded"></div>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <div className="h-4 w-16 bg-gray-300 rounded mb-2"></div>
-                <div className="h-3 w-12 bg-gray-300 rounded"></div>
-              </div>
-              <div className="h-8 w-8 bg-gray-300 rounded"></div>
-            </div>
-          </div>
-        ))}
-      </div>
-    ) : materials.length === 0 ? (
-      // Empty state
-      <div className="text-center py-8">
-        <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-600 mb-2">No products found</p>
-        <Button 
-          variant="outline" 
-          onClick={() => setShowAddMaterialModal(true)}
-          className="gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Add First Product
-        </Button>
-      </div>
-    ) : (
-      // Products list
-      <div className="space-y-4">
-        {job.assignedMaterialsDetails.map((material: any) => (
-          <div 
-            key={material.id} 
-            className={`flex items-center justify-between p-4 bg-blue-50 rounded-lg transition-opacity ${
-              isLoading && productToDelete?.id === material.id ? 'opacity-50' : ''
-            }`}
-          >
-            <div className="flex items-center gap-4">
-              <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
-                <Package className="h-5 w-5 text-blue-700" />
-              </div>
-              <div>
-                <h4 className="font-medium">{material.product_name || material.name}</h4>
-                <p className="text-xs text-gray-600">
-                  {material.supplier?.company_name || material.supplier}     SKU: {material.supplier_sku || material.jdp_sku}    {formatDate(material.created_at)}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="font-semibold">{formatCurrency(material.unit_cost || material.totalCost || 0)}</p>
-                <p className="text-sm text-gray-600">{material.stock_quantity || material.quantity || 0} {material.unit}</p>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-1" 
-                onClick={() => handleAction('delete', material)}
-                disabled={isLoading}
-              >
-                {isLoading && productToDelete?.id === material.id ? (
-                  <div className="h-3 w-3 border border-red-600 border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  <Trash2 className="h-3 w-3 text-red-600" />
-                )}
-              </Button>
-            </div>
-          </div>
-        ))}
-      </div>
-    )}
-  </CardContent>
-</Card>
-
-            {/* Labour & Time Logs */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Labour & Time Logs
-                </CardTitle>
-                <div className="flex items-center gap-4">
-                  <span className="text-sm text-gray-600">
-                    Total Cost: <span className="font-semibold">{formatCurrency(totalLaborCost)}</span>
-                  </span>
-                  <Button variant="outline" size="sm" className="gap-2" onClick={handleCreateTimeLog}>
-                    <Plus className="h-4 w-4" />
-                    Add Time Log
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Show assigned labor data */}
-                  {job.assignedLaborDetails && job.assignedLaborDetails.length > 0 && (
-                    <>
-                      {job.assignedLaborDetails.map((labor: any, index: number) => (
-                        <div key={`assigned-${labor.id}`} className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
-                        <div className="flex items-center gap-4">
-                          <div className="h-10 w-10 bg-green-200 rounded-lg flex items-center justify-center">
-                            <Users className="h-5 w-5 text-green-700" />
-                          </div>
-                          <div>
-                              <h4 className="font-medium">{labor.user?.full_name || labor.labor_code}</h4>
-                            <p className="text-xs text-gray-600">
-                                {labor.trade} • {labor.experience} • {labor.availability}
-                            </p>
-                              <p className="text-xs text-gray-500">Code: {labor.labor_code}</p>
-                          </div>
+                    {isEditing && (
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-600">Location</p>
+                          <Input
+                            value={editedJob.location}
+                            onChange={(e) => setEditedJob({ ...editedJob, location: e.target.value })}
+                          />
                         </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                              <p className="font-semibold">${labor.hourly_rate || 0}/hr</p>
-                            <p className="text-sm text-gray-600">
-                                {labor.hours_worked || 0} hrs worked
-                            </p>
+                      </div>
+                    )}
+
+                    <div>
+                      <p className="text-sm text-gray-600 mb-2">Description</p>
+                      {isEditing ? (
+                        <Textarea
+                          value={editedJob.description}
+                          onChange={(e) => setEditedJob({ ...editedJob, description: e.target.value })}
+                        />
+                      ) : (
+                        <p className="text-sm bg-gray-100 p-3 rounded-md">{editedJob.description}</p>
+                      )}
+                    </div>
+                      {/* Jyoti */}
+                      {/* Labor Selection */}
+                    <div>
+                      <p className="text-sm text-gray-600 mb-2">Labor</p>
+                      <AutoScrollMultiSelect
+                        selectedValues={selectedLabor[job.id] || []}
+                        onSelectionChange={(selectedIds, selectedItems) => {
+                          handleChangeLabor(job.id, selectedIds, selectedItems);
+                          clearValidationError('assignedLabor');
+                        }}
+                        placeholder="Select labor"
+                        fetchData={apiClient.getLabor}
+                        displayField="name"
+                        valueField="name"
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* Jyoti */}
+
+                    {/* Assigned Lead Labor Section */}
+                    {/* Jyoti */}
+                    {/* Lead Labor Selection */}
+                    <div>
+                      <p className="text-sm text-gray-600 mb-2">Lead Labor</p>
+                      <AutoScrollMultiSelect
+                        selectedValues={selectedLeadLabor[job.id] || []}
+                        onSelectionChange={(selectedIds, selectedItems) => {
+                          handleChangeLead(job.id, selectedIds, selectedItems);
+                          clearValidationError('assignedLabor');
+                          clearValidationError('assignedLeadLabor');
+                        }}
+                        placeholder="Select lead labor"
+                        fetchData={apiClient.getLeadLabor}
+                        displayField="name"
+                        valueField="name"
+                        className="w-full"
+                      />
+                    </div>
+                    {/* Jyoti */}
+
+                  </CardContent>
+                  <CardFooter>
+                    {isEditing && (
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" className="gap-1" onClick={handleCancel}>
+                          <X className="h-4 w-4" />
+                          Cancel
+                        </Button>
+                        <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleSave}>
+                          <Check className="h-4 w-4" />
+                          Save
+                        </Button>
+                      </div>
+                    )}
+                  </CardFooter>
+                </Card>
+
+                {/* Transaction History */}
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Transaction History
+                    </CardTitle>
+                    <Button variant="outline" size="sm" className="gap-2" onClick={() => {setOpen(true); fetchAllCustomers();}}>
+                      <Plus className="h-4 w-4" />
+                      Add Invoice
+                    </Button>
+                    <NewInvoiceDialog
+                      open={open}
+                      onOpenChange={setOpen}
+                      customers={customers}
+                      roles={roles}
+                      job={job}
+                      suppliers={suppliers}
+                      onReload={onReload}
+                      setIsLoading={setIsLoading}
+                    />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {invoices.length === 0  ? (
+                        // Empty state
+                      <div className="text-center py-8">
+                        <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-600 mb-2">No invoices found</p>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => {setOpen(true); fetchAllCustomers();}}
+                          className="gap-2"
+                        >
+                          <Plus className="h-4 w-4" />
+                          Add First Invoice
+                        </Button>
+                      </div>
+                      ):
+                      (invoices.map((invoice) => (
+                        <div key={invoice.id} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div className="flex items-center gap-4">
+                            <div className="h-10 w-10 bg-gray-200 rounded-lg flex items-center justify-center">
+                              <FileText className="h-5 w-5 text-gray-700" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-medium">{invoice.invoice_type}</h4>
+                                <span className={`px-2 py-1 rounded text-xs font-medium ${invoice.invoice_type === 'estimate' ? 'bg-blue-100 text-blue-800' :
+                                  invoice.invoice_type === 'proposal_invoice' ? 'bg-purple-100 text-purple-800' :
+                                    invoice.invoice_type === 'progressive_invoice' ? 'bg-orange-100 text-orange-800' :
+                                      'bg-green-100 text-green-800'
+                                  }`}>
+                                  {invoice.invoice_type}
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-600">{invoice.description}</p>
+                              <p className="text-xs text-gray-500">
+                                #{invoice.invoice_number} • Created: {invoice.issue_date} • Due: {invoice.due_date}
+                              </p>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                Assigned
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <p className="font-semibold mb-1">{formatCurrency(invoice.total_amount)}</p>
+                              <span>
+                                {getStatusBadge(job.status)}
                               </span>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="gap-1"
-                                onClick={() => handleViewTimeLog(labor)}
-                              >
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button variant="outline" size="sm" className="gap-1"
+                                onClick={() => {
+                                  setSelectedInvoice(invoice);
+                                  setShowInvoiceModal(true);
+                                }}>
                                 <Eye className="h-3 w-3" />
                                 View
                               </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="gap-1"
-                                onClick={() => handleEditTimeLog(labor)}
-                              >
-                                <Edit className="h-3 w-3" />
-                                Edit
+                              <Button variant="outline" size="sm" className="gap-1" onClick={() => window.print()}>
+                                <Printer className="h-3 w-3" />
+                                Print
+                              </Button>
+                              <Button variant="outline" size="sm" className="gap-1" onClick={() => handleAction('delete', "invoice" , invoice)}
+                                disabled={isLoading}>
+                                <Trash2 className="h-3 w-3 text-red-600" />
                               </Button>
                             </div>
                           </div>
                         </div>
-                      ))}
-                    </>
-                  )}
+                      )))}
+                    </div>
+                  </CardContent>
+                </Card>
 
-                  {/* Show custom labor data */}
-                  {job.customLabor && job.customLabor.length > 0 && (
-                    <>
-                      {job.customLabor.map((labor: any, index: number) => (
-                        <div key={`custom-${labor.id}`} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                        <div className="flex items-center gap-4">
-                          <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
-                            <Users className="h-5 w-5 text-blue-700" />
-                          </div>
-                          <div>
-                              <h4 className="font-medium">{labor.user?.full_name || labor.labor_code}</h4>
-                            <p className="text-xs text-gray-600">
-                                {labor.trade || 'Custom Labor'} • {labor.experience || 'N/A'} • {labor.availability || 'Available'}
-                            </p>
-                              <p className="text-xs text-gray-500">Code: {labor.labor_code}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                              <p className="font-semibold">${labor.hourly_rate || 0}/hr</p>
-                            <p className="text-sm text-gray-600">
-                                {labor.hours_worked || 0} hrs worked
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                Custom
-                              </span>
+                {/* Material Usage */}
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
+                    <CardTitle className="flex items-center gap-2">
+                      <Package className="h-5 w-5" />
+                      Product Usage
+                    </CardTitle>
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm text-gray-600">
+                        Total Cost: <span className="font-semibold">{formatCurrency(totalMaterialCost)}</span>
+                      </span>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="gap-2" 
+                        onClick={() => setShowAddMaterialModal(true)}
+                        disabled={isLoading}
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add Product
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoading ? (
+                      <div className="flex justify-center items-center py-12">
+                        <LoadingSpinner />
+                      </div>
+                    ) : materials.length === 0 ? (
+                      // Empty state
+                      <div className="text-center py-8">
+                        <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-600 mb-2">No products found</p>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setShowAddMaterialModal(true)}
+                          className="gap-2"
+                        >
+                          <Plus className="h-4 w-4" />
+                          Add First Product
+                        </Button>
+                      </div>
+                    ) : (
+                      // Products list
+                      <div className="space-y-4">
+                        {job.assignedMaterialsDetails.map((material: any) => (
+                          <div 
+                            key={material.id} 
+                            className={`flex items-center justify-between p-4 bg-blue-50 rounded-lg transition-opacity ${
+                              isLoading && itemToDelete?.id === material.id ? 'opacity-50' : ''
+                            }`}
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
+                                <Package className="h-5 w-5 text-blue-700" />
+                              </div>
+                              <div>
+                                <h4 className="font-medium">{material.product_name || material.name}</h4>
+                                <p className="text-xs text-gray-600">
+                                  {material.supplier?.company_name || material.supplier}     SKU: {material.supplier_sku || material.jdp_sku}    {formatDate(material.created_at)}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="text-right">
+                                <p className="font-semibold">{formatCurrency(material.unit_cost || material.totalCost || 0)}</p>
+                                <p className="text-sm text-gray-600">{material.stock_quantity || material.quantity || 0} {material.unit}</p>
+                              </div>
                               <Button 
                                 variant="outline" 
                                 size="sm" 
-                                className="gap-1"
-                                onClick={() => handleViewTimeLog(labor)}
+                                className="gap-1" 
+                                onClick={() => handleAction('delete', "product", material)}
+                                disabled={isLoading}
                               >
-                                <Eye className="h-3 w-3" />
-                                View
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="gap-1"
-                                onClick={() => handleEditTimeLog(labor)}
-                              >
-                                <Edit className="h-3 w-3" />
-                                Edit
+                                {isLoading && itemToDelete?.id === material.id ? (
+                                  <div className="h-3 w-3 border border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                                ) : (
+                                  <Trash2 className="h-3 w-3 text-red-600" />
+                                )}
                               </Button>
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </>
-                  )}
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
-                  {/* Show message if no labor at all */}
-                  {(!job.assignedLaborDetails || job.assignedLaborDetails.length === 0) && 
-                   (!job.customLabor || job.customLabor.length === 0) && (
-                    <div className="text-center py-8 text-gray-500">
-                      <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                      <p>No labor assigned to this job</p>
+                {/* Labour & Time Logs */}
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Labour & Time Logs
+                    </CardTitle>
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm text-gray-600">
+                        Total Cost: <span className="font-semibold">{formatCurrency(totalLaborCost)}</span>
+                      </span>
+                      <Button variant="outline" size="sm" className="gap-2" onClick={handleCreateTimeLog}>
+                        <Plus className="h-4 w-4" />
+                        Add Time Log
+                      </Button>
                     </div>
-                  )}
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {/* Show assigned labor data */}
+                      {job.assignedLaborDetails && job.assignedLaborDetails.length > 0 && (
+                        <>
+                          {job.assignedLaborDetails.map((labor: any, index: number) => (
+                            <div key={`assigned-${labor.id}`} className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
+                            <div className="flex items-center gap-4">
+                              <div className="h-10 w-10 bg-green-200 rounded-lg flex items-center justify-center">
+                                <Users className="h-5 w-5 text-green-700" />
+                              </div>
+                              <div>
+                                  <h4 className="font-medium">{labor.user?.full_name || labor.labor_code}</h4>
+                                <p className="text-xs text-gray-600">
+                                    {labor.trade} • {labor.experience} • {labor.availability}
+                                </p>
+                                  <p className="text-xs text-gray-500">Code: {labor.labor_code}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="text-right">
+                                  <p className="font-semibold">${labor.hourly_rate || 0}/hr</p>
+                                <p className="text-sm text-gray-600">
+                                    {labor.hours_worked || 0} hrs worked
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    Assigned
+                                  </span>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="gap-1"
+                                    onClick={() => handleViewTimeLog(labor)}
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                    View
+                                  </Button>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="gap-1"
+                                    onClick={() => handleEditTimeLog(labor)}
+                                  >
+                                    <Edit className="h-3 w-3" />
+                                    Edit
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {/* Show custom labor data */}
+                      {job.customLabor && job.customLabor.length > 0 && (
+                        <>
+                          {job.customLabor.map((labor: any, index: number) => (
+                            <div key={`custom-${labor.id}`} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                            <div className="flex items-center gap-4">
+                              <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
+                                <Users className="h-5 w-5 text-blue-700" />
+                              </div>
+                              <div>
+                                  <h4 className="font-medium">{labor.user?.full_name || labor.labor_code}</h4>
+                                <p className="text-xs text-gray-600">
+                                    {labor.trade || 'Custom Labor'} • {labor.experience || 'N/A'} • {labor.availability || 'Available'}
+                                </p>
+                                  <p className="text-xs text-gray-500">Code: {labor.labor_code}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="text-right">
+                                  <p className="font-semibold">${labor.hourly_rate || 0}/hr</p>
+                                <p className="text-sm text-gray-600">
+                                    {labor.hours_worked || 0} hrs worked
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    Custom
+                                  </span>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="gap-1"
+                                    onClick={() => handleViewTimeLog(labor)}
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                    View
+                                  </Button>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="gap-1"
+                                    onClick={() => handleEditTimeLog(labor)}
+                                  >
+                                    <Edit className="h-3 w-3" />
+                                    Edit
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+
+                      {/* Show message if no labor at all */}
+                      {(!job.assignedLaborDetails || job.assignedLaborDetails.length === 0) && 
+                      (!job.customLabor || job.customLabor.length === 0) && (
+                        <div className="text-center py-8 text-gray-500">
+                          <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                          <p>No labor assigned to this job</p>
+                        </div>
+                      )}
 
 
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
-          {/* Right Column - Project Summary */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Project Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Job Estimate</span>
-                    <span className="font-medium">{formatCurrency(projectSummary?.estimate)}</span>
-                  </div>
+              {/* Right Column - Project Summary */}
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5" />
+                      Project Summary
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="space-y-4">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Job Estimate</span>
+                        <span className="font-medium">{formatCurrency(projectSummary?.estimate)}</span>
+                      </div>
 
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Products Cost</span>
-                    <span className="font-medium">{formatCurrency(projectSummary?.materialsCost)}</span>
-                  </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Products Cost</span>
+                        <span className="font-medium">{formatCurrency(projectSummary?.materialsCost)}</span>
+                      </div>
 
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Labor Cost</span>
-                    <span className="font-medium">{formatCurrency(projectSummary?.laborCost)}</span>
-                  </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Labor Cost</span>
+                        <span className="font-medium">{formatCurrency(projectSummary?.laborCost)}</span>
+                      </div>
 
-                  <hr />
+                      <hr />
 
-                  <div className="flex justify-between">
-                    <span className="font-medium">Actual Project Cost</span>
-                    <span className="font-bold text-lg">{formatCurrency(projectSummary?.actualCost)}</span>
-                  </div>
-                </div> 
-              </CardContent>
-            </Card>
+                      <div className="flex justify-between">
+                        <span className="font-medium">Actual Project Cost</span>
+                        <span className="font-bold text-lg">{formatCurrency(projectSummary?.actualCost)}</span>
+                      </div>
+                    </div> 
+                  </CardContent>
+                </Card>
 
-            {/* Quick Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Quick Actions
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button className="w-full gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
-                  <FileText className="h-4 w-4" />
-                  Generate Invoice
-                </Button>
-                <Button variant="outline" className="w-full gap-2">
-                  <Send className="h-4 w-4" />
-                  Send to Customer
-                </Button>
-                <Button variant="outline" className="w-full gap-2">
-                  <Printer className="h-4 w-4" />
-                  Print Report
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+                {/* Quick Actions */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5" />
+                      Quick Actions
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Button className="w-full gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
+                      <FileText className="h-4 w-4" />
+                      Generate Invoice
+                    </Button>
+                    <Button variant="outline" className="w-full gap-2">
+                      <Send className="h-4 w-4" />
+                      Send to Customer
+                    </Button>
+                    <Button variant="outline" className="w-full gap-2">
+                      <Printer className="h-4 w-4" />
+                      Print Report
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </>
+        ) }
+        
+
+        
+        
       </div>
 
 
@@ -1890,34 +1873,9 @@ const handleSaveProduct = async () => {
             <Button variant="outline" onClick={() => {resetMaterialForm(); setShowAddMaterialModal(false)}}>
               Cancel
             </Button>
-            {/* <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => {
-              // Save logic here
-              setShowAddMaterialModal(false);
-            }}>
-              Add Material
-            </Button> */}
             {/* Jyoti */}
             <Button
               className="bg-primary text-primary-foreground hover:bg-primary/90"
-              // onClick={async () => {
-              //   const result = await createProduct(materialFormData);
-
-              //   if (result?.success) {
-              //     setShowAddMaterialModal(false);
-              //     setMaterialFormData({
-              //       name: '',
-              //       quantity: 0,
-              //       unitCost: 0,
-              //       sku: '',
-              //       unit: 'Pieces',
-              //       supplier: ''
-              //     });
-              //     await fetchProductsData();
-              //     console.log("✅ Product created:", result);
-              //   } else {
-              //     console.error("❌ Failed to create product", result);
-              //   }
-              // }}
               onClick={async () => handleSaveProduct()}
             >
 
@@ -2133,7 +2091,7 @@ const handleSaveProduct = async () => {
                 <X className="h-4 w-4" />
                 Close
               </Button>
-              <Button variant="outline" className="gap-2 bg-primary text-primary-foreground">
+              <Button variant="outline" className="gap-2 bg-primary text-primary-foreground" onClick={() => window.print()}>
                 <Printer className="h-4 w-4" />
                 Print Invoice
               </Button>
@@ -2144,32 +2102,49 @@ const handleSaveProduct = async () => {
       </Dialog>
       {/* Delete Confirmation */}
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
-  <AlertDialogContent>
-    <AlertDialogHeader>
-      <AlertDialogTitle>Are you sure you want to delete this product?</AlertDialogTitle>
-      <AlertDialogDescription>
-        This action cannot be undone. This will permanently delete the product "{productToDelete?.product_name}" from your inventory.
-      </AlertDialogDescription>
-    </AlertDialogHeader>
-    <AlertDialogFooter>
-      <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
-      <AlertDialogAction 
-        onClick={handleDeleteProduct} 
-        disabled={isLoading}
-        className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
-      >
-        {isLoading ? (
-          <div className="flex items-center gap-2">
-            <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            Deleting...
-          </div>
-        ) : (
-          'Delete Product'
-        )}
-      </AlertDialogAction>
-    </AlertDialogFooter>
-  </AlertDialogContent>
-</AlertDialog>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to delete this product?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the 
+              {deleteType === "product" 
+                ? ` product "${itemToDelete?.product_name}" from your inventory.` 
+                : ` invoice "${itemToDelete?.invoice_number}" from your records.`}
+            </AlertDialogDescription>
+
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              // onClick={handleDeleteProduct} 
+              onClick={
+                deleteType === 'product'
+                  ? handleDeleteProduct
+                  : deleteType === 'invoice'
+                  ? handleDeleteInvoice
+                  : undefined
+              }
+ 
+              disabled={isLoading}
+              className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Deleting...
+                </div>
+              ) : (
+                deleteType === 'product'
+                  ? 'Delete Product'
+                  : deleteType === 'invoice'
+                  ? 'Delete Invoice'
+                  : 'Delete'
+              )}
+
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -51,7 +51,7 @@ export interface Invoice {
   customerName: string
   jobId: string | number
   jobTitle: string
-  type: 'proposed' | 'estimate' | 'progressive' | 'final'
+  type: 'proposal_invoice' | 'estimate' | 'progressive_invoice' | 'final_invoice'
   issueDate: string
   dueDate: string
   items: InvoiceItem[]

@@ -11,14 +11,12 @@ import { Separator } from '../ui/separator'
 import { Plus, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { Invoice, InvoiceItem, LaborEntry, AdditionalCost } from '../../types/invoice'
-import { customersData, jobsData } from '../../data/invoiceData'
 import { apiClient } from '../../utils/api'
 import { toast } from 'sonner'
 
 interface NewInvoiceDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSave: (invoice: Partial<Invoice>) => void
   customers: any[];
   roles: any [];
   job: {
@@ -26,14 +24,17 @@ interface NewInvoiceDialogProps {
     title: string;
   };
   suppliers: any[]
+  onReload: () => void
+  setIsLoading: boolean
 }
 
-export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, roles, job, suppliers }: NewInvoiceDialogProps) => {
+export const NewInvoiceDialog = ({ open, onOpenChange, customers, roles, job, suppliers, onReload, setIsLoading }: NewInvoiceDialogProps) => {
+ 
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1)
   const [newInvoice, setNewInvoice] = useState<Partial<Invoice>>({
     customerId: '',
-    jobId: 0,
+    jobId: job.id ,
     type: 'estimate',
     issueDate: format(new Date(), 'yyyy-MM-dd'),
     dueDate: format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
@@ -44,6 +45,8 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, roles,
     taxRate: 0.08,
     invoiceNumber:''
   })
+
+  const [formErrors, setFormErrors] = useState([]);
 
   useEffect(() => {
     if (job?.id) {
@@ -131,16 +134,16 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, customers, roles,
   }
 
   // Updated to handle single additional cost object
-const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
-  setNewInvoice(prev => ({
-    ...prev,
-    additionalCosts: { 
-      description: prev.additionalCosts?.description || '',
-      amount: prev.additionalCosts?.amount || 0,
-      [field]: value 
-    }
-  }))
-}
+  const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
+    setNewInvoice(prev => ({
+      ...prev,
+      additionalCosts: { 
+        description: prev.additionalCosts?.description || '',
+        amount: prev.additionalCosts?.amount || 0,
+        [field]: value 
+      }
+    }))
+  }
 
   const calculateTotalMaterialsCost = () => {
     return (newInvoice.items || []).reduce((sum, item) => sum + (item.total || 0), 0);
@@ -160,42 +163,118 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
     return selectedCustomer?.email || "customer@example.com";
   };
 
-  const validateFormData = () => {
-    const errors: string[] = [];
-    
-    if (!newInvoice.customerId) {
-      errors.push("Customer is required");
-    }
-    
-    if (!newInvoice.jobId) {
-      errors.push("Job is required");
-    }
-    
-    if (!newInvoice.type) {
-      errors.push("Invoice type is required");
-    }
-    
-    if (!newInvoice.issueDate) {
-      errors.push("Issue date is required");
-    }
-    
-    if (!newInvoice.dueDate) {
-      errors.push("Due date is required");
+  const validateStep = (step: number) => {
+    let errors: Record<string, string> = {};
+    console.log(JSON.stringify(newInvoice));
+    switch (step) {
+      case 1: // Customer, Type, Issue Date, Due Date
+        if (!newInvoice.customerId) {
+          errors.customerId = "Customer is required";
+        }
+        if (!newInvoice.type) {
+          errors.type = "Invoice type is required";
+        }
+        if (!newInvoice.invoiceNumber) {
+          errors.invoiceNumber = "Invoice number is required";
+        }
+        if (!newInvoice.taxRate) {
+          errors.taxRate = "Tax rate is required";
+        }
+        if (!newInvoice.issueDate) {
+          errors.issueDate = "Issue date is required";
+        }
+        if (!newInvoice.dueDate) {
+          errors.dueDate = "Due date is required";
+        }
+        break;
+
+      case 2: // Items/Materials
+        if (newInvoice.items && newInvoice.items.length > 0) {
+          newInvoice.items.forEach((item, index) => {
+            if (!item.name || item.name.trim() === "") {
+              errors[`items[${index}].name`] = "Item name is required";
+            }
+            if (!item.quantity || item.quantity <= 0) {
+              errors[`items[${index}].quantity`] = "Quantity must be greater than 0";
+            }
+            if (!item.unitPrice || item.unitPrice <= 0) {
+              errors[`items[${index}].unitPrice`] = "Unit price must be greater than 0";
+            }
+            if (!item.sku ) {
+              errors[`items[${index}].sku`] = "SKU is required";
+            }
+            if (!item.unit) {
+              errors[`items[${index}].unit`] = "Unit is required";
+            }
+            if (!item.supplier) {
+              errors[`items[${index}].supplier`] = "Supplier is required";
+            }
+            // Optional fields like description, supplier, etc. are skipped
+          });
+        }
+        break;
+
+
+      case 3: // Labor (optional, but if filled validate)
+        if (newInvoice.labor?.length) {
+          newInvoice.labor.forEach((labor, index) => {
+            if (!labor.laborName?.trim()) {
+              errors[`labor[${index}].laborName`] = "Name is required";
+            }
+            if (!labor.laborEmail?.trim()) {
+              errors[`labor[${index}].laborEmail`] = "Email is required";
+            }
+            if (!labor.hours || labor.hours <= 0) {
+              errors[`labor[${index}].hours`] = "Hours must be greater than 0";
+            }
+            if (!labor.hourlyRate || labor.hourlyRate <= 0) {
+              errors[`labor[${index}].hourlyRate`] = "Hourly rate must be greater than 0";
+            }
+          });
+        }
+        break;
+
+     case 4: // Additional cost (optional, so usually no hard validation)
+      if (newInvoice.additionalCosts?.description && !newInvoice.additionalCosts?.amount) {
+        errors.additionalCosts = errors.additionalCosts || {};
+        errors.additionalCosts.amount = "Additional amount is required";
+      }
+
+      if (newInvoice.additionalCosts?.amount && !newInvoice.additionalCosts?.description) {
+        errors.additionalCosts = errors.additionalCosts || {};
+        errors.additionalCosts.description = "Additional description is required";
+      }
+      break;
+
+      default:
+        break;
     }
 
-    return errors;
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors); // you can store errors in a state
+      return false;
+    }
+
+    setFormErrors({});
+    return true;
   };
+
+
 
   const saveInvoiceData = async () => {
     try {
-      setLoading(true);
+      setIsLoading(true);
 
       // Validate form data
-      const validationErrors = validateFormData();
-      if (validationErrors.length > 0) {
-        toast.error(`Validation errors: ${validationErrors.join(', ')}`);
+      // const validationErrors = validateFormData();
+     // Check if there are any errors
+      if (Object.keys(formErrors).length > 0) {
+        // Convert all error messages into a single string
+        const errorMessages = Object.values(formErrors).join(", ");
+        toast.error(`Validation errors: ${errorMessages}`);
         return false;
       }
+
 
       // Calculate totals
       const materialsTotal = calculateTotalMaterialsCost();
@@ -213,11 +292,12 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
       const payload = {
         estimate_title: `${newInvoice.type?.charAt(0).toUpperCase()}${newInvoice.type?.slice(1)} Invoice - ${job?.title || 'Project'}`,
         customer_id: Number(newInvoice.customerId),
-        job_id: Number(newInvoice.jobId),
+        // job_id: Number(newInvoice.jobId),
+        job_id: job.id,
         priority: "medium",
         valid_until: newInvoice.dueDate || format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
         location: "Project Location", // You may want to make this dynamic
-        description: newInvoice.notes || `${newInvoice.type || 'Proposed'} invoice for ${job?.title || 'project'}`,
+        description: newInvoice.notes ,
         service_type: "service_based",
         email_address: getSelectedCustomerEmail(),
         estimate_date: newInvoice.issueDate || format(new Date(), 'yyyy-MM-dd'),
@@ -234,7 +314,8 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
         // Invoice specific fields
         status: "draft",
         invoice_type: newInvoice.type || 'estimate',
-        invoice_number: `INV-${format(new Date(), 'yyyy')}-${Date.now().toString().slice(-6)}`, // Generate invoice number
+        // invoice_number: `INV-${format(new Date(), 'yyyy')}-${Date.now().toString().slice(-6)}`, // Generate invoice number
+        invoice_number: `INV-${newInvoice.invoiceNumber}`, 
         issue_date: newInvoice.issueDate || format(new Date(), 'yyyy-MM-dd'),
         due_date: newInvoice.dueDate || format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
         
@@ -274,6 +355,12 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
       const response = await apiClient.createEstimate(payload);
       console.log('Invoice saved successfully:', response);
       toast.success('Invoice saved successfully!');
+      onReload();
+      setIsLoading(false);
+      setNewInvoice({
+        jobId:job.id
+      });
+
       return true;
     } catch (error: any) {
       console.error('Error creating estimate:', error);
@@ -290,7 +377,7 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
       toast.error(errorMessage);
       return false;
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -298,7 +385,7 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
     const success = await saveInvoiceData();
     
     if (success) {
-      onSave(newInvoice);
+     
       
       // Reset form
       setNewInvoice({
@@ -362,6 +449,11 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
                     ))}
                   </SelectContent>
                 </Select>
+               
+                <p className="text-red-500 text-sm">
+                  {formErrors?.customerId}
+                </p>
+
               </div>
               <div className="space-y-2">
                 <Label htmlFor="job">Job *</Label>
@@ -371,24 +463,28 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
                   disabled
                   placeholder="No job selected"
                 />
+               
               </div>
               <div className="space-y-2">
                 <Label htmlFor="type">Invoice Type *</Label>
-                <Select 
+                <Select
                   value={newInvoice.type} 
-                  onValueChange={(value: any) => setNewInvoice(prev => ({ ...prev, type: value }))}
+                  onValueChange={(value) => setNewInvoice(prev => ({ ...prev, type: value }))}
                 >
+
                   <SelectTrigger>
                     <SelectValue placeholder="Select Type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="proposed">Proposed</SelectItem>
+                    <SelectItem value="proposal_invoice">Proposed</SelectItem>
                     <SelectItem value="estimate">Estimate</SelectItem>
-                    <SelectItem value="roughen">Roughen</SelectItem>
-                    <SelectItem value="progressive">Progressive</SelectItem>
-                    <SelectItem value="final">Final</SelectItem>
+                    <SelectItem value="progressive_invoice">Progressive</SelectItem>
+                    <SelectItem value="final_invoice">Final</SelectItem>
                   </SelectContent>
                 </Select>
+                 <p className="text-red-500 text-sm">
+                  {formErrors?.type}
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -398,6 +494,9 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
                   onChange={(e) => setNewInvoice(prev => ({ ...prev, invoiceNumber: e.target.value }))}
                   placeholder="EST-2024-002"
                 />
+                 <p className="text-red-500 text-sm">
+                  {formErrors?.invoiceNumber}
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="taxRate">Tax Rate (%)</Label>
@@ -408,6 +507,9 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
                   onChange={(e) => setNewInvoice(prev => ({ ...prev, taxRate: parseFloat(e.target.value) / 100 }))}
                   placeholder="8.00"
                 />
+                 <p className="text-red-500 text-sm">
+                  {formErrors?.taxRate}
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="issueDate">Issue Date *</Label>
@@ -416,6 +518,9 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
                   value={newInvoice.issueDate} 
                   onChange={(e) => setNewInvoice(prev => ({ ...prev, issueDate: e.target.value }))}
                 />
+                 <p className="text-red-500 text-sm">
+                  {formErrors?.issueDate}
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="dueDate">Due Date *</Label>
@@ -424,6 +529,9 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
                   value={newInvoice.dueDate} 
                   onChange={(e) => setNewInvoice(prev => ({ ...prev, dueDate: e.target.value }))}
                 />
+                 <p className="text-red-500 text-sm">
+                  {formErrors?.dueDate}
+                </p>
               </div>
             </div>
           </TabsContent>
@@ -448,6 +556,14 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
                             onChange={(e) => updateInvoiceItem(index, 'name', e.target.value)}
                             placeholder="Product name"
                           />
+                          {/* <p className="text-red-500 text-sm">
+                            {formErrors?.formErrors[`items[${index}].name`]}
+                          </p> */}
+                          {formErrors[`items[${index}].name`] && (
+                            <p className="text-red-500 text-sm">
+                              {formErrors[`items[${index}].name`]}
+                            </p>
+                          )}
                         </div>
                       <div className="space-y-2">
                         <Label>SKU</Label>
@@ -456,6 +572,11 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
                           onChange={(e) => updateInvoiceItem(index, 'sku', e.target.value)}
                           placeholder="SKU-001"
                         />
+                        {formErrors[`items[${index}].sku`] && (
+                          <p className="text-red-500 text-sm">
+                            {formErrors[`items[${index}].sku`]}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <Label className="mb-2">Unit</Label>
@@ -473,6 +594,11 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
                             <SelectItem value="roll">Roll</SelectItem>
                           </SelectContent>
                         </Select>
+                        {formErrors[`items[${index}].unit`] && (
+                          <p className="text-red-500 text-sm">
+                            {formErrors[`items[${index}].unit`]}
+                          </p>
+                        )}
                       </div>
 
                         <div>
@@ -489,6 +615,11 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
                               </option>
                             ))}
                           </select>
+                           {formErrors[`items[${index}].supplier`] && (
+                              <p className="text-red-500 text-sm">
+                                {formErrors[`items[${index}].supplier`]}
+                              </p>
+                            )}
                         </div>
                       {/* <div className="space-y-2">
                         <Label>Description</Label>
@@ -505,6 +636,11 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
                           value={item.quantity} 
                           onChange={(e) => updateInvoiceItem(index, 'quantity', parseInt(e.target.value) || 0)}
                         />
+                        {formErrors[`items[${index}].quantity`] && (
+                          <p className="text-red-500 text-sm">
+                            {formErrors[`items[${index}].quantity`]}
+                          </p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label>Unit Price</Label>
@@ -514,6 +650,11 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
                           value={item.unitPrice} 
                           onChange={(e) => updateInvoiceItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
                         />
+                        {formErrors[`items[${index}].unitPrice`] && (
+                          <p className="text-red-500 text-sm">
+                            {formErrors[`items[${index}].unitPrice`]}
+                          </p>
+                        )}
                       </div>
                       <div className="space-y-2">
 
@@ -552,6 +693,11 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
                           onChange={(e) => updateLaborEntry(index, 'laborName', e.target.value)}
                           placeholder="Worker name"
                         />
+                        {formErrors[`labor[${index}].laborName`] && (
+                          <p className="text-red-500 text-sm">
+                            {formErrors[`labor[${index}].laborName`]}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <Label className="mb-2">Email </Label>
@@ -560,7 +706,12 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
                           value={labor.laborEmail}
                           onChange={(e) => updateLaborEntry(index, 'laborEmail', e.target.value)}
                           placeholder="Enter email address"
-                        />                       
+                        />   
+                        {formErrors[`labor[${index}].laborEmail`] && (
+                          <p className="text-red-500 text-sm">
+                            {formErrors[`labor[${index}].laborEmail`]}
+                          </p>
+                        )}                    
                       </div>
                       
                       {/* <div>
@@ -599,6 +750,11 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
                           value={labor.hours} 
                           onChange={(e) => updateLaborEntry(index, 'hours', parseFloat(e.target.value) || 0)}
                         />
+                        {formErrors[`labor[${index}].hours`] && (
+                          <p className="text-red-500 text-sm">
+                            {formErrors[`labor[${index}].hours`]}
+                          </p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label>Hourly Rate</Label>
@@ -608,6 +764,11 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
                           value={labor.hourlyRate} 
                           onChange={(e) => updateLaborEntry(index, 'hourlyRate', parseFloat(e.target.value) || 0)}
                         />
+                        {formErrors[`labor[${index}].hourlyRate`] && (
+                          <p className="text-red-500 text-sm">
+                            {formErrors[`labor[${index}].hourlyRate`]}
+                          </p>
+                        )}
                       </div>
 
                        {/* <div className="space-y-2">
@@ -650,6 +811,11 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
                       onChange={(e) => updateAdditionalCost('description', e.target.value)}
                       placeholder="Additional cost description"
                     />
+                    {formErrors.additionalCosts?.description && (
+                      <p className="text-red-500 text-sm">
+                        {formErrors.additionalCosts.description}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label>Amount</Label>
@@ -660,6 +826,12 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
                       onChange={(e) => updateAdditionalCost('amount', parseFloat(e.target.value) || 0)}
                       placeholder="0.00"
                     />
+                    {formErrors.additionalCosts?.amount && (
+                      <p className="text-red-500 text-sm">
+                        {formErrors.additionalCosts.amount}
+                      </p>
+                    )}
+
                   </div>
                 </div>
               </CardContent>
@@ -748,7 +920,17 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
           </div>
           <div className="flex gap-2">
             {currentStep < 6 ? (
-              <Button className='bg-primary text-white' onClick={() => setCurrentStep(prev => prev + 1)}>
+              <Button className='bg-primary text-white' 
+              // onClick={() => setCurrentStep(prev => prev + 1)}
+              onClick={() => {
+                if (validateStep(currentStep)) {
+                  setCurrentStep((prev) => prev + 1);
+                } else {
+                  // show validation error (toast, inline message, etc.)
+                  console.log("Validation failed for step", currentStep);
+                }
+              }}
+              >
                 Next
               </Button>
             ) : (
@@ -764,5 +946,6 @@ const updateAdditionalCost = (field: 'description' | 'amount', value: any) => {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    
   )
 }

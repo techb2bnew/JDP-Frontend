@@ -790,7 +790,7 @@ export function JobManagementPage() {
 
       {/* Jobs Grid */}
       {loading ? (
-        <div className="flex justify-center items-center py-12">
+        <div className="flex justify-center items-center h-screen">
           <LoadingSpinner />
         </div>
       ) : (
