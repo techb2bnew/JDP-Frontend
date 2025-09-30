@@ -16,7 +16,7 @@ import { LoadingSpinner } from './common/LoadingSpinner'
 import { toast } from 'sonner'
 import { usePermissions } from '../contexts/PermissionContext'
 import { apiClient } from '../utils/api'
-import { NewInvoiceDialog } from './invoices/NewInvoiceDialog'
+
 import { 
   Plus, 
   Search, 
@@ -227,38 +227,6 @@ export function JobManagementPage() {
     }
   }
 
-  const fetchEstimateById = async(jobId: string) => {
-    try {
-      setLoading(true)
-      const estimates = await apiClient.getEstimateById(jobId)
-      console.log('Estimates:', estimates);
-
-      //Code is left
-      // setEstimates({
-      //   id: estimates.data.id,
-      //   customer_id: estimates.data.customer_id,
-      //   job_id: estimates.data.job_id,
-      //   invoice_number: estimates.data.invoice_number,
-      //   invoice_type:estimates.data.invoice_type,
-      //   due_date:estimates.data.due_date,
-      //   issue_date:estimates.data.issue_date,
-      //   status:estimates.data.status,
-      //   description: estimates.data.description,
-      //   additional_costs: estimates.data.additional_costs,
-      //   labor_cost: estimates.data.labor_cost,
-      //   subtotal: estimates.data.subtotal,
-      //   total_amount: estimates.data.total_amount
-      // })
-
-
-
-    } catch (error) {
-      console.error('Error fetching estimates:', error)
-      toast.error('Failed to load Estimates')
-    }finally {
-      setLoading(false)
-    }
-  }
   const fetchEstimates = async(jobId: string) => {
     try {
       setLoading(true);

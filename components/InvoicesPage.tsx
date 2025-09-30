@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -24,7 +24,8 @@ import {
   Mail,
   Clock, // Timesheets ke liye icon
   GitCompare, // Invoice Comparison ke liye icon
-  CheckSquare // Approvals ke liye icon
+  CheckSquare, // Approvals ke liye icon
+  Package
 } from 'lucide-react'
 import { Invoice } from '../types/invoice'
 import { invoicesData, customersData, jobsData } from '../data/invoiceData'
@@ -34,6 +35,13 @@ import { useRouter } from 'next/navigation';
 import { TimesheetsPage } from './TimesheetsPage';
 import { InvoiceComparisonPage } from './InvoiceComparisonPage';
 import { ApprovalsPage } from './ApprovalsPage';
+import { globalApiCall } from '@/utils/globalApiHandler'
+import { apiClient } from '@/utils/api'
+import { toast } from 'sonner'
+import { LoadingSpinner } from './common/LoadingSpinner'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
+
 interface Job {
   id: string
   title: string
@@ -96,10 +104,57 @@ const mockJobs: Job[] = [
   }
 ]
 
+interface Supplier {
+  id: number;
+  company_name: string;
+  contact_person: string;
+  supplier_code: string;
+  user_id: number;
+}
+
+interface Job {
+  id: string
+  title: string
+  type: 'service-based' | 'contract-based'
+  status: 'pending' | 'in-progress' | 'completed' | 'cancelled'
+  assignedLeadLabor: string[]
+  assignedLabor: string[]
+  contractor?: string
+  customer?: string
+  description: string
+  createdDate: string
+  dueDate: string
+  estimatedHours?: number
+  actualHours?: number
+  estimatedCost?: number
+  actualCost?: number
+  materials?: string[]
+  address: string
+  cityZip: string
+  phone?: string
+  email?: string
+  billToAddress?: string
+  billToCityZip?: string
+  billToPhone?: string
+  billToEmail?: string
+  sameAsAddress: boolean
+  priority: 'low' | 'medium' | 'high' | 'urgent'
+  billingStatus?: 'pending' | 'invoiced' | 'paid'
+  // Additional fields from API
+  customerName?: string
+  contractorName?: string
+  createdBy?: string
+  assignedLeadLaborDetails?: any[]
+  assignedLaborDetails?: any[]
+  assignedMaterialsDetails?: any[]
+  leadLabors?:any[]
+}
+
 export function InvoicesPage() {
   const { hasPermission } = usePermissions()
   const [activeTab, setActiveTab] = useState('invoices');
   const [invoices, setInvoices] = useState<Invoice[]>(invoicesData)
+  const [invoice, setInvoice] = useState<Invoice[]>(invoicesData)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -107,16 +162,146 @@ export function InvoicesPage() {
   const [showNewInvoiceDialog, setShowNewInvoiceDialog] = useState(false)
   const [showInvoiceDetailDialog, setShowInvoiceDetailDialog] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [jobs, setJobs] = useState<Job[]>([])
+  const[customers, setCustomers] = useState([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+  const invoiceRef = useRef<HTMLDivElement>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalInvoices, setTotalInvoices] = useState(1);
+
+  const fetchData = async () => {
+    try {
+      const response = await globalApiCall(`${apiBaseUrl}/suppliers/getAllSuppliers`, {
+        method: 'GET'
+      });
+      
+      return await response.json();
+    } catch (error) {
+      // Token revocation is automatically handled
+      // Only handle other errors here
+      if (!(error instanceof Error && error.message?.includes('Session expired'))) {
+        console.error('Other error:', error);
+      }
+    }
+  }
+
+  useEffect( () => {
+    const loadSuppliers = async () => {
+      const data = await fetchData(); 
+      console.log("Suppliersss", data.data, data.data.data[0]);
+      if (data?.data) {
+        setSuppliers(data.data.data);
+      }
+      console.log('suppiersSet', suppliers);
+    };
+
+   loadSuppliers();
+   fetchJobs();
+   fetchAllCustomers();
+  
+  }, []);
+
+  useEffect(() => {
+    fetchInvoices(page); // ✅ Only call this here
+  }, [page]);
+
+  const fetchAllCustomers = async() => {
+    try {
+      setIsLoading(true)
+      const customers = await apiClient.getCustomers()
+      console.log('customers', customers);
+      setCustomers(customers.data);
+
+    } catch (error) {
+      console.error('Error fetching dashboard metrics:', error)
+      toast.error('Failed to load Dashboard Metrics')
+    }finally {
+      setIsLoading(false)
+    }
+  }
+
+  const fetchJobs = async () => {
+    try {
+      setIsLoading(true)
+      const response = await apiClient.getJobs();
+
+      setJobs(response.data)
+      console.log('fetchJobsfetchJobs', response.data);
+    } catch (error) {
+      console.error('Error fetching jobs:', error)
+      toast.error('Failed to fetch jobs')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const fetchInvoices = async (page: number = 1) => {
+    try {
+      setIsLoading(true);
+      const response = await apiClient.getAllEstimates(page);
+      const data = response.data;
+
+      setInvoices(data.estimates);          // Current page's invoices
+      setTotalPages(data.totalPages);       // Total number of pages
+      setTotalInvoices(data.total);  
+
+    } catch (error) {
+      console.error('Error fetching invoices:', error);
+      toast.error('Failed to fetch invoices');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+ const fetchInvoiceById = async (id: string) => {
+  try {
+    const response = await apiClient.getEstimateById(id);
+    const data = response.data;
+    setInvoice(data); // still sets the state if you need it elsewhere
+    return data;
+  } catch (error) {
+    console.error('Error fetching invoice:', error);
+    toast.error('Failed to fetch invoice');
+    return null;
+  }
+};
+
+
+  const formattedDate = (date) =>
+    new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+  });
+
+
+// Result: "Sep 30, 2025"
+
+  const totalBilled = invoices.reduce((sum, invoice) => sum + invoice.total_amount, 0);
+
 
   const filteredInvoices = invoices.filter(invoice => {
-    const matchesSearch = invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.jobTitle.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter
-    const matchesType = typeFilter === 'all' || invoice.type === typeFilter
-    return matchesSearch && matchesStatus && matchesType
-  })
+    const search = searchTerm.toLowerCase();
+
+    const matchesSearch =
+      invoice.invoice_number?.toLowerCase().includes(search) ||
+      invoice.customer?.customer_name?.toLowerCase().includes(search) ||
+      invoice.job?.job_title?.toLowerCase().includes(search);
+
+    const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
+    const matchesType = typeFilter === 'all' || invoice.invoice_type === typeFilter;
+
+    return matchesSearch && matchesStatus && matchesType;
+  });
+
+  const invoicesToRender = (
+    searchTerm || statusFilter !== 'all' || typeFilter !== 'all'
+  ) ? filteredInvoices : invoices;
 
   const handleSaveInvoice = (newInvoiceData: Partial<Invoice>) => {
     const subtotal =
@@ -141,10 +326,19 @@ export function InvoicesPage() {
     setInvoices(prev => [invoice, ...prev])
   }
 
-  const handleViewInvoice = (invoice: Invoice) => {
-    localStorage.setItem('selectedInvoice', JSON.stringify(invoice));
-    router.push(`/invoiceDetail?id=${invoice.id}`);
+ const handleViewInvoice = async (inv: Invoice) => {
+  const data = await fetchInvoiceById(inv.id);
+  if (data) {
+    setSelectedInvoice(data);
+    setIsModalOpen(true);
   }
+};
+
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedInvoice(null);
+  };
 
   const handleSendInvoice = (invoiceId: string) => {
     setInvoices(prev => prev.map(inv =>
@@ -152,9 +346,24 @@ export function InvoicesPage() {
     ))
   }
 
-  const handleDeleteInvoice = (invoiceId: string) => {
-    setInvoices(prev => prev.filter(inv => inv.id !== invoiceId))
+ const handleDeleteInvoice = async (invoiceId: string) => {
+  try {
+    setIsLoading(true);
+
+    const response = await apiClient.deleteEstimate(invoiceId); 
+    console.log('Invoice delete response:', response);
+    toast.success('Invoice deleted successfully');
+    fetchInvoices();
+
+  } catch (error) {
+    console.error('Error deleting invoice:', error);
+    toast.error('Failed to delete invoice');
+  } finally {
+    setIsLoading(false);
   }
+};
+
+
   const handleBackToInvoices = () => {
     setActiveTab('invoices')
   }
@@ -162,7 +371,38 @@ export function InvoicesPage() {
     setPendingApprovalCount(count)
   }
   const handlePrintInvoice = () => { window.print() }
-  const handleDownloadInvoice = () => { console.log('Downloading invoice as PDF...') }
+
+  const handleDownloadInvoice = (invoice: Invoice) => {
+    const doc = new jsPDF();
+
+    // Example: add text to PDF
+    doc.text(`Invoice #${invoice.id}`, 10, 10);
+    doc.text(`Customer: ${invoice.customerName}`, 10, 20);
+    // Add more invoice details here...
+
+    doc.save(`invoice_${invoice.id}.pdf`);
+  };
+
+  // const handleDownloadInvoice = async () => {
+  //   if (!invoiceRef.current) return;
+
+  //   const element = invoiceRef.current;
+
+  //   // Convert HTML to canvas
+  //   const canvas = await html2canvas(element, { scale: 2 });
+
+  //   const imgData = canvas.toDataURL('image/png');
+
+  //   const pdf = new jsPDF('p', 'mm', 'a4');
+
+  //   const imgProps = pdf.getImageProperties(imgData);
+  //   const pdfWidth = pdf.internal.pageSize.getWidth();
+  //   const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+  //   pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+  //   pdf.save(`invoice_${selectedInvoice?.id || 'download'}.pdf`);
+  // };
+
   const handleEmailInvoice = () => { console.log('Sending invoice via email...') }
 
   const tabItems = [
@@ -223,7 +463,8 @@ export function InvoicesPage() {
                 <CardContent className="p-6 flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Total Invoices</p>
-                    <p className="text-2xl font-semibold">{invoices.length}</p>
+                    {/* <p className="text-2xl font-semibold">{invoices.length}</p> */}
+                    <p className="text-2xl font-semibold">{totalInvoices}</p>
                   </div>
                   <div className="p-3 bg-blue-100 rounded-lg">
                     <Receipt className="h-6 w-6 text-blue-600" />
@@ -234,7 +475,7 @@ export function InvoicesPage() {
                 <CardContent className="p-6 flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Total Billed</p>
-                    <p className="text-2xl font-semibold text-primary">$4,480.92</p>
+                    <p className="text-2xl font-semibold text-primary">${totalBilled.toFixed(2)}</p>
                   </div>
                   <div className="p-3 bg-green-100 rounded-lg">
                     <DollarSign className="h-6 w-6 text-green-600" />
@@ -303,75 +544,148 @@ export function InvoicesPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Types</SelectItem>
-                        <SelectItem value="proposed">Proposed</SelectItem>
-                        <SelectItem value="roughen">Roughen</SelectItem>
-                        <SelectItem value="progressive">Progressive</SelectItem>
-                        <SelectItem value="final">Final</SelectItem>
+                        <SelectItem value="proposal_invoice">Proposed</SelectItem>
+                        <SelectItem value="estimate">Estimate</SelectItem>
+                        <SelectItem value="progressive_invoice">Progressive</SelectItem>
+                        <SelectItem value="final_invoice">Final</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
 
                 {/* Invoices Table */}
-                <div className="border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader className="bg-gray-50">
-                      <TableRow>
-                        <TableHead>Invoice #</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Job</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Issue Date</TableHead>
-                        <TableHead>Due Date</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredInvoices.map((invoice) => (
-                        <TableRow key={invoice.id}>
-                          <TableCell className="font-mono">{invoice.invoiceNumber}</TableCell>
-                          <TableCell>{invoice.customerName}</TableCell>
-                          <TableCell className="max-w-48 truncate">{invoice.jobTitle}</TableCell>
-                          <TableCell>{invoice.type}</TableCell>
-                          <TableCell>{new Date(invoice.createdAt).toLocaleDateString()}</TableCell>
-                          <TableCell>{new Date(invoice.dueDate).toLocaleDateString()}</TableCell>
-                          <TableCell className="font-medium">${invoice.totalAmount.toFixed(2)}</TableCell>
-                          <TableCell>
-                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
-                                invoice.status === 'sent' ? 'bg-blue-100 text-blue-800' :
-                                  invoice.status === 'overdue' ? 'bg-red-100 text-red-800' :
-                                    'bg-gray-100 text-gray-800'
-                              }`}>
-                              {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center justify-end gap-2">
-                              {hasPermission('invoices', 'view') && (
-                                <Button variant="outline" size="icon" onClick={() => handleViewInvoice(invoice)}>
-                                  <Eye className="w-4 h-4" />
-                                </Button>
-                              )}
-                              {hasPermission('invoices', 'view') && (
-                                <Button variant="outline" size="icon" onClick={() => handleDownloadInvoice()}>
-                                  <Download className="w-4 h-4" />
-                                </Button>
-                              )}
-                              {hasPermission('invoices', 'delete') && (
-                                <Button variant="outline" size="icon" onClick={() => handleDeleteInvoice(invoice.id)}>
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                {
+                  isLoading ? (
+                    <div className="flex justify-center items-center py-12">
+                      <LoadingSpinner />
+                    </div>
+                  ) : invoices.length === 0 ? (
+                        // Empty state
+                        <div className="text-center py-8">
+                          <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                          <p className="text-gray-600 mb-2">No invoices found</p>
+                          <Button 
+                            variant="outline" 
+                            // onClick={() => {setOpen(true); fetchAllCustomers();}}
+                            className="gap-2"
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add First Invoice
+                          </Button>
+                        </div>
+                      ) 
+                  : <div className="border rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader className="bg-gray-50">
+                          <TableRow>
+                            <TableHead>Invoice #</TableHead>
+                            <TableHead>Customer</TableHead>
+                            <TableHead>Job</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Issue Date</TableHead>
+                            <TableHead>Due Date</TableHead>
+                            <TableHead>Amount</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {invoicesToRender.map((invoice) => (
+                            <TableRow key={invoice.id}>
+                              <TableCell className="font-mono">{invoice.invoice_number}</TableCell>
+                              <TableCell>{invoice.customer?.customer_name}</TableCell>
+                              <TableCell className="max-w-48 truncate">{invoice.job?.job_title}</TableCell>
+                              {/* <TableCell >{invoice?.invoice_type}</TableCell> */}
+                                <TableCell>
+                                <div>
+                                  <span className={`px-2 py-1 rounded text-xs font-medium ${invoice.invoice_type === 'estimate' ? 'bg-blue-100 text-blue-800' :
+                                    invoice.invoice_type === 'proposal_invoice' ? 'bg-purple-100 text-purple-800' :
+                                      invoice.invoice_type === 'progressive_invoice' ? 'bg-orange-100 text-orange-800' :
+                                        'bg-green-100 text-green-800'
+                                    }`}>
+                                    {invoice.invoice_type === 'progressive_invoice'
+                                      ? 'Progressive'
+                                      : invoice.invoice_type === 'proposal_invoice'
+                                      ? 'Proposed'
+                                      : invoice.invoice_type === 'final_invoice'
+                                      ? 'Final'
+                                      : invoice.invoice_type === 'estimate'
+                                      ? 'Estimate'
+                                      : invoice.invoice_type
+                                    }
+                                  </span>
+                                </div>
+                                </TableCell>
+                              <TableCell>{formattedDate(invoice?.issue_date)}</TableCell>
+                              <TableCell>{formattedDate(invoice?.due_date)}</TableCell>
+                              <TableCell className="font-medium">${invoice?.total_amount?.toFixed(2)}</TableCell>
+                              <TableCell>
+                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
+                                    invoice.status === 'sent' ? 'bg-blue-100 text-blue-800' :
+                                      invoice.status === 'overdue' ? 'bg-red-100 text-red-800' :
+                                        'bg-gray-100 text-gray-800'
+                                  }`}>
+                                  {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center justify-end gap-2">
+                                  {hasPermission('invoices', 'view') && (
+                                    <Button variant="outline" size="icon" onClick={() => handleViewInvoice(invoice)}>
+                                      <Eye className="w-4 h-4" />
+                                    </Button>
+                                   
+                                  )}
+
+                                  {/* Modal */}
+                                  <Dialog open={isModalOpen} onOpenChange={handleCloseModal}>
+                                    <DialogContent>
+                                      <DialogHeader>
+                                        <DialogTitle>Invoice Preview</DialogTitle>
+                                      </DialogHeader>
+                                      {selectedInvoice && <InvoiceTemplate invoice={selectedInvoice} />}
+                                    </DialogContent>
+                                  </Dialog>
+
+                                  {hasPermission('invoices', 'view') && (
+                                    <Button variant="outline" size="icon" onClick={() => handleDownloadInvoice(invoice)}>
+                                      <Download className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                  {hasPermission('invoices', 'delete') && (
+                                    <Button variant="outline" size="icon" onClick={() => handleDeleteInvoice(invoice.id)}>
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+
+                      </Table>
+                    </div>
+                   
+                }
+               
               </CardContent>
+               <div className="flex gap-2 mt-4">
+                  <Button
+                    disabled={page <= 1}
+                    onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                  >
+                    Previous
+                  </Button>
+
+                  <span>Page {page} of {totalPages}</span>
+
+                  <Button
+                    disabled={page >= totalPages}
+                    onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
+                  >
+                    Next
+                  </Button>
+                </div>
             </Card>
           </div>
         </TabsContent>
@@ -393,8 +707,13 @@ export function InvoicesPage() {
       <NewInvoiceDialog
         open={showNewInvoiceDialog}
         onOpenChange={setShowNewInvoiceDialog}
+        customers={customers}       
+        jobs={jobs}
+        suppliers={suppliers}
         onSave={handleSaveInvoice}
+        onReload={fetchInvoices}
       />
+      
       <Dialog open={showInvoiceDetailDialog} onOpenChange={setShowInvoiceDetailDialog}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-auto">
           <DialogHeader>

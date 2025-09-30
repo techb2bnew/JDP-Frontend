@@ -554,6 +554,57 @@ export const apiClient = {
     return transformedData
   },
 
+  getAllEstimates: async (page: number = 1) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${apiBaseUrl}/estimates/getEstimates?page=${page}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to fetch all estimates')
+    }
+
+    const result = await response.json()
+    console.log('All Estimates API Response:', result)
+
+    if (!result.data || !result.data.estimates) {
+      console.error('All Estimates API: Unexpected response structure:', result)
+      return {
+        data: [],
+      }
+    }
+
+    // Transform the API response to match our Job interface
+    const estimates = result.data?.estimates || {};
+
+    const transformedData = {
+      data: {
+       estimates: estimates,
+       total: result.data.total,
+        page: result.data.page,
+        limit: result.data.limit,
+        totalPages: result.data.totalPages,
+        message: result.message || '',
+        success: result.success || false,
+      }
+    }
+
+
+    console.log('Transformed Estimates data:', transformedData)
+    return transformedData
+  },
+
   getEstimateById: async (selectedJobId: string | number) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
     const token = getAuthToken()
@@ -579,35 +630,14 @@ export const apiClient = {
     const result = await response.json()
     console.log('Estimates API Response:', result)
 
-    if (!result.data || !result.data.invoice_details) {
+    if (!result.data) {
       console.error('Estimates API: Unexpected response structure:', result)
       return {
         data: [],
       }
     }
 
-    // Transform the API response to match our Job interface
-    const estimates = result.data || {};
-
-    const transformedData = {
-      data: {
-        id: estimates.id,
-        customer_id: estimates.customer_id,
-        job_id: estimates.job_id,
-        invoice_number: estimates.invoice_number,
-        invoice_type: estimates.invoice_type,
-        due_date: estimates.due_date,
-        issue_date: estimates.issue_date,
-        status: estimates.status,
-        description: estimates.description,
-        additional_costs: estimates.additional_costs,
-        labor_cost: estimates.labor_cost,
-        subtotal: estimates.subtotal,
-        total_amount: estimates.total_amount,
-        message: result.message || '',
-        success: result.success || false,
-      }
-    }
+    const transformedData = result;
 
 
     console.log('Transformed Estimates data:', transformedData)

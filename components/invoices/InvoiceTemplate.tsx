@@ -1,16 +1,36 @@
+import React, { useState, useEffect } from 'react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
 import { Separator } from '../ui/separator'
 import { Invoice, Customer } from '../../types/invoice'
+import { apiClient } from '../../utils/api'
 // import { formatCurrency, formatDate } from '../../utils/invoiceUtils'
 import { customersData } from '../../data/invoiceData'
+import { toast } from 'sonner'
+import { LoadingSpinner } from '../common/LoadingSpinner'
 
 interface InvoiceTemplateProps {
+  inv: Invoice
   invoice: Invoice
 }
 
 export const InvoiceTemplate = ({ invoice }: InvoiceTemplateProps) => {
-  const customer = customersData.find(c => c.id === invoice.customerId)
 
+  const formattedDate = (date) =>
+    new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+  });
+
+  // const customer = customersData.find(c => c.id === invoice.customerId) //invoice.customerId
+  console.log('invoiceinvoice', invoice);
+  if (!invoice) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <LoadingSpinner />
+      </div>
+    );
+  }
   return (
     <div className="bg-white p-8">
       {/* Invoice Header */}
@@ -18,18 +38,18 @@ export const InvoiceTemplate = ({ invoice }: InvoiceTemplateProps) => {
         <div>
           <h1 className="text-3xl font-bold text-primary mb-2">INVOICE</h1>
           <div className="text-sm text-muted-foreground">
-            <p>Invoice #: {invoice.invoiceNumber}</p>
-            <p>Issue Date: 23523</p>
-            <p>Due Date: 3255</p>
+            <p>Invoice #: {invoice.invoice_number}</p>
+            <p>Issue Date: {invoice.issue_date}</p>
+            <p>Due Date: {invoice.due_date}</p>
           </div>
         </div>
         <div className="text-right">
-          <h2 className="text-xl font-semibold mb-2">JDP Corporation</h2>
+          <h2 className="text-xl font-semibold mb-2">{invoice.customer?.company_name}</h2>
           <div className="text-sm text-muted-foreground">
-            <p>1234 Business Street</p>
+            <p>{invoice?.location}</p>
             <p>City, State 12345</p>
-            <p>Phone: (555) 123-4567</p>
-            <p>Email: billing@jdpcorp.com</p>
+            <p>Phone: {invoice?.customer?.phone}</p>
+            <p>Email: {invoice?.customer?.email}</p>
           </div>
         </div>
       </div>
@@ -39,22 +59,22 @@ export const InvoiceTemplate = ({ invoice }: InvoiceTemplateProps) => {
         <div>
           <h3 className="font-semibold mb-2">Bill To:</h3>
           <div className="text-sm">
-            <p className="font-medium">{invoice.customerName}</p>
-            <p>{customer?.address}</p>
+            <p className="font-medium">{invoice.customer?.customer_name}</p>
+            {/* <p>{customer?.address}</p> */}
           </div>
         </div>
         <div>
           <h3 className="font-semibold mb-2">Job Details:</h3>
           <div className="text-sm">
-            <p><span className="font-medium">Job ID:</span> {invoice.jobId}</p>
-            <p><span className="font-medium">Project:</span> {invoice.jobTitle}</p>
-            <p><span className="font-medium">Type:</span> {invoice.type.charAt(0).toUpperCase() + invoice.type.slice(1)} Invoice</p>
+            <p><span className="font-medium">Job ID:</span> {invoice.job.id}</p>
+            <p><span className="font-medium">Project:</span> {invoice.job.job_title}</p>
+            <p><span className="font-medium">Type:</span> {invoice.invoice_type} Invoice</p>
           </div>
         </div>
       </div>
 
       {/* Items */}
-      {invoice.items.length > 0 && (
+      {invoice.products && invoice.products.length > 0 && (
         <div className="mb-8">
           <h3 className="font-semibold mb-4">Items/Materials</h3>
           <Table>
@@ -68,13 +88,13 @@ export const InvoiceTemplate = ({ invoice }: InvoiceTemplateProps) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {invoice.items.map((item) => (
+              {invoice.products.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell className="font-mono text-sm">{item.sku}</TableCell>
+                  <TableCell className="font-mono text-sm">{item.jdp_sku}</TableCell>
                   <TableCell>{item.description}</TableCell>
-                  <TableCell>{item.quantity}</TableCell>
-                  <TableCell>235</TableCell>
-                  <TableCell className="text-right">55</TableCell>
+                  <TableCell>{item.stock_quantity}</TableCell>
+                  <TableCell>{item.unit_price}</TableCell>
+                  <TableCell className="text-right">{item.total_price}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -83,7 +103,7 @@ export const InvoiceTemplate = ({ invoice }: InvoiceTemplateProps) => {
       )}
 
       {/* Labor */}
-      {invoice.labor.length > 0 && (
+      {invoice.labor && invoice.labor.length > 0 && (
         <div className="mb-8">
           <h3 className="font-semibold mb-4">Labor</h3>
           <Table>
@@ -99,11 +119,11 @@ export const InvoiceTemplate = ({ invoice }: InvoiceTemplateProps) => {
             <TableBody>
               {invoice.labor.map((labor) => (
                 <TableRow key={labor.id}>
-                  <TableCell>{labor.laborName}</TableCell>
-                  <TableCell>{labor.description}</TableCell>
-                  <TableCell>{labor.hours}h</TableCell>
-                  <TableCell>43/h</TableCell>
-                  <TableCell className="text-right">234</TableCell>
+                  <TableCell>{labor.user.full_name}</TableCell>
+                  <TableCell>{invoice.description}</TableCell>
+                  <TableCell>{labor.hours_worked}h</TableCell>
+                  <TableCell>{labor.hourly_rate}/h</TableCell>
+                  <TableCell className="text-right">{labor.total_cost}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -112,7 +132,7 @@ export const InvoiceTemplate = ({ invoice }: InvoiceTemplateProps) => {
       )}
 
       {/* Additional Costs */}
-      {invoice.additionalCosts.length > 0 && (
+      {invoice.additional_costs_details && invoice.additional_costs_details.length > 0 && (
         <div className="mb-8">
           <h3 className="font-semibold mb-4">Additional Costs</h3>
           <Table>
@@ -123,10 +143,10 @@ export const InvoiceTemplate = ({ invoice }: InvoiceTemplateProps) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {invoice.additionalCosts.map((cost, index) => (
+              {invoice.additional_costs_details.map((cost, index) => (
                 <TableRow key={index}>
                   <TableCell>{cost.description}</TableCell>
-                  <TableCell className="text-right">879</TableCell>
+                  <TableCell className="text-right">{cost.amount}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -140,16 +160,16 @@ export const InvoiceTemplate = ({ invoice }: InvoiceTemplateProps) => {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span>Subtotal:</span>
-              <span>657</span>
+              <span>{invoice.subtotal}</span>
             </div>
             <div className="flex justify-between">
-              <span>Tax ({(invoice.taxRate * 100).toFixed(1)}%):</span>
-              <span>666</span>
+              <span>Tax: {invoice.tax_percentage }</span>
+              <span>{invoice.tax_amount}</span>
             </div>
             <Separator />
             <div className="flex justify-between font-semibold text-lg">
               <span>Total Amount:</span>
-              <span className="text-primary">6575</span>
+              <span className="text-primary">{invoice.total_amount}</span>
             </div>
           </div>
         </div>

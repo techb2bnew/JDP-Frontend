@@ -18,8 +18,9 @@ interface NewInvoiceDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   customers: any[];
+  jobs: any[];
   roles: any [];
-  job: {
+  job?: {            // <--- make optional
     id: number;
     title: string;
   };
@@ -28,13 +29,15 @@ interface NewInvoiceDialogProps {
   setIsLoading: boolean
 }
 
-export const NewInvoiceDialog = ({ open, onOpenChange, customers, roles, job, suppliers, onReload, setIsLoading }: NewInvoiceDialogProps) => {
+export const NewInvoiceDialog = ({ open, onOpenChange, customers, job, jobs, suppliers, onReload, setIsLoading }: NewInvoiceDialogProps) => {
  
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1)
+  const [selectJob, setSelectJob] = useState('')
   const [newInvoice, setNewInvoice] = useState<Partial<Invoice>>({
     customerId: '',
-    jobId: job.id ,
+    jobId: Number(job?.id || selectJob.id),
+    // jobId: job?.id || selectJob.id,
     type: 'estimate',
     issueDate: format(new Date(), 'yyyy-MM-dd'),
     dueDate: format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
@@ -171,6 +174,9 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, roles, job, su
         if (!newInvoice.customerId) {
           errors.customerId = "Customer is required";
         }
+        if (!newInvoice.jobId) {
+          errors.jobId = "Select the job";
+        }
         if (!newInvoice.type) {
           errors.type = "Invoice type is required";
         }
@@ -263,7 +269,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, roles, job, su
 
   const saveInvoiceData = async () => {
     try {
-      setIsLoading(true);
+      // setIsLoading(true);
 
       // Validate form data
       // const validationErrors = validateFormData();
@@ -292,8 +298,8 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, roles, job, su
       const payload = {
         estimate_title: `${newInvoice.type?.charAt(0).toUpperCase()}${newInvoice.type?.slice(1)} Invoice - ${job?.title || 'Project'}`,
         customer_id: Number(newInvoice.customerId),
-        // job_id: Number(newInvoice.jobId),
-        job_id: job.id,
+        job_id: Number(newInvoice.jobId),
+        // job_id: job?.id || selectJob.id,
         priority: "medium",
         valid_until: newInvoice.dueDate || format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
         location: "Project Location", // You may want to make this dynamic
@@ -356,9 +362,9 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, roles, job, su
       console.log('Invoice saved successfully:', response);
       toast.success('Invoice saved successfully!');
       onReload();
-      setIsLoading(false);
+      // setIsLoading(false);
       setNewInvoice({
-        jobId:job.id
+        jobId:job?.id || selectJob.id
       });
 
       return true;
@@ -377,7 +383,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, roles, job, su
       toast.error(errorMessage);
       return false;
     } finally {
-      setIsLoading(false);
+      // setIsLoading(false);
     }
   };
 
@@ -457,12 +463,48 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, roles, job, su
               </div>
               <div className="space-y-2">
                 <Label htmlFor="job">Job *</Label>
-                <Input 
+
+                {/* <Input 
                   type="text" 
                   value={job?.title || ''} 
                   disabled
                   placeholder="No job selected"
-                />
+                /> */}
+                <div className="space-y-2">
+  {/* <Label htmlFor="job">Job *</Label> */}
+
+  {job ? (
+    <Input 
+      type="text" 
+      value={job?.title || ''} 
+      disabled 
+      placeholder="No job selected" 
+    />
+  ) : (
+    <select
+      id="job"
+      className="w-full border border-input rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+      onChange={(e) => {
+        const selectedJobId = e.target.value;
+        const selected = jobs.find(j => j.id === (selectedJobId));
+        setSelectJob(selected || null);  // Assumes you have a setJob function
+        setNewInvoice((prev) => ({ ...prev, jobId: selectedJobId }));
+      }}
+    >
+      <option value="">Select a job</option>
+      {jobs.map((j) => (
+        <option key={j.id} value={j.id}>
+          {j.title}
+        </option>
+      ))}
+    </select>
+    
+  )}
+</div>
+ <p className="text-red-500 text-sm">
+                  {formErrors?.jobId}
+                </p>
+
                
               </div>
               <div className="space-y-2">
@@ -852,7 +894,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, roles, job, su
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Job</p>
-                      <p className="font-medium">{job?.title || 'Not selected'}</p>
+                      <p className="font-medium">{job?.title || selectJob.title}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Type</p>

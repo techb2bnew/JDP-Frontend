@@ -430,8 +430,6 @@ const handleAction = (action: string, type: string, item: any) => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
   const fetchData = async () => {
-
-
     try {
       const response = await globalApiCall(`${apiBaseUrl}/suppliers/getAllSuppliers`, {
         method: 'GET'
@@ -1312,7 +1310,7 @@ const handleSaveProduct = async () => {
                       open={open}
                       onOpenChange={setOpen}
                       customers={customers}
-                      roles={roles}
+                      // roles={roles}
                       job={job}
                       suppliers={suppliers}
                       onReload={onReload}
