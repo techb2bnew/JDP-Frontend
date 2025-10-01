@@ -605,6 +605,56 @@ export const apiClient = {
     return transformedData
   },
 
+  getEstimatesStats: async () => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${apiBaseUrl}/estimates/getEstimateStats`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to fetch job dashboard')
+    }
+
+
+    const result = await response.json()
+    console.log('Estimates Stats API Response:', result)
+
+    if (!result.data || !result.data.detailed_stats) {
+      console.error('Estimates Stats API: Unexpected response structure:', result)
+      return {
+        data: [],
+      }
+    }  
+
+    const estimateStats = result.data?.detailed_stats || {};
+
+    const transformedData = {
+      data:{
+        pending: estimateStats?.pending || 0,
+        total: estimateStats?.total || 0,
+        totalBilled: estimateStats?.totalBilled || 0,
+        paid: estimateStats?.paid || 0,
+      },
+      message: result.message || '',
+      success: result.success || false,
+    }
+
+
+    console.log('Transformed Dashboard Matrics data:', transformedData)
+    return transformedData
+  }, 
+
   getEstimateById: async (selectedJobId: string | number) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
     const token = getAuthToken()
@@ -644,6 +694,82 @@ export const apiClient = {
     return transformedData
   },
 
+  getAllTimeSheets: async (startDate: string, endDate: string) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${apiBaseUrl}/job/getAllJobsWeeklyTimesheetSummary?start_date=${startDate}&end_date=${endDate}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+
+    console.log('response', response)
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to fetch timesheets')
+    }
+
+    const result = await response.json()
+    console.log('Timesheets API Response:', result)
+
+    if (!result.success || !result.data || !result.data.dashboard_timesheets) {
+      console.error('Timesheets API: Unexpected response structure:', result)
+      return {
+        data: [],
+      }
+    }
+
+    // Transform the API response to match our Job interface
+    // const timesheets = result.data?.dashboard_timesheets || {};
+    // const period = result.data?.period || {};
+
+    const transformedData = {
+      data: result.data
+    }
+
+
+    console.log('Transformed Timesheets data:', transformedData)
+    return transformedData
+  },
+
+  approveWeekTimesheet: async (timesheet:{
+      jobId: number,
+      laborId: number,
+      startDate: string,
+      endDate: string,
+      status: string
+    }) => {
+
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${apiBaseUrl}/job/approveWeekTimesheet`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(timesheet),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to approve weekly timesheet')
+    }
+
+    return response.json()
+  },
 
   updateJob: async (jobId: string, jobData: {
     job_title: string,

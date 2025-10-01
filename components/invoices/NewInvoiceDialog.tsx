@@ -29,14 +29,21 @@ interface NewInvoiceDialogProps {
   setIsLoading: boolean
 }
 
+interface Job {
+  id: number;
+  title: string;
+  
+};
+
 export const NewInvoiceDialog = ({ open, onOpenChange, customers, job, jobs, suppliers, onReload, setIsLoading }: NewInvoiceDialogProps) => {
  
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1)
-  const [selectJob, setSelectJob] = useState('')
+  
+  const [selectJob, setSelectJob] = useState<Job | null>(null);
   const [newInvoice, setNewInvoice] = useState<Partial<Invoice>>({
     customerId: '',
-    jobId: Number(job?.id || selectJob.id),
+    jobId: Number(job?.id || selectJob?.id),
     // jobId: job?.id || selectJob.id,
     type: 'estimate',
     issueDate: format(new Date(), 'yyyy-MM-dd'),
@@ -481,26 +488,29 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, job, jobs, sup
       placeholder="No job selected" 
     />
   ) : (
-    <select
-      id="job"
-      className="w-full border border-input rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-      onChange={(e) => {
-        const selectedJobId = e.target.value;
-        const selected = jobs.find(j => j.id === (selectedJobId));
-        setSelectJob(selected || null);  // Assumes you have a setJob function
-        setNewInvoice((prev) => ({ ...prev, jobId: selectedJobId }));
-      }}
-    >
-      <option value="">Select a job</option>
-      {jobs.map((j) => (
-        <option key={j.id} value={j.id}>
-          {j.title}
-        </option>
-      ))}
-    </select>
-    
+ <select
+  id="job"
+  className="w-full border border-input rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+  value={newInvoice.jobId || ""}
+  onChange={(e) => {
+    const selectedJobId = Number(e.target.value);
+  
+     const selected = jobs.find((j) => j.id == selectedJobId) || null;
+    setSelectJob(selected);
+    setNewInvoice((prev) => ({ ...prev, jobId: selectedJobId }));
+  }}
+>
+  <option value="">Select a job</option>
+  {jobs.map((j) => (
+    <option key={j.id} value={j.id}>
+      {j.title}
+    </option>
+  ))}
+</select>
+
   )}
 </div>
+
  <p className="text-red-500 text-sm">
                   {formErrors?.jobId}
                 </p>
@@ -894,7 +904,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, job, jobs, sup
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Job</p>
-                      <p className="font-medium">{job?.title || selectJob.title}</p>
+                      <p className="font-medium">{job?.title || selectJob?.title}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Type</p>

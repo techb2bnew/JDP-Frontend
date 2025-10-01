@@ -173,6 +173,12 @@ export function InvoicesPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalInvoices, setTotalInvoices] = useState(1);
+  const [timesheets, setTimesheets] = useState<any[]>([]);
+  const [period, setPeriod] = useState<any[]>([]);
+  const [leadLabors, setLeadLabors] = useState<Job[]>([])
+  const [labors, setLabors] = useState<Job[]>([])
+  const [employees, setEmployees] = useState<any[]>([])
+  const [stats, setStats] = useState<any[]>([])
 
   const fetchData = async () => {
     try {
@@ -203,6 +209,9 @@ export function InvoicesPage() {
    loadSuppliers();
    fetchJobs();
    fetchAllCustomers();
+   fetchTimesheets();
+   fetchAllEmployees();
+   fetchInvoiceStats();
   
   }, []);
 
@@ -240,6 +249,22 @@ export function InvoicesPage() {
     }
   }
 
+  const fetchInvoiceStats = async () => {
+    try {
+      setIsLoading(true);
+      const response = await apiClient.getEstimatesStats();
+      console.log('Estiamtes stats', response.data);
+      setStats(response.data);
+      // const data = response.data;  
+
+    } catch (error) {
+      console.error('Error fetching invoices:', error);s
+      toast.error('Failed to fetch invoices');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const fetchInvoices = async (page: number = 1) => {
     try {
       setIsLoading(true);
@@ -258,19 +283,87 @@ export function InvoicesPage() {
     }
   };
 
- const fetchInvoiceById = async (id: string) => {
-  try {
-    const response = await apiClient.getEstimateById(id);
-    const data = response.data;
-    setInvoice(data); // still sets the state if you need it elsewhere
-    return data;
-  } catch (error) {
-    console.error('Error fetching invoice:', error);
-    toast.error('Failed to fetch invoice');
-    return null;
-  }
-};
+  const fetchInvoiceById = async (id: string) => {
+    try {
+      const response = await apiClient.getEstimateById(id);
+      const data = response.data;
+      setInvoice(data); // still sets the state if you need it elsewhere
+      return data;
+    } catch (error) {
+      console.error('Error fetching invoice:', error);
+      toast.error('Failed to fetch invoice');
+      return null;
+    }
+  };
 
+  const fetchLeadLabors = async (page: number = 1) => {
+  try {
+    const response = await apiClient.getLeadLabor(page, undefined);
+    console.log('leadLabors response', response);
+    setLeadLabors(response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('Error fetching lead labors:', error);
+    toast.error(error.message || 'Failed to fetch lead labors');
+    return [];
+  }
+  };
+
+  const fetchLabors = async (page: number = 1) => {
+    try {
+      const response = await apiClient.getLabor(page, undefined);
+      setLabors(response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('Error fetching labors:', error);
+      toast.error(error.message || 'Failed to fetch labors');
+      return [];
+    }
+  };
+
+  const fetchAllEmployees = async (page: number = 1) => {
+    setIsLoading(true);
+    try {
+      const [leadLabors, labors] = await Promise.all([
+        fetchLeadLabors(page),
+        fetchLabors(page),
+      ]);
+
+      const combined = [...(leadLabors || []), ...(labors || [])];
+      console.log('combined', leadLabors, labors, combined);
+      setEmployees(combined);
+    } catch (error) {
+      console.error("Error fetching employees:", error);
+      toast.error("Failed to fetch employees");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
+
+  let startDate = '2025-09-20';
+  let endDate = '2025-09-26';
+
+  const fetchTimesheets = async () => {
+    try {
+      setIsLoading(true)
+      if (!startDate || !endDate) {
+        toast.error("startDate and endDate are required");
+        return;
+      }
+      const response = await apiClient.getAllTimeSheets(startDate, endDate); 
+
+      setTimesheets(response.data.dashboard_timesheets)
+      setPeriod(response.data.period)
+      console.log('fetchTimesheets', response.data);
+    } catch (error) {
+      console.error('Error fetching timesheets:', error)
+      toast.error('Failed to fetch timesheets')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const formattedDate = (date) =>
     new Date(date).toLocaleDateString('en-US', {
@@ -383,26 +476,6 @@ export function InvoicesPage() {
     doc.save(`invoice_${invoice.id}.pdf`);
   };
 
-  // const handleDownloadInvoice = async () => {
-  //   if (!invoiceRef.current) return;
-
-  //   const element = invoiceRef.current;
-
-  //   // Convert HTML to canvas
-  //   const canvas = await html2canvas(element, { scale: 2 });
-
-  //   const imgData = canvas.toDataURL('image/png');
-
-  //   const pdf = new jsPDF('p', 'mm', 'a4');
-
-  //   const imgProps = pdf.getImageProperties(imgData);
-  //   const pdfWidth = pdf.internal.pageSize.getWidth();
-  //   const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-  //   pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-  //   pdf.save(`invoice_${selectedInvoice?.id || 'download'}.pdf`);
-  // };
-
   const handleEmailInvoice = () => { console.log('Sending invoice via email...') }
 
   const tabItems = [
@@ -455,6 +528,7 @@ export function InvoicesPage() {
         </TabsList>
 
         {/* Invoices Tab Content */}
+ 
         <TabsContent value="invoices" className="mt-6">
           <div className="space-y-6">
             {/* Summary Cards */}
@@ -464,7 +538,7 @@ export function InvoicesPage() {
                   <div>
                     <p className="text-sm text-muted-foreground">Total Invoices</p>
                     {/* <p className="text-2xl font-semibold">{invoices.length}</p> */}
-                    <p className="text-2xl font-semibold">{totalInvoices}</p>
+                    <p className="text-2xl font-semibold">{stats.total ?? totalInvoices}</p>
                   </div>
                   <div className="p-3 bg-blue-100 rounded-lg">
                     <Receipt className="h-6 w-6 text-blue-600" />
@@ -475,7 +549,7 @@ export function InvoicesPage() {
                 <CardContent className="p-6 flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Total Billed</p>
-                    <p className="text-2xl font-semibold text-primary">${totalBilled.toFixed(2)}</p>
+                    <p className="text-2xl font-semibold text-primary">${stats.totalBilled ?? totalBilled.toFixed(2)}</p>
                   </div>
                   <div className="p-3 bg-green-100 rounded-lg">
                     <DollarSign className="h-6 w-6 text-green-600" />
@@ -486,7 +560,7 @@ export function InvoicesPage() {
                 <CardContent className="p-6 flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Paid Invoices</p>
-                    <p className="text-2xl font-semibold text-green-600">{invoices.filter(inv => inv.status === 'paid').length}</p>
+                    <p className="text-2xl font-semibold text-green-600">{stats.paid ?? invoices.filter(inv => inv.status === 'paid').length}</p>
                   </div>
                   <div className="p-3 bg-green-100 rounded-lg">
                     <CheckCircle className="h-6 w-6 text-green-600" />
@@ -497,7 +571,7 @@ export function InvoicesPage() {
                 <CardContent className="p-6 flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Pending</p>
-                    <p className="text-2xl font-semibold text-orange-600">{invoices.filter(inv => inv.status === 'sent' || inv.status === 'overdue').length}</p>
+                    <p className="text-2xl font-semibold text-orange-600">{stats.pending ?? invoices.filter(inv => inv.status === 'sent' || inv.status === 'overdue').length}</p>
                   </div>
                   <div className="p-3 bg-orange-100 rounded-lg">
                     <AlertCircle className="h-6 w-6 text-orange-600" />
@@ -593,6 +667,7 @@ export function InvoicesPage() {
                           {invoicesToRender.map((invoice) => (
                             <TableRow key={invoice.id}>
                               <TableCell className="font-mono">{invoice.invoice_number}</TableCell>
+                              {/* <TableCell className="font-mono">{invoice.id}</TableCell> */}
                               <TableCell>{invoice.customer?.customer_name}</TableCell>
                               <TableCell className="max-w-48 truncate">{invoice.job?.job_title}</TableCell>
                               {/* <TableCell >{invoice?.invoice_type}</TableCell> */}
@@ -665,7 +740,6 @@ export function InvoicesPage() {
 
                       </Table>
                     </div>
-                   
                 }
                
               </CardContent>
@@ -691,7 +765,7 @@ export function InvoicesPage() {
         </TabsContent>
 
         {/* Other Tabs Content */}
-        <TabsContent value="timesheets"><TimesheetsPage /></TabsContent>
+        <TabsContent value="timesheets"><TimesheetsPage timesheets={timesheets} period={period} employees={employees}/></TabsContent>
         <TabsContent value="invoice-comparison"><InvoiceComparisonPage
           onBack={handleBackToInvoices}
           jobs={mockJobs} /></TabsContent>
