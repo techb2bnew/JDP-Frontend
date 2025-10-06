@@ -16,9 +16,9 @@ import { LoadingSpinner } from './common/LoadingSpinner'
 import { toast } from 'sonner'
 import { usePermissions } from '../contexts/PermissionContext'
 import { apiClient } from '../utils/api'
-import { 
-  Plus, 
-  Search, 
+import {
+  Plus,
+  Search,
   Filter,
   Calendar,
   User,
@@ -139,15 +139,15 @@ export function JobManagementPage() {
   // Client-side filtering for search and other filters
   const filteredJobs = jobs.filter(job => {
     const matchesSearch = job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         job.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         job.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         job.contractorName?.toLowerCase().includes(searchTerm.toLowerCase())
-    
+      job.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      job.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      job.contractorName?.toLowerCase().includes(searchTerm.toLowerCase())
+
     const matchesType = filterType === 'all' || job.type === filterType
     const matchesStatus = filterStatus === 'all' || job.status === filterStatus
     const matchesLabor = filterLabor === 'all' || job.assignedLabor.includes(filterLabor)
     const matchesPriority = filterPriority === 'all' || job.priority === filterPriority
-    
+
     return matchesSearch && matchesType && matchesStatus && matchesLabor && matchesPriority
   })
 
@@ -158,12 +158,12 @@ export function JobManagementPage() {
       setLoading(true)
       // Fetch the latest job details from API
       const jobDetails = await apiClient.getJobById(jobId)
-      
+
       // Update the jobs array with the fetched job details
-      setJobs(prevJobs => 
+      setJobs(prevJobs =>
         prevJobs.map(j => j.id === jobId ? jobDetails : j)
       )
-      
+
       setSelectedJobId(jobId)
       setCurrentView('details')
     } catch (error) {
@@ -173,6 +173,7 @@ export function JobManagementPage() {
       setLoading(false)
     }
   }
+
 
   const handleCreateJob = () => {
     setCurrentView('create')
@@ -191,12 +192,12 @@ export function JobManagementPage() {
       setLoading(true)
       // Fetch the latest job details from API
       const jobDetails = await apiClient.getJobById(job.id)
-      
+
       // Update the jobs array with the fetched job details
-      setJobs(prevJobs => 
+      setJobs(prevJobs =>
         prevJobs.map(j => j.id === job.id ? jobDetails : j)
       )
-      
+
       setSelectedJobId(job.id)
       setCurrentView('details')
       toast.success(`Editing job: ${jobDetails.title}`)
@@ -219,7 +220,7 @@ export function JobManagementPage() {
     try {
       // Call the delete API
       await apiClient.deleteJob(jobToDelete)
-      
+
       // Remove the job from the local state and refresh stats
       setJobs(jobs.filter(job => job.id !== jobToDelete))
       fetchJobStats()
@@ -349,8 +350,8 @@ export function JobManagementPage() {
   // Handle different views
   if (currentView === 'details' && selectedJobId) {
     return (
-      <JobDetailsPage 
-        jobId={selectedJobId} 
+      <JobDetailsPage
+        jobId={selectedJobId}
         onBack={handleBackToList}
         jobs={jobs}
         setJobs={setJobs}
@@ -360,7 +361,7 @@ export function JobManagementPage() {
 
   if (currentView === 'create') {
     return (
-      <JobCreationPage 
+      <JobCreationPage
         onBack={handleBackToList}
         onJobCreated={handleJobCreated}
       />
@@ -378,7 +379,7 @@ export function JobManagementPage() {
 
   if (currentView === 'timesheets') {
     return (
-      <TimesheetManagement 
+      <TimesheetManagement
         onBack={handleBackToList}
         jobs={transformedJobs}
       />
@@ -387,7 +388,7 @@ export function JobManagementPage() {
 
   if (currentView === 'invoices') {
     return (
-      <InvoiceComparison 
+      <InvoiceComparison
         onBack={handleBackToList}
         jobs={transformedJobs}
       />
@@ -396,7 +397,7 @@ export function JobManagementPage() {
 
   if (currentView === 'approvals') {
     return (
-      <JobApprovals 
+      <JobApprovals
         onBack={handleBackToList}
         jobs={transformedJobs}
       />
@@ -413,26 +414,26 @@ export function JobManagementPage() {
             Manage jobs, track progress, and handle invoicing
           </p>
         </div>
-        
+
         <div className="flex items-center gap-3">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => setCurrentView('timesheets')}
             className="gap-2"
           >
             <Clock className="h-4 w-4" />
             Timesheets
           </Button>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => setCurrentView('invoices')}
             className="gap-2"
           >
             <FileText className="h-4 w-4" />
             Invoices
           </Button>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => setCurrentView('approvals')}
             className="gap-2"
           >
@@ -440,7 +441,7 @@ export function JobManagementPage() {
             Approvals
           </Button>
           {hasPermission('jobs', 'create') && (
-            <Button 
+            <Button
               onClick={handleCreateJob}
               className="bg-primary text-primary-foreground hover:bg-[#0090e6] gap-2"
             >
@@ -525,7 +526,7 @@ export function JobManagementPage() {
                 className="pl-10"
               />
             </div>
-            
+
             <Select value={filterType} onValueChange={setFilterType}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Job Type" />
@@ -567,7 +568,7 @@ export function JobManagementPage() {
                 <SelectValue placeholder="Priority" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Priority</SelectItem> 
+                <SelectItem value="all">All Priority</SelectItem>
                 <SelectItem value="high">High</SelectItem>
                 <SelectItem value="medium">Medium</SelectItem>
                 <SelectItem value="low">Low</SelectItem>
@@ -590,100 +591,100 @@ export function JobManagementPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {filteredJobs.map((job) => (
-          <Card key={job.id} className="bg-white shadow-md border-0 hover:shadow-md transition-shadow">
-            <CardHeader className="pb-4">
-              <div className="flex items-start justify-between">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-medium text-[#2b2b2b]">{job.title}</h3>
-                    {getPriorityBadge(job.priority)}
+            <Card key={job.id} className="bg-white shadow-md border-0 hover:shadow-md transition-shadow">
+              <CardHeader className="pb-4">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium text-[#2b2b2b]">{job.title}</h3>
+                      {getPriorityBadge(job.priority)}
+                    </div>
+                    <p className="text-sm text-gray-600">#{job.id}</p>
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(job.status)}
+                      {getTypeBadge(job.type)}
+                    </div>
                   </div>
-                  <p className="text-sm text-gray-600">#{job.id}</p>
-                  <div className="flex items-center gap-2">
-                    {getStatusBadge(job.status)}
-                    {getTypeBadge(job.type)}
+                  <ActionButtonsPopup
+                    onView={() => handleViewDetails(job.id)}
+                    onEdit={() => handleEditJob(job)}
+                    onDelete={() => handleDeleteJob(job.id)}
+                    itemName={job.title}
+                    itemType="Job"
+                    showView={hasPermission('jobs', 'view')}
+                    showEdit={hasPermission('jobs', 'edit')}
+                    showDelete={hasPermission('jobs', 'delete')}
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-gray-700">{job.description}</p>
+
+                <div className="space-y-3">
+                  {job.customerName && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <User className="h-4 w-4 text-gray-400" />
+                      <span className="text-gray-600">Customer:</span>
+                      <span className="font-medium text-[#2b2b2b]">{job.customerName}</span>
+                    </div>
+                  )}
+
+                  {job.contractorName && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Users className="h-4 w-4 text-gray-400" />
+                      <span className="text-gray-600">Contractor:</span>
+                      <span className="font-medium text-[#2b2b2b]">{job.contractorName}</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 text-sm">
+                    <MapPin className="h-4 w-4 text-gray-400" />
+                    <span className="text-gray-600">Location:</span>
+                    <span className="font-medium text-[#2b2b2b]">{job.address}, {job.cityZip}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-sm">
+                    <Calendar className="h-4 w-4 text-gray-400" />
+                    <span className="text-gray-600">Due:</span>
+                    <span className="font-medium text-[#2b2b2b]">{formatDate(job.dueDate)}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-sm">
+                    <DollarSign className="h-4 w-4 text-gray-400" />
+                    <span className="text-gray-600">Cost:</span>
+                    <span className="font-medium text-[#2b2b2b]">
+                      {formatCurrency(job.actualCost || job.estimatedCost)}
+                    </span>
                   </div>
                 </div>
-                <ActionButtonsPopup
-                  onView={() => handleViewDetails(job.id)}
-                  onEdit={() => handleEditJob(job)}
-                  onDelete={() => handleDeleteJob(job.id)}
-                  itemName={job.title}
-                  itemType="Job"
-                  showView={hasPermission('jobs', 'view')}
-                  showEdit={hasPermission('jobs', 'edit')}
-                  showDelete={hasPermission('jobs', 'delete')}
-                />
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-gray-700">{job.description}</p>
-              
-              <div className="space-y-3">
-                {job.customerName && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <User className="h-4 w-4 text-gray-400" />
-                    <span className="text-gray-600">Customer:</span>
-                    <span className="font-medium text-[#2b2b2b]">{job.customerName}</span>
+
+                {job.assignedLaborDetails && job.assignedLaborDetails.length > 0 && (
+                  <div>
+                    <p className="text-sm text-gray-600 mb-2">Assigned Labor:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {job.assignedLaborDetails.map((labor, index) => (
+                        <Badge key={index} className="bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-50">
+                          {labor.user?.full_name || labor.labor_code}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 )}
-                
-                {job.contractorName && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Users className="h-4 w-4 text-gray-400" />
-                    <span className="text-gray-600">Contractor:</span>
-                    <span className="font-medium text-[#2b2b2b]">{job.contractorName}</span>
+
+                {job.assignedLeadLaborDetails && job.assignedLeadLaborDetails.length > 0 && (
+                  <div>
+                    <p className="text-sm text-gray-600 mb-2">Lead Labor:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {job.assignedLeadLaborDetails.map((leadLabor, index) => (
+                        <Badge key={index} className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-50">
+                          {leadLabor.user?.full_name || leadLabor.labor_code}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 )}
-                
-                <div className="flex items-center gap-2 text-sm">
-                  <MapPin className="h-4 w-4 text-gray-400" />
-                  <span className="text-gray-600">Location:</span>
-                  <span className="font-medium text-[#2b2b2b]">{job.address}, {job.cityZip}</span>
-                </div>
-                
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="h-4 w-4 text-gray-400" />
-                  <span className="text-gray-600">Due:</span>
-                  <span className="font-medium text-[#2b2b2b]">{formatDate(job.dueDate)}</span>
-                </div>
-                
-                <div className="flex items-center gap-2 text-sm">
-                  <DollarSign className="h-4 w-4 text-gray-400" />
-                  <span className="text-gray-600">Cost:</span>
-                  <span className="font-medium text-[#2b2b2b]">
-                    {formatCurrency(job.actualCost || job.estimatedCost)}
-                  </span>
-                </div>
-              </div>
-
-              {job.assignedLaborDetails && job.assignedLaborDetails.length > 0 && (
-                <div>
-                  <p className="text-sm text-gray-600 mb-2">Assigned Labor:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {job.assignedLaborDetails.map((labor, index) => (
-                      <Badge key={index} className="bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-50">
-                        {labor.user?.full_name || labor.labor_code}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {job.assignedLeadLaborDetails && job.assignedLeadLaborDetails.length > 0 && (
-                <div>
-                  <p className="text-sm text-gray-600 mb-2">Lead Labor:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {job.assignedLeadLaborDetails.map((leadLabor, index) => (
-                      <Badge key={index} className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-50">
-                        {leadLabor.user?.full_name || leadLabor.labor_code}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
@@ -720,7 +721,7 @@ export function JobManagementPage() {
           >
             Previous
           </Button>
-          
+
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
             <Button
               key={page}
@@ -732,7 +733,7 @@ export function JobManagementPage() {
               {page}
             </Button>
           ))}
-          
+
           <Button
             variant="outline"
             onClick={() => handlePageChange(currentPage + 1)}

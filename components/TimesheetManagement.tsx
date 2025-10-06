@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
@@ -6,6 +6,7 @@ import { Badge } from './ui/badge'
 import { Input } from './ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { ArrowLeft, Clock, Search, CheckSquare, X } from 'lucide-react'
+import { apiClient } from '@/utils/api'
 
 interface Job {
   id: string
@@ -55,61 +56,81 @@ export function TimesheetManagement({ onBack, jobs }: TimesheetManagementProps) 
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterEmployee, setFilterEmployee] = useState<string>('all')
+  const [timesheets, setTimesheets] = useState<TimesheetEntry[]>([])
+
 
   // Sample timesheet data
-  const [timesheets] = useState<TimesheetEntry[]>([
-    {
-      id: '1',
-      employeeName: 'John Smith',
-      jobId: 'JOB-2025-001',
-      jobTitle: 'Electrical Panel Installation',
-      week: '2025-01-20',
-      monday: 8,
-      tuesday: 8,
-      wednesday: 6,
-      thursday: 8,
-      friday: 7,
-      saturday: 0,
-      sunday: 0,
-      totalHours: 37,
-      billableHours: 37,
-      status: 'submitted'
-    },
-    {
-      id: '2',
-      employeeName: 'David Wilson',
-      jobId: 'JOB-2025-001',
-      jobTitle: 'Electrical Panel Installation',
-      week: '2025-01-20',
-      monday: 6,
-      tuesday: 7,
-      wednesday: 5,
-      thursday: 8,
-      friday: 6,
-      saturday: 0,
-      sunday: 0,
-      totalHours: 32,
-      billableHours: 30,
-      status: 'approved'
-    },
-    {
-      id: '3',
-      employeeName: 'Sarah Johnson',
-      jobId: 'JOB-2025-002',
-      jobTitle: 'Office Lighting Maintenance',
-      week: '2025-01-20',
-      monday: 8,
-      tuesday: 8,
-      wednesday: 8,
-      thursday: 8,
-      friday: 8,
-      saturday: 4,
-      sunday: 0,
-      totalHours: 44,
-      billableHours: 40,
-      status: 'draft'
-    }
-  ])
+  // const [timesheets] = useState<TimesheetEntry[]>([
+  //   {
+  //     id: '1',
+  //     employeeName: 'John Smith',
+  //     jobId: 'JOB-2025-001',
+  //     jobTitle: 'Electrical Panel Installation',
+  //     week: '2025-01-20',
+  //     monday: 8,
+  //     tuesday: 8,
+  //     wednesday: 6,
+  //     thursday: 8,
+  //     friday: 7,
+  //     saturday: 0,
+  //     sunday: 0,
+  //     totalHours: 37,
+  //     billableHours: 37,
+  //     status: 'submitted'
+  //   },
+  //   {
+  //     id: '2',
+  //     employeeName: 'David Wilson',
+  //     jobId: 'JOB-2025-001',
+  //     jobTitle: 'Electrical Panel Installation',
+  //     week: '2025-01-20',
+  //     monday: 6,
+  //     tuesday: 7,
+  //     wednesday: 5,
+  //     thursday: 8,
+  //     friday: 6,
+  //     saturday: 0,
+  //     sunday: 0,
+  //     totalHours: 32,
+  //     billableHours: 30,
+  //     status: 'approved'
+  //   },
+  //   {
+  //     id: '3',
+  //     employeeName: 'Sarah Johnson',
+  //     jobId: 'JOB-2025-002',
+  //     jobTitle: 'Office Lighting Maintenance',
+  //     week: '2025-01-20',
+  //     monday: 8,
+  //     tuesday: 8,
+  //     wednesday: 8,
+  //     thursday: 8,
+  //     friday: 8,
+  //     saturday: 4,
+  //     sunday: 0,
+  //     totalHours: 44,
+  //     billableHours: 40,
+  //     status: 'draft'
+  //   }
+  // ])
+  const startDate = '2025-09-20'
+  const endDate = '2025-09-26'
+
+
+  useEffect(() => {
+    console.log('asas')
+    const fetchAlltimesheets = async () => {
+      try {
+        const response = await apiClient.getAllTimesheets(startDate, endDate);
+        console.log(response, "timeres")
+        setTimesheets(response.data.data);
+      } catch (error) {
+        console.error('Error fetching suppliers:', error);
+      }
+    };
+
+    fetchAlltimesheets();
+  }, []);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -152,7 +173,7 @@ export function TimesheetManagement({ onBack, jobs }: TimesheetManagementProps) 
     const date = new Date(weekString)
     const endDate = new Date(date)
     endDate.setDate(date.getDate() + 6)
-    
+
     return `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
   }
 
@@ -160,12 +181,12 @@ export function TimesheetManagement({ onBack, jobs }: TimesheetManagementProps) 
 
   const filteredTimesheets = timesheets.filter(timesheet => {
     const matchesSearch = timesheet.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         timesheet.jobTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         timesheet.jobId.toLowerCase().includes(searchTerm.toLowerCase())
-    
+      timesheet.jobTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      timesheet.jobId.toLowerCase().includes(searchTerm.toLowerCase())
+
     const matchesStatus = filterStatus === 'all' || timesheet.status === filterStatus
     const matchesEmployee = filterEmployee === 'all' || timesheet.employeeName === filterEmployee
-    
+
     return matchesSearch && matchesStatus && matchesEmployee
   })
 
@@ -263,7 +284,7 @@ export function TimesheetManagement({ onBack, jobs }: TimesheetManagementProps) 
                 className="pl-10"
               />
             </div>
-            
+
             <Select value={filterStatus} onValueChange={setFilterStatus}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Filter by Status" />

@@ -6,17 +6,17 @@ import { LoadingSpinner } from '../common/LoadingSpinner'
 import { ChevronDown, X } from 'lucide-react'
 
 interface AutoScrollMultiSelectProps {
-  selectedValues: string[]
-  onSelectionChange: (selectedIds: string[], selectedItems: any[]) => void
-  placeholder: string
+  selectedValues: any[];
+  onSelectionChange: (selectedIds: string[], selectedItems: any[]) => void;
+  placeholder: string;
   fetchData: (page: number, limit: number) => Promise<{
-    data: Array<{ id: string; name: string; [key: string]: any }>
-    totalPages: number
-    currentPage: number
-  }>
-  displayField: string
-  valueField: string
-  className?: string
+    data: Array<{ id: string; name: string;[key: string]: any }>;
+    totalPages: number;
+    currentPage: number;
+  }>;
+  displayField: string;
+  valueField: string;
+  className?: string;
 }
 
 export function AutoScrollMultiSelect({
@@ -28,111 +28,114 @@ export function AutoScrollMultiSelect({
   valueField,
   className
 }: AutoScrollMultiSelectProps) {
-  const [items, setItems] = useState<Array<{ id: string; name: string; [key: string]: any }>>([])
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [isLoading, setIsLoading] = useState(false)
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
-  const [hasMore, setHasMore] = useState(true)
-  const [isOpen, setIsOpen] = useState(false)
-  const [selectedItems, setSelectedItems] = useState<any[]>([])
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const [items, setItems] = useState<Array<{ id: string; name: string;[key: string]: any }>>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<any[]>([]);
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Initial Load
   const loadData = useCallback(async (page: number, append: boolean = false) => {
     try {
-      if (page === 1) {
-        setIsLoading(true)
-      } else {
-        setIsLoadingMore(true)
-      }
+      page === 1 ? setIsLoading(true) : setIsLoadingMore(true);
 
-      const response = await fetchData(page, 10)
-      
-      if (append) {
-        setItems(prev => [...prev, ...response.data])
-      } else {
-        setItems(response.data)
-      }
-      
-      setCurrentPage(response.currentPage)
-      setTotalPages(response.totalPages)
-      setHasMore(response.currentPage < response.totalPages)
+      const response = await fetchData(page, 10);
+      setItems(prev => append ? [...prev, ...response.data] : response.data);
+      setCurrentPage(response.currentPage);
+      setTotalPages(response.totalPages);
+      setHasMore(response.currentPage < response.totalPages);
     } catch (error) {
-      console.error('Error loading data:', error)
+      console.error('Error loading data:', error);
     } finally {
-      setIsLoading(false)
-      setIsLoadingMore(false)
+      setIsLoading(false);
+      setIsLoadingMore(false);
     }
-  }, [fetchData])
+  }, [fetchData]);
 
   const loadMore = useCallback(() => {
     if (hasMore && !isLoadingMore && currentPage < totalPages) {
-      loadData(currentPage + 1, true)
+      loadData(currentPage + 1, true);
     }
-  }, [hasMore, isLoadingMore, currentPage, totalPages, loadData])
+  }, [hasMore, isLoadingMore, currentPage, totalPages, loadData]);
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
-    const threshold = 50 // Load more when 50px from bottom
-
-    if (scrollHeight - scrollTop - clientHeight < threshold) {
-      loadMore()
-    }
-  }, [loadMore])
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollHeight - scrollTop - clientHeight < 50) loadMore();
+  }, [loadMore]);
 
   useEffect(() => {
     if (isOpen && items.length === 0) {
-      loadData(1)
+      loadData(1);
     }
-  }, [isOpen, items.length, loadData])
+  }, [isOpen, items.length, loadData]);
+
+  useEffect(() => {
+    const matchedItems = items.filter(item =>
+      selectedValues.includes(item[valueField]?.toString())
+    );
+    setSelectedItems(matchedItems);
+  }, [items, selectedValues, valueField]);
 
   const handleItemToggle = (item: any) => {
-    const itemId = item[valueField]
-    const isSelected = selectedValues.includes(itemId)
-    
-    let newSelectedValues: string[]
-    let newSelectedItems: any[]
-    
+    const itemId = item[valueField]?.toString();
+    const isSelected = selectedValues.includes(itemId);
+
+    let newSelectedValues: string[];
+    let newSelectedItems: any[];
+
     if (isSelected) {
-      newSelectedValues = selectedValues.filter(id => id !== itemId)
-      newSelectedItems = selectedItems.filter(selectedItem => selectedItem[valueField] !== itemId)
+      newSelectedValues = selectedValues.filter(id => id !== itemId);
+      newSelectedItems = selectedItems.filter(selected => selected[valueField]?.toString() !== itemId);
     } else {
-      newSelectedValues = [...selectedValues, itemId]
-      newSelectedItems = [...selectedItems, item]
+      // Prevent duplicates
+      const alreadyExists = selectedItems.some(selected => selected[valueField]?.toString() === itemId);
+      newSelectedValues = [...selectedValues, itemId];
+      newSelectedItems = alreadyExists ? selectedItems : [...selectedItems, item];
     }
-    
-    setSelectedItems(newSelectedItems)
-    onSelectionChange(newSelectedValues, newSelectedItems)
-  }
+
+    setSelectedItems(newSelectedItems);
+    onSelectionChange(newSelectedValues, newSelectedItems);
+  };
 
   const removeSelectedItem = (itemId: string) => {
-    const newSelectedValues = selectedValues.filter(id => id !== itemId)
-    const newSelectedItems = selectedItems.filter(item => item[valueField] !== itemId)
-    setSelectedItems(newSelectedItems)
-    onSelectionChange(newSelectedValues, newSelectedItems)
-  }
+    const newSelectedValues = selectedValues.filter(id => id !== itemId);
+    const newSelectedItems = selectedItems.filter(item => item[valueField]?.toString() !== itemId);
+    setSelectedItems(newSelectedItems);
+    onSelectionChange(newSelectedValues, newSelectedItems);
+  };
 
   const getSelectedItemName = (itemId: string) => {
-    const item = selectedItems.find(item => item[valueField] === itemId)
-    return item ? item[displayField] : itemId
-  }
+    const item = selectedItems.find(item => item[valueField]?.toString() === itemId);
+    return item?.[displayField] || itemId;
+  };
 
   return (
     <div className="space-y-2">
-      {/* Selected Items Display */}
+      {/* Selected items */}
       {selectedValues.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {selectedValues.map((value) => (
-            <Badge key={value} className="bg-[#E6F6FF] text-[#00A1FF] border-[#00A1FF]/20 flex items-center gap-1">
-              {getSelectedItemName(value)}
-              <button
-                onClick={() => removeSelectedItem(value)}
-                className="ml-1 hover:bg-[#00A1FF]/20 rounded-full p-0.5"
+          {selectedValues.map((value, index) => {
+            const itemId = typeof value === 'string' ? value : value?.[valueField]?.toString();
+            return (
+              <Badge
+                key={itemId || index}
+                className="bg-[#E6F6FF] text-[#00A1FF] border-[#00A1FF]/20 flex items-center gap-1"
               >
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          ))}
+                {getSelectedItemName(itemId)}
+                <button
+                  onClick={() => removeSelectedItem(itemId)}
+                  className="ml-1 hover:bg-[#00A1FF]/20 rounded-full p-0.5"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            );
+          })}
         </div>
       )}
 
@@ -145,10 +148,9 @@ export function AutoScrollMultiSelect({
           className={`w-full justify-between ${className}`}
         >
           <span className="text-left">
-            {selectedValues.length > 0 
-              ? `${selectedValues.length} selected` 
-              : placeholder
-            }
+            {selectedValues.length > 0
+              ? `${selectedValues.length} selected`
+              : placeholder}
           </span>
           <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
         </Button>
@@ -167,20 +169,21 @@ export function AutoScrollMultiSelect({
               ) : (
                 <>
                   {items.map((item) => {
-                    const isSelected = selectedValues.includes(item[valueField])
+                    const itemId = item[valueField]?.toString();
+                    const isSelected = selectedValues.includes(itemId);
                     return (
                       <div
-                        key={item[valueField]}
+                        key={itemId}
                         className="flex items-center space-x-2 p-3 hover:bg-gray-50 cursor-pointer"
                         onClick={() => handleItemToggle(item)}
                       >
-                        <Checkbox 
+                        <Checkbox
                           checked={isSelected}
                           onCheckedChange={() => handleItemToggle(item)}
                         />
                         <span className="text-sm font-medium">{item[displayField]}</span>
                       </div>
-                    )
+                    );
                   })}
                   {isLoadingMore && (
                     <div className="flex items-center justify-center p-2">
@@ -199,13 +202,13 @@ export function AutoScrollMultiSelect({
         )}
       </div>
 
-      {/* Click outside to close */}
+      {/* Outside click closes dropdown */}
       {isOpen && (
-        <div 
-          className="fixed inset-0 z-40" 
+        <div
+          className="fixed inset-0 z-40"
           onClick={() => setIsOpen(false)}
         />
       )}
     </div>
-  )
+  );
 }

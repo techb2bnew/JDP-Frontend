@@ -5,7 +5,7 @@ import { Input } from './ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
 import { Button } from './ui/button'
-import { 
+import {
   ArrowLeft,
   Search,
   Clock,
@@ -15,6 +15,30 @@ import {
   Check,
   X
 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { apiClient } from '@/utils/api'
+
+
+
+interface TimesheetItem {
+  employee: string;
+  job: string;
+  jobCode?: string;
+  week: string;
+  mon: string;
+  tue: string;
+  wed: string;
+  thu: string;
+  fri: string;
+  sat: string;
+  sun: string;
+  total: string;
+  billable: string;
+  status: string;
+  actions?: string[];
+  id?: string | number;
+}
+
 
 const timesheetData = [
   {
@@ -66,6 +90,43 @@ const getStatusBadge = (status: string) => {
 }
 
 export function TimesheetsPage() {
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const [timesheets, setTimesheets] = useState<{
+    dashboard_timesheets: TimesheetItem[];
+    period: {
+      start_date: string;
+      end_date: string;
+      week_range: string;
+    };
+  } | null>(null);
+
+  const filteredTimesheets = timesheets?.dashboard_timesheets.filter(item =>
+    item.employee.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.job.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
+
+
+
+  const startDate = '2025-09-20'
+  const endDate = '2025-09-26'
+
+
+  useEffect(() => {
+    console.log('asas')
+    const fetchAlltimesheets = async () => {
+      try {
+        const response = await apiClient.getAllTimesheets(startDate, endDate);
+        console.log(response, "timeres")
+        setTimesheets(response.data);
+        console.log(response.data, "newtimeres")
+      } catch (error) {
+        console.error('Error fetching suppliers:', error);
+      }
+    };
+
+    fetchAlltimesheets();
+  }, []);
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -126,7 +187,12 @@ export function TimesheetsPage() {
             <div className="flex-1 min-w-[250px]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                <Input placeholder="Search timesheets..." className="pl-10" />
+                <Input
+                  placeholder="Search timesheets..."
+                  className="pl-10"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -166,15 +232,23 @@ export function TimesheetsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {timesheetData.map((item) => (
-                  <TableRow key={item.id} className="odd:bg-white even:bg-slate-50">
+                {filteredTimesheets?.map((item: any) => (
+                  <TableRow key={item.id || `${item.employee}-${item.week}`} className="odd:bg-white even:bg-slate-50">
                     <TableCell className="font-medium">{item.employee}</TableCell>
                     <TableCell>
                       <div>{item.job}</div>
                       <div className="text-xs text-muted-foreground">{item.jobCode}</div>
                     </TableCell>
                     <TableCell>{item.week}</TableCell>
-                    {Object.values(item.hours).map((hour, i) => <TableCell key={i} className="text-center">{hour > 0 ? `${hour}h` : '-'}</TableCell>)}
+                    {['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day: string) => {
+                      const hourValue = item[day];
+                      return (
+                        <TableCell key={day} className="text-center">
+                          {hourValue !== '0h' ? hourValue : '-'}
+                        </TableCell>
+                      );
+                    })}
+
                     <TableCell className="font-bold text-center">{item.total}h</TableCell>
                     <TableCell className="font-bold text-center">{item.billable}h</TableCell>
                     <TableCell>

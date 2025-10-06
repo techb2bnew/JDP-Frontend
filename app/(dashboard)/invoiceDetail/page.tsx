@@ -20,29 +20,29 @@ export default function InvoiceTemplatePage() {
   useEffect(() => {
     const storedInvoice = localStorage.getItem('selectedInvoice');
     if (storedInvoice) {
-      setInvoice(JSON.parse(storedInvoice)); 
+      setInvoice(JSON.parse(storedInvoice));
     }
   }, [invoiceId]);
 
   const handlePrint = async () => {
-  if (!printRef.current) return;
+    if (!printRef.current) return;
 
-  try {
-    const canvas = await html2canvas(printRef.current, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      ignoreElements: (element) => {
-        return element.classList.contains('no-export');
-      }
-    });
+    try {
+      const canvas = await html2canvas(printRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        ignoreElements: (element) => {
+          return element.classList.contains('no-export');
+        }
+      });
 
-    const imageData = canvas.toDataURL('image/png');
+      const imageData = canvas.toDataURL('image/png');
 
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) return;
 
-    printWindow.document.write(`
+      printWindow.document.write(`
       <html>
         <head>
           <title>Invoice #${invoice?.invoiceNumber || ''}</title>
@@ -65,27 +65,27 @@ export default function InvoiceTemplatePage() {
       </html>
     `);
 
-    printWindow.document.close();
-    printWindow.onload = () => {
-      setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-      }, 500);
-    };
-  } catch (err) {
-    console.error('Print error:', err);
-  }
-};
+      printWindow.document.close();
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+          printWindow.close();
+        }, 500);
+      };
+    } catch (err) {
+      console.error('Print error:', err);
+    }
+  };
 
 
   const handleDownload = async () => {
     if (!printRef.current) return;
-    
+
     setIsGeneratingPdf(true);
     try {
       // Add temporary class to ensure proper rendering
       printRef.current.classList.add('pdf-export');
-      
+
       const canvas = await html2canvas(printRef.current, {
         scale: 2,
         logging: false,
@@ -95,10 +95,10 @@ export default function InvoiceTemplatePage() {
           return element.classList.contains('no-export');
         }
       });
-      
+
       // Remove temporary class
       printRef.current.classList.remove('pdf-export');
-      
+
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgWidth = 210;
@@ -125,41 +125,41 @@ export default function InvoiceTemplatePage() {
     }
   };
 
-const handleEmail = async () => {
-  try {
-    // 1. Generate the PDF properly
-    const pdfDoc = new jsPDF();
-    pdfDoc.text("Invoice Details", 10, 10);
-    pdfDoc.text("Customer Name: John Doe", 10, 20);
-    pdfDoc.text("Amount: $100.00", 10, 30);
-    // Add more invoice details as needed
-    
-    const pdfData = pdfDoc.output('arraybuffer');
-    
-    // 2. Create download link
-    const blob = new Blob([pdfData], { type: 'application/pdf' });
-    const pdfUrl = URL.createObjectURL(blob);
-    
-    // 3. Open email client with prefilled details
-    const subject = 'Your Invoice #12345';
-    const body = 'Dear Customer,\n\nPlease find your invoice attached.\n\nYou can also download it directly from this link if the attachment doesn\'t appear.\n\nBest regards,\nYour Company';
-    window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
-    
-    // 4. Force download the invoice
-    const downloadLink = document.createElement('a');
-    downloadLink.href = pdfUrl;
-    downloadLink.download = 'Invoice_12345.pdf';
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
-    
-    // Clean up after download
-    setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
-  } catch (error) {
-    console.error('Error generating/sending invoice:', error);
-    alert('Failed to generate invoice. Please try again.');
-  }
-};
+  const handleEmail = async () => {
+    try {
+      // 1. Generate the PDF properly
+      const pdfDoc = new jsPDF();
+      pdfDoc.text("Invoice Details", 10, 10);
+      pdfDoc.text("Customer Name: John Doe", 10, 20);
+      pdfDoc.text("Amount: $100.00", 10, 30);
+      // Add more invoice details as needed
+
+      const pdfData = pdfDoc.output('arraybuffer');
+
+      // 2. Create download link
+      const blob = new Blob([pdfData], { type: 'application/pdf' });
+      const pdfUrl = URL.createObjectURL(blob);
+
+      // 3. Open email client with prefilled details
+      const subject = 'Your Invoice #12345';
+      const body = 'Dear Customer,\n\nPlease find your invoice attached.\n\nYou can also download it directly from this link if the attachment doesn\'t appear.\n\nBest regards,\nYour Company';
+      window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+
+      // 4. Force download the invoice
+      const downloadLink = document.createElement('a');
+      downloadLink.href = pdfUrl;
+      downloadLink.download = 'Invoice_12345.pdf';
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+
+      // Clean up after download
+      setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
+    } catch (error) {
+      console.error('Error generating/sending invoice:', error);
+      alert('Failed to generate invoice. Please try again.');
+    }
+  };
 
   if (!invoice) {
     return <div>Loading invoice...</div>;
@@ -177,8 +177,8 @@ const handleEmail = async () => {
               <Printer className="h-4 w-4 mr-2" />
               Print
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleDownload}
               disabled={isGeneratingPdf}
             >
@@ -191,17 +191,17 @@ const handleEmail = async () => {
             </Button>
           </div>
         </div>
-        
+
         {/* Invoice content for both display and print */}
-        <div 
+        <div
           ref={printRef}
           className="p-6 bg-white border border-black-400 rounded print:p-0 print:bg-white"
-          style={{ 
+          style={{
             margin: '0 auto',
-            width: '22cm', 
+            width: '22cm',
           }}
         >
-          <InvoiceTemplate invoice={invoice} />
+          <InvoiceTemplate />
         </div>
       </div>
     </div>

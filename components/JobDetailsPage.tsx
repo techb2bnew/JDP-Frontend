@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { apiClient } from '../utils/api'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -22,7 +22,8 @@ import {
   ClockIcon,
   X,
   Check,
-  MapPin
+  MapPin,
+  UserCheck
 } from 'lucide-react'
 import {
   Dialog,
@@ -42,6 +43,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AutoScrollMultiSelect } from './ui/AutoScrollMultiSelect'
+import { useDispatch } from 'react-redux'
+import { addProduct, deleteProduct, deleteInvoice } from '@/redux/slices/jobsSlice'
+import { NewInvoiceDialog } from './invoices/NewInvoiceDialog'
+import { InvoiceTemplate } from './invoices/InvoiceTemplate'
+import html2canvas from 'html2canvas'
+import { Invoice } from '@/types/invoice'
 // Sample data structure - replace with your actual data
 const sampleJobData = {
   "job": {
@@ -174,22 +182,28 @@ interface JobDetailsPageProps {
 }
 
 export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageProps) {
+
+
+
   // Find the job from your jobs array or use sample data
   const job = jobs.find(j => j.id === jobId) || sampleJobData.job
-  
+
   // Use real job data for materials, timeLogs, and invoices
-  const materials = job.assignedMaterialsDetails || sampleJobData.materials
+  // const materials = job.assignedMaterialsDetails || sampleJobData.materials
+  // console.log(materials,"testmateris")
+  const [materials, setMaterials] = useState<any[]>(job.assignedMaterialsDetails || sampleJobData.materials || []);
+
   const timeLogs = sampleJobData.timeLogs // Keep sample data for now as we don't have time logs API
   const invoices = sampleJobData.invoices // Keep sample data for now as we don't have invoices API
 
   // Calculate totals using real job data
   const totalMaterialCost = materials.reduce((sum: number, material: any) => sum + (material.unit_cost || material.totalCost || 0), 0)
-  const totalLaborCost = job.assignedLaborDetails && job.assignedLaborDetails.length > 0 ? 
+  const totalLaborCost = job.assignedLaborDetails && job.assignedLaborDetails.length > 0 ?
     job.assignedLaborDetails.reduce((sum: number, labor: any) => {
       const hourlyRate = labor.hourly_rate || 0;
       const estimatedHours = job.estimatedHours || 0;
       return sum + (hourlyRate * estimatedHours);
-    }, 0) : 
+    }, 0) :
     job.estimatedCost || 0
   const totalHours = timeLogs.reduce((sum, log) => sum + log.hoursWorked, 0)
   const totalMaterialItems = materials.reduce((sum: number, material: any) => sum + (material.stock_quantity || material.quantity || 0), 0)
@@ -197,10 +211,34 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const totalInvoices = invoices.length;
   const [showEditJobModal, setShowEditJobModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  console.log(selectedInvoice, 'invoice')
+
+
+
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showAddInvoiceModal, setShowAddInvoiceModal] = useState(false);
   const [showAddMaterialModal, setShowAddMaterialModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [suppliers, setSuppliers] = useState<{ id: number, name: string }[]>([]);
+  const dispatch = useDispatch();
+  const [isLoading, setIsLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [estimates, setEstimates] = useState([]);
+  const [refreshInvoices, setRefreshInvoices] = useState(false);
+  const [localInvoices, setLocalInvoices] = useState<Invoice[]>([]);
+  const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
+  const [isLoadingEstimates, setIsLoadingEstimates] = useState(false);
+  const [dashboardMetrics, setDashboardMetrics] = useState<any>(null);
+  const [showNewInvoiceDialog, setShowNewInvoiceDialog] = useState(false)
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<number | null>(null)
+  const printRef = useRef<HTMLDivElement>(null);
+  const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [projectSummary, setProjectSummary] = useState<{
+    jobEstimate: number;
+    materialsCost: number;
+    laborCost: number;
+    actualProjectCost: number;
+  } | null>(null);
   const [editedJob, setEditedJob] = useState({
     title: job.title,
     type: job.type,
@@ -208,11 +246,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     description: job.description,
     contractor: job.contractor || job.customer,
     startDate: '01/15/2025',
-    priority: 'High'
+    priority: 'High',
+    assignedLabor: job.assignedLaborDetails || [],
+    assignedLeadLabor: job.assignedLeadLaborDetails || [],
   });
   const handleSave = async () => {
     try {
-      // Map edited job data to API payload structure
       const updatePayload = {
         job_title: editedJob.title,
         job_type: editedJob.type === 'service-based' ? 'service_based' : 'contract_based',
@@ -232,27 +271,51 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         due_date: job.dueDate || '',
         estimated_hours: job.estimatedHours || undefined,
         estimated_cost: job.estimatedCost || undefined,
-        assigned_lead_labor_ids: job.assignedLeadLaborDetails && job.assignedLeadLaborDetails.length > 0 ? JSON.stringify(job.assignedLeadLaborDetails.map((labor: any) => labor.id)) : undefined,
-        assigned_labor_ids: job.assignedLaborDetails && job.assignedLaborDetails.length > 0 ? JSON.stringify(job.assignedLaborDetails.map((labor: any) => labor.id)) : undefined,
-        assigned_material_ids: job.materials && job.materials.length > 0 ? JSON.stringify(job.materials) : undefined,
-        status: job.status === 'pending' ? 'active' : job.status === 'in-progress' ? 'in_progress' : job.status
+
+        assigned_labor_ids: (editedJob.assignedLabor || []).length > 0
+          ? JSON.stringify(editedJob.assignedLabor.map((labor: any) => labor.id))
+          : undefined,
+
+        assigned_lead_labor_ids: (editedJob.assignedLeadLabor || []).length > 0
+          ? JSON.stringify(editedJob.assignedLeadLabor.map((labor: any) => labor.id))
+          : undefined,
+
+        assigned_material_ids: job.materials && job.materials.length > 0
+          ? JSON.stringify(job.materials)
+          : undefined,
+
+        status: ['pending', 'in-progress', 'completed'].includes(job.status)
+          ? job.status === 'pending'
+            ? 'active'
+            : job.status === 'in-progress'
+              ? 'in_progress'
+              : job.status
+          : 'unknown',
       };
 
       console.log('Updating job with payload:', updatePayload);
+
       const response = await apiClient.updateJob(jobId, updatePayload);
       console.log('Job updated successfully:', response);
-      
-      // Update the job data in the parent component
-      const updatedJobs = jobs.map((j: any) => j.id === jobId ? { ...j, ...editedJob } : j);
+
+      const updatedJobs = jobs.map((j: any) =>
+        j.id === jobId ? { ...j, ...editedJob } : j
+      );
       setJobs(updatedJobs);
-      
-    setIsEditing(false);
+
+      setIsEditing(false);
       toast.success('Job updated successfully!');
     } catch (error) {
       console.error('Error updating job:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to update job');
     }
   };
+
+
+  console.log(invoice, "invs")
+  const currentInvoice = estimates.find((inv) => inv.id === selectedInvoiceId);
+  console.log(currentInvoice, "current")
+
 
   const handleCancel = () => {
     setEditedJob({
@@ -262,12 +325,14 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       description: job.description,
       contractor: job.contractor || job.customer,
       startDate: '01/15/2025',
-      priority: 'High'
+      priority: 'High',
+      assignedLabor: job.assignedLaborDetails || [],
+      assignedLeadLabor: job.assignedLeadLaborDetails || [],
     });
     setIsEditing(false);
   };
 
-  
+
 
   const validateTimeLogForm = () => {
     const errors: Record<string, string> = {};
@@ -333,7 +398,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       } else if (timeLogModalMode === 'edit') {
         // Determine is_custom value based on labor type
         const isCustom = currentTimeLog.isCustomLabor || false;
-        
+
         const updatePayload = {
           job_id: jobId,
           labor_id: currentTimeLog.id,
@@ -354,7 +419,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       setShowTimeLogModal(false);
       setCurrentTimeLog(null);
       resetTimeLogForm();
-      
+
       // Refresh job data to show the new/updated labor time log
       await refreshJobData();
     } catch (error) {
@@ -369,7 +434,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       // Fetch detailed labor data from API
       const laborDetails = await apiClient.getLaborById(labor.id);
       console.log('Fetched labor details:', laborDetails);
-      
+
       setCurrentTimeLog(laborDetails);
       setTimeLogFormData({
         workerName: laborDetails.users?.full_name || '',
@@ -395,18 +460,18 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       // Fetch detailed labor data from API
       const laborDetails = await apiClient.getLaborById(labor.id);
       console.log('Fetched labor details for edit:', laborDetails);
-      
+
       // Check if this is assigned labor or custom labor
       const isAssignedLabor = job.assignedLaborDetails && job.assignedLaborDetails.some((al: any) => al.id === labor.id);
       const isCustomLabor = job.customLabor && job.customLabor.some((cl: any) => cl.id === labor.id);
-      
+
       // Store the labor type for use in save operation
       setCurrentTimeLog({
         ...laborDetails,
         isAssignedLabor: isAssignedLabor,
         isCustomLabor: isCustomLabor
       });
-      
+
       setTimeLogFormData({
         workerName: laborDetails.users?.full_name || laborDetails.labor_code || '',
         email: laborDetails.users?.email || '',
@@ -432,6 +497,181 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     setShowTimeLogModal(true);
   };
 
+  const handleAddProduct = async () => {
+    setIsLoading(true);
+    try {
+      const newProduct = await apiClient.createProduct({
+        product_name: materialFormData.name,
+        supplier_id: Number(materialFormData.supplier) || 0,
+        supplier_sku: materialFormData.sku,
+        jdp_sku: '',
+        stock_quantity: materialFormData.quantity,
+        unit: materialFormData.unit,
+        job_id: job.id || 2,
+        is_custom: true,
+        unit_cost: materialFormData.unitCost,
+      });
+
+      setMaterials((prev) => [...prev, newProduct]);
+
+      dispatch(addProduct(newProduct));
+      toast.success('Product added successfully!');
+      setShowAddMaterialModal(false);
+      setMaterialFormData({
+        name: '',
+        quantity: 0,
+        unitCost: 0,
+        sku: '',
+        unit: 'Pieces',
+        supplier: ''
+      });
+    } catch (error) {
+      console.error('Error adding product:', error);
+      toast.error('Failed to add product');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
+
+  const handleDeleteProduct = async (productId: string | number) => {
+    try {
+      const confirmDelete = window.confirm("Are you sure you want to delete this product?");
+      if (!confirmDelete) return;
+
+      setIsDeleting(true);
+
+      await apiClient.deleteProduct(productId);
+      dispatch(deleteProduct(String(productId)));
+
+      toast.success("Product deleted successfully!");
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      toast.error("Failed to delete product");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const fetchEstimates = async () => {
+    setIsLoadingEstimates(true);
+    try {
+      const response = await apiClient.getAllEstimates();
+      const filtered = response.data.estimates.filter(
+        (item: any) => Number(item.job_id) === Number(jobId)
+      );
+      setEstimates(filtered);
+    } catch (error) {
+      console.error('Failed to fetch estimates:', error);
+    } finally {
+      setIsLoadingEstimates(false);
+    }
+  };
+
+
+  useEffect(() => {
+    fetchEstimates();
+  }, [jobId, refreshInvoices]);
+
+
+  const handlePrint = async (currentInvoice: any) => {
+    console.log('1')
+    if (!printRef.current) return;
+    console.log('2')
+
+    try {
+      const canvas = await html2canvas(printRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        ignoreElements: (element) => {
+          return element.classList.contains('no-export');
+        }
+      });
+
+      const imageData = canvas.toDataURL('image/png');
+
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) return;
+
+      console.log(currentInvoice, "number")
+
+      printWindow.document.write(`
+      <html>
+        <head>
+          <title>Invoice #${currentInvoice?.invoice_number || ''}</title>
+          <style>
+            body, html {
+              margin: 0;
+              padding: 0;
+              text-align: center;
+            }
+            img {
+              max-width: 100%;
+              width: 100%;
+              height: auto;
+            }
+          </style>
+        </head>
+        <body>
+          <img src="${imageData}" />
+        </body>
+      </html>
+    `);
+
+      printWindow.document.close();
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+          printWindow.close();
+        }, 500);
+      };
+    } catch (err) {
+      console.error('Print error:', err);
+    }
+  };
+
+
+  const handleSaveInvoice = async (newInvoiceData: Partial<Invoice>) => {
+    try {
+      const payload = { ...newInvoiceData, job_id: jobId };
+      await apiClient.createEstimate(payload);
+      toast.success("Invoice added successfully!");
+      fetchEstimates();
+    } catch (error) {
+      console.error("Failed to save invoice:", error);
+      toast.error("Failed to add invoice");
+    }
+  };
+
+  const triggerRefresh = () => {
+    setRefreshInvoices(prev => !prev);
+  };
+
+
+
+  const handleDeleteEstimate = async (estimateId: any) => {
+    try {
+      const confirmDelete = window.confirm("Are you sure you want to delete this estimate?");
+      if (!confirmDelete) return;
+      setIsDeleting(true);
+      await apiClient.deleteEstimate(estimateId);
+      console.log(estimateId, "IDD")
+      dispatch(deleteInvoice(String(estimateId)));
+      toast.success("Estimate deleted successfully!");
+      setRefreshInvoices(prev => !prev);
+    } catch (error) {
+      console.error("Error deleting estimate:", error);
+      toast.error("Failed to delete estimate");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+
+
+
   const handleUpdateTimeLog = async () => {
     if (!validateTimeLogForm() || !currentTimeLog) {
       toast.error('Please fix the validation errors');
@@ -439,9 +679,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     }
 
     try {
-      // Determine is_custom value based on labor type
       const isCustom = currentTimeLog.isCustomLabor || false;
-      
+
       const updatePayload = {
         job_id: jobId,
         labor_id: currentTimeLog.id,
@@ -459,21 +698,22 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       toast.success('Labor time log updated successfully!');
       setShowTimeLogModal(false);
       setCurrentTimeLog(null);
-      resetTimeLogForm(); 
+      resetTimeLogForm();
     } catch (error) {
       console.error('Error updating labor time log:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to update labor time log');
     }
   };
 
+
   const handleDeleteTimeLog = async (timeLogId: string) => {
     try {
       await apiClient.deleteLaborTimeLog(timeLogId);
       toast.success('Labor time log deleted successfully!');
-      
+
       // Refresh job data to remove the deleted labor time log
       await refreshJobData();
-     } catch (error) {
+    } catch (error) {
       console.error('Error deleting labor time log:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to delete labor time log');
     }
@@ -497,11 +737,11 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       console.log('Refreshing job data...');
       const updatedJobData = await apiClient.getJobById(jobId);
       console.log('Updated job data:', updatedJobData);
-      
+
       // Update the jobs array in the parent component
       const updatedJobs = jobs.map((j: any) => j.id === jobId ? updatedJobData : j);
       setJobs(updatedJobs);
-      
+
       console.log('Job data refreshed successfully');
     } catch (error) {
       console.error('Error refreshing job data:', error);
@@ -518,11 +758,6 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
   // Update editedJob when job data changes
   useEffect(() => {
-    console.log('JobDetailsPage: Job data updated:', job);
-    console.log('JobDetailsPage: Job location:', job.location);
-    console.log('JobDetailsPage: Job address:', job.address);
-    console.log('JobDetailsPage: Job cityZip:', job.cityZip);
-    
     setEditedJob({
       title: job.title,
       type: job.type,
@@ -530,9 +765,73 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       description: job.description,
       contractor: job.contractor || job.customer,
       startDate: '01/15/2025',
-      priority: 'High'
+      priority: job.priority || 'High',
+      assignedLabor: job.assignedLaborDetails || [],
+      assignedLeadLabor: job.assignedLeadLaborDetails || [],
     });
   }, [job]);
+
+
+
+
+
+
+
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      try {
+        const response = await apiClient.getAllSuppliers();
+        // response structure: { success, message, data: { data: [ ...suppliers ] } }
+        setSuppliers(response.data.data);
+      } catch (error) {
+        console.error('Error fetching suppliers:', error);
+      }
+    };
+
+    fetchSuppliers();
+  }, []);
+
+
+  useEffect(() => {
+    if (job.assignedMaterialsDetails) {
+      setMaterials(job.assignedMaterialsDetails);
+    }
+  }, [job.assignedMaterialsDetails]);
+
+
+  useEffect(() => {
+    const fetchProjectSummary = async () => {
+      try {
+        const res = await apiClient.getProjectSummary(jobId);
+        setProjectSummary(res.data.projectSummary);
+      } catch (error) {
+        console.error('Failed to fetch project summary', error);
+      }
+    };
+
+    if (jobId) fetchProjectSummary();
+  }, [jobId]);
+
+
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        setIsLoadingDashboard(true);
+        const res = await apiClient.getJobDashboard(jobId);
+        console.log(res, 'dashres')
+        setDashboardMetrics(res.data.dashboardMetrics);
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      } finally {
+        setIsLoadingDashboard(false);
+      }
+    };
+
+    if (jobId) fetchDashboard();
+  }, [jobId]);
+
+
 
   // Fetch roles and labor time logs on component mount
   useEffect(() => {
@@ -540,7 +839,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       try {
         // Fetch roles
         const rolesData = await apiClient.getRoles();
-        setRoles(rolesData); 
+        setRoles(rolesData);
       } catch (error) {
         console.error('Error fetching initial data:', error);
         toast.error('Failed to load initial data');
@@ -623,6 +922,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     )
   }
 
+  console.log("Parent selectedInvoiceId:", selectedInvoiceId);
+
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -644,7 +946,17 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               <Send className="h-4 w-4" />
               Send Invoice
             </Button>
-            <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => setIsEditing(true)}>
+            <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => {
+              setEditedJob({
+                ...job,
+                assignedLeadLabor: job.assignedLeadLaborDetails || [],
+                assignedLabor: job.assignedLaborDetails || [],
+              });
+              setIsEditing(true);
+            }}
+            >
+              {/* <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => setIsEditing(true)}> */}
+
               <Edit className="h-4 w-4" />
               Edit Job
             </Button>
@@ -667,60 +979,96 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           </div>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {/* Total Hours Worked */}
           <Card className="bg-blue-50 border-blue-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-blue-600">Total Hours Worked</p>
-                  <p className="text-2xl font-bold text-blue-900">{totalHours}</p>
-                  <p className="text-xs text-blue-600">hours</p>
+                  <p className="text-2xl font-bold text-blue-900">
+                    {isLoadingDashboard ? (
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                    ) : (
+                      dashboardMetrics?.totalHoursWorked?.value ?? 0
+                    )}
+                  </p>
+                  <p className="text-xs text-blue-600">
+                    {isLoadingDashboard ? "Loading..." : dashboardMetrics?.totalHoursWorked?.unit ?? "hours"}
+                  </p>
                 </div>
                 <Clock className="h-8 w-8 text-blue-600" />
               </div>
             </CardContent>
           </Card>
 
+          {/* Total Material Used */}
           <Card className="bg-green-50 border-green-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-green-600">Total Material Used</p>
-                  <p className="text-2xl font-bold text-green-900">{totalMaterialItems}</p>
-                  <p className="text-xs text-green-600">items</p>
+                  <p className="text-2xl font-bold text-green-900">
+                    {isLoadingDashboard ? (
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
+                    ) : (
+                      dashboardMetrics?.totalMaterialUsed?.value ?? 0
+                    )}
+                  </p>
+                  <p className="text-xs text-green-600">
+                    {isLoadingDashboard ? "Loading..." : dashboardMetrics?.totalMaterialUsed?.unit ?? "items"}
+                  </p>
                 </div>
                 <Package className="h-8 w-8 text-green-600" />
               </div>
             </CardContent>
           </Card>
 
+          {/* Total Labour Entries */}
           <Card className="bg-purple-50 border-purple-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-purple-600">Total Labour Entries</p>
-                  <p className="text-2xl font-bold text-purple-900">{totalLaborEntries}</p>
-                  <p className="text-xs text-purple-600">entries</p>
+                  <p className="text-2xl font-bold text-purple-900">
+                    {isLoadingDashboard ? (
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+                    ) : (
+                      dashboardMetrics?.totalLabourEntries?.value ?? 0
+                    )}
+                  </p>
+                  <p className="text-xs text-purple-600">
+                    {isLoadingDashboard ? "Loading..." : dashboardMetrics?.totalLabourEntries?.unit ?? "entries"}
+                  </p>
                 </div>
                 <Users className="h-8 w-8 text-purple-600" />
               </div>
             </CardContent>
           </Card>
 
+          {/* Number of Invoices */}
           <Card className="bg-orange-50 border-orange-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-orange-600">Number of Invoices</p>
-                  <p className="text-2xl font-bold text-orange-900">{totalInvoices}</p>
-                  <p className="text-xs text-orange-600">invoices</p>
+                  <p className="text-2xl font-bold text-orange-900">
+                    {isLoadingDashboard ? (
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-600"></div>
+                    ) : (
+                      dashboardMetrics?.numberOfInvoices?.value ?? 0
+                    )}
+                  </p>
+                  <p className="text-xs text-orange-600">
+                    {isLoadingDashboard ? "Loading..." : dashboardMetrics?.numberOfInvoices?.unit ?? "invoices"}
+                  </p>
                 </div>
                 <FileText className="h-8 w-8 text-orange-600" />
               </div>
             </CardContent>
           </Card>
         </div>
+
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -859,8 +1207,97 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                   )}
                 </div>
 
+                <div>
+                  <Label className="flex items-center gap-2">
+                    <UserCheck className="h-4 w-4 text-[#00A1FF]" />
+                    Assigned Lead Labor
+                  </Label>
+
+                  {isEditing ? (
+                    <AutoScrollMultiSelect
+                      selectedValues={editedJob.assignedLeadLabor?.map((labor: any) => labor.id.toString()) || []}
+                      onSelectionChange={(selectedIds, selectedItems) => {
+                        const validSelectedItems = selectedItems.filter((labor: any) => labor !== undefined);
+
+                        setEditedJob((prev) => ({
+                          ...prev,
+                          assignedLeadLabor: validSelectedItems,
+                        }));
+
+                        console.log('Selected Lead Labor IDs:', selectedIds);
+                        console.log('Selected Lead Labor Items:', validSelectedItems);
+                      }}
+                      placeholder="Select lead labor"
+                      fetchData={apiClient.getLeadLabor}
+                      displayField="name"
+                      valueField="id"
+                    />
+
+
+                  ) : (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {(editedJob.assignedLeadLabor || []).map((labor: any, index: number) => (
+                        <span
+                          key={labor.id || `labor-${index}`}
+                          className="bg-blue-50 text-blue-700 text-sm px-2 py-1 rounded-md border border-blue-200"
+                        >
+                          {labor.name || labor.user?.full_name || labor.labor_code}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+
+                <div>
+                  <Label className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-[#00A1FF]" />
+                    Lead Labor
+                  </Label>
+
+                  {isEditing ? (
+                    <AutoScrollMultiSelect
+                      selectedValues={editedJob.assignedLabor?.map((labor: any) => labor.id.toString()) || []}
+                      onSelectionChange={(selectedIds, selectedItems) => {
+                        const validSelectedItems = selectedItems.filter((labor: any) => labor !== undefined);
+
+                        setEditedJob((prev) => ({
+                          ...prev,
+                          assignedLabor: validSelectedItems,
+                        }));
+
+                        console.log('Selected Lead Labor IDs:', selectedIds);
+                        console.log('Selected Lead Labor Items:', validSelectedItems);
+                      }}
+                      placeholder="Select lead labor"
+                      fetchData={apiClient.getLabor}
+                      displayField="name"
+                      valueField="id"
+                    />
+
+                  ) : (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {(editedJob.assignedLabor || []).map((labor: any, index: number) => (
+                        <span
+                          key={labor.id || `labor-${index}`}
+                          className="bg-orange-50 text-orange-700 text-sm px-2 py-1 rounded-md border border-orange-200"
+                        >
+                          {labor.user?.full_name || labor.labor_code}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+
+                </div>
+
+
+
+
+
+
                 {/* Assigned Labor Section */}
-                {job.assignedLaborDetails && job.assignedLaborDetails.length > 0 && (
+                {/* {job.assignedLaborDetails && job.assignedLaborDetails.length > 0 && (
                   <div>
                     <p className="text-sm text-gray-600 mb-2">Assigned Labor</p>
                     <div className="space-y-2">
@@ -881,10 +1318,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                       ))}
                     </div>
                   </div>
-                )}
+                )} */}
 
                 {/* Assigned Lead Labor Section */}
-                {job.assignedLeadLaborDetails && job.assignedLeadLaborDetails.length > 0 && (
+                {/* {job.assignedLeadLaborDetails && job.assignedLeadLaborDetails.length > 0 && (
                   <div>
                     <p className="text-sm text-gray-600 mb-2">Lead Labor</p>
                     <div className="space-y-2">
@@ -905,7 +1342,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                       ))}
                     </div>
                   </div>
-                )}
+                )} */}
               </CardContent>
               <CardFooter>
                 {isEditing && (
@@ -930,73 +1367,101 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                   <FileText className="h-5 w-5" />
                   Transaction History
                 </CardTitle>
-                <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowAddInvoiceModal(true)}>
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowNewInvoiceDialog(true)}>
                   <Plus className="h-4 w-4" />
                   Add Invoice
                 </Button>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {invoices.map((invoice) => (
-                    <div key={invoice.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center gap-4">
-                        <div className="h-10 w-10 bg-gray-200 rounded-lg flex items-center justify-center">
-                          <FileText className="h-5 w-5 text-gray-700" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-medium">{invoice.type}</h4>
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${invoice.type === 'Estimate' ? 'bg-blue-100 text-blue-800' :
-                              invoice.type === 'Proposal Invoice' ? 'bg-purple-100 text-purple-800' :
-                                invoice.type === 'Progressive Invoice' ? 'bg-orange-100 text-orange-800' :
-                                  'bg-green-100 text-green-800'
-                              }`}>
-                              {invoice.type}
-                            </span>
+                {isLoadingEstimates ? (
+                  <p className="text-sm text-gray-500">Loading estimates...</p>
+                ) : estimates.length === 0 ? (
+                  <p className="text-sm text-gray-500">No invoices found for this job.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {estimates.map((invoice: any, index: any) => (
+                      <div key={invoice.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center gap-4">
+                          <div className="h-10 w-10 bg-gray-200 rounded-lg flex items-center justify-center">
+                            <FileText className="h-5 w-5 text-gray-700" />
                           </div>
-                          <p className="text-sm text-gray-600">{invoice.description}</p>
-                          <p className="text-xs text-gray-500">
-                            #{invoice.id} • Created: {invoice.createdDate} • Due: {invoice.dueDate}
-                          </p>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-medium">{invoice.estimate_title}</h4>
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${invoice.invoice_type === 'estimate'
+                                ? 'bg-blue-100 text-blue-800'
+                                : invoice.invoice_type === 'proposal_invoice'
+                                  ? 'bg-purple-100 text-purple-800'
+                                  : invoice.invoice_type === 'progressive_invoice'
+                                    ? 'bg-orange-100 text-orange-800'
+                                    : 'bg-green-100 text-green-800'
+                                }`}>
+                                {invoice.invoice_type.replace('_', ' ')}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-600">{invoice.description}</p>
+                            <p className="text-xs text-gray-500">
+                              #{invoice.invoice_number} • Created: {invoice.issue_date} • Due: {invoice.due_date}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="font-semibold mb-1">{formatCurrency(invoice.amount)}</p>
-                          <span>
-                            {getStatusBadge(job.status)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" className="gap-1"
-                            onClick={() => {
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <p className="font-semibold mb-1">{formatCurrency(invoice.total_amount)}</p>
+                            <span>{getStatusBadge(invoice.status)}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {/* <Button variant="outline" size="sm" className="gap-1" onClick={() => {
                               setSelectedInvoice(invoice);
                               setShowInvoiceModal(true);
                             }}>
-                            <Eye className="h-3 w-3" />
-                            View
-                          </Button>
-                          <Button variant="outline" size="sm" className="gap-1">
-                            <Printer className="h-3 w-3" />
-                            Print
-                          </Button>
-                          <Button variant="outline" size="sm" className="gap-1">
-                            <Trash2 className="h-3 w-3 text-red-600" />
-                          </Button>
+                              <Eye className="h-3 w-3" />
+                              View
+                            </Button> */}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1"
+                              onClick={() => {
+                                console.log("Selected invoice ID:", invoice.id);
+                                setSelectedInvoiceId(invoice.id);
+                                setShowInvoiceModal(true);
+                              }}
+
+                            >
+                              <Eye className="h-3 w-3" />
+                              View
+                            </Button>
+                            <Button variant="outline" size="sm" className="gap-1" onClick={() => handlePrint(currentInvoice)}>
+                              <Printer className="h-3 w-3" />
+                              Print
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1"
+                              onClick={() => handleDeleteEstimate(invoice.id)}
+                            >
+                              <Trash2 className="h-3 w-3 text-red-600" />
+                            </Button>
+
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
+
+
 
             {/* Material Usage */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
                 <CardTitle className="flex items-center gap-2">
                   <Package className="h-5 w-5" />
-                  Material Usage
+                  Product Usage
                 </CardTitle>
                 <div className="flex items-center gap-4">
                   <span className="text-sm text-gray-600">
@@ -1004,14 +1469,14 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                   </span>
                   <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowAddMaterialModal(true)}>
                     <Plus className="h-4 w-4" />
-                    Add Material
+                    Add Product
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {materials.map((material: any) => (
-                    <div key={material.id} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                  {materials.map((material: any, index: numbe) => (
+                    <div key={material.id ?? material.sku ?? index} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
                       <div className="flex items-center gap-4">
                         <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
                           <Package className="h-5 w-5 text-blue-700" />
@@ -1028,7 +1493,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                           <p className="font-semibold">{formatCurrency(material.unit_cost || material.totalCost || 0)}</p>
                           <p className="text-sm text-gray-600">{material.stock_quantity || material.quantity || 0} {material.unit}</p>
                         </div>
-                        <Button variant="outline" size="sm" className="gap-1">
+                        <Button variant="outline" size="sm" className="gap-1" onClick={() => handleDeleteProduct(material.id)}>
                           <Trash2 className="h-3 w-3 text-red-600" />
                         </Button>
                       </div>
@@ -1062,41 +1527,41 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                     <>
                       {job.assignedLaborDetails.map((labor: any, index: number) => (
                         <div key={`assigned-${labor.id}`} className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
-                        <div className="flex items-center gap-4">
-                          <div className="h-10 w-10 bg-green-200 rounded-lg flex items-center justify-center">
-                            <Users className="h-5 w-5 text-green-700" />
-                          </div>
-                          <div>
+                          <div className="flex items-center gap-4">
+                            <div className="h-10 w-10 bg-green-200 rounded-lg flex items-center justify-center">
+                              <Users className="h-5 w-5 text-green-700" />
+                            </div>
+                            <div>
                               <h4 className="font-medium">{labor.user?.full_name || labor.labor_code}</h4>
-                            <p className="text-xs text-gray-600">
+                              <p className="text-xs text-gray-600">
                                 {labor.trade} • {labor.experience} • {labor.availability}
-                            </p>
+                              </p>
                               <p className="text-xs text-gray-500">Code: {labor.labor_code}</p>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
                               <p className="font-semibold">${labor.hourly_rate || 0}/hr</p>
-                            <p className="text-sm text-gray-600">
+                              <p className="text-sm text-gray-600">
                                 {labor.hours_worked || 0} hrs worked
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
                               <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                 Assigned
                               </span>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
+                              <Button
+                                variant="outline"
+                                size="sm"
                                 className="gap-1"
                                 onClick={() => handleViewTimeLog(labor)}
                               >
                                 <Eye className="h-3 w-3" />
                                 View
                               </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
+                              <Button
+                                variant="outline"
+                                size="sm"
                                 className="gap-1"
                                 onClick={() => handleEditTimeLog(labor)}
                               >
@@ -1115,41 +1580,41 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                     <>
                       {job.customLabor.map((labor: any, index: number) => (
                         <div key={`custom-${labor.id}`} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                        <div className="flex items-center gap-4">
-                          <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
-                            <Users className="h-5 w-5 text-blue-700" />
-                          </div>
-                          <div>
+                          <div className="flex items-center gap-4">
+                            <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
+                              <Users className="h-5 w-5 text-blue-700" />
+                            </div>
+                            <div>
                               <h4 className="font-medium">{labor.user?.full_name || labor.labor_code}</h4>
-                            <p className="text-xs text-gray-600">
+                              <p className="text-xs text-gray-600">
                                 {labor.trade || 'Custom Labor'} • {labor.experience || 'N/A'} • {labor.availability || 'Available'}
-                            </p>
+                              </p>
                               <p className="text-xs text-gray-500">Code: {labor.labor_code}</p>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
                               <p className="font-semibold">${labor.hourly_rate || 0}/hr</p>
-                            <p className="text-sm text-gray-600">
+                              <p className="text-sm text-gray-600">
                                 {labor.hours_worked || 0} hrs worked
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
                               <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                 Custom
                               </span>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
+                              <Button
+                                variant="outline"
+                                size="sm"
                                 className="gap-1"
                                 onClick={() => handleViewTimeLog(labor)}
                               >
                                 <Eye className="h-3 w-3" />
                                 View
                               </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
+                              <Button
+                                variant="outline"
+                                size="sm"
                                 className="gap-1"
                                 onClick={() => handleEditTimeLog(labor)}
                               >
@@ -1164,13 +1629,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                   )}
 
                   {/* Show message if no labor at all */}
-                  {(!job.assignedLaborDetails || job.assignedLaborDetails.length === 0) && 
-                   (!job.customLabor || job.customLabor.length === 0) && (
-                    <div className="text-center py-8 text-gray-500">
-                      <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                      <p>No labor assigned to this job</p>
-                    </div>
-                  )}
+                  {(!job.assignedLaborDetails || job.assignedLaborDetails.length === 0) &&
+                    (!job.customLabor || job.customLabor.length === 0) && (
+                      <div className="text-center py-8 text-gray-500">
+                        <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                        <p>No labor assigned to this job</p>
+                      </div>
+                    )}
 
 
                 </div>
@@ -1188,29 +1653,33 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Job Estimate</span>
-                    <span className="font-medium">{formatCurrency(job.estimatedCost)}</span>
-                  </div>
+                {projectSummary ? (
+                  <div className="space-y-4">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Job Estimate</span>
+                      <span className="font-medium">{formatCurrency(projectSummary.jobEstimate)}</span>
+                    </div>
 
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Materials Cost</span>
-                    <span className="font-medium">{formatCurrency(totalMaterialCost)}</span>
-                  </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Projects Cost</span>
+                      <span className="font-medium">{formatCurrency(projectSummary.materialsCost)}</span>
+                    </div>
 
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Labor Cost</span>
-                    <span className="font-medium">{formatCurrency(totalLaborCost)}</span>
-                  </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Labor Cost</span>
+                      <span className="font-medium">{formatCurrency(projectSummary.laborCost)}</span>
+                    </div>
 
-                  <hr />
+                    <hr />
 
-                  <div className="flex justify-between">
-                    <span className="font-medium">Actual Project Cost</span>
-                    <span className="font-bold text-lg">{formatCurrency(job.actualCost)}</span>
+                    <div className="flex justify-between">
+                      <span className="font-medium">Actual Project Cost</span>
+                      <span className="font-bold text-lg">{formatCurrency(projectSummary.actualProjectCost)}</span>
+                    </div>
                   </div>
-                </div> 
+                ) : (
+                  <p className="text-sm text-gray-500">Loading summary...</p>
+                )}
               </CardContent>
             </Card>
 
@@ -1231,7 +1700,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                   <Send className="h-4 w-4" />
                   Send to Customer
                 </Button>
-                <Button variant="outline" className="w-full gap-2">
+                <Button variant="outline" className="w-full gap-2" onClick={handlePrint}>
                   <Printer className="h-4 w-4" />
                   Print Report
                 </Button>
@@ -1243,7 +1712,15 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
 
       {/* Add Invoice Modal */}
-      <Dialog open={showAddInvoiceModal} onOpenChange={setShowAddInvoiceModal}>
+      <NewInvoiceDialog
+        open={showNewInvoiceDialog}
+        onOpenChange={setShowNewInvoiceDialog}
+        onSave={handleSaveInvoice}
+        jobId={jobId}
+        jobs={jobs}
+        onInvoiceSaved={triggerRefresh}
+      />
+      {/* <Dialog open={showAddInvoiceModal} onOpenChange={setShowAddInvoiceModal}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Add New Invoice</DialogTitle>
@@ -1306,19 +1783,19 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
 
       {/* Add Material Modal */}
       <Dialog open={showAddMaterialModal} onOpenChange={setShowAddMaterialModal}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Add Material</DialogTitle>
-            <DialogDescription>Add a new material to this job</DialogDescription>
+            <DialogTitle>Add Product</DialogTitle>
+            <DialogDescription>Add a new product to this job</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className='grid grid-cols-2 gap-2'>
               <div>
-                <Label className="mb-2">Material Name</Label>
+                <Label className="mb-2">Product Name</Label>
                 <Input
                   value={materialFormData.name}
                   onChange={(e) => setMaterialFormData({ ...materialFormData, name: e.target.value })}
@@ -1374,11 +1851,32 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               </div>
               <div>
                 <Label className="mb-2">Supplier</Label>
+                <Select
+                  value={materialFormData.supplier}
+                  onValueChange={(value) =>
+                    setMaterialFormData({ ...materialFormData, supplier: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Supplier" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers.map((supplier) => (
+                      <SelectItem key={supplier.id} value={supplier.id.toString()}>
+                        {supplier.company_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* <div>
+                <Label className="mb-2">Supplier</Label>
                 <Input
                   value={materialFormData.supplier}
                   onChange={(e) => setMaterialFormData({ ...materialFormData, supplier: e.target.value })}
                 />
-              </div>
+              </div> */}
             </div>
             <div className='bg-blue-100 p-3 border border-blue-300 rounded flex items-center gap-2'>
               <Building className='w-4 h-4' />
@@ -1386,16 +1884,40 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddMaterialModal(false)}>
+            <Button variant="outline" onClick={() => setShowAddMaterialModal(false)} disabled={isLoading}>
               Cancel
             </Button>
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => {
-              // Save logic here
-              setShowAddMaterialModal(false);
-            }}>
-              Add Material
+            <Button
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={handleAddProduct}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                  Adding...
+                </div>
+              ) : (
+                'Add Product'
+              )}
             </Button>
           </DialogFooter>
+
         </DialogContent>
       </Dialog>
 
@@ -1442,12 +1964,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                 )}
               </div>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label className="mb-2">Role *</Label>
-                <Select 
-                  value={timeLogFormData.role} 
+                <Select
+                  value={timeLogFormData.role}
                   onValueChange={(value) => setTimeLogFormData({ ...timeLogFormData, role: value })}
                   disabled={timeLogModalMode === 'view'}
                 >
@@ -1520,7 +2042,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                 disabled={timeLogModalMode === 'view'}
               />
             </div>
-            
+
             <div className='bg-blue-100 p-3 border border-blue-300 rounded flex items-center gap-2'>
               <ClockIcon className='w-4 h-4' />
               <Label>Total Cost: ${(timeLogFormData.hoursWorked * timeLogFormData.hourlyRate).toFixed(2)}</Label>
@@ -1542,77 +2064,130 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-
       <Dialog open={showInvoiceModal} onOpenChange={setShowInvoiceModal}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[800px]">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">
-              Invoice Details
+              Invoice Preview
             </DialogTitle>
-            <DialogDescription className="text-sm font-semibold">
-              {selectedInvoice?.type} - {selectedInvoice?.id}
+            <DialogDescription className="text-sm text-muted-foreground">
+              Preview of selected invoice
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6">
-            {/* Invoice Information */}
-            <div className="space-y-2">
-              <h3 className="font-semibold text-lg">Invoice Information</h3>
-            <div className="border-t border-gray-200 my-4"></div> 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-600">Type</p>
-                  <p className="font-medium">{selectedInvoice?.type}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Number</p>
-                  <p className="font-medium">{selectedInvoice?.id}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Amount</p>
-                  <p className="font-medium">{formatCurrency(selectedInvoice?.amount || 0)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Status</p>
-                  {selectedInvoice && getStatusBadge(selectedInvoice.status)}
-                </div>
-              </div>
+          {selectedInvoiceId && (
+            <div className="mt-4 max-h-[70vh] overflow-auto">
+              <InvoiceTemplate invoiceId={selectedInvoiceId} />
             </div>
-            {/* Dates */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-600">Created Date</p>
-                <p className="font-medium">{selectedInvoice?.createdDate}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Due Date</p>
-                <p className="font-medium">{selectedInvoice?.dueDate}</p>
-              </div>
-            </div>
-            {/* Description */}
-            <div>
-              <h3 className="font-semibold text-lg">Description</h3>
-              <p className="text-sm mt-2">{selectedInvoice?.description}</p>
-            </div>
+          )}
 
-
-            {/* Divider */}
-            <div className="border-t border-gray-200 my-4"></div>
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button variant="outline" className="gap-2" onClick={() => setShowInvoiceModal(false)}>
-                <X className="h-4 w-4" />
-                Close
-              </Button>
-              <Button variant="outline" className="gap-2 bg-primary text-primary-foreground">
-                <Printer className="h-4 w-4" />
-                Print Invoice
-              </Button>
-            </div>
-
+          <div className="flex justify-end mt-6">
+            <Button variant="outline" onClick={() => setShowInvoiceModal(false)}>
+              Close
+            </Button>
+            <Button variant="outline" className="gap-2 bg-primary text-primary-foreground" onClick={() => handlePrint(currentInvoice)}>
+              <Printer className="h-4 w-4" />
+              Print Estimate
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
+
+      {selectedInvoiceId && (
+        <div
+          ref={printRef}
+          className="p-6 bg-white border border-black-400 rounded print:p-0 print:bg-white"
+          style={{
+            margin: '0 auto',
+            width: '22cm',
+          }}
+        >
+          <InvoiceTemplate invoiceId={selectedInvoiceId} />
+        </div>
+      )}
+
+
+
+      {/* <Dialog open={showInvoiceModal} onOpenChange={setShowInvoiceModal}>
+  <DialogContent className="sm:max-w-[600px]">
+    <DialogHeader>
+      <DialogTitle className="text-2xl font-bold">
+        Estimate Details
+      </DialogTitle>
+      <DialogDescription className="text-sm font-semibold">
+        {selectedInvoice?.invoice_type} - #{selectedInvoice?.invoice_number}
+      </DialogDescription>
+    </DialogHeader>
+
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <h3 className="font-semibold text-lg">Estimate Information</h3>
+        <div className="border-t border-gray-200 my-4"></div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-sm text-gray-600">Type</p>
+            <p className="font-medium capitalize">{selectedInvoice?.invoice_type}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Estimate Number</p>
+            <p className="font-medium">{selectedInvoice?.invoice_number}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Total Amount</p>
+            <p className="font-medium">{formatCurrency(selectedInvoice?.total_amount || 0)}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Status</p>
+            {selectedInvoice && getStatusBadge(selectedInvoice.status)}
+          </div>
+        </div>
+      </div>
+
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <p className="text-sm text-gray-600">Created At</p>
+          <p className="font-medium">{new Date(selectedInvoice?.created_at).toLocaleDateString()}</p>
+        </div>
+        <div>
+          <p className="text-sm text-gray-600">Due Date</p>
+          <p className="font-medium">{new Date(selectedInvoice?.due_date).toLocaleDateString()}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <p className="text-sm text-gray-600">Customer</p>
+          <p className="font-medium">{selectedInvoice?.customer?.customer_name}</p>
+        </div>
+        <div>
+          <p className="text-sm text-gray-600">Email</p>
+          <p className="font-medium">{selectedInvoice?.email_address}</p>
+        </div>
+      </div>
+
+ 
+      <div>
+        <h3 className="font-semibold text-lg">Description</h3>
+        <p className="text-sm mt-2">{selectedInvoice?.description}</p>
+      </div>
+
+
+      <div className="border-t border-gray-200 my-4"></div>
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button variant="outline" className="gap-2" onClick={() => setShowInvoiceModal(false)}>
+          <X className="h-4 w-4" />
+          Close
+        </Button>
+        <Button variant="outline" className="gap-2 bg-primary text-primary-foreground">
+          <Printer className="h-4 w-4" />
+          Print Estimate
+        </Button>
+      </div>
+    </div>
+  </DialogContent>
+</Dialog> */}
+
     </div>
   )
 }

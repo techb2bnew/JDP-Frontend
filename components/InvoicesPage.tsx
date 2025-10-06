@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { apiClient } from '../utils/api'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -34,6 +35,11 @@ import { useRouter } from 'next/navigation';
 import { TimesheetsPage } from './TimesheetsPage';
 import { InvoiceComparisonPage } from './InvoiceComparisonPage';
 import { ApprovalsPage } from './ApprovalsPage';
+import html2canvas from 'html2canvas'
+import jsPDF from 'jspdf'
+import { useDispatch } from 'react-redux'
+import { deleteInvoice } from '@/redux/slices/jobsSlice'
+import { toast } from 'sonner'
 interface Job {
   id: string
   title: string
@@ -54,6 +60,45 @@ interface Job {
   priority: 'low' | 'medium' | 'high'
   billingStatus?: 'pending' | 'invoiced' | 'paid'
 }
+
+interface Estimate {
+  id: number
+  invoice_number: string
+  estimate_title: string
+  customer_id: string
+  job_id: number
+  job?: {
+    id: number
+    job_type: string
+    job_title: string
+  }
+  customer?: {
+    customer_name: string
+    id: number
+  }
+  items?: any[]
+  labor?: any[]
+  additionalCosts?: any[]
+  subtotal?: number
+  tax_percentage?: number
+  tax_amount?: number
+  total_amount?: number
+  description?: string
+  status?: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
+  invoice_type?: 'proposal_invoice' | 'roughen' | 'progressive' | 'final'
+  issue_date?: string
+  due_date?: string
+  created_by?: string
+  created_at?: string
+}
+
+type DashboardCards = {
+  total_invoices: { value: number }
+  total_billed: { value: string | number }
+  paid_invoices: { value: number }
+  pending_invoices: { value: number }
+}
+
 
 const mockJobs: Job[] = [
   {
@@ -107,6 +152,20 @@ export function InvoicesPage() {
   const [showNewInvoiceDialog, setShowNewInvoiceDialog] = useState(false)
   const [showInvoiceDetailDialog, setShowInvoiceDetailDialog] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
+  const [isLoadingEstimates, setIsLoadingEstimates] = useState(false);
+  const [estimates, setEstimates] = useState<Estimate[]>([])
+  const [localJobs, setLocalJobs] = useState([]);
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [loadingInvoice, setLoadingInvoice] = useState(false)
+  const [errorInvoice, setErrorInvoice] = useState<string | null>(null)
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
+  const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [refreshInvoices, setRefreshInvoices] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [dashboardCards, setDashboardCards] = useState<DashboardCards | null>(null)
+  const [detailedStats, setDetailedStats] = useState(null);
+  const dispatch = useDispatch();
   const router = useRouter();
 
   const filteredInvoices = invoices.filter(invoice => {
@@ -141,10 +200,89 @@ export function InvoicesPage() {
     setInvoices(prev => [invoice, ...prev])
   }
 
-  const handleViewInvoice = (invoice: Invoice) => {
-    localStorage.setItem('selectedInvoice', JSON.stringify(invoice));
-    router.push(`/invoiceDetail?id=${invoice.id}`);
+  // const handleViewInvoice = (invoice: Invoice) => {
+  //   localStorage.setItem('selectedInvoice', JSON.stringify(invoice));
+  //   router.push(`/invoiceDetail?id=${invoice.id}`);
+  // }
+
+
+
+
+
+  const handleViewInvoice = (invoiceId: number) => {
+    router.push(`/invoiceDetail?id=${invoiceId}`)
   }
+
+
+
+  const handleDownloadInvoice = async () => {
+    console.log("1")
+    if (!printRef.current) return;
+    console.log("2")
+
+    setIsGeneratingPdf(true);
+    try {
+      // Add temporary class to ensure proper rendering
+      printRef.current.classList.add('pdf-export');
+
+      const canvas = await html2canvas(printRef.current, {
+        scale: 2,
+        logging: false,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        ignoreElements: (element) => {
+          return element.classList.contains('no-export');
+        }
+      });
+
+
+      printRef.current.classList.remove('pdf-export');
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`invoice_${invoice?.invoiceNumber || 'unknown'}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleDeleteInvoice = async (invoiceId: string | number) => {
+    try {
+      const confirmDelete = window.confirm("Are you sure you want to delete this estimate?");
+      if (!confirmDelete) return;
+      setIsDeleting(true);
+      await apiClient.deleteEstimate(invoiceId);
+      console.log(invoiceId, "IDD")
+      dispatch(deleteInvoice(String(invoiceId)));
+      toast.success("Estimate deleted successfully!");
+      setRefreshInvoices(prev => !prev);
+    } catch (error) {
+      console.error("Error deleting estimate:", error);
+      toast.error("Failed to delete estimate");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+
 
   const handleSendInvoice = (invoiceId: string) => {
     setInvoices(prev => prev.map(inv =>
@@ -152,9 +290,9 @@ export function InvoicesPage() {
     ))
   }
 
-  const handleDeleteInvoice = (invoiceId: string) => {
-    setInvoices(prev => prev.filter(inv => inv.id !== invoiceId))
-  }
+  // const handleDeleteInvoice = (invoiceId: string) => {
+  //   setInvoices(prev => prev.filter(inv => inv.id !== invoiceId))
+  // }
   const handleBackToInvoices = () => {
     setActiveTab('invoices')
   }
@@ -162,7 +300,7 @@ export function InvoicesPage() {
     setPendingApprovalCount(count)
   }
   const handlePrintInvoice = () => { window.print() }
-  const handleDownloadInvoice = () => { console.log('Downloading invoice as PDF...') }
+  // const handleDownloadInvoice = () => { console.log('Downloading invoice as PDF...') }
   const handleEmailInvoice = () => { console.log('Sending invoice via email...') }
 
   const tabItems = [
@@ -171,6 +309,94 @@ export function InvoicesPage() {
     { id: 'invoice-comparison', label: 'Invoice Comparison', icon: GitCompare },
     { id: 'approvals', label: 'Approvals', icon: CheckSquare, notification: 2 },
   ]
+
+  useEffect(() => {
+    const fetchEstimates = async () => {
+      setIsLoadingEstimates(true);
+      try {
+        const response = await apiClient.getAllEstimates();
+        console.log('API Response:', response);
+        setEstimates(response.data.estimates || []);
+        console.log("API Estimates:", response.data.estimates);
+      } catch (error) {
+        console.error('Failed to fetch estimates:', error);
+      } finally {
+        setIsLoadingEstimates(false);
+      }
+    };
+
+    fetchEstimates();
+  }, []);
+
+
+  useEffect(() => {
+    const fetchEstimateStats = async () => {
+      setIsLoadingEstimates(true);
+      try {
+        const response = await apiClient.getEstimateStats();
+        console.log('estimatestas:', response);
+        const dashboardCards = response.data.dashboard_cards;
+        const detailedStats = response.data.detailed_stats;
+        setDashboardCards(dashboardCards);
+        setDetailedStats(detailedStats);
+      } catch (error) {
+        console.error('Failed to fetch estimate stats:', error);
+      } finally {
+        setIsLoadingEstimates(false);
+      }
+    };
+    fetchEstimateStats();
+  }, []);
+
+
+
+  const filteredEstimates = estimates.filter((invoice: any) => {
+    const term = searchTerm.toLowerCase();
+    return (
+      invoice.invoice_number?.toLowerCase().includes(term) ||
+      invoice.customer?.customer_name?.toLowerCase().includes(term) ||
+      invoice.job?.job_title?.toLowerCase().includes(term)
+    );
+  });
+
+
+  console.log(filteredEstimates, "filterrrr")
+
+
+
+  useEffect(() => {
+    if (!showInvoiceDetailDialog || !selectedId) return
+
+    const fetchById = async () => {
+      setLoadingInvoice(true)
+      try {
+        const res = await apiClient.getEstimateById(selectedId)
+        const data = (res?.data && (res.data.estimate || res.data)) || res
+        setSelectedInvoice(data)
+      } catch (e) {
+        console.error('Failed to fetch estimate by id:', e)
+        setErrorInvoice('Failed to load invoice')
+      } finally {
+        setLoadingInvoice(false)
+      }
+    }
+
+    fetchById()
+  }, [showInvoiceDetailDialog, selectedId])
+
+  useEffect(() => {
+    const fetchJobs = async () => {
+      try {
+        const res = await apiClient.getJobs();
+        // console.log("jonsjobssss", res, res.data);
+        setLocalJobs(res.data || []);
+      } catch (err) {
+        console.error("Error fetching jobs:", err);
+      }
+    };
+
+    fetchJobs();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -216,54 +442,59 @@ export function InvoicesPage() {
 
         {/* Invoices Tab Content */}
         <TabsContent value="invoices" className="mt-6">
+
           <div className="space-y-6">
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <Card>
-                <CardContent className="p-6 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Total Invoices</p>
-                    <p className="text-2xl font-semibold">{invoices.length}</p>
-                  </div>
-                  <div className="p-3 bg-blue-100 rounded-lg">
-                    <Receipt className="h-6 w-6 text-blue-600" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Total Billed</p>
-                    <p className="text-2xl font-semibold text-primary">$4,480.92</p>
-                  </div>
-                  <div className="p-3 bg-green-100 rounded-lg">
-                    <DollarSign className="h-6 w-6 text-green-600" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Paid Invoices</p>
-                    <p className="text-2xl font-semibold text-green-600">{invoices.filter(inv => inv.status === 'paid').length}</p>
-                  </div>
-                  <div className="p-3 bg-green-100 rounded-lg">
-                    <CheckCircle className="h-6 w-6 text-green-600" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Pending</p>
-                    <p className="text-2xl font-semibold text-orange-600">{invoices.filter(inv => inv.status === 'sent' || inv.status === 'overdue').length}</p>
-                  </div>
-                  <div className="p-3 bg-orange-100 rounded-lg">
-                    <AlertCircle className="h-6 w-6 text-orange-600" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            {dashboardCards && (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <Card>
+                  <CardContent className="p-6 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Invoices</p>
+                      <p className="text-2xl font-semibold">{dashboardCards.total_invoices.value}</p>
+                    </div>
+                    <div className="p-3 bg-blue-100 rounded-lg">
+                      <Receipt className="h-6 w-6 text-blue-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Billed</p>
+                      <p className="text-2xl font-semibold text-primary">{dashboardCards.total_billed.value}</p>
+                    </div>
+                    <div className="p-3 bg-green-100 rounded-lg">
+                      <DollarSign className="h-6 w-6 text-green-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Paid Invoices</p>
+
+                      <p className="text-2xl font-semibold text-green-600">{dashboardCards.paid_invoices.value}</p>
+                    </div>
+                    <div className="p-3 bg-green-100 rounded-lg">
+                      <CheckCircle className="h-6 w-6 text-green-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Pending</p>
+                      <p className="text-2xl font-semibold text-orange-600">{dashboardCards.pending_invoices.value}</p>
+                    </div>
+                    <div className="p-3 bg-orange-100 rounded-lg">
+                      <AlertCircle className="h-6 w-6 text-orange-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
 
             {/* Filters and Search */}
             <Card>
@@ -329,20 +560,22 @@ export function InvoicesPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredInvoices.map((invoice) => (
+                      {filteredEstimates?.map((invoice: any) => (
                         <TableRow key={invoice.id}>
-                          <TableCell className="font-mono">{invoice.invoiceNumber}</TableCell>
-                          <TableCell>{invoice.customerName}</TableCell>
-                          <TableCell className="max-w-48 truncate">{invoice.jobTitle}</TableCell>
-                          <TableCell>{invoice.type}</TableCell>
-                          <TableCell>{new Date(invoice.createdAt).toLocaleDateString()}</TableCell>
-                          <TableCell>{new Date(invoice.dueDate).toLocaleDateString()}</TableCell>
-                          <TableCell className="font-medium">${invoice.totalAmount.toFixed(2)}</TableCell>
+                          <TableCell className="font-mono">{invoice.invoice_number}</TableCell>
+                          <TableCell>{invoice.customer.customer_name}</TableCell>
+                          <TableCell className="max-w-48 truncate">{invoice.job.job_title}</TableCell>
+                          <TableCell>{invoice.job.job_type}</TableCell>
+                          <TableCell>{new Date(invoice.issue_date).toLocaleDateString()}</TableCell>
+                          <TableCell>{new Date(invoice.valid_until).toLocaleDateString()}</TableCell>
+                          <TableCell className="font-medium">
+                            ${Number(invoice.total_amount || 0).toFixed(2)}
+                          </TableCell>
                           <TableCell>
                             <span className={`px-2 py-1 text-xs font-medium rounded-full ${invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
-                                invoice.status === 'sent' ? 'bg-blue-100 text-blue-800' :
-                                  invoice.status === 'overdue' ? 'bg-red-100 text-red-800' :
-                                    'bg-gray-100 text-gray-800'
+                              invoice.status === 'sent' ? 'bg-blue-100 text-blue-800' :
+                                invoice.status === 'overdue' ? 'bg-red-100 text-red-800' :
+                                  'bg-gray-100 text-gray-800'
                               }`}>
                               {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
                             </span>
@@ -350,7 +583,7 @@ export function InvoicesPage() {
                           <TableCell>
                             <div className="flex items-center justify-end gap-2">
                               {hasPermission('invoices', 'view') && (
-                                <Button variant="outline" size="icon" onClick={() => handleViewInvoice(invoice)}>
+                                <Button variant="outline" size="icon" onClick={() => handleViewInvoice(invoice.id)}>
                                   <Eye className="w-4 h-4" />
                                 </Button>
                               )}
@@ -374,6 +607,8 @@ export function InvoicesPage() {
               </CardContent>
             </Card>
           </div>
+
+
         </TabsContent>
 
         {/* Other Tabs Content */}
@@ -389,12 +624,17 @@ export function InvoicesPage() {
           /></TabsContent>
       </Tabs>
 
+
+
       {/* Dialogs */}
       <NewInvoiceDialog
         open={showNewInvoiceDialog}
         onOpenChange={setShowNewInvoiceDialog}
         onSave={handleSaveInvoice}
+        jobs={localJobs}
       />
+
+
       <Dialog open={showInvoiceDetailDialog} onOpenChange={setShowInvoiceDetailDialog}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-auto">
           <DialogHeader>
@@ -406,7 +646,8 @@ export function InvoicesPage() {
               Invoice details for {selectedInvoice?.invoiceNumber}
             </DialogDescription>
           </DialogHeader>
-          {selectedInvoice && <InvoiceTemplate invoice={selectedInvoice} />}
+
+          {selectedInvoice && <InvoiceTemplate />}
           <DialogFooter className="flex gap-2">
             {hasPermission('invoices', 'view') && (
               <Button variant="outline" onClick={handlePrintInvoice}><Printer className="h-4 w-4 mr-2" />Print</Button>
@@ -420,6 +661,15 @@ export function InvoicesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <div
+        ref={printRef}
+        // className="p-6 bg-white border border-black-400 rounded print:p-0 print:bg-white"
+        style={{
+          margin: '0 auto',
+          width: '22cm',
+        }}
+      ></div>
     </div>
+
   )
 }
