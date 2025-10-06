@@ -91,6 +91,8 @@ const getStatusBadge = (status: string) => {
 
 export function TimesheetsPage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+
 
   const [timesheets, setTimesheets] = useState<{
     dashboard_timesheets: TimesheetItem[];
@@ -100,11 +102,33 @@ export function TimesheetsPage() {
       week_range: string;
     };
   } | null>(null);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [employeeFilter, setEmployeeFilter] = useState('all');
 
-  const filteredTimesheets = timesheets?.dashboard_timesheets.filter(item =>
-    item.employee.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.job.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const [dashboardStats, setDashboardStats] = useState({
+    total: 0,
+    pending: 0,
+    totalHours: '0h',
+    billableHours: '0h'
+  });
+
+  const filteredTimesheets = timesheets?.dashboard_timesheets.filter((item: TimesheetItem) => {
+    const searchMatch =
+      item.employee.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.job.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const statusMatch =
+      statusFilter === 'all' || item.status.toLowerCase() === statusFilter;
+
+    const employeeMatch =
+      employeeFilter === 'all' || item.employee.toLowerCase() === employeeFilter;
+
+    return searchMatch && statusMatch && employeeMatch;
+  }) || [];
+
+  const employeeOptions = Array.from(new Set(timesheets?.dashboard_timesheets.map(t => t.employee.toLowerCase())));
+
+
 
 
 
@@ -116,16 +140,34 @@ export function TimesheetsPage() {
     console.log('asas')
     const fetchAlltimesheets = async () => {
       try {
+        setIsLoading(true);
         const response = await apiClient.getAllTimesheets(startDate, endDate);
         console.log(response, "timeres")
         setTimesheets(response.data);
         console.log(response.data, "newtimeres")
       } catch (error) {
         console.error('Error fetching suppliers:', error);
-      }
+      }finally {
+      setIsLoading(false);
+    }
     };
 
     fetchAlltimesheets();
+  }, []);
+
+
+  useEffect(() => {
+    const fetchDashboardStats = async () => {
+      try {
+        const response = await apiClient.getTimesheetDashboardStats();
+        console.log("Dashboard stats", response);
+        setDashboardStats(response?.data);
+      } catch (error) {
+        console.error('Error fetching dashboard stats:', error);
+      }
+    };
+
+    fetchDashboardStats();
   }, []);
   return (
     <div className="space-y-6">
@@ -146,7 +188,7 @@ export function TimesheetsPage() {
           <CardContent className="p-6 flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Total Timesheets</p>
-              <p className="text-2xl font-bold">3</p>
+              <p className="text-2xl font-bold">{dashboardStats.total}</p>
             </div>
             <div className="p-3 bg-blue-100 rounded-lg"><Clock className="h-6 w-6 text-blue-600" /></div>
           </CardContent>
@@ -155,7 +197,7 @@ export function TimesheetsPage() {
           <CardContent className="p-6 flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Pending Approval</p>
-              <p className="text-2xl font-bold">1</p>
+              <p className="text-2xl font-bold">{dashboardStats.pending}</p>
             </div>
             <div className="p-3 bg-yellow-100 rounded-lg"><Hourglass className="h-6 w-6 text-yellow-600" /></div>
           </CardContent>
@@ -164,7 +206,7 @@ export function TimesheetsPage() {
           <CardContent className="p-6 flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Total Hours</p>
-              <p className="text-2xl font-bold">113<span className="text-lg font-medium text-muted-foreground">h</span></p>
+              <p className="text-2xl font-bold">{dashboardStats.totalHours}<span className="text-lg font-medium text-muted-foreground">h</span></p>
             </div>
             <div className="p-3 bg-blue-100 rounded-lg"><Clock className="h-6 w-6 text-blue-600" /></div>
           </CardContent>
@@ -173,7 +215,7 @@ export function TimesheetsPage() {
           <CardContent className="p-6 flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Billable Hours</p>
-              <p className="text-2xl font-bold">107<span className="text-lg font-medium text-muted-foreground">h</span></p>
+              <p className="text-2xl font-bold">{dashboardStats.billableHours}<span className="text-lg font-medium text-muted-foreground">h</span></p>
             </div>
             <div className="p-3 bg-green-100 rounded-lg"><CheckCircle className="h-6 w-6 text-green-600" /></div>
           </CardContent>
@@ -196,26 +238,42 @@ export function TimesheetsPage() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <Select defaultValue="all-status">
-                <SelectTrigger className="w-auto min-w-[150px]"><SelectValue /></SelectTrigger>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-auto min-w-[150px]">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all-status">All Status</SelectItem>
+                  <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="submitted">Submitted</SelectItem>
                   <SelectItem value="approved">Approved</SelectItem>
                   <SelectItem value="draft">Draft</SelectItem>
                 </SelectContent>
               </Select>
-              <Select defaultValue="all-employees">
-                <SelectTrigger className="w-auto min-w-[150px]"><SelectValue /></SelectTrigger>
+
+              <Select value={employeeFilter} onValueChange={setEmployeeFilter}>
+                <SelectTrigger className="w-auto min-w-[150px]">
+                  <SelectValue placeholder="All Employees" />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all-employees">All Employees</SelectItem>
-                  <SelectItem value="john-smith">John Smith</SelectItem>
-                  <SelectItem value="david-wilson">David Wilson</SelectItem>
+                  <SelectItem value="all">All Employees</SelectItem>
+                  {employeeOptions.map(emp => (
+                    <SelectItem key={emp} value={emp}>
+                      {emp.charAt(0).toUpperCase() + emp.slice(1)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-              <span className="text-sm text-muted-foreground">3 timesheets</span>
+
+              <span className="text-sm text-muted-foreground">{filteredTimesheets.length} timesheets</span>
             </div>
+
           </div>
+                  {isLoading ? (
+          <div className="flex justify-center items-center py-10 text-muted-foreground">
+            <div className="animate-spin rounded-full h-6 w-6 border-2 border-t-transparent border-gray-400 mr-3"></div>
+            Loading timesheets...
+          </div>
+        ) : (
 
           <div className="border rounded-lg overflow-x-auto">
             <Table>
@@ -232,49 +290,66 @@ export function TimesheetsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTimesheets?.map((item: any) => (
-                  <TableRow key={item.id || `${item.employee}-${item.week}`} className="odd:bg-white even:bg-slate-50">
-                    <TableCell className="font-medium">{item.employee}</TableCell>
-                    <TableCell>
-                      <div>{item.job}</div>
-                      <div className="text-xs text-muted-foreground">{item.jobCode}</div>
-                    </TableCell>
-                    <TableCell>{item.week}</TableCell>
-                    {['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day: string) => {
-                      const hourValue = item[day];
-                      return (
-                        <TableCell key={day} className="text-center">
-                          {hourValue !== '0h' ? hourValue : '-'}
-                        </TableCell>
-                      );
-                    })}
-
-                    <TableCell className="font-bold text-center">{item.total}h</TableCell>
-                    <TableCell className="font-bold text-center">{item.billable}h</TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(item.status)}`}>
-                        {item.status}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {item.status === 'Submitted' && (
-                          <>
-                            <Button variant="outline" size="icon" className="border-green-500 text-green-500 hover:bg-green-50 hover:text-green-600">
-                              <Check className="w-4 h-4" />
-                            </Button>
-                            <Button variant="outline" size="icon" className="border-red-500 text-red-500 hover:bg-red-50 hover:text-red-600">
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
+                {filteredTimesheets.length > 0 ? (
+                  filteredTimesheets.map((item: any) => (
+                    <TableRow key={item.id || `${item.employee}-${item.week}`} className="odd:bg-white even:bg-slate-50">
+                      <TableCell className="font-medium">{item.employee}</TableCell>
+                      <TableCell>
+                        <div>{item.job}</div>
+                        <div className="text-xs text-muted-foreground">{item.jobCode}</div>
+                      </TableCell>
+                      <TableCell>{item.week}</TableCell>
+                      {['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day: string) => {
+                        const hourValue = item[day];
+                        return (
+                          <TableCell key={day} className="text-center">
+                            {hourValue !== '0h' ? hourValue : '-'}
+                          </TableCell>
+                        );
+                      })}
+                      <TableCell className="font-bold text-center">{item.total}h</TableCell>
+                      <TableCell className="font-bold text-center">{item.billable}h</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(item.status)}`}>
+                          {item.status}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {item.status === 'Submitted' && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="border-green-500 text-green-500 hover:bg-green-50 hover:text-green-600"
+                              >
+                                <Check className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="border-red-500 text-red-500 hover:bg-red-50 hover:text-red-600"
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={11} className="text-center py-6 text-muted-foreground">
+                      No matching timesheets found.
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
+
             </Table>
           </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -214,7 +214,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   console.log(selectedInvoice, 'invoice')
 
 
-
+  const [refreshMaterials, setRefreshMaterials] = useState(false);
+  const [isLoadingMaterials, setIsLoadingMaterials] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showAddInvoiceModal, setShowAddInvoiceModal] = useState(false);
   const [showAddMaterialModal, setShowAddMaterialModal] = useState(false);
@@ -512,7 +513,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         unit_cost: materialFormData.unitCost,
       });
 
-      setMaterials((prev) => [...prev, newProduct]);
+      triggerRefreshMaterials();
 
       dispatch(addProduct(newProduct));
       toast.success('Product added successfully!');
@@ -573,6 +574,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   useEffect(() => {
     fetchEstimates();
   }, [jobId, refreshInvoices]);
+
+
 
 
   const handlePrint = async (currentInvoice: any) => {
@@ -737,8 +740,6 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       console.log('Refreshing job data...');
       const updatedJobData = await apiClient.getJobById(jobId);
       console.log('Updated job data:', updatedJobData);
-
-      // Update the jobs array in the parent component
       const updatedJobs = jobs.map((j: any) => j.id === jobId ? updatedJobData : j);
       setJobs(updatedJobs);
 
@@ -747,6 +748,29 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       console.error('Error refreshing job data:', error);
       toast.error('Failed to refresh job data');
     }
+  };
+
+
+  const fetchMaterials = async () => {
+    setIsLoadingMaterials(true);
+    try {
+      const response = await apiClient.getJobById(jobId);
+      const materialsFromAPI = response.assignedMaterialsDetails || [];
+      setMaterials(materialsFromAPI);
+    } catch (error) {
+      console.error('Failed to fetch materials:', error);
+    } finally {
+      setIsLoadingMaterials(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMaterials();
+  }, [job.id, refreshMaterials]);
+
+
+  const triggerRefreshMaterials = () => {
+    setRefreshMaterials(prev => !prev);
   };
 
   const [jobFormData, setJobFormData] = useState({
@@ -792,11 +816,11 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   }, []);
 
 
-  useEffect(() => {
-    if (job.assignedMaterialsDetails) {
-      setMaterials(job.assignedMaterialsDetails);
-    }
-  }, [job.assignedMaterialsDetails]);
+  // useEffect(() => {
+  //   if (job.assignedMaterialsDetails) {
+  //     setMaterials(job.assignedMaterialsDetails);
+  //   }
+  // }, [job.assignedMaterialsDetails]);
 
 
   useEffect(() => {
@@ -833,11 +857,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
 
 
-  // Fetch roles and labor time logs on component mount
+
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        // Fetch roles
         const rolesData = await apiClient.getRoles();
         setRoles(rolesData);
       } catch (error) {
@@ -978,7 +1001,6 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
             {getPriorityBadge(job.priority)}
           </div>
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {/* Total Hours Worked */}
           <Card className="bg-blue-50 border-blue-200">
@@ -986,13 +1008,15 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-blue-600">Total Hours Worked</p>
-                  <p className="text-2xl font-bold text-blue-900">
-                    {isLoadingDashboard ? (
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                    ) : (
-                      dashboardMetrics?.totalHoursWorked?.value ?? 0
-                    )}
-                  </p>
+                  {isLoadingDashboard ? (
+                    <div className="h-6 flex items-center">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
+                    </div>
+                  ) : (
+                    <p className="text-2xl font-bold text-blue-900">
+                      {dashboardMetrics?.totalHoursWorked?.value ?? 0}
+                    </p>
+                  )}
                   <p className="text-xs text-blue-600">
                     {isLoadingDashboard ? "Loading..." : dashboardMetrics?.totalHoursWorked?.unit ?? "hours"}
                   </p>
@@ -1008,13 +1032,15 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-green-600">Total Material Used</p>
-                  <p className="text-2xl font-bold text-green-900">
-                    {isLoadingDashboard ? (
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
-                    ) : (
-                      dashboardMetrics?.totalMaterialUsed?.value ?? 0
-                    )}
-                  </p>
+                  {isLoadingDashboard ? (
+                    <div className="h-6 flex items-center">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600" />
+                    </div>
+                  ) : (
+                    <p className="text-2xl font-bold text-green-900">
+                      {dashboardMetrics?.totalMaterialUsed?.value ?? 0}
+                    </p>
+                  )}
                   <p className="text-xs text-green-600">
                     {isLoadingDashboard ? "Loading..." : dashboardMetrics?.totalMaterialUsed?.unit ?? "items"}
                   </p>
@@ -1030,13 +1056,15 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-purple-600">Total Labour Entries</p>
-                  <p className="text-2xl font-bold text-purple-900">
-                    {isLoadingDashboard ? (
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
-                    ) : (
-                      dashboardMetrics?.totalLabourEntries?.value ?? 0
-                    )}
-                  </p>
+                  {isLoadingDashboard ? (
+                    <div className="h-6 flex items-center">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600" />
+                    </div>
+                  ) : (
+                    <p className="text-2xl font-bold text-purple-900">
+                      {dashboardMetrics?.totalLabourEntries?.value ?? 0}
+                    </p>
+                  )}
                   <p className="text-xs text-purple-600">
                     {isLoadingDashboard ? "Loading..." : dashboardMetrics?.totalLabourEntries?.unit ?? "entries"}
                   </p>
@@ -1052,13 +1080,15 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-orange-600">Number of Invoices</p>
-                  <p className="text-2xl font-bold text-orange-900">
-                    {isLoadingDashboard ? (
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-600"></div>
-                    ) : (
-                      dashboardMetrics?.numberOfInvoices?.value ?? 0
-                    )}
-                  </p>
+                  {isLoadingDashboard ? (
+                    <div className="h-6 flex items-center">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-600" />
+                    </div>
+                  ) : (
+                    <p className="text-2xl font-bold text-orange-900">
+                      {dashboardMetrics?.numberOfInvoices?.value ?? 0}
+                    </p>
+                  )}
                   <p className="text-xs text-orange-600">
                     {isLoadingDashboard ? "Loading..." : dashboardMetrics?.numberOfInvoices?.unit ?? "invoices"}
                   </p>
@@ -1068,6 +1098,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
             </CardContent>
           </Card>
         </div>
+
 
 
         {/* Main Content */}
@@ -1200,6 +1231,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                   {isEditing ? (
                     <Textarea
                       value={editedJob.description}
+                      maxLength={30}
                       onChange={(e) => setEditedJob({ ...editedJob, description: e.target.value })}
                     />
                   ) : (
@@ -1474,33 +1506,40 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {materials.map((material: any, index: numbe) => (
-                    <div key={material.id ?? material.sku ?? index} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                      <div className="flex items-center gap-4">
-                        <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
-                          <Package className="h-5 w-5 text-blue-700" />
+                {isLoadingMaterials ? (
+                  <p className="text-sm text-gray-500">Loading materials...</p>
+                ) : materials.length === 0 ? (
+                  <p className="text-sm text-gray-500">No materials found.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {materials.map((material: any, index: number) => (
+                      <div key={material.id ?? material.sku ?? index} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                        <div className="flex items-center gap-4">
+                          <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
+                            <Package className="h-5 w-5 text-blue-700" />
+                          </div>
+                          <div>
+                            <h4 className="font-medium">{material.product_name || material.name}</h4>
+                            <p className="text-xs text-gray-600">
+                              {material.supplier?.company_name || material.supplier} • SKU: {material.supplier_sku || material.jdp_sku} • {material.unit}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="font-medium">{material.product_name || material.name}</h4>
-                          <p className="text-xs text-gray-600">
-                            {material.supplier?.company_name || material.supplier} • SKU: {material.supplier_sku || material.jdp_sku} • {material.unit}
-                          </p>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <p className="font-semibold">{formatCurrency(material.unit_cost || material.totalCost || 0)}</p>
+                            <p className="text-sm text-gray-600">{material.stock_quantity || material.quantity || 0} {material.unit}</p>
+                          </div>
+                          <Button variant="outline" size="sm" className="gap-1" onClick={() => handleDeleteProduct(material.id)}>
+                            <Trash2 className="h-3 w-3 text-red-600" />
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="font-semibold">{formatCurrency(material.unit_cost || material.totalCost || 0)}</p>
-                          <p className="text-sm text-gray-600">{material.stock_quantity || material.quantity || 0} {material.unit}</p>
-                        </div>
-                        <Button variant="outline" size="sm" className="gap-1" onClick={() => handleDeleteProduct(material.id)}>
-                          <Trash2 className="h-3 w-3 text-red-600" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
+
             </Card>
 
             {/* Labour & Time Logs */}
@@ -1798,6 +1837,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                 <Label className="mb-2">Product Name</Label>
                 <Input
                   value={materialFormData.name}
+                  maxLength={15}
                   onChange={(e) => setMaterialFormData({ ...materialFormData, name: e.target.value })}
                 />
               </div>
@@ -1805,6 +1845,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                 <Label className="mb-2">SKU</Label>
                 <Input
                   value={materialFormData.sku}
+                   maxLength={15}
                   onChange={(e) => setMaterialFormData({ ...materialFormData, sku: e.target.value })}
                 />
               </div>
@@ -1815,7 +1856,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                 <Label className="mb-2">Quantity</Label>
                 <Input
                   type="number"
-                  value={materialFormData.quantity}
+                  maxLength={10}
+                   value={materialFormData.quantity === 0 ? "" : materialFormData.quantity}
                   onChange={(e) => setMaterialFormData({ ...materialFormData, quantity: Number(e.target.value) })}
                 />
               </div>
@@ -1845,7 +1887,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                 <Label className="mb-2">Unit Cost</Label>
                 <Input
                   type="number"
-                  value={materialFormData.unitCost}
+                  maxLength={10}
+                  value={materialFormData.unitCost === 0 ? "" : materialFormData.unitCost}
                   onChange={(e) => setMaterialFormData({ ...materialFormData, unitCost: Number(e.target.value) })}
                 />
               </div>
@@ -2036,6 +2079,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               <Label className="mb-2">Description</Label>
               <Textarea
                 value={timeLogFormData.description}
+                maxLength={20}
                 onChange={(e) => setTimeLogFormData({ ...timeLogFormData, description: e.target.value })}
                 placeholder="Describe the work performed"
                 rows={3}

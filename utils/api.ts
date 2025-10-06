@@ -887,7 +887,7 @@ export const apiClient = {
     }
     return response.json();
   },
-  // Get Estimate Stats
+
   getEstimateStats: async () => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
     const token = getAuthToken();
@@ -911,6 +911,33 @@ export const apiClient = {
     console.log("Fetch Estimate Stats", response);
     return response.json();
   },
+
+
+getTimesheetDashboardStats: async () => {
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+  const token = getAuthToken();
+
+  if (!token) {
+    throw new Error("No authentication token found");
+  }
+
+  const response = await fetch(`${apiBaseUrl}/job/getTimesheetDashboardStats`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch timesheet dashboard stats");
+  }
+
+  console.log("Fetch Timesheet Dashboard Stats", response);
+  return response.json();
+},
+
+  
 
   getProjectSummary: async (jobId: string | number) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;

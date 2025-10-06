@@ -177,6 +177,8 @@ export function InvoicesPage() {
     return matchesSearch && matchesStatus && matchesType
   })
 
+  console.log(invoice, "newfilter")
+
   const handleSaveInvoice = (newInvoiceData: Partial<Invoice>) => {
     const subtotal =
       (newInvoiceData.items?.reduce((sum, item) => sum + item.total, 0) || 0) +
@@ -350,14 +352,20 @@ export function InvoicesPage() {
 
 
 
-  const filteredEstimates = estimates.filter((invoice: any) => {
+  const filteredEstimates = estimates.filter((invoice: Estimate) => {
     const term = searchTerm.toLowerCase();
-    return (
+
+    const matchesSearch =
       invoice.invoice_number?.toLowerCase().includes(term) ||
       invoice.customer?.customer_name?.toLowerCase().includes(term) ||
-      invoice.job?.job_title?.toLowerCase().includes(term)
-    );
+      invoice.job?.job_title?.toLowerCase().includes(term);
+
+    const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
+    const matchesType = typeFilter === 'all' || invoice.invoice_type === typeFilter;
+
+    return matchesSearch && matchesStatus && matchesType;
   });
+
 
 
   console.log(filteredEstimates, "filterrrr")
@@ -534,7 +542,7 @@ export function InvoicesPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Types</SelectItem>
-                        <SelectItem value="proposed">Proposed</SelectItem>
+                        <SelectItem value="proposal_invoice">Proposed</SelectItem>
                         <SelectItem value="roughen">Roughen</SelectItem>
                         <SelectItem value="progressive">Progressive</SelectItem>
                         <SelectItem value="final">Final</SelectItem>
@@ -560,48 +568,57 @@ export function InvoicesPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredEstimates?.map((invoice: any) => (
-                        <TableRow key={invoice.id}>
-                          <TableCell className="font-mono">{invoice.invoice_number}</TableCell>
-                          <TableCell>{invoice.customer.customer_name}</TableCell>
-                          <TableCell className="max-w-48 truncate">{invoice.job.job_title}</TableCell>
-                          <TableCell>{invoice.job.job_type}</TableCell>
-                          <TableCell>{new Date(invoice.issue_date).toLocaleDateString()}</TableCell>
-                          <TableCell>{new Date(invoice.valid_until).toLocaleDateString()}</TableCell>
-                          <TableCell className="font-medium">
-                            ${Number(invoice.total_amount || 0).toFixed(2)}
-                          </TableCell>
-                          <TableCell>
-                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
-                              invoice.status === 'sent' ? 'bg-blue-100 text-blue-800' :
-                                invoice.status === 'overdue' ? 'bg-red-100 text-red-800' :
-                                  'bg-gray-100 text-gray-800'
-                              }`}>
-                              {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center justify-end gap-2">
-                              {hasPermission('invoices', 'view') && (
-                                <Button variant="outline" size="icon" onClick={() => handleViewInvoice(invoice.id)}>
-                                  <Eye className="w-4 h-4" />
-                                </Button>
-                              )}
-                              {hasPermission('invoices', 'view') && (
-                                <Button variant="outline" size="icon" onClick={() => handleDownloadInvoice()}>
-                                  <Download className="w-4 h-4" />
-                                </Button>
-                              )}
-                              {hasPermission('invoices', 'delete') && (
-                                <Button variant="outline" size="icon" onClick={() => handleDeleteInvoice(invoice.id)}>
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              )}
-                            </div>
+                      {filteredEstimates.length > 0 ? (
+                        filteredEstimates.map((invoice: any) => (
+                          <TableRow key={invoice.id}>
+                            <TableCell className="font-mono">{invoice.invoice_number}</TableCell>
+                            <TableCell>{invoice.customer?.customer_name || 'N/A'}</TableCell>
+                            <TableCell className="max-w-48 truncate">{invoice.job?.job_title || 'N/A'}</TableCell>
+                            <TableCell>{invoice.invoice_type || 'N/A'}</TableCell>
+                            <TableCell>{invoice.issue_date ? new Date(invoice.issue_date).toLocaleDateString() : 'N/A'}</TableCell>
+                            <TableCell>{invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'N/A'}</TableCell>
+                            <TableCell className="font-medium">
+                              ${Number(invoice.total_amount || 0).toFixed(2)}
+                            </TableCell>
+                            <TableCell>
+                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
+                                  invoice.status === 'sent' ? 'bg-blue-100 text-blue-800' :
+                                    invoice.status === 'overdue' ? 'bg-red-100 text-red-800' :
+                                      'bg-gray-100 text-gray-800'
+                                }`}>
+                                {invoice.status?.charAt(0).toUpperCase() + invoice.status?.slice(1)}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center justify-end gap-2">
+                                {hasPermission('invoices', 'view') && (
+                                  <Button variant="outline" size="icon" onClick={() => handleViewInvoice(invoice.id)}>
+                                    <Eye className="w-4 h-4" />
+                                  </Button>
+                                )}
+                                {hasPermission('invoices', 'view') && (
+                                  <Button variant="outline" size="icon" onClick={() => handleDownloadInvoice()}>
+                                    <Download className="w-4 h-4" />
+                                  </Button>
+                                )}
+                                {hasPermission('invoices', 'delete') && (
+                                  <Button variant="outline" size="icon" onClick={() => handleDeleteInvoice(invoice.id)}>
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
+                            No matching invoices found.
                           </TableCell>
                         </TableRow>
-                      ))}
+                      )}
                     </TableBody>
+
                   </Table>
                 </div>
               </CardContent>

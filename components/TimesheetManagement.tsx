@@ -57,6 +57,12 @@ export function TimesheetManagement({ onBack, jobs }: TimesheetManagementProps) 
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterEmployee, setFilterEmployee] = useState<string>('all')
   const [timesheets, setTimesheets] = useState<TimesheetEntry[]>([])
+  const [dashboardStats, setDashboardStats] = useState({
+  total: 0,
+  pending: 0,
+  totalHours: '0h',
+  billableHours: '0h'
+});
 
 
   // Sample timesheet data
@@ -131,6 +137,21 @@ export function TimesheetManagement({ onBack, jobs }: TimesheetManagementProps) 
 
     fetchAlltimesheets();
   }, []);
+
+
+  useEffect(() => {
+  const fetchDashboardStats = async () => {
+    try {
+      const response = await apiClient.getTimesheetDashboardStats();
+      console.log("Dashboard stats", response);
+      setDashboardStats(response.data.data);
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+    }
+  };
+
+  fetchDashboardStats();
+}, []);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -212,8 +233,8 @@ export function TimesheetManagement({ onBack, jobs }: TimesheetManagementProps) 
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Timesheets</p>
-                <p className="text-2xl font-medium text-[#2b2b2b]">{timesheets.length}</p>
+                <p className="text-sm text-gray-600">Total Timesheetssss</p>
+                <p className="text-2xl font-medium text-[#2b2b2b]">{dashboardStats.total}</p>
               </div>
               <div className="w-12 h-12 bg-[#E6F6FF] rounded-lg flex items-center justify-center">
                 <Clock className="h-6 w-6 text-[#00A1FF]" />
