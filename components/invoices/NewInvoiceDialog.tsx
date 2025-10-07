@@ -13,38 +13,16 @@ import { format } from 'date-fns'
 import { Invoice, InvoiceItem, LaborEntry, AdditionalCost } from '../../types/invoice'
 import { apiClient } from '../../utils/api'
 import { toast } from 'sonner'
+import {NewInvoiceDialogProps, Job} from '../../types/invoice'
 
-interface NewInvoiceDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  customers: any[];
-  jobs: any[];
-  roles: any [];
-  job?: {            // <--- make optional
-    id: number;
-    title: string;
-  };
-  suppliers: any[]
-  onReload: () => void
-  setIsLoading: boolean
-}
-
-interface Job {
-  id: number;
-  title: string;
-  
-};
-
-export const NewInvoiceDialog = ({ open, onOpenChange, customers, job, jobs, suppliers, onReload, setIsLoading }: NewInvoiceDialogProps) => {
- 
+export const NewInvoiceDialog = ({ open, onOpenChange, customers, job, jobs, suppliers, onReload }: NewInvoiceDialogProps) => {
+ console.log("Jobs in NewInvoiceDialog:", jobs); // Debugging line to check jobs prop
   const [loading, setLoading] = useState(false);
-  const [currentStep, setCurrentStep] = useState(1)
-  
+  const [currentStep, setCurrentStep] = useState(1);
   const [selectJob, setSelectJob] = useState<Job | null>(null);
   const [newInvoice, setNewInvoice] = useState<Partial<Invoice>>({
     customerId: '',
     jobId: Number(job?.id || selectJob?.id),
-    // jobId: job?.id || selectJob.id,
     type: 'estimate',
     issueDate: format(new Date(), 'yyyy-MM-dd'),
     dueDate: format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
@@ -56,7 +34,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, job, jobs, sup
     invoiceNumber:''
   })
 
-  const [formErrors, setFormErrors] = useState([]);
+  const [formErrors, setFormErrors] = useState<Record<string, any>>({});
 
   useEffect(() => {
     if (job?.id) {
@@ -174,7 +152,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, job, jobs, sup
   };
 
   const validateStep = (step: number) => {
-    let errors: Record<string, string> = {};
+    let errors: Record<string, any> = {};
     console.log(JSON.stringify(newInvoice));
     switch (step) {
       case 1: // Customer, Type, Issue Date, Due Date
@@ -249,12 +227,16 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, job, jobs, sup
 
      case 4: // Additional cost (optional, so usually no hard validation)
       if (newInvoice.additionalCosts?.description && !newInvoice.additionalCosts?.amount) {
-        errors.additionalCosts = errors.additionalCosts || {};
+        if (typeof errors.additionalCosts !== 'object' || errors.additionalCosts === undefined) {
+          errors.additionalCosts = {};
+        }
         errors.additionalCosts.amount = "Additional amount is required";
       }
 
       if (newInvoice.additionalCosts?.amount && !newInvoice.additionalCosts?.description) {
-        errors.additionalCosts = errors.additionalCosts || {};
+        if (typeof errors.additionalCosts !== 'object' || errors.additionalCosts === undefined) {
+          errors.additionalCosts = {};
+        }
         errors.additionalCosts.description = "Additional description is required";
       }
       break;
@@ -276,11 +258,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, job, jobs, sup
 
   const saveInvoiceData = async () => {
     try {
-      // setIsLoading(true);
-
-      // Validate form data
-      // const validationErrors = validateFormData();
-     // Check if there are any errors
+      
       if (Object.keys(formErrors).length > 0) {
         // Convert all error messages into a single string
         const errorMessages = Object.values(formErrors).join(", ");
@@ -288,7 +266,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, job, jobs, sup
         return false;
       }
 
-
+      setLoading(true);
       // Calculate totals
       const materialsTotal = calculateTotalMaterialsCost();
       const laborTotal = calculateTotalLaborCost();
@@ -310,7 +288,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, job, jobs, sup
         priority: "medium",
         valid_until: newInvoice.dueDate || format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
         location: "Project Location", // You may want to make this dynamic
-        description: newInvoice.notes ,
+        description: newInvoice.notes || '',
         service_type: "service_based",
         email_address: getSelectedCustomerEmail(),
         estimate_date: newInvoice.issueDate || format(new Date(), 'yyyy-MM-dd'),
@@ -363,15 +341,16 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, job, jobs, sup
         }))
       };
 
+      
       console.log('Sending payload:', payload); // For debugging
 
       const response = await apiClient.createEstimate(payload);
       console.log('Invoice saved successfully:', response);
       toast.success('Invoice saved successfully!');
       onReload();
-      // setIsLoading(false);
+      
       setNewInvoice({
-        jobId:job?.id || selectJob.id
+        jobId:job?.id || selectJob?.id
       });
 
       return true;
@@ -390,15 +369,16 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, job, jobs, sup
       toast.error(errorMessage);
       return false;
     } finally {
-      // setIsLoading(false);
+      setLoading(false);
     }
   };
 
   const handleSave = async () => {
+    setLoading(true);
     const success = await saveInvoiceData();
     
     if (success) {
-     
+      onReload();
       
       // Reset form
       setNewInvoice({
@@ -416,6 +396,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, job, jobs, sup
       
       setCurrentStep(1);
       onOpenChange(false);
+      
     }
   }
 
@@ -424,7 +405,31 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, job, jobs, sup
   const totalAmount = subtotal + taxAmount;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(isOpen) => {
+        onOpenChange(isOpen);      // 👈 Call the parent’s handler to close the dialog
+        if (!isOpen) {
+          setFormErrors([]); 
+          setNewInvoice({
+            customerId: '',
+            jobId: Number(job?.id || selectJob?.id),
+            // jobId: job?.id || selectJob.id,
+            type: 'estimate',
+            issueDate: format(new Date(), 'yyyy-MM-dd'),
+            dueDate: format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
+            items: [],
+            labor: [],
+            additionalCosts: { description: '', amount: 0 }, // Changed to single object
+            notes: '',
+            taxRate: 0.08,
+            invoiceNumber:''
+          });     
+        }
+      }}
+    >
+
+
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
         <DialogHeader>
           <DialogTitle>Create New Invoice</DialogTitle>
@@ -480,7 +485,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, job, jobs, sup
                 <div className="space-y-2">
   {/* <Label htmlFor="job">Job *</Label> */}
 
-  {job ? (
+  {job && Object.keys(job).length > 0? (
     <Input 
       type="text" 
       value={job?.title || ''} 
@@ -493,7 +498,8 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, job, jobs, sup
   className="w-full border border-input rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
   value={newInvoice.jobId || ""}
   onChange={(e) => {
-    const selectedJobId = Number(e.target.value);
+    // const selectedJobId = Number(e.target.value);
+    const selectedJobId = e.target.value
   
      const selected = jobs.find((j) => j.id == selectedJobId) || null;
     setSelectJob(selected);
@@ -521,7 +527,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, customers, job, jobs, sup
                 <Label htmlFor="type">Invoice Type *</Label>
                 <Select
                   value={newInvoice.type} 
-                  onValueChange={(value) => setNewInvoice(prev => ({ ...prev, type: value }))}
+                  onValueChange={(value) => setNewInvoice(prev => ({ ...prev, type: value as Invoice['type'] }))}
                 >
 
                   <SelectTrigger>

@@ -31,111 +31,14 @@ import {
   CheckSquare
 } from 'lucide-react'
 
-interface Job {
-  id: string
-  title: string
-  type: 'service-based' | 'contract-based'
-  status: 'pending' | 'in-progress' | 'completed' | 'cancelled'
-  assignedLeadLabor: string[]
-  assignedLabor: string[]
-  contractor?: string
-  customer?: string
-  description: string
-  createdDate: string
-  dueDate: string
-  estimatedHours?: number
-  actualHours?: number
-  estimatedCost?: number
-  actualCost?: number
-  materials?: string[]
-  address: string
-  cityZip: string
-  phone?: string
-  email?: string
-  billToAddress?: string
-  billToCityZip?: string
-  billToPhone?: string
-  billToEmail?: string
-  sameAsAddress: boolean
-  priority: 'low' | 'medium' | 'high' | 'urgent'
-  billingStatus?: 'pending' | 'invoiced' | 'paid'
-  // Additional fields from API
-  customerName?: string
-  contractorName?: string
-  createdBy?: string
-  assignedLeadLaborDetails?: any[]
-  assignedLaborDetails?: any[]
-  assignedMaterialsDetails?: any[]
-  leadLabors?:any[]
-}
-
-// Define a type for project summary
-interface ProjectSummary {
-  estimate?: number
-  actualCost?: number
-  laborCost?: number
-  materialsCost?: number
-  message?: string
-  success?: boolean
-}
-
-interface Metric {
-  value: number
-  unit: string
-  color: string
-}
-
-interface DashboardMatrics {
-  totalHoursWorked?: Metric
-  totalMaterialUsed?: Metric
-  totalLabourEntries?: Metric
-  numberOfInvoices?: Metric
-}
-
-// Individual estimate interface
-interface Estimate {
-  id: string;
-  customer_id: string;
-  job_id: string;
-  invoice_number: string;
-  invoice_type: string;
-  due_date: string;
-  issue_date: string;
-  status: string;
-  description: string;
-  additional_costs: string;
-  labor_cost: string;
-  subtotal: string;
-  total_amount: string;
-}
-
-interface EstimatesResponse {
-  data: {
-    estimates: Estimate[];
-  };
-}
-
+import { GetEstimatesResponse, ProjectSummary, DashboardMatrics, Job, Estimate} from '../types/jobManagement'
 
 export function JobManagementPage() {
   const { hasPermission } = usePermissions()
   const [jobs, setJobs] = useState<Job[]>([])
   const [projectSummary, setProjectSummary] = useState<ProjectSummary | null>(null)
   const [dashboardMetrics, setDashboardMetrics] = useState<DashboardMatrics | null>(null)
-  const [estimates, setEstimates] = useState<EstimatesResponse | null >({
-    id: '',
-    customer_id: '',
-    job_id: '',
-    invoice_number: '',
-    invoice_type:'',
-    due_date:'',
-    issue_date:'',
-    status:'',
-    description: '',
-    additional_costs: '',
-    labor_cost: '',
-    subtotal: '',
-    total_amount: '',
-  })
+  const [estimates, setEstimates] = useState<Estimate[]>([]);
   const [leadLabors, setLeadLabors] = useState<Job[]>([])
   const [labors, setLabors] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
@@ -189,7 +92,7 @@ export function JobManagementPage() {
   };
   //Jyoti
   
-  const fetchProjectSummary = async (selectedJobId: string | number ) => {
+  const fetchProjectSummary = async (selectedJobId: number ) => {
     if (selectedJobId == null) return // skip when no job is selected
     try {
       setLoading(true)
@@ -205,7 +108,7 @@ export function JobManagementPage() {
     }
   }
   
-  const fetchDashboardMetrics = async(jobId: string) => {
+  const fetchDashboardMetrics = async(jobId: number) => {
     try {
       setLoading(true)
       const dashboardMetrics = await apiClient.getDashboardMetrics(jobId)
@@ -227,12 +130,15 @@ export function JobManagementPage() {
     }
   }
 
-  const fetchEstimates = async(jobId: string) => {
+  const fetchEstimates = async(jobId: number) => {
     try {
       setLoading(true);
-      const estimates = await apiClient.getEstimatesByJob(jobId);
-      console.log('Estimates:', estimates);
-      setEstimates(estimates.data.estimates);
+     
+      const estimatesResponse = await apiClient.getEstimatesByJob(jobId) as { data: GetEstimatesResponse };
+
+      console.log('Estimates:', estimatesResponse);
+      
+      setEstimates(estimatesResponse.data.estimates);
     } catch (error) {
       console.error('Error fetching estimates:', error);
       toast.error('Failed to load Estimates');
@@ -242,7 +148,8 @@ export function JobManagementPage() {
   }
 
   const onActionTrigger = async() => {
-    await Promise.all([fetchDashboardMetrics(selectedJobId), fetchProjectSummary(selectedJobId), fetchEstimates(selectedJobId)]);
+    setLoading(true);
+    await Promise.all([fetchDashboardMetrics(Number(selectedJobId)), fetchProjectSummary(Number(selectedJobId)), fetchEstimates(Number(selectedJobId))]);
   }
 
   const fetchLeadLabors = async (page: number = 1) => {
@@ -297,8 +204,16 @@ export function JobManagementPage() {
     fetchJobStats()
     fetchLeadLabors()
     fetchLabors()
-    fetchEstimates('30')
+    // fetchEstimates(30)
   }, [])
+
+  useEffect(() => {
+    if (selectedJobId != null) {
+      fetchEstimates(Number(selectedJobId)); 
+    }
+  }, [selectedJobId]);
+
+
 
   // Handle page change
   const handlePageChange = (page: number) => {
@@ -326,7 +241,7 @@ export function JobManagementPage() {
     try {
       setLoading(true)
       // Fetch the latest job details from API
-      const jobDetails = await apiClient.getJobById(jobId)
+      const jobDetails = await apiClient.getJobById(jobId) as Job
       console.log('jobDetailsjobDetails', jobDetails);
       // Update the jobs array with the fetched job details
       setJobs(prevJobs => 
@@ -359,7 +274,7 @@ export function JobManagementPage() {
     try {
       setLoading(true)
       // Fetch the latest job details from API
-      const jobDetails = await apiClient.getJobById(job.id)
+      const jobDetails = await apiClient.getJobById(job.id) as Job
       
       // Update the jobs array with the fetched job details
       setJobs(prevJobs => 
@@ -524,7 +439,7 @@ export function JobManagementPage() {
         onBack={handleBackToList}
         jobs={jobs}
         setJobs={setJobs}
-        projectSummary={projectSummary}
+        projectSummary={projectSummary }
         dashboardMetrics={dashboardMetrics}
         estimates={estimates}
         onReload={onActionTrigger} 
@@ -546,7 +461,7 @@ export function JobManagementPage() {
     ...job,
     location: `${job.address}, ${job.cityZip}`,
     customer: job.customerName || job.customer || 'Unknown Customer',
-    priority: job.priority === 'urgent' ? 'high' : job.priority,
+    priority: job.priority as 'low' | 'medium' | 'high',
     assignedLabor: job.assignedLaborDetails?.map(l => l.user?.full_name || l.labor_code) || []
   }))
 
@@ -779,7 +694,7 @@ export function JobManagementPage() {
                   </div>
                 </div>
                 <ActionButtonsPopup
-                  onView={() => {handleViewDetails(job.id); fetchDashboardMetrics(job.id); fetchProjectSummary(job.id)}}
+                  onView={() => {handleViewDetails(job.id); fetchDashboardMetrics(Number(job.id)); fetchProjectSummary(Number(job.id))}}
                   onEdit={() => handleEditJob(job)}
                   onDelete={() => handleDeleteJob(job.id)}
                   itemName={job.title}

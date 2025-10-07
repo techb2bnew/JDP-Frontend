@@ -4,44 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
 import { Badge } from './ui/badge'
 import { ArrowLeft, CheckSquare, X, Clock, FileText, User } from 'lucide-react'
-
-interface Job {
-  id: string
-  title: string
-  type: 'service-based' | 'contract-based'
-  status: 'pending' | 'in-progress' | 'completed' | 'cancelled'
-  assignedLabor: string[]
-  contractor?: string
-  customer: string
-  description: string
-  createdDate: string
-  dueDate: string
-  estimatedHours?: number
-  actualHours?: number
-  estimatedCost?: number
-  actualCost?: number
-  materials?: string[]
-  location: string
-  priority: 'low' | 'medium' | 'high'
-  billingStatus?: 'pending' | 'invoiced' | 'paid'
-}
-
-interface ApprovalItem {
-  id: string
-  type: 'bluesheet' | 'timesheet' | 'invoice' | 'job-completion'
-  jobId: string
-  jobTitle: string
-  submittedBy: string
-  submittedDate: string
-  status: 'pending' | 'approved' | 'rejected'
-  description: string
-  amount?: number
-}
-
-interface JobApprovalsProps {
-  onBack: () => void
-  jobs: Job[]
-}
+import {Job, ApprovalItem, JobApprovalsProps} from '../types/jobManagement'
 
 export function JobApprovals({ onBack }: JobApprovalsProps) {
   const [approvals, setApprovals] = useState<ApprovalItem[]>([

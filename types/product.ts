@@ -57,5 +57,17 @@ export interface ProductFormData {
   }
 }
 
+export interface createProductPayload {
+    product_name: string,
+    supplier_id: Number,
+    supplier_sku: string,
+    jdp_sku: string,
+    stock_quantity: Number,
+    unit: string,
+    job_id: string,
+    is_custom: boolean,
+    unit_cost: Number,
+}
+
 export type ProductAction = 'view' | 'edit' | 'delete' | 'add'
 export type FilterStatus = 'all' | 'active' | 'inactive' | 'draft'

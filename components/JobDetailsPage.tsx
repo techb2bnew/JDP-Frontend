@@ -49,7 +49,8 @@ import { globalApiCall } from '../utils/globalApiHandler';
 import { Product, Branch } from '../types/product';
 import { NewInvoiceDialog } from './invoices/NewInvoiceDialog'
 import { LoadingSpinner } from './common/LoadingSpinner'
-
+import { Supplier, JobDetailsPageProps, Estimate } from '../types/jobManagement'
+import { Invoice } from '@/types/invoice'
 // Sample data structure - replace with your actual data
 const sampleJobData = {
   "job": {
@@ -174,62 +175,6 @@ const sampleJobData = {
   ]
 }
 
-interface ProjectSummary {
-  estimate: number
-  actualCost: number
-  laborCost: number
-  materialsCost: number
-  message: string
-  success: boolean
-}
-
-interface Metric {
-  value: number
-  unit: string
-  color: string
-}
-
-interface DashboardMetrics {
-  totalHoursWorked?: Metric
-  totalMaterialUsed?: Metric
-  totalLabourEntries?: Metric
-  numberOfInvoices?: Metric
-}
-
-interface Estimates {
-  id: string,
-  customer_id: string,
-  job_id: string,
-  invoice_number: string,
-  invoice_type:string,
-  due_date:string,
-  issue_date:string,
-  status:string,
-  description:string,
-  additional_costs: string,
-  labor_cost: string,
-  subtotal: string,
-  total_amount: string,
-}
-
-interface JobDetailsPageProps {
-  jobId: string
-  onBack: () => void
-  jobs: any[]
-  setJobs: (jobs: any[]) => void
-  projectSummary: ProjectSummary 
-  dashboardMetrics: DashboardMetrics | null
-  estimates: Estimates | null
-  onReload: () => void
-}
-
-interface Supplier {
-  id: number;
-  company_name: string;
-  contact_person: string;
-  supplier_code: string;
-  user_id: number;
-}
 
 export function JobDetailsPage({ jobId, onBack, jobs, setJobs, projectSummary, dashboardMetrics, estimates, onReload }: JobDetailsPageProps) {
   // Find the job from your jobs array or use sample data
@@ -321,28 +266,14 @@ const handleDeleteProduct = async () => {
   if (!itemToDelete) return;
 
   try {
-    setIsLoading(true); // Global loading for delete action
+      setIsLoading(true); 
     
-    const token = localStorage.getItem("jdp_auth")
-      ? JSON.parse(localStorage.getItem("jdp_auth")!).token
-      : null;
-
-    const headers: Record<string, string> = {};
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      const response = await fetch(
-        `${apiBaseUrl}/products/deleteProduct/${itemToDelete.id}`,
-        { method: "DELETE", headers }
-      );
-
-      const responseData = await response.json();
+      const responseData = await apiClient.deleteProduct(itemToDelete.id);
+      
       console.log("Product deletion response:", responseData);
 
       if (responseData.success) {
-        if (typeof window !== "undefined") {
-          const { toast } = await import("sonner");
-          toast.success("Product deleted successfully!");
-        }
+        toast.success("Product deleted successfully!");
 
         // Close dialog and reset state
         setShowDeleteAlert(false);
@@ -428,28 +359,30 @@ const handleAction = (action: string, type: string, item: any) => {
   }, []);
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const fetchData = async () => {
+
+  const fetchSuppliers = async (): Promise<Supplier[]> => {
     try {
-      const response = await globalApiCall(`${apiBaseUrl}/suppliers/getAllSuppliers`, {
-        method: 'GET'
-      });
-      
-      return await response.json();
+      setIsLoading(true)
+      const suppliers = await apiClient.getAllSuppliers()
+      console.log('supplierssuppliers', suppliers)
+      return suppliers;
     } catch (error) {
-      // Token revocation is automatically handled
-      // Only handle other errors here
-      if (!(error instanceof Error && error.message?.includes('Session expired'))) {
-        console.error('Other error:', error);
-      }
+      console.error('Error fetching suppliers:', error)
+      toast.error('Failed to fetch suppliers')
+      return [] // ✅ safe fallback for failed request
+    } finally {
+      setIsLoading(false)
     }
   }
+
+
+
   useEffect(() => {
     const loadSuppliers = async () => {
-      const data = await fetchData(); 
-      console.log("Suppliersss", data.data, data.data.data[0]);
-      if (data?.data) {
-        setSuppliers(data.data.data);
+      const data = await fetchSuppliers(); 
+      console.log("Suppliersss", data);
+      if (data) {
+        setSuppliers(data);
       }
       console.log('suppiersSet', suppliers);
     };
@@ -457,68 +390,62 @@ const handleAction = (action: string, type: string, item: any) => {
     loadSuppliers();
   }, []);
 
-const handleSaveProduct = async () => {
-  // ✅ Run validation first
-  const errors: Record<string, string> = {};
+  const handleSaveProduct = async () => {
+    // ✅ Run validation first
+    const errors: Record<string, string> = {};
 
-  if (!materialFormData.name?.trim()) {
-    errors.name = "Product name is required";
-  }
-  if (!materialFormData.supplier) {
-    errors.supplier = "Supplier is required";
-  }
-  if (!materialFormData.sku?.trim()) {
-    errors.sku = "Supplier SKU is required";
-  }
-  if (materialFormData.quantity <= 0) {
-    errors.quantity = "Quantity must be greater than 0";
-  }
-  if (!materialFormData.unit?.trim()) {
-    errors.unit = "Unit is required";
-  }
-  if (materialFormData.unitCost <= 0) {
-    errors.unitCost = "Unit cost must be greater than 0";
-  }
+    if (!materialFormData.name?.trim()) {
+      errors.name = "Product name is required";
+    }
+    if (!materialFormData.supplier) {
+      errors.supplier = "Supplier is required";
+    }
+    if (!materialFormData.sku?.trim()) {
+      errors.sku = "Supplier SKU is required";
+    }
+    if (materialFormData.quantity <= 0) {
+      errors.quantity = "Quantity must be greater than 0";
+    }
+    if (!materialFormData.unit?.trim()) {
+      errors.unit = "Unit is required";
+    }
+    if (materialFormData.unitCost <= 0) {
+      errors.unitCost = "Unit cost must be greater than 0";
+    }
 
-  if (Object.keys(errors).length > 0) {
-    setMaterialValidationErrors(errors);
-    toast.error("Please fix the validation errors");
-    return;
-  }
+    if (Object.keys(errors).length > 0) {
+      setMaterialValidationErrors(errors);
+      toast.error("Please fix the validation errors");
+      return;
+    }
 
-  try {
-    const payload = {
-      product_name: materialFormData.name,
-      supplier_id: Number(materialFormData.supplier),
-      supplier_sku: materialFormData.sku,
-      jdp_sku: `JDP-${materialFormData.sku}`,
-      stock_quantity: materialFormData.quantity,
-      unit: materialFormData.unit.toLowerCase(),
-      job_id: jobId,
-      is_custom: true,
-      unit_cost: materialFormData.unitCost,
-    };
+    try {
+      const payload = {
+        product_name: materialFormData.name,
+        supplier_id: Number(materialFormData.supplier),
+        supplier_sku: materialFormData.sku,
+        jdp_sku: `JDP-${materialFormData.sku}`,
+        stock_quantity: materialFormData.quantity,
+        unit: materialFormData.unit.toLowerCase(),
+        job_id: jobId,
+        is_custom: true,
+        unit_cost: materialFormData.unitCost,
+      };
 
-
-    const response = await globalApiCall(`${apiBaseUrl}/products/createProduct`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    console.log('inside ti',response);
-    toast.success("Product created successfully!");
-    setShowAddMaterialModal(false);
-    resetMaterialForm(); // <- same like resetTimeLogForm
-    onReload();
-    await fetchProductsData();
-    setIsLoading(false);
- 
-  } catch (error) {
-    console.error("Error creating product:", error);
-    toast.error(error instanceof Error ? error.message : "Failed to create product");
-  }
-};
+      const response = await apiClient.createProduct(payload);
+      console.log('inside ti',response);
+      toast.success("Product created successfully!");
+      setShowAddMaterialModal(false);
+      resetMaterialForm(); // <- same like resetTimeLogForm
+      onReload();
+      await fetchProductsData();
+      setIsLoading(false);
+  
+    } catch (error) {
+      console.error("Error creating product:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to create product");
+    }
+  };
 
 
 
@@ -541,8 +468,7 @@ const handleSaveProduct = async () => {
 
   const materials = job.assignedMaterialsDetails || sampleJobData.materials
 
-  const timeLogs = sampleJobData.timeLogs // Keep sample data for now as we don't have time logs API
-  const invoices = estimates || sampleJobData.invoices // Keep sample data for now as we don't have invoices API
+  // Keep sample data for now as we don't have invoices API`
 
   // Calculate totals using real job data
   const totalMaterialCost = materials.reduce((sum: number, material: any) => sum + (material.unit_cost || material.totalCost || 0), 0)
@@ -553,11 +479,7 @@ const handleSaveProduct = async () => {
       return sum + (hourlyRate * estimatedHours);
     }, 0) : 
     job.estimatedCost || 0
-  const totalHours = timeLogs.reduce((sum, log) => sum + log.hoursWorked, 0)
-  const totalMaterialItems = materials.reduce((sum: number, material: any) => sum + (material.stock_quantity || material.quantity || 0), 0)
-  const totalLaborEntries = job.assignedLaborDetails ? job.assignedLaborDetails.length : timeLogs.length;
-  const totalInvoices = invoices.length;
-  const [showEditJobModal, setShowEditJobModal] = useState(false);
+  
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showAddInvoiceModal, setShowAddInvoiceModal] = useState(false);
@@ -1306,20 +1228,20 @@ const handleSaveProduct = async () => {
                       <Plus className="h-4 w-4" />
                       Add Invoice
                     </Button>
-                    <NewInvoiceDialog
+                     <NewInvoiceDialog
                       open={open}
                       onOpenChange={setOpen}
                       customers={customers}
-                      // roles={roles}
                       job={job}
+                      jobs={[]}
                       suppliers={suppliers}
                       onReload={onReload}
-                      setIsLoading={setIsLoading}
+                      onSave={(newInvoiceData: Partial<Invoice>): void => {}}
                     />
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {invoices.length === 0  ? (
+                      {estimates?.length == 0  ? (
                         // Empty state
                       <div className="text-center py-8">
                         <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -1334,7 +1256,7 @@ const handleSaveProduct = async () => {
                         </Button>
                       </div>
                       ):
-                      (invoices.map((invoice) => (
+                      (estimates?.map((invoice:Estimate) => (
                         <div key={invoice.id} className="flex items-center justify-between p-4 border rounded-lg">
                           <div className="flex items-center gap-4">
                             <div className="h-10 w-10 bg-gray-200 rounded-lg flex items-center justify-center">
@@ -1359,7 +1281,7 @@ const handleSaveProduct = async () => {
                           </div>
                           <div className="flex items-center gap-4">
                             <div className="text-right">
-                              <p className="font-semibold mb-1">{formatCurrency(invoice.total_amount)}</p>
+                              <p className="font-semibold mb-1">{formatCurrency(Number(invoice.total_amount))}</p>
                               <span>
                                 {getStatusBadge(job.status)}
                               </span>
@@ -1631,24 +1553,24 @@ const handleSaveProduct = async () => {
                     <div className="space-y-4">
                       <div className="flex justify-between">
                         <span className="text-sm text-gray-600">Job Estimate</span>
-                        <span className="font-medium">{formatCurrency(projectSummary?.estimate)}</span>
+                        <span className="font-medium">{formatCurrency(projectSummary?.estimate ?? 0)}</span>
                       </div>
 
                       <div className="flex justify-between">
                         <span className="text-sm text-gray-600">Products Cost</span>
-                        <span className="font-medium">{formatCurrency(projectSummary?.materialsCost)}</span>
+                        <span className="font-medium">{formatCurrency(projectSummary?.materialsCost ?? 0)}</span>
                       </div>
 
                       <div className="flex justify-between">
                         <span className="text-sm text-gray-600">Labor Cost</span>
-                        <span className="font-medium">{formatCurrency(projectSummary?.laborCost)}</span>
+                        <span className="font-medium">{formatCurrency(projectSummary?.laborCost ?? 0)}</span>
                       </div>
 
                       <hr />
 
                       <div className="flex justify-between">
                         <span className="font-medium">Actual Project Cost</span>
-                        <span className="font-bold text-lg">{formatCurrency(projectSummary?.actualCost)}</span>
+                        <span className="font-bold text-lg">{formatCurrency(projectSummary?.actualCost ?? 0)}</span>
                       </div>
                     </div> 
                   </CardContent>
@@ -1755,7 +1677,7 @@ const handleSaveProduct = async () => {
       </Dialog>
 
       {/* Add Material Modal */}
-      <Dialog open={showAddMaterialModal} onOpenChange={setShowAddMaterialModal}>
+      <Dialog open={showAddMaterialModal} onOpenChange={() => {resetMaterialForm(); setShowAddMaterialModal(false)}}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Add Product</DialogTitle>
@@ -1833,15 +1755,9 @@ const handleSaveProduct = async () => {
                   <p className="text-red-500 text-sm mt-1">{materialValidationErrors.unitCost}</p>
                 )}
               </div>
-              <div>
+              {/* <div>
                 <Label className="mb-2">Supplier</Label>
                 
-                {/* <Input
-                  value={materialFormData.supplier}
-                  onChange={(e) => setMaterialFormData({ ...materialFormData, supplier: e.target.value })}
-                /> */}
-                
-                {/* Jyoti */}
                 <select
                   value={materialFormData.supplier}
                   onChange={(e) =>
@@ -1858,9 +1774,35 @@ const handleSaveProduct = async () => {
                 {materialValidationErrors.supplier && (
                   <p className="text-red-500 text-sm mt-1">{materialValidationErrors.supplier}</p>
                 )}
-                {/* Jyoti */}
+               
 
+              </div> */}
+              <div>
+                <Label className="mb-2">Supplier</Label>
+                <Select
+                  value={materialFormData.supplier}
+                  onValueChange={(value) =>
+                    setMaterialFormData({ ...materialFormData, supplier: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Supplier" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers.map((s) => (
+                      <SelectItem key={s.id} value={s.id.toString()}>
+                        {s.contact_person}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {materialValidationErrors.supplier && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {materialValidationErrors.supplier}
+                  </p>
+                )}
               </div>
+
             </div>
             <div className='bg-blue-100 p-3 border border-blue-300 rounded flex items-center gap-2'>
               <Building className='w-4 h-4' />

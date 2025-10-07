@@ -29,45 +29,7 @@ import {
   Mail
 } from 'lucide-react'
 
-interface Job {
-  id: string
-  title: string
-  type: 'service-based' | 'contract-based'
-  status: 'pending' | 'in-progress' | 'completed' | 'cancelled'
-  assignedLeadLabor: string[]
-  assignedLabor: string[]
-  contractor?: string
-  customer?: string
-  description: string
-  createdDate: string
-  dueDate: string
-  estimatedHours?: number
-  actualHours?: number
-  estimatedCost?: number
-  actualCost?: number
-  materials?: string[]
-  // Enhanced location fields
-  address: string
-  cityZip: string
-  phone: string
-  email: string
-  billToAddress: string
-  billToCityZip: string
-  billToPhone: string
-  billToEmail: string
-  sameAsAddress: boolean
-  priority: 'low' | 'medium' | 'high'
-  billingStatus?: 'pending' | 'invoiced' | 'paid'
-}
-
-interface JobCreationPageProps {
-  onBack: () => void
-  onJobCreated: (job: Job) => void
-}
-
-// Removed hardcoded arrays - now using API
-
-// Removed hardcoded contractors - now using API
+import {Job, JobCreationPageProps} from '../types/jobManagement'
 
 
 export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) {
@@ -338,7 +300,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
       // Create the local job object for the callback
     const newJob: Job = {
-        id: response.data?.id || generateJobId(),
+      id: response.data?.id || generateJobId(),
       title: formData.title,
       type: formData.type as 'service-based' | 'contract-based',
       status: 'pending',
@@ -351,7 +313,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
       dueDate: formData.dueDate,
       estimatedHours: formData.estimatedHours || undefined,
       estimatedCost: formData.estimatedCost || undefined,
-        materials: undefined,
+      materials: undefined,
       address: formData.address,
       cityZip: formData.cityZip,
       phone: formData.phone,

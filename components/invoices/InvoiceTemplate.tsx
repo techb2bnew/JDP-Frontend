@@ -4,18 +4,14 @@ import { Separator } from '../ui/separator'
 import { Invoice, Customer } from '../../types/invoice'
 import { apiClient } from '../../utils/api'
 // import { formatCurrency, formatDate } from '../../utils/invoiceUtils'
-import { customersData } from '../../data/invoiceData'
 import { toast } from 'sonner'
 import { LoadingSpinner } from '../common/LoadingSpinner'
+import {InvoiceTemplateProps} from '../../types/invoice'
+import { Estimate } from '@/types/jobManagement'
 
-interface InvoiceTemplateProps {
-  inv: Invoice
-  invoice: Invoice
-}
-
-export const InvoiceTemplate = ({ invoice }: InvoiceTemplateProps) => {
-
-  const formattedDate = (date) =>
+export const InvoiceTemplate = ({ invoice }: InvoiceTemplateProps ) => {
+  console.log('InvoiceTemplate invoice', invoice);
+  const formattedDate = (date: string | number | Date) =>
     new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -88,7 +84,7 @@ export const InvoiceTemplate = ({ invoice }: InvoiceTemplateProps) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {invoice.products.map((item) => (
+              {invoice.products.map((item:any) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-mono text-sm">{item.jdp_sku}</TableCell>
                   <TableCell>{item.description}</TableCell>
@@ -117,7 +113,7 @@ export const InvoiceTemplate = ({ invoice }: InvoiceTemplateProps) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {invoice.labor.map((labor) => (
+              {invoice.labor.map((labor:any) => (
                 <TableRow key={labor.id}>
                   <TableCell>{labor.user.full_name}</TableCell>
                   <TableCell>{invoice.description}</TableCell>
@@ -132,6 +128,7 @@ export const InvoiceTemplate = ({ invoice }: InvoiceTemplateProps) => {
       )}
 
       {/* Additional Costs */}
+      
       {invoice.additional_costs_details && invoice.additional_costs_details.length > 0 && (
         <div className="mb-8">
           <h3 className="font-semibold mb-4">Additional Costs</h3>
@@ -143,17 +140,21 @@ export const InvoiceTemplate = ({ invoice }: InvoiceTemplateProps) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {invoice.additional_costs_details.map((cost, index) => (
-                <TableRow key={index}>
-                  <TableCell>{cost.description}</TableCell>
-                  <TableCell className="text-right">{cost.amount}</TableCell>
-                </TableRow>
-              ))}
+              {invoice.additional_costs_details.map((cost: any, index: number) => {
+                console.log("Cost at index", index, ":", cost); // <-- console.log here
+                return (
+                  <TableRow key={index}>
+                    <TableCell>{cost.description}</TableCell>
+                    <TableCell className="text-right">{cost.amount}</TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
       )}
 
+      
       {/* Invoice Summary */}
       <div className="flex justify-end">
         <div className="w-64">

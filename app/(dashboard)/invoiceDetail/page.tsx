@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Printer, Download, Mail } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { Estimate } from '@/types/jobManagement'
 
 export default function InvoiceTemplatePage() {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
@@ -19,6 +20,7 @@ export default function InvoiceTemplatePage() {
 
   useEffect(() => {
     const storedInvoice = localStorage.getItem('selectedInvoice');
+    console.log('storedInvoicestoredInvoice', storedInvoice);
     if (storedInvoice) {
       setInvoice(JSON.parse(storedInvoice)); 
     }

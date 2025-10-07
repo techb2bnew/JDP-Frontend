@@ -28,7 +28,6 @@ import {
   Package
 } from 'lucide-react'
 import { Invoice } from '../types/invoice'
-import { invoicesData, customersData, jobsData } from '../data/invoiceData'
 import { InvoiceTemplate } from './invoices/InvoiceTemplate'
 import { NewInvoiceDialog } from './invoices/NewInvoiceDialog'
 import { useRouter } from 'next/navigation';
@@ -40,38 +39,21 @@ import { apiClient } from '@/utils/api'
 import { toast } from 'sonner'
 import { LoadingSpinner } from './common/LoadingSpinner'
 import jsPDF from 'jspdf'
-import html2canvas from 'html2canvas'
-
-interface Job {
-  id: string
-  title: string
-  type: 'service-based' | 'contract-based'
-  status: 'pending' | 'in-progress' | 'completed' | 'cancelled'
-  assignedLabor: string[]
-  contractor?: string
-  customer: string
-  description: string
-  createdDate: string
-  dueDate: string
-  estimatedHours?: number
-  actualHours?: number
-  estimatedCost?: number
-  actualCost?: number
-  materials?: string[]
-  location: string
-  priority: 'low' | 'medium' | 'high'
-  billingStatus?: 'pending' | 'invoiced' | 'paid'
-}
+import {Supplier, InvoiceStats} from '../types/jobManagement'
+import {Job} from '../types/invoice'
 
 const mockJobs: Job[] = [
   {
     id: 'JOB-2025-001',
     title: 'Electrical Panel Installation',
+    job_title: 'Electrical Panel Installation',
     type: 'service-based',
-    status: 'in-progress',
+    status: 'pending', // valid
     assignedLabor: ['John Smith', 'David Wilson'],
     contractor: 'Elite Electrical Services',
     customer: 'ABC Corporation',
+    customerId: 'CUST-001',
+    customerName: 'ABC Corporation',
     description: 'Install new electrical panel and upgrade wiring system',
     createdDate: '2025-01-15',
     dueDate: '2025-01-30',
@@ -87,11 +69,14 @@ const mockJobs: Job[] = [
   {
     id: 'JOB-2025-002',
     title: 'Office Lighting Maintenance',
+    job_title: 'Office Lighting Maintenance',
     type: 'contract-based',
-    status: 'pending',
-    assignedLabor: ['Sarah Johnson'],
+    status: 'active', // changed from 'pending' or 'active' to valid value
+    assignedLabor: ['Sarah Johnson', 'David Wilson'],
     contractor: 'Bright Solutions Ltd',
     customer: 'XYZ Office Complex',
+    customerId: 'CUST-002',
+    customerName: 'XYZ Office Complex',
     description: 'Monthly maintenance of office lighting systems',
     createdDate: '2025-01-18',
     dueDate: '2025-02-15',
@@ -104,57 +89,11 @@ const mockJobs: Job[] = [
   }
 ]
 
-interface Supplier {
-  id: number;
-  company_name: string;
-  contact_person: string;
-  supplier_code: string;
-  user_id: number;
-}
-
-interface Job {
-  id: string
-  title: string
-  type: 'service-based' | 'contract-based'
-  status: 'pending' | 'in-progress' | 'completed' | 'cancelled'
-  assignedLeadLabor: string[]
-  assignedLabor: string[]
-  contractor?: string
-  customer?: string
-  description: string
-  createdDate: string
-  dueDate: string
-  estimatedHours?: number
-  actualHours?: number
-  estimatedCost?: number
-  actualCost?: number
-  materials?: string[]
-  address: string
-  cityZip: string
-  phone?: string
-  email?: string
-  billToAddress?: string
-  billToCityZip?: string
-  billToPhone?: string
-  billToEmail?: string
-  sameAsAddress: boolean
-  priority: 'low' | 'medium' | 'high' | 'urgent'
-  billingStatus?: 'pending' | 'invoiced' | 'paid'
-  // Additional fields from API
-  customerName?: string
-  contractorName?: string
-  createdBy?: string
-  assignedLeadLaborDetails?: any[]
-  assignedLaborDetails?: any[]
-  assignedMaterialsDetails?: any[]
-  leadLabors?:any[]
-}
-
 export function InvoicesPage() {
   const { hasPermission } = usePermissions()
   const [activeTab, setActiveTab] = useState('invoices');
-  const [invoices, setInvoices] = useState<Invoice[]>(invoicesData)
-  const [invoice, setInvoice] = useState<Invoice[]>(invoicesData)
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [invoice, setInvoice] = useState<Invoice[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -178,7 +117,7 @@ export function InvoicesPage() {
   const [leadLabors, setLeadLabors] = useState<Job[]>([])
   const [labors, setLabors] = useState<Job[]>([])
   const [employees, setEmployees] = useState<any[]>([])
-  const [stats, setStats] = useState<any[]>([])
+  const [stats, setStats] = useState<InvoiceStats>({ total: 0, totalBilled: 0, paid: 0, pending: 0 })
 
   const fetchData = async () => {
     try {
@@ -254,11 +193,11 @@ export function InvoicesPage() {
       setIsLoading(true);
       const response = await apiClient.getEstimatesStats();
       console.log('Estiamtes stats', response.data);
-      setStats(response.data);
-      // const data = response.data;  
+      const data = response.data as { pending: any; total: any; totalBilled: any; paid: any };
+      setStats(data);
 
     } catch (error) {
-      console.error('Error fetching invoices:', error);s
+      console.error('Error fetching invoices:', error);
       toast.error('Failed to fetch invoices');
     } finally {
       setIsLoading(false);
@@ -269,7 +208,7 @@ export function InvoicesPage() {
     try {
       setIsLoading(true);
       const response = await apiClient.getAllEstimates(page);
-      const data = response.data;
+      const data = response.data as { estimates: Invoice[]; totalPages: number; total: number };
 
       setInvoices(data.estimates);          // Current page's invoices
       setTotalPages(data.totalPages);       // Total number of pages
@@ -286,6 +225,7 @@ export function InvoicesPage() {
   const fetchInvoiceById = async (id: string) => {
     try {
       const response = await apiClient.getEstimateById(id);
+      console.log('fetchInvoiceById response', response);
       const data = response.data;
       setInvoice(data); // still sets the state if you need it elsewhere
       return data;
@@ -365,7 +305,7 @@ export function InvoicesPage() {
     }
   }
 
-  const formattedDate = (date) =>
+  const formattedDate = (date: string | number | Date) =>
     new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -375,19 +315,19 @@ export function InvoicesPage() {
 
 // Result: "Sep 30, 2025"
 
-  const totalBilled = invoices.reduce((sum, invoice) => sum + invoice.total_amount, 0);
+  const totalBilled = invoices.reduce((sum, invoice) => sum + invoice.totalAmount, 0);
 
 
   const filteredInvoices = invoices.filter(invoice => {
     const search = searchTerm.toLowerCase();
 
     const matchesSearch =
-      invoice.invoice_number?.toLowerCase().includes(search) ||
-      invoice.customer?.customer_name?.toLowerCase().includes(search) ||
-      invoice.job?.job_title?.toLowerCase().includes(search);
+      invoice.invoiceNumber?.toLowerCase().includes(search) ||
+      invoice.customerName?.toLowerCase().includes(search) ||
+      invoice.jobTitle?.toLowerCase().includes(search);
 
     const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
-    const matchesType = typeFilter === 'all' || invoice.invoice_type === typeFilter;
+    const matchesType = typeFilter === 'all' || invoice.type === typeFilter;
 
     return matchesSearch && matchesStatus && matchesType;
   });
@@ -397,27 +337,43 @@ export function InvoicesPage() {
   ) ? filteredInvoices : invoices;
 
   const handleSaveInvoice = (newInvoiceData: Partial<Invoice>) => {
-    const subtotal =
-      (newInvoiceData.items?.reduce((sum, item) => sum + item.total, 0) || 0) +
-      (newInvoiceData.labor?.reduce((sum, labor) => sum + labor.total, 0) || 0) +
-      (newInvoiceData.additionalCosts?.reduce((sum, cost) => sum + cost.amount, 0) || 0)
-    const taxAmount = subtotal * (newInvoiceData.taxRate || 0)
-    const totalAmount = subtotal + taxAmount
-    const invoice: Invoice = {
-      ...newInvoiceData as Invoice,
-      id: `INV-${Date.now()}`,
-      invoiceNumber: `INV-2025-${String(invoices.length + 1).padStart(3, '0')}`,
-      customerName: customersData.find(c => c.id === newInvoiceData.customerId)?.name || '',
-      jobTitle: jobsData.find(j => j.id === newInvoiceData.jobId)?.title || '',
-      subtotal,
-      taxAmount,
-      totalAmount,
-      status: 'draft',
-      createdBy: 'Admin User',
-      createdAt: new Date().toISOString()
-    }
-    setInvoices(prev => [invoice, ...prev])
-  }
+  // Safely calculate subtotal
+  // const itemTotal = newInvoiceData.items?.reduce((sum, item) => sum + (item.total || 0), 0) || 0;
+  // const laborTotal = newInvoiceData.labor?.reduce((sum, labor) => sum + (labor.total || 0), 0) || 0;
+  // const additionalCostAmount = newInvoiceData.additionalCosts?.amount || 0;
+
+  // const subtotal = itemTotal + laborTotal + additionalCostAmount;
+  // const taxRate = newInvoiceData.taxRate || 0;
+  // const taxAmount = subtotal * taxRate;
+  // const totalAmount = subtotal + taxAmount;
+
+  // const invoice: Invoice = {
+  //   id: `INV-${Date.now()}`,
+  //   invoiceNumber: `INV-2025-${String(invoices.length + 1).padStart(3, '0')}`,
+  //   customerId: newInvoiceData.customerId || '',
+  //   customerName: customersData.find(c => c.id === newInvoiceData.customerId)?.name || '',
+  //   jobId: newInvoiceData.jobId || '',
+  //   jobTitle: jobsData.find(j => j.id === newInvoiceData.jobId)?.title || '',
+  //   type: newInvoiceData.type || 'estimate',
+  //   issueDate: newInvoiceData.issueDate || new Date().toISOString(),
+  //   dueDate: newInvoiceData.dueDate || new Date().toISOString(),
+  //   items: newInvoiceData.items || [],
+  //   labor: newInvoiceData.labor || [],
+  //   additionalCosts: newInvoiceData.additionalCosts || { amount: 0, description: '' },
+  //   subtotal: subtotal?.toString() ?? '0',
+
+  //   taxRate,
+  //   taxAmount,
+  //   totalAmount,
+  //   status: 'draft',
+  //   notes: newInvoiceData.notes || '',
+  //   createdBy: 'Admin User',
+  //   createdAt: new Date().toISOString()
+  // };
+
+  // setInvoices(prev => [invoice, ...prev]);
+};
+
 
  const handleViewInvoice = async (inv: Invoice) => {
   const data = await fetchInvoiceById(inv.id);
@@ -484,6 +440,8 @@ export function InvoicesPage() {
     { id: 'invoice-comparison', label: 'Invoice Comparison', icon: GitCompare },
     { id: 'approvals', label: 'Approvals', icon: CheckSquare, notification: 2 },
   ]
+
+
 
   return (
     <div className="space-y-6">
@@ -666,34 +624,34 @@ export function InvoicesPage() {
                         <TableBody>
                           {invoicesToRender.map((invoice) => (
                             <TableRow key={invoice.id}>
-                              <TableCell className="font-mono">{invoice.invoice_number}</TableCell>
+                              <TableCell className="font-mono">{invoice.invoiceNumber}</TableCell>
                               {/* <TableCell className="font-mono">{invoice.id}</TableCell> */}
-                              <TableCell>{invoice.customer?.customer_name}</TableCell>
-                              <TableCell className="max-w-48 truncate">{invoice.job?.job_title}</TableCell>
+                              <TableCell>{invoice.customerName}</TableCell>
+                              <TableCell className="max-w-48 truncate">{invoice.jobTitle}</TableCell>
                               {/* <TableCell >{invoice?.invoice_type}</TableCell> */}
                                 <TableCell>
                                 <div>
-                                  <span className={`px-2 py-1 rounded text-xs font-medium ${invoice.invoice_type === 'estimate' ? 'bg-blue-100 text-blue-800' :
-                                    invoice.invoice_type === 'proposal_invoice' ? 'bg-purple-100 text-purple-800' :
-                                      invoice.invoice_type === 'progressive_invoice' ? 'bg-orange-100 text-orange-800' :
+                                  <span className={`px-2 py-1 rounded text-xs font-medium ${invoice.type === 'estimate' ? 'bg-blue-100 text-blue-800' :
+                                    invoice.type === 'proposal_invoice' ? 'bg-purple-100 text-purple-800' :
+                                      invoice.type === 'progressive_invoice' ? 'bg-orange-100 text-orange-800' :
                                         'bg-green-100 text-green-800'
                                     }`}>
-                                    {invoice.invoice_type === 'progressive_invoice'
+                                    {invoice.type === 'progressive_invoice'
                                       ? 'Progressive'
-                                      : invoice.invoice_type === 'proposal_invoice'
+                                      : invoice.type === 'proposal_invoice'
                                       ? 'Proposed'
-                                      : invoice.invoice_type === 'final_invoice'
+                                      : invoice.type === 'final_invoice'
                                       ? 'Final'
-                                      : invoice.invoice_type === 'estimate'
+                                      : invoice.type === 'estimate'
                                       ? 'Estimate'
-                                      : invoice.invoice_type
+                                      : invoice.type
                                     }
                                   </span>
                                 </div>
                                 </TableCell>
-                              <TableCell>{formattedDate(invoice?.issue_date)}</TableCell>
-                              <TableCell>{formattedDate(invoice?.due_date)}</TableCell>
-                              <TableCell className="font-medium">${invoice?.total_amount?.toFixed(2)}</TableCell>
+                              <TableCell>{formattedDate(invoice?.issueDate)}</TableCell>
+                              <TableCell>{formattedDate(invoice?.dueDate)}</TableCell>
+                              <TableCell className="font-medium">${invoice?.totalAmount?.toFixed(2)}</TableCell>
                               <TableCell>
                                 <span className={`px-2 py-1 text-xs font-medium rounded-full ${invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
                                     invoice.status === 'sent' ? 'bg-blue-100 text-blue-800' :
@@ -768,11 +726,12 @@ export function InvoicesPage() {
         <TabsContent value="timesheets"><TimesheetsPage timesheets={timesheets} period={period} employees={employees}/></TabsContent>
         <TabsContent value="invoice-comparison"><InvoiceComparisonPage
           onBack={handleBackToInvoices}
-          jobs={mockJobs} /></TabsContent>
+          jobs={{} as any} />
+          </TabsContent>
         <TabsContent value="approvals">
           <ApprovalsPage
             onBack={handleBackToInvoices}
-            jobs={mockJobs}
+            jobs={{} as any}
             onApprovalCountChange={handleApprovalCountChange}
           /></TabsContent>
       </Tabs>
@@ -781,7 +740,8 @@ export function InvoicesPage() {
       <NewInvoiceDialog
         open={showNewInvoiceDialog}
         onOpenChange={setShowNewInvoiceDialog}
-        customers={customers}       
+        customers={customers}  
+        job={{} as any}
         jobs={jobs}
         suppliers={suppliers}
         onSave={handleSaveInvoice}
@@ -805,7 +765,7 @@ export function InvoicesPage() {
               <Button variant="outline" onClick={handlePrintInvoice}><Printer className="h-4 w-4 mr-2" />Print</Button>
             )}
             {hasPermission('invoices', 'view') && (
-              <Button variant="outline" onClick={handleDownloadInvoice}><Download className="h-4 w-4 mr-2" />Download PDF</Button>
+              <Button variant="outline" onClick={() => selectedInvoice && handleDownloadInvoice(selectedInvoice)}><Download className="h-4 w-4 mr-2" />Download PDF</Button>
             )}
             {hasPermission('invoices', 'edit') && (
               <Button onClick={handleEmailInvoice} className="bg-primary text-primary-foreground hover:bg-primary/90"><Mail className="h-4 w-4 mr-2" />Send to Customer</Button>

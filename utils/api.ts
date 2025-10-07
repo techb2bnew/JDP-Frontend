@@ -1,4 +1,8 @@
+import { Supplier } from '@/types/jobManagement'
 import { clearAuthData } from './auth'
+import { createProductPayload } from '@/types/product'
+import { Invoice } from '@/types/invoice'
+import { toast } from 'sonner'
 
 // API utility functions with authentication
 
@@ -333,7 +337,7 @@ export const apiClient = {
   },
 
 
-  getProjectSummary: async (selectedJobId: string | number) => {
+  getProjectSummary: async (selectedJobId: number) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
     const token = getAuthToken()
 
@@ -354,35 +358,42 @@ export const apiClient = {
       throw new Error(errorData.message || 'Failed to fetch jobs')
     }
 
-
     const result = await response.json()
     console.log('Project Summary API Response:', result)
 
-    if (!result.data || !result.data.projectSummary) {
+    const projectSummary = result.data?.projectSummary
+
+    if (!projectSummary) {
       console.error('Project Summary API: Unexpected response structure:', result)
+
+      // ✅ Return an empty ProjectSummary object instead of an array
       return {
-        data: [],
+        data: {
+          estimate: 0,
+          actualCost: 0,
+          laborCost: 0,
+          materialsCost: 0,
+          message: result.message || 'No data available',
+          success: result.success || false,
+        }
       }
+  }
+
+  const transformedData = {
+    data: {
+      estimate: projectSummary?.jobEstimate || 0,
+      actualCost: projectSummary?.actualProjectCost || 0,
+      laborCost: projectSummary?.laborCost || 0,
+      materialsCost: projectSummary?.materialsCost || 0,
+      message: result.message || '',
+      success: result.success || false,
     }
+  }
 
-    // Transform the API response to match our Job interface
-    const projectSummary = result.data?.projectSummary || {};
-
-    const transformedData = {
-      data: {
-        estimate: projectSummary?.jobEstimate || 0,
-        actualCost: projectSummary?.actualProjectCost || 0,
-        laborCost: projectSummary?.laborCost || 0,
-        materialsCost: projectSummary?.materialsCost || 0,
-        message: result.message || '',
-        success: result.success || false,
-      }
-    }
-
-
-    console.log('Transformed project Summary data:', transformedData)
-    return transformedData
+  console.log('Transformed project Summary data:', transformedData)
+  return transformedData
   },
+
 
 
   createEstimate : async (estimateData: {
@@ -425,6 +436,7 @@ export const apiClient = {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
+      // toast.error(errorData.message || 'Failed to create estimate');
       throw new Error(errorData.message || 'Failed to create estimate')
     }
 
@@ -454,7 +466,7 @@ export const apiClient = {
     return response.json()
   },
 
-  getDashboardMetrics: async (selectedJobId: string | number) => {
+  getDashboardMetrics: async (selectedJobId: number) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
     const token = getAuthToken()
 
@@ -472,7 +484,8 @@ export const apiClient = {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.message || 'Failed to fetch job dashboard')
+      toast.error(errorData.message || 'Failed to fetch job dashboard');
+      // throw new Error(errorData.message || 'Failed to fetch job dashboard')
     }
 
 
@@ -482,7 +495,12 @@ export const apiClient = {
     if (!result.data || !result.data.dashboardMetrics) {
       console.error('Dashboard Matrics API: Unexpected response structure:', result)
       return {
-        data: [],
+        data: {
+          totalHoursWorked: 0,
+          totalMaterialUsed: 0,
+          totalLabourEntries: 0,
+          numberOfInvoices: 0,
+        },
       }
     }
 
@@ -505,8 +523,52 @@ export const apiClient = {
     return transformedData
   },
 
+  getAllSuppliers: async (): Promise<Supplier[]> => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
 
-  getEstimatesByJob: async (selectedJobId: string | number) => {
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+
+    const response = await fetch(`${apiBaseUrl}/suppliers/getAllSuppliers`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to fetch suppliers')
+    }
+
+    const result = await response.json()
+    console.log('Suppliers API Response:', result)
+
+    const rawData = result.data?.data
+
+    if (!Array.isArray(rawData)) {
+      console.error('Suppliers API: Unexpected response structure:', result)
+      return [] // ✅ return an empty array on failure
+    }
+
+    const transformedData: Supplier[] = rawData.map((item) => ({
+      id: item.id,
+      company_name: item.company_name,
+      contact_person: item.contact_person,
+      supplier_code: item.supplier_code,
+      user_id: item.user_id,
+    }))
+
+    console.log('Transformed Suppliers:', transformedData)
+    return transformedData
+  },
+
+
+
+  getEstimatesByJob: async (selectedJobId: number) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
     const token = getAuthToken()
 
@@ -540,10 +602,10 @@ export const apiClient = {
 
     // Transform the API response to match our Job interface
     const estimates = result.data?.estimates || {};
-
+    console.log('estimatesestimates', estimates);
     const transformedData = {
       data: {
-       estimates: estimates,
+      estimates: estimates,
         message: result.message || '',
         success: result.success || false,
       }
@@ -589,16 +651,41 @@ export const apiClient = {
     const estimates = result.data?.estimates || {};
 
     const transformedData = {
-      data: {
-       estimates: estimates,
-       total: result.data.total,
-        page: result.data.page,
-        limit: result.data.limit,
-        totalPages: result.data.totalPages,
-        message: result.message || '',
-        success: result.success || false,
-      }
-    }
+  data: {
+    estimates: result.data.estimates.map((estimate: any) => ({
+      id: estimate.id.toString(),
+      invoiceNumber: estimate.invoice_number,
+      customerId: estimate.customer_id.toString(),
+      customerName: estimate.customer?.customer_name || "",
+      jobId: estimate.job_id,
+      jobTitle: estimate.job?.job_title || "",
+      type: estimate.invoice_type as Invoice['type'],
+      issueDate: estimate.issue_date,
+      dueDate: estimate.due_date,
+      items: [], // 🟡 Add logic to map invoice items if available in the API
+      labor: [], // 🟡 Add logic to map labor entries if available in the API
+      additionalCosts: {
+        amount: estimate.additional_costs || 0,
+        description: estimate.description || "", // or adjust per your actual structure
+      },
+      subtotal: estimate.subtotal,
+      taxRate: estimate.tax_percentage,
+      taxAmount: estimate.tax_amount,
+      totalAmount: estimate.total_amount,
+      status: estimate.status as Invoice['status'],
+      notes: estimate.description || "",
+      createdBy: estimate.created_by.toString(),
+      createdAt: estimate.created_at,
+    })),
+    total: result.data.total,
+    page: result.data.page,
+    limit: result.data.limit,
+    totalPages: result.data.totalPages,
+    message: result.message || '',
+    success: result.success || false,
+  }
+};
+
 
 
     console.log('Transformed Estimates data:', transformedData)
@@ -1598,6 +1685,46 @@ export const apiClient = {
     return result.data
   },
 
+  createProduct: async (productData: createProductPayload) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+    const response = await fetch(`${apiBaseUrl}/products/createProduct`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(productData),
+    })
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to create product')
+    }
+    return response.json()
+  }, 
+
+  deleteProduct: async (productId: string) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    const token = getAuthToken()
+    if (!token) {
+      throw new Error('No authentication token found')
+    }
+    const response = await fetch(`${apiBaseUrl}/products/deleteProduct/${productId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to delete product')
+    }
+
+    return response.json()
+  }, 
   // Logout
   logout: async () => {
     try {
