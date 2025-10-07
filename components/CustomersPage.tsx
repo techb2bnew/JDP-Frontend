@@ -1184,7 +1184,7 @@ export function CustomersPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure you want to delete this customer?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the customer "{customerToDelete?.name}" from your database.
+              This action cannot be undone. This will permanently delete the customer &quot;{customerToDelete?.name}&quot; from your database.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

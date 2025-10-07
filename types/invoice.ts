@@ -22,6 +22,9 @@ export interface InvoiceItem {
   quantity: number;
   unitPrice: number;
   total: number;
+  supplierId?: number;
+  jdp_sku?: string;
+  unit?: string;
 }
 
 export interface LaborEntry {
@@ -31,6 +34,7 @@ export interface LaborEntry {
   hourlyRate: number;
   total: number;
   description: string;
+   email?: string;
 }
 
 export interface AdditionalCost {
@@ -43,7 +47,7 @@ export interface Invoice {
   invoiceNumber: string;
   customerId: string;
   customerName: string;
-  jobId: string;
+  jobId: number;
   jobTitle: string;
   type: "proposal_invoice" | "roughen" | "progressive" | "final";
   issueDate: string;
@@ -84,4 +88,60 @@ export interface TimesheetEntry {
   totalHours: number;
   billableHours: number;
   status: "draft" | "submitted" | "approved" | "rejected";
+}
+
+
+
+export interface CreateEstimatePayload {
+  estimate_title: string;
+  customer_id: number;
+  priority: "low" | "medium" | "high";
+  valid_until: string;
+  location: string;
+  description: string;
+  service_type: string;
+  email_address: string;
+  estimate_date: string;
+
+  materials_cost: number;
+  labor_cost: number;
+  additional_costs: number;
+  subtotal: number;
+  tax_percentage: number;
+  tax_amount: number;
+  total_amount: number;
+
+  status: string;
+  invoice_type: string;
+  invoice_number: string;
+  issue_date: string;
+  due_date: string;
+
+  job_id: number;
+
+  additional_cost: {
+    description: string;
+    amount: number;
+  };
+
+  custom_labor: {
+    full_name: string;
+    email: string;
+    hours_worked: number;
+    hourly_rate: number;
+    job_id: number;
+    is_custom: boolean;
+  }[];
+
+  custom_products: {
+    product_name: string;
+    supplier_id: number;
+    supplier_sku: string;
+    jdp_sku: string;
+    stock_quantity: number;
+    unit: string;
+    job_id:number;
+    is_custom: boolean;
+    unit_cost: number;
+  }[];
 }

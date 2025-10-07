@@ -40,6 +40,7 @@ import jsPDF from 'jspdf'
 import { useDispatch } from 'react-redux'
 import { deleteInvoice } from '@/redux/slices/jobsSlice'
 import { toast } from 'sonner'
+import { LoadingSpinner } from './common/LoadingSpinner'
 interface Job {
   id: string
   title: string
@@ -191,7 +192,8 @@ export function InvoicesPage() {
       id: `INV-${Date.now()}`,
       invoiceNumber: `INV-2025-${String(invoices.length + 1).padStart(3, '0')}`,
       customerName: customersData.find(c => c.id === newInvoiceData.customerId)?.name || '',
-      jobTitle: jobsData.find(j => j.id === newInvoiceData.jobId)?.title || '',
+      jobTitle: jobsData.find(j => j.id === String(newInvoiceData.jobId))?.title || '',
+
       subtotal,
       taxAmount,
       totalAmount,
@@ -271,7 +273,7 @@ export function InvoicesPage() {
       const confirmDelete = window.confirm("Are you sure you want to delete this estimate?");
       if (!confirmDelete) return;
       setIsDeleting(true);
-      await apiClient.deleteEstimate(invoiceId);
+      await apiClient.deleteEstimate(String(invoiceId));
       console.log(invoiceId, "IDD")
       dispatch(deleteInvoice(String(invoiceId)));
       toast.success("Estimate deleted successfully!");
@@ -552,75 +554,87 @@ export function InvoicesPage() {
                 </div>
 
                 {/* Invoices Table */}
-                <div className="border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader className="bg-gray-50">
-                      <TableRow>
-                        <TableHead>Invoice #</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Job</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Issue Date</TableHead>
-                        <TableHead>Due Date</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredEstimates.length > 0 ? (
-                        filteredEstimates.map((invoice: any) => (
-                          <TableRow key={invoice.id}>
-                            <TableCell className="font-mono">{invoice.invoice_number}</TableCell>
-                            <TableCell>{invoice.customer?.customer_name || 'N/A'}</TableCell>
-                            <TableCell className="max-w-48 truncate">{invoice.job?.job_title || 'N/A'}</TableCell>
-                            <TableCell>{invoice.invoice_type || 'N/A'}</TableCell>
-                            <TableCell>{invoice.issue_date ? new Date(invoice.issue_date).toLocaleDateString() : 'N/A'}</TableCell>
-                            <TableCell>{invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'N/A'}</TableCell>
-                            <TableCell className="font-medium">
-                              ${Number(invoice.total_amount || 0).toFixed(2)}
-                            </TableCell>
-                            <TableCell>
-                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
-                                  invoice.status === 'sent' ? 'bg-blue-100 text-blue-800' :
-                                    invoice.status === 'overdue' ? 'bg-red-100 text-red-800' :
-                                      'bg-gray-100 text-gray-800'
-                                }`}>
-                                {invoice.status?.charAt(0).toUpperCase() + invoice.status?.slice(1)}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center justify-end gap-2">
-                                {hasPermission('invoices', 'view') && (
-                                  <Button variant="outline" size="icon" onClick={() => handleViewInvoice(invoice.id)}>
-                                    <Eye className="w-4 h-4" />
-                                  </Button>
-                                )}
-                                {hasPermission('invoices', 'view') && (
-                                  <Button variant="outline" size="icon" onClick={() => handleDownloadInvoice()}>
-                                    <Download className="w-4 h-4" />
-                                  </Button>
-                                )}
-                                {hasPermission('invoices', 'delete') && (
-                                  <Button variant="outline" size="icon" onClick={() => handleDeleteInvoice(invoice.id)}>
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
-                            No matching invoices found.
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-
-                  </Table>
+               <div className="border rounded-lg overflow-hidden">
+  {isLoadingEstimates ? (
+    <div className="flex justify-center items-center py-10">
+      <LoadingSpinner />
+    </div>
+  ) : (
+    <Table>
+      <TableHeader className="bg-gray-50">
+        <TableRow>
+          <TableHead>Invoice #</TableHead>
+          <TableHead>Customer</TableHead>
+          <TableHead>Job</TableHead>
+          <TableHead>Type</TableHead>
+          <TableHead>Issue Date</TableHead>
+          <TableHead>Due Date</TableHead>
+          <TableHead>Amount</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {filteredEstimates.length > 0 ? (
+          filteredEstimates.map((invoice: any) => (
+            <TableRow key={invoice.id}>
+              <TableCell className="font-mono">{invoice.invoice_number}</TableCell>
+              <TableCell>{invoice.customer?.customer_name || 'N/A'}</TableCell>
+              <TableCell className="max-w-48 truncate">{invoice.job?.job_title || 'N/A'}</TableCell>
+              <TableCell>{invoice.invoice_type || 'N/A'}</TableCell>
+              <TableCell>{invoice.issue_date ? new Date(invoice.issue_date).toLocaleDateString() : 'N/A'}</TableCell>
+              <TableCell>{invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'N/A'}</TableCell>
+              <TableCell className="font-medium">
+                ${Number(invoice.total_amount || 0).toFixed(2)}
+              </TableCell>
+              <TableCell>
+                <span
+                  className={`px-2 py-1 text-xs font-medium rounded-full ${
+                    invoice.status === 'paid'
+                      ? 'bg-green-100 text-green-800'
+                      : invoice.status === 'sent'
+                      ? 'bg-blue-100 text-blue-800'
+                      : invoice.status === 'overdue'
+                      ? 'bg-red-100 text-red-800'
+                      : 'bg-gray-100 text-gray-800'
+                  }`}
+                >
+                  {invoice.status?.charAt(0).toUpperCase() + invoice.status?.slice(1)}
+                </span>
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center justify-end gap-2">
+                  {hasPermission('invoices', 'view') && (
+                    <Button variant="outline" size="icon" onClick={() => handleViewInvoice(invoice.id)}>
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                  )}
+                  {hasPermission('invoices', 'view') && (
+                    <Button variant="outline" size="icon" onClick={() => handleDownloadInvoice()}>
+                      <Download className="w-4 h-4" />
+                    </Button>
+                  )}
+                  {hasPermission('invoices', 'delete') && (
+                    <Button variant="outline" size="icon" onClick={() => handleDeleteInvoice(invoice.id)}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
+              </TableCell>
+            </TableRow>
+          ))
+        ) : (
+          <TableRow>
+            <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
+              No matching invoices found.
+            </TableCell>
+          </TableRow>
+        )}
+      </TableBody>
+    </Table>
+  )}
+</div>
+
               </CardContent>
             </Card>
           </div>

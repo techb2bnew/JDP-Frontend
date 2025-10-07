@@ -4,6 +4,7 @@ import { Input } from '../ui/input'
 import { AuthStep } from '../AuthFlow'
 import svgPaths from '../../imports/svg-gg40su13b1'
 import { toast } from 'sonner'
+import Image from 'next/image'
 
 interface SignupScreenProps {
   onStepChange: (step: AuthStep, email?: string, role?: string) => void
@@ -24,26 +25,26 @@ export function SignupScreen({ onStepChange, onAuthSuccess }: SignupScreenProps)
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {}
-    
+
     if (!email.trim()) {
       newErrors.email = 'Email is required'
     } else if (!/\S+@\S+\.\S+/.test(email)) {
       newErrors.email = 'Please enter valid email'
     }
-    
+
     if (!role) {
       newErrors.role = 'Role is required'
     }
-    
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
   const handleVerify = async (): Promise<void> => {
     if (!validateForm()) return
-    
+
     setIsLoading(true)
-    
+
     try {
       // For now, we'll just proceed to OTP screen
       // In a real implementation, you might want to send OTP first
@@ -84,21 +85,25 @@ export function SignupScreen({ onStepChange, onAuthSuccess }: SignupScreenProps)
       <div className="absolute left-[-10px] top-[-318px] w-[561px] h-[561px]">
         <div className="w-full h-full rounded-full bg-[#00A1FF] opacity-10" />
       </div>
-      
+
       {/* Dark left section */}
       <div className="absolute bg-[#111c2d] h-full w-[50%] left-0 top-0" />
-      
+
       {/* White right section */}
       <div className="absolute bg-white h-full w-[50%] right-0 top-0" />
-      
+
       {/* Left content */}
       <div className="absolute left-[72px] top-1/2 transform -translate-y-1/2">
         <div className="mb-8">
-          <img 
-            src="/assets/logos/logo-jdp.png" 
-            alt="JDP Logo" 
+          <Image
+            src="/assets/logos/logo-jdp.png"
+            alt="JDP Logo"
             className="w-[168px] h-[63px] object-contain opacity-99"
+            width={168}
+            height={63}
+
           />
+
         </div>
         <div className="text-white">
           <h1 className="text-[32px] font-extrabold mb-4">Welcome to JDP</h1>
@@ -110,7 +115,7 @@ export function SignupScreen({ onStepChange, onAuthSuccess }: SignupScreenProps)
           </p>
         </div>
       </div>
-      
+
       {/* Right content */}
       <div className="absolute right-[150px] top-1/2 transform -translate-y-1/2 w-[507px]">
         <div className="mb-8">
@@ -119,7 +124,7 @@ export function SignupScreen({ onStepChange, onAuthSuccess }: SignupScreenProps)
             Verify your email and select your role to continue setting up securely.
           </p>
         </div>
-        
+
         <div className="space-y-6">
           {/* Email Field */}
           <div>
@@ -152,13 +157,12 @@ export function SignupScreen({ onStepChange, onAuthSuccess }: SignupScreenProps)
                 value={email}
                 onChange={handleEmailChange}
                 placeholder="Enter your email/ phone number"
-                className={`pl-12 h-[50px] rounded-full border ${
-                  errors.email 
-                    ? 'border-[#e02424] bg-[#fff3f3] text-[#e02424]' 
-                    : email 
-                    ? 'border-[#00a1ff] bg-white' 
-                    : 'border-[rgba(17,24,39,0.2)]'
-                }`}
+                className={`pl-12 h-[50px] rounded-full border ${errors.email
+                    ? 'border-[#e02424] bg-[#fff3f3] text-[#e02424]'
+                    : email
+                      ? 'border-[#00a1ff] bg-white'
+                      : 'border-[rgba(17,24,39,0.2)]'
+                  }`}
               />
             </div>
             {errors.email && (
@@ -174,13 +178,12 @@ export function SignupScreen({ onStepChange, onAuthSuccess }: SignupScreenProps)
             <select
               value={role}
               onChange={handleRoleChange}
-              className={`w-full px-4 py-3 h-[50px] rounded-full border focus:outline-none focus:ring-2 focus:ring-[#00a1ff] focus:border-transparent ${
-                errors.role 
-                  ? 'border-[#e02424] bg-[#fff3f3] text-[#e02424]' 
-                  : role 
-                  ? 'border-[#00a1ff] bg-white' 
-                  : 'border-[rgba(17,24,39,0.2)] bg-white'
-              }`}
+              className={`w-full px-4 py-3 h-[50px] rounded-full border focus:outline-none focus:ring-2 focus:ring-[#00a1ff] focus:border-transparent ${errors.role
+                  ? 'border-[#e02424] bg-[#fff3f3] text-[#e02424]'
+                  : role
+                    ? 'border-[#00a1ff] bg-white'
+                    : 'border-[rgba(17,24,39,0.2)] bg-white'
+                }`}
             >
               <option value="">Select your role</option>
               <option value="Staff">Staff</option>
@@ -192,7 +195,7 @@ export function SignupScreen({ onStepChange, onAuthSuccess }: SignupScreenProps)
               <p className="text-[#e02424] text-[14px] mt-1">{errors.role}</p>
             )}
           </div>
-          
+
           {/* Terms & Conditions */}
           <div className="flex items-center gap-2">
             <button
@@ -206,7 +209,7 @@ export function SignupScreen({ onStepChange, onAuthSuccess }: SignupScreenProps)
             </button>
             <span className="text-[14px] text-gray-900 opacity-70">Terms & Conditions</span>
           </div>
-          
+
           {/* Verify Button */}
           <Button
             onClick={handleVerify}
@@ -215,7 +218,7 @@ export function SignupScreen({ onStepChange, onAuthSuccess }: SignupScreenProps)
           >
             {isLoading ? 'Verifying...' : 'Verify'}
           </Button>
-          
+
           {/* Back to Login Link */}
           <div className="text-center">
             <p className="text-[14px] text-gray-900">

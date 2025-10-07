@@ -53,7 +53,7 @@ export function QuickBooksIntegration({ onComplete, onSkip }: QuickBooksIntegrat
             Welcome to JDP Dashboard
           </h1>
           <p className="text-lg text-[#2b2b2b]/60">
-            Let's integrate QuickBooks to supercharge your business management
+           Let&apos;s integrate QuickBooks to supercharge your business management
           </p>
         </div>
 
@@ -148,7 +148,7 @@ export function QuickBooksIntegration({ onComplete, onSkip }: QuickBooksIntegrat
                 <div className="space-y-4">
                   <p className="text-[#2b2b2b]/60">
                     Click below to securely connect your QuickBooks account. 
-                    You'll be redirected to QuickBooks to authorize the connection.
+                    You&apos;ll be redirected to QuickBooks to authorize the connection.
                   </p>
                   <div className="space-y-3">
                     <Button
@@ -180,7 +180,7 @@ export function QuickBooksIntegration({ onComplete, onSkip }: QuickBooksIntegrat
                     </Badge>
                   </div>
                   <p className="text-[#2b2b2b]/60">
-                    Great! We're now syncing your QuickBooks data. This may take a few moments.
+                    Great! We&apos;re now syncing your QuickBooks data. This may take a few moments.
                   </p>
                   <div className="bg-[#f8fafd] p-4 rounded-lg">
                     <div className="space-y-2">
@@ -214,7 +214,7 @@ export function QuickBooksIntegration({ onComplete, onSkip }: QuickBooksIntegrat
                   </div>
                   <p className="text-[#2b2b2b]/60">
                     Perfect! Your QuickBooks integration is complete. 
-                    You're all set to manage your business efficiently.
+                    You&apos;re all set to manage your business efficiently.
                   </p>
                   <div className="bg-[#f8fafd] p-4 rounded-lg">
                     <p className="text-sm text-[#2b2b2b]/80">

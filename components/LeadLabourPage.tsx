@@ -13,12 +13,12 @@ import { ActionButtonsPopup } from './ActionButtonsPopup'
 import { usePermissions } from '../contexts/PermissionContext'
 import { AutoSuggestInput } from './ui/auto-suggest-input'
 import { toast } from 'sonner'
-import { 
-  Plus, 
-  Search, 
-  MoreVertical, 
-  Edit, 
-  Trash2, 
+import {
+  Plus,
+  Search,
+  MoreVertical,
+  Edit,
+  Trash2,
   Eye,
   Upload,
   Download,
@@ -31,6 +31,7 @@ import {
   X,
   Briefcase
 } from 'lucide-react'
+import Image from 'next/image'
 
 interface LeadLabour {
   id: string | number
@@ -217,20 +218,20 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
 
   const filteredLeadLabours = leadLabours.filter(labour => {
     const matchesSearch = labour.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         labour.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         labour.phone.includes(searchTerm) ||
-                         labour.leadLabourId.includes(searchTerm) ||
-                         labour.specialization.toLowerCase().includes(searchTerm.toLowerCase())
-    
+      labour.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      labour.phone.includes(searchTerm) ||
+      labour.leadLabourId.includes(searchTerm) ||
+      labour.specialization.toLowerCase().includes(searchTerm.toLowerCase())
+
     const matchesSpecialization = filterSpecialization === 'all' || labour.specialization === filterSpecialization
     const matchesStatus = filterStatus === 'all' || labour.status === filterStatus
-    
+
     return matchesSearch && matchesSpecialization && matchesStatus
   })
 
-  
+
   const paginatedLeadLabours = filteredLeadLabours
-  const totalPages = Math.ceil(totalLead / itemsPerPage) 
+  const totalPages = Math.ceil(totalLead / itemsPerPage)
 
   const handleCreate = async () => {
     // Validation
@@ -251,7 +252,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       if (!formData.experience) errors.experience = 'Experience is required';
       if (!formData.documents.idProof) errors.idProof = 'ID Proof is required';
       if (!formData.agreeToTerms) errors.agreeToTerms = 'Please agree to terms';
-      
+
       setValidationErrors(errors);
       toast.error('Please fill in all required fields and agree to terms');
       return;
@@ -260,7 +261,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      const errors = {...validationErrors, email: 'Please enter a valid email address'};
+      const errors = { ...validationErrors, email: 'Please enter a valid email address' };
       setValidationErrors(errors);
       toast.error('Please enter a valid email address');
       return;
@@ -269,7 +270,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     // Phone number validation (exactly 10 digits)
     const phoneRegex = /^\d{10}$/;
     if (!phoneRegex.test(formData.phone)) {
-      const errors = {...validationErrors, phone: 'Phone number must be exactly 10 digits'};
+      const errors = { ...validationErrors, phone: 'Phone number must be exactly 10 digits' };
       setValidationErrors(errors);
       toast.error('Phone number must be exactly 10 digits');
       return;
@@ -301,7 +302,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       formDataPayload.append('agreed_terms', formData.agreeToTerms.toString());
       formDataPayload.append('role', formData.role);
       formDataPayload.append('management_type', 'lead_labor');
-      
+
       // Append file uploads if they exist
       if (formData.documents.idProof && formData.documents.idProof instanceof File) {
         formDataPayload.append('id_proof', formData.documents.idProof as File);
@@ -406,7 +407,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       if (!formData.specialization) errors.specialization = 'Specialization is required';
       if (!formData.experience) errors.experience = 'Experience is required';
       if (!formData.agreeToTerms) errors.agreeToTerms = 'Please agree to terms';
-      
+
       setValidationErrors(errors);
       toast.error('Please fill in all required fields and agree to terms');
       return;
@@ -415,7 +416,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      const errors = {...validationErrors, email: 'Please enter a valid email address'};
+      const errors = { ...validationErrors, email: 'Please enter a valid email address' };
       setValidationErrors(errors);
       toast.error('Please enter a valid email address');
       return;
@@ -424,7 +425,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     // Phone number validation (exactly 10 digits)
     const phoneRegex = /^\d{10}$/;
     if (!phoneRegex.test(formData.phone)) {
-      const errors = {...validationErrors, phone: 'Phone number must be exactly 10 digits'};
+      const errors = { ...validationErrors, phone: 'Phone number must be exactly 10 digits' };
       setValidationErrors(errors);
       toast.error('Phone number must be exactly 10 digits');
       return;
@@ -455,7 +456,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       formDataPayload.append('agreed_terms', formData.agreeToTerms.toString());
       formDataPayload.append('role', formData.role);
       formDataPayload.append('management_type', 'lead_labour');
-      
+
       // Append file uploads if they exist
       if (formData.documents.idProof && formData.documents.idProof instanceof File) {
         formDataPayload.append('id_proof', formData.documents.idProof as File);
@@ -509,9 +510,9 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
 
     try {
       loadingToastId = toast.loading('Deleting lead labour...');
-      
+
       const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
-      const headers: Record<string, string> = { };
+      const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const response = await fetch(`${apiBaseUrl}/lead-labor/deleteLeadLabor/${id}`, {
@@ -596,10 +597,10 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
         [type]: file
       }
     }))
-    
+
     // Clear validation error for the specific file type
     if (type === 'idProof' && validationErrors.idProof) {
-      setValidationErrors({...validationErrors, idProof: ''})
+      setValidationErrors({ ...validationErrors, idProof: '' })
     }
   }
 
@@ -609,20 +610,29 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       (currentFile instanceof File && currentFile.type.startsWith('image/')) ||
       (!(currentFile instanceof File) && currentFile && (currentFile as any).name && /\.(jpg|jpeg|png|gif)$/i.test((currentFile as any).name))
     )
-    
+
     return (
       <div className="space-y-2">
         <Label>{label}</Label>
-        
+
         {currentFile ? (
           <div className="relative border-2 border-dashed rounded-lg p-4">
             {isImageFile ? (
               <div className="relative">
-                <img 
+                <Image
+                  src={currentFile instanceof File ? URL.createObjectURL(currentFile) : (currentFile as any).url}
+                  alt="Preview"
+                  className="w-full h-32 object-cover rounded-lg"
+                  width={168}
+                  height={63}
+
+
+                />
+                {/* <img 
                   src={currentFile instanceof File ? URL.createObjectURL(currentFile) : (currentFile as any).url} 
                   alt="Preview" 
                   className="w-full h-32 object-cover rounded-lg"
-                />
+                /> */}
                 <button
                   type="button"
                   onClick={(e) => {
@@ -653,10 +663,9 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
             )}
           </div>
         ) : (
-          <div 
-            className={`border-2 border-dashed rounded-lg p-6 text-center hover:border-[#00A1FF] transition-colors cursor-pointer ${
-              error ? 'border-red-300' : 'border-gray-300'
-            }`}
+          <div
+            className={`border-2 border-dashed rounded-lg p-6 text-center hover:border-[#00A1FF] transition-colors cursor-pointer ${error ? 'border-red-300' : 'border-gray-300'
+              }`}
             onClick={() => document.getElementById(`file-${type}`)?.click()}
           >
             <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
@@ -674,16 +683,25 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
             />
           </div>
         )}
-        
+
         {editingLeadLabour && editingLeadLabour.documents?.[type] && !formData.documents[type] && (
           <div className="mt-2">
             <p className="text-sm text-blue-600 mb-2">📄 Current: {editingLeadLabour.documents[type]!.name}</p>
             {editingLeadLabour.documents[type]!.name && /\.(jpg|jpeg|png|gif)$/i.test(editingLeadLabour.documents[type]!.name) && (
-              <img 
-                src={editingLeadLabour.documents[type]!.url} 
-                alt="Current Preview" 
+              <Image
+                src={editingLeadLabour.documents[type]!.url}
+                alt="Current Preview"
                 className="w-full h-32 object-cover rounded-lg border"
+                width={168}
+                height={63}
+
+
               />
+              // <img 
+              //   src={editingLeadLabour.documents[type]!.url} 
+              //   alt="Current Preview" 
+              //   className="w-full h-32 object-cover rounded-lg border"
+              // />
             )}
           </div>
         )}
@@ -695,264 +713,264 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
   }
 
   const exportToCSV = () => {
-  // CSV header
-  const headers = [
-    "ID",
-    "Lead Labour ID",
-    "Name",
-    "Email",
-    "Phone",
-    "DOB",
-    "Address",
-    "Department",
-    "Date of Joining",
-    "Specialization",
-    "Experience",
-    "Certifications",
-    "Hourly Rate",
-    "Availability",
-    "Jobs Completed",
-    "Last Assignment",
-    "Skills",
-    "Emergency Contact"
-  ];
+    // CSV header
+    const headers = [
+      "ID",
+      "Lead Labour ID",
+      "Name",
+      "Email",
+      "Phone",
+      "DOB",
+      "Address",
+      "Department",
+      "Date of Joining",
+      "Specialization",
+      "Experience",
+      "Certifications",
+      "Hourly Rate",
+      "Availability",
+      "Jobs Completed",
+      "Last Assignment",
+      "Skills",
+      "Emergency Contact"
+    ];
 
-  // CSV rows
-  const rows = leadLabours.map(labour => [
-    labour.id,
-    labour.leadLabourId,
-    labour.name,
-    labour.email,
-    labour.phone,
-    labour.dob,
-    labour.address,
-    labour.department,
-    labour.dateOfJoining,
-    labour.specialization,
-    labour.experience,
-    labour.certifications.join(", "),
-    labour.hourlyRate,
-    labour.availability,
-    labour.jobsCompleted,
-    labour.lastAssignment,
-    labour.skills.join(", "),
-    labour.emergencyContact
-  ]);
+    // CSV rows
+    const rows = leadLabours.map(labour => [
+      labour.id,
+      labour.leadLabourId,
+      labour.name,
+      labour.email,
+      labour.phone,
+      labour.dob,
+      labour.address,
+      labour.department,
+      labour.dateOfJoining,
+      labour.specialization,
+      labour.experience,
+      labour.certifications.join(", "),
+      labour.hourlyRate,
+      labour.availability,
+      labour.jobsCompleted,
+      labour.lastAssignment,
+      labour.skills.join(", "),
+      labour.emergencyContact
+    ]);
 
-  // Combine headers and rows
-  const csvContent = [
-    headers.join(","),
-    ...rows.map(row => row.map(field => `"${field}"`).join(","))
-  ].join("\n");
+    // Combine headers and rows
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(field => `"${field}"`).join(","))
+    ].join("\n");
 
-  // Create download link
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.setAttribute("href", url);
-  link.setAttribute("download", `lead_labour_${new Date().toISOString().slice(0, 10)}.csv`);
-  link.style.visibility = "hidden";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
+    // Create download link
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `lead_labour_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
 
-useEffect(() => {
-  fetchRoles();
-  fetchLeadLabourData(currentPage, itemsPerPage);
-}, []);
+  useEffect(() => {
+    fetchRoles();
+    fetchLeadLabourData(currentPage, itemsPerPage);
+  }, []);
 
-const fetchRoles = async () => {
-  try {
-    const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+  const fetchRoles = async () => {
+    try {
+      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const response = await fetch(`${apiBaseUrl}/permissions/roles-with-permissions`, {
-      method: 'GET',
-      headers
-    });
+      const response = await fetch(`${apiBaseUrl}/permissions/roles-with-permissions`, {
+        method: 'GET',
+        headers
+      });
 
-    if (response.ok) {
-      const responseData = await response.json();
-      console.log('API Response:', responseData);
-      
-      // Transform API response to match component's expected format
-      if (responseData.success && responseData.data) {
-        const transformedRoles = responseData.data.map((apiRole: any) => ({
-          id: apiRole.id.toString(),
-          roleName: apiRole.role_name || '',
-          roleType: apiRole.role_type || '',
-          permissions: apiRole.permissions || []
-        }));
-        
-        setRoles(transformedRoles);
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('API Response:', responseData);
+
+        // Transform API response to match component's expected format
+        if (responseData.success && responseData.data) {
+          const transformedRoles = responseData.data.map((apiRole: any) => ({
+            id: apiRole.id.toString(),
+            roleName: apiRole.role_name || '',
+            roleType: apiRole.role_type || '',
+            permissions: apiRole.permissions || []
+          }));
+
+          setRoles(transformedRoles);
+        } else {
+          console.error('Invalid API response structure:', responseData);
+        }
       } else {
-        console.error('Invalid API response structure:', responseData);
+        console.error('Failed to fetch roles:', response.status, response.statusText);
       }
-    } else {
-      console.error('Failed to fetch roles:', response.status, response.statusText);
+    } catch (error) {
+      console.error('Error fetching roles:', error);
     }
-  } catch (error) {
-    console.error('Error fetching roles:', error);
-  }
-};
+  };
 
-const fetchLeadLabourData = async (page: number, limit: number) => {
-  setIsLoadingLeadLabour(true);
-  try {
-    const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+  const fetchLeadLabourData = async (page: number, limit: number) => {
+    setIsLoadingLeadLabour(true);
+    try {
+      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const response = await fetch(`${apiBaseUrl}/lead-labor/getAllLeadLabor`, {
-      method: 'GET',
-      headers
-    });
+      const response = await fetch(`${apiBaseUrl}/lead-labor/getAllLeadLabor`, {
+        method: 'GET',
+        headers
+      });
 
-    if (response.ok) {
-      const responseData = await response.json();
-      if (responseData.success && responseData.data) {
-        // Map API response to component data structure
-        const mappedData = responseData.data.data.map((item: any) => ({
-          id: item.id,
-          leadLabourId: item.labor_code,
-          name: item.users?.full_name || 'N/A',
-          email: item.users?.email || 'N/A',
-          phone: item.users?.phone || 'N/A',
-          dob: item.dob,
-          address: item.address,
-          notes: item.notes,
-          department: item.department,
-          dateOfJoining: item.date_of_joining,
-          specialization: item.specialization,
-          experience: item.experience,
-          trade: item.trade,
-          idProofUrl: item.id_proof_url,
-          photoUrl: item.photo_url,
-          resumeUrl: item.resume_url,
-          agreedTerms: item.agreed_terms,
-          status: item.users?.status || 'active',
-          role: item.users?.role || 'Lead labor',
-          createdAt: item.created_at,
-          jobsCompleted: 0, // Default value
-          hourlyRate: 0, // Default value
-          availability: 'available', // Default value
-          certifications: [], // Default value
-          lastAssignment: '', // Default value
-          skills: [], // Default value
-          emergencyContact: '', // Default value
-          documents: {
-            idProof: item.id_proof_url ? { name: item.id_proof_url.split('/').pop() || 'ID Proof', url: item.id_proof_url } : null,
-            photo: item.photo_url ? { name: item.photo_url.split('/').pop() || 'Photo', url: item.photo_url } : null,
-            resume: item.resume_url ? { name: item.resume_url.split('/').pop() || 'Resume', url: item.resume_url } : null
-          },
-          permissions: {
-            createJob: false,
-            addClient: false,
-            orderInventoryPrice: false,
-            invoicePrice: false,
-            invoiceGenerate: false,
-            closeJob: false,
-            changeLaborTime: false
-          },
-          agreeToTerms: item.agreed_terms
-        }));
+      if (response.ok) {
+        const responseData = await response.json();
+        if (responseData.success && responseData.data) {
+          // Map API response to component data structure
+          const mappedData = responseData.data.data.map((item: any) => ({
+            id: item.id,
+            leadLabourId: item.labor_code,
+            name: item.users?.full_name || 'N/A',
+            email: item.users?.email || 'N/A',
+            phone: item.users?.phone || 'N/A',
+            dob: item.dob,
+            address: item.address,
+            notes: item.notes,
+            department: item.department,
+            dateOfJoining: item.date_of_joining,
+            specialization: item.specialization,
+            experience: item.experience,
+            trade: item.trade,
+            idProofUrl: item.id_proof_url,
+            photoUrl: item.photo_url,
+            resumeUrl: item.resume_url,
+            agreedTerms: item.agreed_terms,
+            status: item.users?.status || 'active',
+            role: item.users?.role || 'Lead labor',
+            createdAt: item.created_at,
+            jobsCompleted: 0, // Default value
+            hourlyRate: 0, // Default value
+            availability: 'available', // Default value
+            certifications: [], // Default value
+            lastAssignment: '', // Default value
+            skills: [], // Default value
+            emergencyContact: '', // Default value
+            documents: {
+              idProof: item.id_proof_url ? { name: item.id_proof_url.split('/').pop() || 'ID Proof', url: item.id_proof_url } : null,
+              photo: item.photo_url ? { name: item.photo_url.split('/').pop() || 'Photo', url: item.photo_url } : null,
+              resume: item.resume_url ? { name: item.resume_url.split('/').pop() || 'Resume', url: item.resume_url } : null
+            },
+            permissions: {
+              createJob: false,
+              addClient: false,
+              orderInventoryPrice: false,
+              invoicePrice: false,
+              invoiceGenerate: false,
+              closeJob: false,
+              changeLaborTime: false
+            },
+            agreeToTerms: item.agreed_terms
+          }));
 
-        setLeadLabours(mappedData);
-        setTotalLead(responseData.data.pagination.totalItems || mappedData.length);
-        
-        // Extract unique departments and specializations
-        const uniqueDepartments = Array.from(new Set(responseData.data?.data?.map((item: any) => item.department).filter(Boolean))) as string[];
-        const uniqueSpecializations = Array.from(new Set(responseData.data?.data?.map((item: any) => item.specialization).filter(Boolean))) as string[];
-        
-        setDepartments(uniqueDepartments);
-        setSpecializations(uniqueSpecializations);
+          setLeadLabours(mappedData);
+          setTotalLead(responseData.data.pagination.totalItems || mappedData.length);
+
+          // Extract unique departments and specializations
+          const uniqueDepartments = Array.from(new Set(responseData.data?.data?.map((item: any) => item.department).filter(Boolean))) as string[];
+          const uniqueSpecializations = Array.from(new Set(responseData.data?.data?.map((item: any) => item.specialization).filter(Boolean))) as string[];
+
+          setDepartments(uniqueDepartments);
+          setSpecializations(uniqueSpecializations);
+        }
+      } else {
+        console.error('Failed to fetch lead labour data:', response.status, response.statusText);
       }
-    } else {
-      console.error('Failed to fetch lead labour data:', response.status, response.statusText);
+    } catch (error) {
+      console.error('Error fetching lead labour data:', error);
+    } finally {
+      setIsLoadingLeadLabour(false);
     }
-  } catch (error) {
-    console.error('Error fetching lead labour data:', error);
-  } finally {
-    setIsLoadingLeadLabour(false);
-  }
-};
+  };
 
-const fetchLeadLabourById = async (id: number) => {
-  try {
-    const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+  const fetchLeadLabourById = async (id: number) => {
+    try {
+      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const response = await fetch(`${apiBaseUrl}/lead-labor/getLeadLaborById/${id}`, {
-      method: 'GET',
-      headers
-    });
+      const response = await fetch(`${apiBaseUrl}/lead-labor/getLeadLaborById/${id}`, {
+        method: 'GET',
+        headers
+      });
 
-    if (response.ok) {
-      const responseData = await response.json();
-      if (responseData.success && responseData.data) {
-        const item = responseData.data;
-        // Map API response to component data structure
-        const mappedData: LeadLabour = {
-          id: item.id,
-          leadLabourId: item.labor_code,
-          name: item.users?.full_name || 'N/A',
-          email: item.users?.email || 'N/A',
-          phone: item.users?.phone || 'N/A',
-          dob: item.dob,
-          address: item.address,
-          notes: item.notes,
-          department: item.department,
-          dateOfJoining: item.date_of_joining,
-          specialization: item.specialization,
-          experience: item.experience,
-          trade: item.trade,
-          idProofUrl: item.id_proof_url,
-          photoUrl: item.photo_url,
-          resumeUrl: item.resume_url,
-          agreedTerms: item.agreed_terms,
-          status: item.users?.status || 'active',
-          role: item.users?.role || 'Lead labor',
-          createdAt: item.created_at,
-          jobsCompleted: 0, // Default value
-          hourlyRate: 0, // Default value
-          availability: 'available', // Default value
-          certifications: [], // Default value
-          lastAssignment: '', // Default value
-          skills: [], // Default value
-          emergencyContact: '', // Default value
-          documents: {
-            idProof: item.id_proof_url ? { name: item.id_proof_url.split('/').pop() || 'ID Proof', url: item.id_proof_url } : null,
-            photo: item.photo_url ? { name: item.photo_url.split('/').pop() || 'Photo', url: item.photo_url } : null,
-            resume: item.resume_url ? { name: item.resume_url.split('/').pop() || 'Resume', url: item.resume_url } : null
-          },
-          permissions: {
-            createJob: false,
-            addClient: false,
-            orderInventoryPrice: false,
-            invoicePrice: false,
-            invoiceGenerate: false,
-            closeJob: false,
-            changeLaborTime: false
-          },
-          agreeToTerms: item.agreed_terms
-        };
+      if (response.ok) {
+        const responseData = await response.json();
+        if (responseData.success && responseData.data) {
+          const item = responseData.data;
+          // Map API response to component data structure
+          const mappedData: LeadLabour = {
+            id: item.id,
+            leadLabourId: item.labor_code,
+            name: item.users?.full_name || 'N/A',
+            email: item.users?.email || 'N/A',
+            phone: item.users?.phone || 'N/A',
+            dob: item.dob,
+            address: item.address,
+            notes: item.notes,
+            department: item.department,
+            dateOfJoining: item.date_of_joining,
+            specialization: item.specialization,
+            experience: item.experience,
+            trade: item.trade,
+            idProofUrl: item.id_proof_url,
+            photoUrl: item.photo_url,
+            resumeUrl: item.resume_url,
+            agreedTerms: item.agreed_terms,
+            status: item.users?.status || 'active',
+            role: item.users?.role || 'Lead labor',
+            createdAt: item.created_at,
+            jobsCompleted: 0, // Default value
+            hourlyRate: 0, // Default value
+            availability: 'available', // Default value
+            certifications: [], // Default value
+            lastAssignment: '', // Default value
+            skills: [], // Default value
+            emergencyContact: '', // Default value
+            documents: {
+              idProof: item.id_proof_url ? { name: item.id_proof_url.split('/').pop() || 'ID Proof', url: item.id_proof_url } : null,
+              photo: item.photo_url ? { name: item.photo_url.split('/').pop() || 'Photo', url: item.photo_url } : null,
+              resume: item.resume_url ? { name: item.resume_url.split('/').pop() || 'Resume', url: item.resume_url } : null
+            },
+            permissions: {
+              createJob: false,
+              addClient: false,
+              orderInventoryPrice: false,
+              invoicePrice: false,
+              invoiceGenerate: false,
+              closeJob: false,
+              changeLaborTime: false
+            },
+            agreeToTerms: item.agreed_terms
+          };
 
-        setViewingLeadLabour(mappedData);
-        setIsViewDialogOpen(true);
+          setViewingLeadLabour(mappedData);
+          setIsViewDialogOpen(true);
+        }
+      } else {
+        console.error('Failed to fetch lead labour details:', response.status, response.statusText);
+        toast.error('Failed to fetch lead labour details');
       }
-    } else {
-      console.error('Failed to fetch lead labour details:', response.status, response.statusText);
-      toast.error('Failed to fetch lead labour details');
+    } catch (error) {
+      console.error('Error fetching lead labour details:', error);
+      toast.error('Error fetching lead labour details');
     }
-  } catch (error) {
-    console.error('Error fetching lead labour details:', error);
-    toast.error('Error fetching lead labour details');
-  }
-};
+  };
 
 
   const renderForm = () => (
@@ -961,29 +979,29 @@ const fetchLeadLabourById = async (id: number) => {
       <div>
         <h3 className="text-lg font-medium text-[#2b2b2b] mb-4">Personal Details</h3>
         <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-              <Label htmlFor="role">Role *</Label>
-              <Select value={formData.role} onValueChange={(value) => {
-                setFormData({...formData, role: value})
-                if (validationErrors.role) {
-                  setValidationErrors({...validationErrors, role: ''})
-                }
-              }}>
-                <SelectTrigger className={validationErrors.role ? 'border-red-500' : ''}>
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map((role) => (
-                    <SelectItem key={role.id} value={role.roleName}>
-                      {role.roleName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {validationErrors.role && (
-                <p className="text-sm text-red-500 mt-1">{validationErrors.role}</p>
-              )}
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="role">Role *</Label>
+            <Select value={formData.role} onValueChange={(value) => {
+              setFormData({ ...formData, role: value })
+              if (validationErrors.role) {
+                setValidationErrors({ ...validationErrors, role: '' })
+              }
+            }}>
+              <SelectTrigger className={validationErrors.role ? 'border-red-500' : ''}>
+                <SelectValue placeholder="Select role" />
+              </SelectTrigger>
+              <SelectContent>
+                {roles.map((role) => (
+                  <SelectItem key={role.id} value={role.roleName}>
+                    {role.roleName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {validationErrors.role && (
+              <p className="text-sm text-red-500 mt-1">{validationErrors.role}</p>
+            )}
+          </div>
           <div className="space-y-2">
             <Label htmlFor="name">Full Name *</Label>
             <Input
@@ -991,9 +1009,9 @@ const fetchLeadLabourById = async (id: number) => {
               value={formData.name}
               className={validationErrors.name ? 'border-red-500' : ''}
               onChange={(e) => {
-                setFormData({...formData, name: e.target.value})
+                setFormData({ ...formData, name: e.target.value })
                 if (validationErrors.name) {
-                  setValidationErrors({...validationErrors, name: ''})
+                  setValidationErrors({ ...validationErrors, name: '' })
                 }
               }}
               placeholder="Enter full name"
@@ -1010,9 +1028,9 @@ const fetchLeadLabourById = async (id: number) => {
               onChange={(e) => {
                 // Only allow digits and limit to 10 characters
                 const value = e.target.value.replace(/\D/g, '').slice(0, 10);
-                setFormData({...formData, phone: value})
+                setFormData({ ...formData, phone: value })
                 if (validationErrors.phone) {
-                  setValidationErrors({...validationErrors, phone: ''})
+                  setValidationErrors({ ...validationErrors, phone: '' })
                 }
               }}
               placeholder="Enter 10-digit phone number"
@@ -1029,9 +1047,9 @@ const fetchLeadLabourById = async (id: number) => {
               type="email"
               value={formData.email}
               onChange={(e) => {
-                setFormData({...formData, email: e.target.value})
+                setFormData({ ...formData, email: e.target.value })
                 if (validationErrors.email) {
-                  setValidationErrors({...validationErrors, email: ''})
+                  setValidationErrors({ ...validationErrors, email: '' })
                 }
               }}
               placeholder="Enter your email address"
@@ -1049,9 +1067,9 @@ const fetchLeadLabourById = async (id: number) => {
               value={formData.dob}
               className={validationErrors.dob ? 'border-red-500' : ''}
               onChange={(e) => {
-                setFormData({...formData, dob: e.target.value})
+                setFormData({ ...formData, dob: e.target.value })
                 if (validationErrors.dob) {
-                  setValidationErrors({...validationErrors, dob: ''})
+                  setValidationErrors({ ...validationErrors, dob: '' })
                 }
               }}
               max={new Date().toISOString().split('T')[0]}
@@ -1061,16 +1079,16 @@ const fetchLeadLabourById = async (id: number) => {
             )}
           </div>
           <div className="space-y-2">
-              <Label htmlFor="edit-status">Status</Label>
-              <Select value={formData.status} onValueChange={(value: 'active' | 'inactive') => setFormData({...formData, status: value})}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem> 
-                </SelectContent>
-              </Select>
+            <Label htmlFor="edit-status">Status</Label>
+            <Select value={formData.status} onValueChange={(value: 'active' | 'inactive') => setFormData({ ...formData, status: value })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="col-span-2 space-y-2">
             <Label htmlFor="address">Address *</Label>
@@ -1079,9 +1097,9 @@ const fetchLeadLabourById = async (id: number) => {
               value={formData.address}
               className={validationErrors.address ? 'border-red-500' : ''}
               onChange={(e) => {
-                setFormData({...formData, address: e.target.value})
+                setFormData({ ...formData, address: e.target.value })
                 if (validationErrors.address) {
-                  setValidationErrors({...validationErrors, address: ''})
+                  setValidationErrors({ ...validationErrors, address: '' })
                 }
               }}
               placeholder="Enter address"
@@ -1095,7 +1113,7 @@ const fetchLeadLabourById = async (id: number) => {
             <Textarea
               id="notes"
               value={formData.notes}
-              onChange={(e) => setFormData({...formData, notes: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               placeholder="Additional notes..."
               rows={3}
             />
@@ -1113,9 +1131,9 @@ const fetchLeadLabourById = async (id: number) => {
               label=""
               value={formData.department}
               onChange={(value) => {
-                setFormData({...formData, department: value})
+                setFormData({ ...formData, department: value })
                 if (validationErrors.department) {
-                  setValidationErrors({...validationErrors, department: ''})
+                  setValidationErrors({ ...validationErrors, department: '' })
                 }
               }}
               suggestions={departments}
@@ -1129,9 +1147,9 @@ const fetchLeadLabourById = async (id: number) => {
               label=""
               value={formData.specialization}
               onChange={(value) => {
-                setFormData({...formData, specialization: value})
+                setFormData({ ...formData, specialization: value })
                 if (validationErrors.specialization) {
-                  setValidationErrors({...validationErrors, specialization: ''})
+                  setValidationErrors({ ...validationErrors, specialization: '' })
                 }
               }}
               suggestions={specializations}
@@ -1146,9 +1164,9 @@ const fetchLeadLabourById = async (id: number) => {
               type="date"
               value={formData.dateOfJoining}
               onChange={(e) => {
-                setFormData({...formData, dateOfJoining: e.target.value})
+                setFormData({ ...formData, dateOfJoining: e.target.value })
                 if (validationErrors.dateOfJoining) {
-                  setValidationErrors({...validationErrors, dateOfJoining: ''})
+                  setValidationErrors({ ...validationErrors, dateOfJoining: '' })
                 }
               }}
               className={validationErrors.dateOfJoining ? 'border-red-500' : ''}
@@ -1157,7 +1175,7 @@ const fetchLeadLabourById = async (id: number) => {
               <p className="text-sm text-red-500 mt-1">{validationErrors.dateOfJoining}</p>
             )}
           </div>
-         
+
           <div className="space-y-2">
             <Label htmlFor="experience">Experience</Label>
             <Input
@@ -1166,9 +1184,9 @@ const fetchLeadLabourById = async (id: number) => {
               className={validationErrors.experience ? 'border-red-500' : ''}
 
               onChange={(e) => {
-                setFormData({...formData, experience: e.target.value})
+                setFormData({ ...formData, experience: e.target.value })
                 if (validationErrors.experience) {
-                  setValidationErrors({...validationErrors, experience: ''})
+                  setValidationErrors({ ...validationErrors, experience: '' })
                 }
               }}
               placeholder="e.g., 5 years"
@@ -1196,9 +1214,9 @@ const fetchLeadLabourById = async (id: number) => {
           id="agreeToTerms"
           checked={formData.agreeToTerms}
           onCheckedChange={(checked) => {
-            setFormData({...formData, agreeToTerms: checked as boolean})
+            setFormData({ ...formData, agreeToTerms: checked as boolean })
             if (validationErrors.agreeToTerms) {
-              setValidationErrors({...validationErrors, agreeToTerms: ''})
+              setValidationErrors({ ...validationErrors, agreeToTerms: '' })
             }
           }}
         />
@@ -1219,7 +1237,7 @@ const fetchLeadLabourById = async (id: number) => {
           <h1 className="text-2xl font-medium text-[#2b2b2b]">Lead Labour Management</h1>
           <p className="text-sm text-[#2b2b2b]/60 mt-1">Manage your lead labour workforce and their assignments.</p>
         </div>
-        
+
         <div className="flex items-center gap-3">
           <Button variant="outline" className="gap-2">
             <Upload className="h-4 w-4" />
@@ -1230,31 +1248,31 @@ const fetchLeadLabourById = async (id: number) => {
             Export
           </Button>
           {canCreateLeadLabour && (
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2">
-                <Plus className="h-4 w-4" />
-                Add Lead Labour
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh]">
-              <DialogHeader>
-                <DialogTitle>Lead Labour Creation Form</DialogTitle>
-              </DialogHeader>
-              {renderForm()}
-              <div className="flex justify-end gap-3 mt-6">
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Lead Labour
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh]">
+                <DialogHeader>
+                  <DialogTitle>Lead Labour Creation Form</DialogTitle>
+                </DialogHeader>
+                {renderForm()}
+                <div className="flex justify-end gap-3 mt-6">
                   <Button variant="outline" onClick={() => {
                     setIsCreateDialogOpen(false);
                     resetForm();
                   }}>
-                  Cancel
-                </Button>
-                <Button onClick={handleCreate} className="bg-primary text-white hover:bg-[#0090e6]">
-                  Submit
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleCreate} className="bg-primary text-white hover:bg-[#0090e6]">
+                    Submit
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           )}
         </div>
       </div>
@@ -1276,7 +1294,7 @@ const fetchLeadLabourById = async (id: number) => {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -1292,7 +1310,7 @@ const fetchLeadLabourById = async (id: number) => {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -1308,7 +1326,7 @@ const fetchLeadLabourById = async (id: number) => {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -1340,7 +1358,7 @@ const fetchLeadLabourById = async (id: number) => {
                   className="pl-10"
                 />
               </div>
-              
+
               <Select value={filterSpecialization} onValueChange={setFilterSpecialization}>
                 <SelectTrigger className="w-56">
                   <SelectValue placeholder="Filter by Specialization" />
@@ -1364,7 +1382,7 @@ const fetchLeadLabourById = async (id: number) => {
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <span>Total: {filteredLeadLabours.length}</span>
             </div>
@@ -1409,8 +1427,8 @@ const fetchLeadLabourById = async (id: number) => {
                     <div className="flex flex-col items-center justify-center text-gray-500">
                       <div className="text-lg font-medium mb-2">No data available</div>
                       <div className="text-sm">
-                        {searchTerm || filterSpecialization !== 'all' || filterStatus !== 'all' 
-                          ? 'No lead labour found matching your filters' 
+                        {searchTerm || filterSpecialization !== 'all' || filterStatus !== 'all'
+                          ? 'No lead labour found matching your filters'
                           : 'No lead labour data found. Create your first lead labour record.'}
                       </div>
                     </div>
@@ -1478,7 +1496,7 @@ const fetchLeadLabourById = async (id: number) => {
           >
             Previous
           </Button>
-          
+
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
             <Button
               key={page}
@@ -1492,7 +1510,7 @@ const fetchLeadLabourById = async (id: number) => {
               {page}
             </Button>
           ))}
-          
+
           <Button
             variant="outline"
             onClick={() => {

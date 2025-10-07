@@ -13,10 +13,15 @@ import {
   CheckCircle,
   XCircle,
   Check,
+  Calendar as CalendarIcon,
   X
 } from 'lucide-react'
+import { format } from 'date-fns'
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { useEffect, useState } from 'react'
 import { apiClient } from '@/utils/api'
+import { LoadingSpinner } from './common/LoadingSpinner'
+import { Calendar } from './ui/calendar'
 
 
 
@@ -37,6 +42,11 @@ interface TimesheetItem {
   status: string;
   actions?: string[];
   id?: string | number;
+  jobId?: number;      
+  laborId?: number;
+  job_id?:number;
+  labor_id?:number;
+
 }
 
 
@@ -102,6 +112,7 @@ export function TimesheetsPage() {
       week_range: string;
     };
   } | null>(null);
+   const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined })
   const [statusFilter, setStatusFilter] = useState('all');
   const [employeeFilter, setEmployeeFilter] = useState('all');
 
@@ -113,18 +124,27 @@ export function TimesheetsPage() {
   });
 
   const filteredTimesheets = timesheets?.dashboard_timesheets.filter((item: TimesheetItem) => {
-    const searchMatch =
-      item.employee.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.job.toLowerCase().includes(searchTerm.toLowerCase());
+  const searchMatch =
+    item.employee.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.job.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const statusMatch =
-      statusFilter === 'all' || item.status.toLowerCase() === statusFilter;
+  const statusMatch =
+    statusFilter === 'all' || item.status.toLowerCase() === statusFilter;
 
-    const employeeMatch =
-      employeeFilter === 'all' || item.employee.toLowerCase() === employeeFilter;
+  const employeeMatch =
+    employeeFilter === 'all' || item.employee.toLowerCase() === employeeFilter;
 
-    return searchMatch && statusMatch && employeeMatch;
-  }) || [];
+  const dateMatch = (() => {
+    if (!dateRange.from || !dateRange.to) return true;
+
+    const [startStr] = item.week.split(' - ');
+    const itemStartDate = new Date(startStr);
+    return itemStartDate >= dateRange.from && itemStartDate <= dateRange.to;
+  })();
+
+  return searchMatch && statusMatch && employeeMatch && dateMatch;
+}) || [];
+
 
   const employeeOptions = Array.from(new Set(timesheets?.dashboard_timesheets.map(t => t.employee.toLowerCase())));
 
@@ -141,7 +161,7 @@ export function TimesheetsPage() {
     const fetchAlltimesheets = async () => {
       try {
         setIsLoading(true);
-        const response = await apiClient.getAllTimesheets(startDate, endDate);
+        const response = await apiClient.getAllTimesheets();
         console.log(response, "timeres")
         setTimesheets(response.data);
         console.log(response.data, "newtimeres")
@@ -169,6 +189,39 @@ export function TimesheetsPage() {
 
     fetchDashboardStats();
   }, []);
+
+const handleApproveTimesheet = async (item: TimesheetItem) => {
+  try {
+    setIsLoading(true);
+
+    const payload = {
+      jobId: item.jobId ||item.job_id|| 0,
+      laborId: item.laborId || item.labor_id|| 0,
+      startDate: timesheets?.period.start_date || '2025-09-20',
+      endDate: timesheets?.period.end_date || '2025-09-26',
+      status: 'approved',
+    };
+    console.log(payload,"playload ")
+  
+
+    await apiClient.approveWeekTimesheet(payload); 
+    const refreshed = await apiClient.getAllTimesheets();
+    setTimesheets(refreshed.data);
+
+  } catch (error) {
+    console.error('Error approving timesheet:', error);
+    alert("Failed to approve timesheet.");
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+
+
+
+
+
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -263,6 +316,35 @@ export function TimesheetsPage() {
                   ))}
                 </SelectContent>
               </Select>
+               <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-[240px] justify-start text-left font-normal">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateRange.from ? (
+                      dateRange.to ? (
+                        <>
+                          {format(dateRange.from, "LLL dd, y")} -{" "}
+                          {format(dateRange.to, "LLL dd, y")}
+                        </>
+                      ) : (
+                        format(dateRange.from, "LLL dd, y")
+                      )
+                    ) : (
+                      <span>Pick a date range</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={dateRange.from}
+                    selected={dateRange as any}
+                    onSelect={(range: any) => setDateRange(range)}
+                    numberOfMonths={2}
+                  />
+                </PopoverContent>
+              </Popover>
 
               <span className="text-sm text-muted-foreground">{filteredTimesheets.length} timesheets</span>
             </div>
@@ -270,7 +352,7 @@ export function TimesheetsPage() {
           </div>
                   {isLoading ? (
           <div className="flex justify-center items-center py-10 text-muted-foreground">
-            <div className="animate-spin rounded-full h-6 w-6 border-2 border-t-transparent border-gray-400 mr-3"></div>
+            <LoadingSpinner />
             Loading timesheets...
           </div>
         ) : (
@@ -292,7 +374,7 @@ export function TimesheetsPage() {
               <TableBody>
                 {filteredTimesheets.length > 0 ? (
                   filteredTimesheets.map((item: any) => (
-                    <TableRow key={item.id || `${item.employee}-${item.week}`} className="odd:bg-white even:bg-slate-50">
+                    <TableRow key={`${item.employee}-${item.jobId}-${item.week}`} className="odd:bg-white even:bg-slate-50">
                       <TableCell className="font-medium">{item.employee}</TableCell>
                       <TableCell>
                         <div>{item.job}</div>
@@ -315,26 +397,48 @@ export function TimesheetsPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {item.status === 'Submitted' && (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="border-green-500 text-green-500 hover:bg-green-50 hover:text-green-600"
-                              >
-                                <Check className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="border-red-500 text-red-500 hover:bg-red-50 hover:text-red-600"
-                              >
-                                <X className="w-4 h-4" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
+                      <div className="flex items-center justify-end gap-2">
+                        {item.status.toLowerCase() === 'approved' && (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="border-green-500 text-green-500 hover:bg-green-50 hover:text-green-600"
+                          >
+                            <Check className="w-4 h-4" />
+                          </Button>
+                        )}
+
+                        {item.status.toLowerCase() === 'draft' && (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="border-red-500 text-red-500 hover:bg-red-50 hover:text-red-600"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        )}
+
+                        {item.status.toLowerCase() === 'active' && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="border-green-500 text-green-500 hover:bg-green-50 hover:text-green-600"
+                              onClick={() => handleApproveTimesheet(item)}
+                            >
+                              <Check className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="border-red-500 text-red-500 hover:bg-red-50 hover:text-red-600"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+
                       </TableCell>
                     </TableRow>
                   ))

@@ -651,7 +651,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
                     <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
                     <div className="text-sm text-blue-800">
                       <p className="font-medium mb-1">Security Notice</p>
-                      <p>For your security, you'll be automatically logged out after changing your password. Please save any unsaved work before proceeding.</p>
+                      <p>For your security, you&apos;ll be automatically logged out after changing your password. Please save any unsaved work before proceeding.</p>
                     </div>
                   </div>
                 </div>

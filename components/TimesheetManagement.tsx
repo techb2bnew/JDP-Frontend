@@ -123,20 +123,20 @@ export function TimesheetManagement({ onBack, jobs }: TimesheetManagementProps) 
   const endDate = '2025-09-26'
 
 
-  useEffect(() => {
-    console.log('asas')
-    const fetchAlltimesheets = async () => {
-      try {
-        const response = await apiClient.getAllTimesheets(startDate, endDate);
-        console.log(response, "timeres")
-        setTimesheets(response.data.data);
-      } catch (error) {
-        console.error('Error fetching suppliers:', error);
-      }
-    };
+  // useEffect(() => {
+  //   console.log('asas')
+  //   const fetchAlltimesheets = async () => {
+  //     try {
+  //       const response = await apiClient.getAllTimesheets(startDate, endDate);
+  //       console.log(response, "timeres")
+  //       setTimesheets(response.data.data);
+  //     } catch (error) {
+  //       console.error('Error fetching suppliers:', error);
+  //     }
+  //   };
 
-    fetchAlltimesheets();
-  }, []);
+  //   fetchAlltimesheets();
+  // }, []);
 
 
   useEffect(() => {
@@ -233,8 +233,8 @@ export function TimesheetManagement({ onBack, jobs }: TimesheetManagementProps) 
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Timesheetssss</p>
-                <p className="text-2xl font-medium text-[#2b2b2b]">{dashboardStats.total}</p>
+                <p className="text-sm text-gray-600">Total Timesheets</p>
+                <p className="text-2xl font-medium text-[#2b2b2b]">{timesheets.length}</p>
               </div>
               <div className="w-12 h-12 bg-[#E6F6FF] rounded-lg flex items-center justify-center">
                 <Clock className="h-6 w-6 text-[#00A1FF]" />

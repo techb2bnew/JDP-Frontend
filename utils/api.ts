@@ -836,7 +836,7 @@ export const apiClient = {
   },
 
   // Get All Timesheets
-  getAllTimesheets: async (startDate: string, endDate: string) => {
+  getAllTimesheets: async () => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
     const token = getAuthToken();
 
@@ -844,7 +844,7 @@ export const apiClient = {
       throw new Error("No authentication token found");
     }
 
-    const url = `${apiBaseUrl}/job/getAllJobsWeeklyTimesheetSummary?start_date=${startDate}&end_date=${endDate}`;
+    const url = `${apiBaseUrl}/job/getAllJobsWeeklyTimesheetSummary`;
 
     const response = await fetch(url, {
       method: "GET",
@@ -861,6 +861,54 @@ export const apiClient = {
 
     return response.json();
   },
+
+approveWeekTimesheet: async ({
+  jobId,
+  laborId,
+  startDate,
+  endDate,
+  status,
+}: {
+  jobId: number;
+  laborId: number;
+  startDate: string;
+  endDate: string;
+  status: string;
+}) => {
+
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+  const token = getAuthToken();
+
+  if (!token) {
+    throw new Error("No authentication token found");
+  }
+
+  const url = `${apiBaseUrl}/job/approveWeekTimesheet`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      jobId,
+      laborId,
+      startDate,
+      endDate,
+      status,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || "Failed to approve timesheet");
+  }
+
+  return response.json();
+},
+
+  
 
   // Get Estimate By Id
   getEstimateById: async (id: number) => {
@@ -1473,7 +1521,7 @@ getTimesheetDashboardStats: async () => {
       jdp_sku: string;
       stock_quantity: number;
       unit: string;
-      job_id: string;
+      job_id: number;
       is_custom: boolean;
       unit_cost: number;
     }[];

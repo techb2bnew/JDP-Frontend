@@ -1762,7 +1762,7 @@ export function ProductsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure you want to delete this product?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the product "{productToDelete?.name}" from your inventory.
+              This action cannot be undone. This will permanently delete the product &quot;{productToDelete?.name}&quot; from your inventory.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -24,9 +24,71 @@ interface NewInvoiceDialogProps {
   onSave: (invoice: Partial<Invoice>) => void
   jobs: any[];
   jobId?: number;
+onInvoiceSaved?: (invoice: any) => void;
+  
+  
 }
 
-export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onInvoiceSaved, }: NewInvoiceDialogProps) => {
+
+
+
+export interface CreateEstimatePayload {
+  estimate_title: string;
+  customer_id: number;
+  priority: "low" | "medium" | "high";
+  valid_until: string;
+  location: string;
+  description: string;
+  service_type: string;
+  email_address: string;
+  estimate_date: string;
+
+  materials_cost: number;
+  labor_cost: number;
+  additional_costs: number;
+  subtotal: number;
+  tax_percentage: number;
+  tax_amount: number;
+  total_amount: number;
+
+  status: string;
+  invoice_type: string;
+  invoice_number: string;
+  issue_date: string;
+  due_date: string;
+
+  job_id: number;
+
+  additional_cost: {
+    description: string;
+    amount: number;
+  };
+
+  custom_labor: {
+    full_name: string;
+    email: string;
+    hours_worked: number;
+    hourly_rate: number;
+    job_id: number;
+    is_custom: boolean;
+  }[];
+
+  custom_products: {
+    product_name: string;
+    supplier_id: number;
+    supplier_sku: string;
+    jdp_sku: string;
+    stock_quantity: number;
+    unit: string;
+    job_id:number;
+    is_custom: boolean;
+    unit_cost: number;
+  }[];
+}
+
+
+
+export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onInvoiceSaved }: NewInvoiceDialogProps) => {
   console.log('trsting jobs', jobs);
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -224,98 +286,105 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
     return Object.keys(stepErrors).length === 0
   }
 
+    const isPriority = (value: any): value is "low" | "medium" | "high" =>
+  ["low", "medium", "high"].includes(value);
+
 
   const handleSave = async () => {
-    setLoading(true);
-    try {
-      const laborPayload = newInvoice.labor?.map(l => ({
+  setLoading(true);
+  try {
+    const laborPayload =
+      newInvoice.labor?.map((l) => ({
         full_name: l.laborName,
         email: l.email || "customer@example.com",
         hours_worked: l.hours,
         hourly_rate: l.hourlyRate,
-        job_id: newInvoice.jobId,
+        job_id: Number(newInvoice.jobId),
         is_custom: true,
       })) || [];
 
-
-      const productsPayload = newInvoice.items?.map(i => ({
+    const productsPayload =
+      newInvoice.items?.map((i) => ({
         product_name: i.description,
         supplier_id: i.supplierId && i.supplierId > 0 ? i.supplierId : 1,
         supplier_sku: i.sku || "",
         jdp_sku: i.jdp_sku || "SKU-DEFAULT",
         stock_quantity: i.quantity,
-        job_id: newInvoice.jobId,
+       job_id: Number(newInvoice.jobId),
         unit: i.unit ? i.unit.toString() : "1",
         is_custom: true,
         unit_cost: i.unitPrice,
       })) || [];
 
-      const payload: Invoice = {
-        estimate_title: "New Estimate",
-        customer_id: Number(newInvoice.customerId),
-        priority: newInvoice.priority || "medium",
-        valid_until: newInvoice.dueDate || "",
-        location: "N/A",
-        description: newInvoice.notes || "",
-        service_type: "service_based",
-        email_address: "customer@example.com",
-        estimate_date: newInvoice.issueDate || "",
+    const payload: CreateEstimatePayload = {
+      estimate_title: "New Estimate",
+      customer_id: Number(newInvoice.customerId),
 
-        materials_cost: itemsTotal,
-        labor_cost: laborTotal,
-        additional_costs: additionalTotal,
-        subtotal,
-        tax_percentage: (newInvoice.taxRate || 0) * 100,
-        tax_amount: taxAmount,
-        total_amount: totalAmount,
+      priority: isPriority(newInvoice.priority) ? newInvoice.priority : "medium",
+      valid_until: newInvoice.dueDate || "",
+      location: newInvoice.location || "N/A",
+      description: newInvoice.notes || "",
+      service_type: "service_based",
+      email_address: newInvoice.emailAddress || "customer@example.com",
+      estimate_date: newInvoice.issueDate || "",
 
-        status: "draft",
-        invoice_type: newInvoice.type || "proposal_invoice",
-        invoice_number: `INV-${Date.now()}`,
-        issue_date: newInvoice.issueDate || "",
-        due_date: newInvoice.dueDate || "",
-        job_id: newInvoice.jobId,
+      materials_cost: itemsTotal,
+      labor_cost: laborTotal,
+      additional_costs: additionalTotal,
+      subtotal,
+      tax_percentage: (newInvoice.taxRate || 0) * 100,
+      tax_amount: taxAmount,
+      total_amount: totalAmount,
 
-        additional_cost: newInvoice.additionalCosts?.length
-          ? {
+      status: "draft",
+      invoice_type: newInvoice.type || "proposal_invoice",
+      invoice_number: `INV-${Date.now()}`,
+      issue_date: newInvoice.issueDate || "",
+      due_date: newInvoice.dueDate || "",
+
+      job_id: Number(newInvoice.jobId),
+
+      additional_cost: newInvoice.additionalCosts?.length
+        ? {
             description: newInvoice.additionalCosts[0].description || "",
             amount: newInvoice.additionalCosts.reduce((sum, c) => sum + c.amount, 0),
           }
-          : { description: "", amount: 0 },
+        : { description: "", amount: 0 },
 
-        custom_labor: laborPayload,
-        custom_products: productsPayload,
-      };
+      custom_labor: laborPayload,
+      custom_products: productsPayload,
+    };
 
-      const createdInvoice = await apiClient.createEstimate(payload);
-      dispatch(addInvoice(createdInvoice));
-      toast.success("Invoice created successfully!");
-      onOpenChange(false);
+    const createdInvoice = await apiClient.createEstimate(payload);
+    dispatch(addInvoice(createdInvoice));
+    toast.success("Invoice created successfully!");
+    onOpenChange(false);
 
-      onInvoiceSaved?.();
+    onInvoiceSaved?.(createdInvoice);
 
-      // Reset invoice
-      setNewInvoice({
-        customerId: "",
-        jobId: undefined,
-        type: "proposal_invoice",
-        issueDate: format(new Date(), "yyyy-MM-dd"),
-        dueDate: format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"),
-        items: [],
-        labor: [],
-        additionalCosts: [],
-        notes: "",
-        taxRate: 0.08,
-        priority: "medium",
-      });
-      setCurrentStep(1);
-    } catch (error) {
-      console.error("Error creating invoice:", error);
-      toast.error("Failed to create invoice");
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Reset invoice
+    setNewInvoice({
+      customerId: "",
+      jobId: undefined,
+      type: "proposal_invoice",
+      issueDate: format(new Date(), "yyyy-MM-dd"),
+      dueDate: format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"),
+      items: [],
+      labor: [],
+      additionalCosts: [],
+      notes: "",
+      taxRate: 0.08,
+      priority: "medium",
+    });
+
+    setCurrentStep(1);
+  } catch (error) {
+    console.error("Error creating invoice:", error);
+    toast.error("Failed to create invoice");
+  } finally {
+    setLoading(false);
+  }
+};
 
 
   useEffect(() => {
@@ -402,7 +471,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
                   onValueChange={(value) => {
                     const newCustomerId = Number(value);
 
-                    setNewInvoice((prev) => {
+                    setNewInvoice((prev:any) => {
                       const validJobs = jobs.filter(
                         (job) => Number(job.customerId) === newCustomerId
                       );
@@ -650,123 +719,126 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
               </Button>
             </div>
 
-            <div className="space-y-3">
-              {newInvoice.items?.length > 0 ? (
-                newInvoice.items.map((item, index) => (
-                  <Card key={item.id}>
-                    <CardContent className="p-4">
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label>SKU</Label>
-                          <Input
-                            value={item.sku}
-                            maxLength={20}
-                            onChange={(e) =>
-                              updateInvoiceItem(index, "sku", e.target.value.slice(0, 10))
-                            }
-                            placeholder="SKU-001"
-                          />
-                          {errors[`item_${index}_sku`] && (
-                            <p className="text-red-500 text-sm">
-                              {errors[`item_${index}_sku`]}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Description</Label>
-                          <Input
-                            value={item.description}
-                            maxLength={20}
-                            onChange={(e) =>
-                              updateInvoiceItem(index, "description", e.target.value)
-                            }
-                            placeholder="Item description"
-                          />
-                          {errors[`item_${index}_desc`] && (
-                            <p className="text-red-500 text-sm">
-                              {errors[`item_${index}_desc`]}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Quantity</Label>
-                          <Input
-                            type="number"
-                            value={item.quantity === 0 ? "" : item.quantity}
-                            onChange={(e) =>
-                              updateInvoiceItem(
-                                index,
-                                "quantity",
-                                e.target.value === "" ? 0 : parseInt(e.target.value)
-                              )
-                            }
-                            placeholder="0"
-                          />
-                          {errors[`item_${index}_qty`] && (
-                            <p className="text-red-500 text-sm">
-                              {errors[`item_${index}_qty`]}
-                            </p>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Unit Price</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={item.unitPrice === 0 ? "" : item.unitPrice}
-                            onChange={(e) =>
-                              updateInvoiceItem(
-                                index,
-                                "unitPrice",
-                                e.target.value === "" ? 0 : parseFloat(e.target.value)
-                              )
-                            }
-                            placeholder="0.00"
-                          />
-                          {errors[`item_${index}_price`] && (
-                            <p className="text-red-500 text-sm">
-                              {errors[`item_${index}_price`]}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Total</Label>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={item.total === 0 ? "" : item.total}
-                              onChange={(e) =>
-                                updateInvoiceItem(
-                                  index,
-                                  "total",
-                                  e.target.value === "" ? 0 : parseFloat(e.target.value)
-                                )
-                              }
-                              placeholder="0.00"
-                            />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => removeInvoiceItem(index)}
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              ) : (
-                <p className="text-center text-muted-foreground py-8">
-                  No items added yet
+      <div className="space-y-3">
+  {(newInvoice.items ?? []).length > 0 ? (
+    (newInvoice.items ?? []).map((item, index) => (
+      <Card key={item.id}>
+        <CardContent className="p-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>SKU</Label>
+              <Input
+                value={item.sku}
+                maxLength={20}
+                onChange={(e) =>
+                  updateInvoiceItem(index, "sku", e.target.value.slice(0, 10))
+                }
+                placeholder="SKU-001"
+              />
+              {errors[`item_${index}_sku`] && (
+                <p className="text-red-500 text-sm">
+                  {errors[`item_${index}_sku`]}
                 </p>
               )}
             </div>
+
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Input
+                value={item.description}
+                maxLength={20}
+                onChange={(e) =>
+                  updateInvoiceItem(index, "description", e.target.value)
+                }
+                placeholder="Item description"
+              />
+              {errors[`item_${index}_desc`] && (
+                <p className="text-red-500 text-sm">
+                  {errors[`item_${index}_desc`]}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Quantity</Label>
+              <Input
+                type="number"
+                value={item.quantity === 0 ? "" : item.quantity}
+                onChange={(e) =>
+                  updateInvoiceItem(
+                    index,
+                    "quantity",
+                    e.target.value === "" ? 0 : parseInt(e.target.value)
+                  )
+                }
+                placeholder="0"
+              />
+              {errors[`item_${index}_qty`] && (
+                <p className="text-red-500 text-sm">
+                  {errors[`item_${index}_qty`]}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Unit Price</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={item.unitPrice === 0 ? "" : item.unitPrice}
+                onChange={(e) =>
+                  updateInvoiceItem(
+                    index,
+                    "unitPrice",
+                    e.target.value === "" ? 0 : parseFloat(e.target.value)
+                  )
+                }
+                placeholder="0.00"
+              />
+              {errors[`item_${index}_price`] && (
+                <p className="text-red-500 text-sm">
+                  {errors[`item_${index}_price`]}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Total</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={item.total === 0 ? "" : item.total}
+                  onChange={(e) =>
+                    updateInvoiceItem(
+                      index,
+                      "total",
+                      e.target.value === "" ? 0 : parseFloat(e.target.value)
+                    )
+                  }
+                  placeholder="0.00"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => removeInvoiceItem(index)}
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )) 
+  ) : (
+    <p className="text-center text-muted-foreground py-8">
+      No items added yet
+    </p>
+  )}
+</div>
+
+
           </TabsContent>
 
 
@@ -780,115 +852,108 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
             </div>
 
             <div className="space-y-3">
-              {newInvoice.labor?.length > 0 ? (
-                newInvoice.labor.map((labor, index) => (
-                  <Card key={labor.id}>
-                    <CardContent className="p-4">
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label>Labor Name</Label>
-                          <Input
-                            value={labor.laborName}
-                            maxLength={20}
-                            onChange={(e) =>
-                              updateLaborEntry(index, "laborName", e.target.value.slice(0, 20))
-                            }
-                            placeholder="Worker name"
-                          />
-                          {errors[`labor_${index}_name`] && (
-                            <p className="text-red-500 text-sm">
-                              {errors[`labor_${index}_name`]}
-                            </p>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Description</Label>
-                          <Input
-                            value={labor.description}
-                            maxLength={20}
-                            onChange={(e) =>
-                              updateLaborEntry(index, "description", e.target.value)
-                            }
-                            placeholder="Work description"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Hours</Label>
-                          <Input
-                            type="number"
-                            step="0.5"
-                            value={labor.hours === 0 ? "" : labor.hours}
-                            onChange={(e) =>
-                              updateLaborEntry(
-                                index,
-                                "hours",
-                                e.target.value === "" ? 0 : parseFloat(e.target.value)
-                              )
-                            }
-                            placeholder="0"
-                          />
-                          {errors[`labor_${index}_hours`] && (
-                            <p className="text-red-500 text-sm">
-                              {errors[`labor_${index}_hours`]}
-                            </p>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Hourly Rate</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={labor.hourlyRate === 0 ? "" : labor.hourlyRate}
-                            onChange={(e) =>
-                              updateLaborEntry(
-                                index,
-                                "hourlyRate",
-                                e.target.value === "" ? 0 : parseFloat(e.target.value)
-                              )
-                            }
-                            placeholder="0.00"
-                          />
-                          {errors[`labor_${index}_rate`] && (
-                            <p className="text-red-500 text-sm">
-                              {errors[`labor_${index}_rate`]}
-                            </p>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Total</Label>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={labor.total === 0 ? "" : labor.total}
-                              onChange={(e) =>
-                                updateLaborEntry(
-                                  index,
-                                  "total",
-                                  e.target.value === "" ? 0 : parseFloat(e.target.value)
-                                )
-                              }
-                              placeholder="0.00"
-                            />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => removeLaborEntry(index)}
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              ) : (
-                <p className="text-center text-muted-foreground py-8">
-                  No labor entries added yet
-                </p>
+  {(newInvoice.labor ?? []).length > 0 ? (
+    (newInvoice.labor ?? []).map((labor, index) => (
+      <Card key={labor.id}>
+        <CardContent className="p-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Labor Name</Label>
+              <Input
+                value={labor.laborName}
+                maxLength={20}
+                onChange={(e) =>
+                  updateLaborEntry(index, "laborName", e.target.value.slice(0, 20))
+                }
+                placeholder="Worker name"
+              />
+              {errors[`labor_${index}_name`] && (
+                <p className="text-red-500 text-sm">{errors[`labor_${index}_name`]}</p>
               )}
             </div>
+
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Input
+                value={labor.description}
+                maxLength={20}
+                onChange={(e) => updateLaborEntry(index, "description", e.target.value)}
+                placeholder="Work description"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Hours</Label>
+              <Input
+                type="number"
+                step="0.5"
+                value={labor.hours === 0 ? "" : labor.hours}
+                onChange={(e) =>
+                  updateLaborEntry(
+                    index,
+                    "hours",
+                    e.target.value === "" ? 0 : parseFloat(e.target.value)
+                  )
+                }
+                placeholder="0"
+              />
+              {errors[`labor_${index}_hours`] && (
+                <p className="text-red-500 text-sm">{errors[`labor_${index}_hours`]}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Hourly Rate</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={labor.hourlyRate === 0 ? "" : labor.hourlyRate}
+                onChange={(e) =>
+                  updateLaborEntry(
+                    index,
+                    "hourlyRate",
+                    e.target.value === "" ? 0 : parseFloat(e.target.value)
+                  )
+                }
+                placeholder="0.00"
+              />
+              {errors[`labor_${index}_rate`] && (
+                <p className="text-red-500 text-sm">{errors[`labor_${index}_rate`]}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Total</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={labor.total === 0 ? "" : labor.total}
+                  onChange={(e) =>
+                    updateLaborEntry(
+                      index,
+                      "total",
+                      e.target.value === "" ? 0 : parseFloat(e.target.value)
+                    )
+                  }
+                  placeholder="0.00"
+                />
+                <Button variant="outline" size="sm" onClick={() => removeLaborEntry(index)}>
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    ))
+  ) : (
+    <p className="text-center text-muted-foreground py-8">
+      No labor entries added yet
+    </p>
+  )}
+</div>
+
           </TabsContent>
 
           <TabsContent value="step-4" className="space-y-4">

@@ -4,6 +4,7 @@ import { Input } from '../ui/input'
 import { AuthStep } from '../AuthFlow'
 import { toast } from 'sonner'
 import svgPaths from '../../imports/svg-gg40su13b1'
+import Image from 'next/image'
 // import img4541 from "figma:asset/a3e40afe539df138ee43712dc0bf65b14d1b7224.png"
 
 interface ForgotPasswordScreenProps {
@@ -70,10 +71,12 @@ export function ForgotPasswordScreen({ onStepChange }: ForgotPasswordScreenProps
       {/* Left content */}
       <div className="absolute left-[72px] top-1/2 transform -translate-y-1/2">
         <div className="mb-8">
-          <img 
-            src="/assets/logos/logo-jdp.png" 
-            alt="JDP Logo" 
-            className="w-[168px] h-[63px] object-contain opacity-99"
+          <Image 
+            src="/assets/logos/logo-jdp.png"
+            alt="JDP Logo"
+            width={168}
+            height={63}
+            className="object-contain opacity-99"
           />
         </div>
         <div className="text-white">
@@ -92,7 +95,7 @@ export function ForgotPasswordScreen({ onStepChange }: ForgotPasswordScreenProps
         <div className="mb-8">
           <h2 className="text-[24px] font-extrabold text-[#00a1ff] mb-2">Forgot Password</h2>
           <p className="text-[16px] text-gray-900 leading-[26px] opacity-99">
-            Type in your email or phone and we'll help you reset your password.
+            Type in your email or phone and we&apos;ll help you reset your password.
           </p>
         </div>
         

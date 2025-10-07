@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import { addInvoice } from '@/redux/slices/jobsSlice'
 import {
   ArrowLeft,
   Edit,
@@ -49,7 +50,8 @@ import { addProduct, deleteProduct, deleteInvoice } from '@/redux/slices/jobsSli
 import { NewInvoiceDialog } from './invoices/NewInvoiceDialog'
 import { InvoiceTemplate } from './invoices/InvoiceTemplate'
 import html2canvas from 'html2canvas'
-import { Invoice } from '@/types/invoice'
+import { Invoice,CreateEstimatePayload } from '@/types/invoice'
+import { LoadingSpinner } from './common/LoadingSpinner'
 // Sample data structure - replace with your actual data
 const sampleJobData = {
   "job": {
@@ -224,7 +226,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const dispatch = useDispatch();
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [estimates, setEstimates] = useState([]);
+  const [estimates, setEstimates] = useState<Invoice[]>([]);
   const [refreshInvoices, setRefreshInvoices] = useState(false);
   const [localInvoices, setLocalInvoices] = useState<Invoice[]>([]);
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
@@ -314,7 +316,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
 
   console.log(invoice, "invs")
-  const currentInvoice = estimates.find((inv) => inv.id === selectedInvoiceId);
+  const currentInvoice = selectedInvoiceId == null
+  ? undefined
+  : estimates.find(inv => Number(inv.id) === selectedInvoiceId);
+
   console.log(currentInvoice, "current")
 
 
@@ -636,17 +641,120 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   };
 
 
-  const handleSaveInvoice = async (newInvoiceData: Partial<Invoice>) => {
-    try {
-      const payload = { ...newInvoiceData, job_id: jobId };
-      await apiClient.createEstimate(payload);
-      toast.success("Invoice added successfully!");
-      fetchEstimates();
-    } catch (error) {
-      console.error("Failed to save invoice:", error);
-      toast.error("Failed to add invoice");
-    }
-  };
+ const handleSaveInvoice = async (newInvoice: Partial<Invoice>) => {
+  setIsLoading(true);
+  try {
+    // ✅ Labor payload
+    const laborPayload =
+      newInvoice.labor?.map((l) => ({
+        full_name: l.laborName,
+        email: l.email || "customer@example.com",
+        hours_worked: l.hours,
+        hourly_rate: l.hourlyRate,
+        job_id: Number(newInvoice.jobId),
+        is_custom: true,
+      })) || [];
+
+    // ✅ Product payload
+    const productsPayload =
+      newInvoice.items?.map((i) => ({
+        product_name: i.description,
+        supplier_id: i.supplierId && i.supplierId > 0 ? i.supplierId : 1,
+        supplier_sku: i.sku || "",
+        jdp_sku: i.jdp_sku || "SKU-DEFAULT",
+        stock_quantity: i.quantity,
+        job_id: Number(newInvoice.jobId),
+        unit: i.unit ? i.unit.toString() : "1",
+        is_custom: true,
+        unit_cost: i.unitPrice,
+      })) || [];
+
+    // ✅ Totals & Calculations
+    const itemsTotal =
+      newInvoice.items?.reduce(
+        (sum, item) => sum + (item.quantity ?? 0) * (item.unitPrice ?? 0),
+        0
+      ) || 0;
+
+    const laborTotal =
+      newInvoice.labor?.reduce(
+        (sum, labor) => sum + (labor.hours ?? 0) * (labor.hourlyRate ?? 0),
+        0
+      ) || 0;
+
+    const additionalTotal =
+      newInvoice.additionalCosts?.reduce(
+        (sum, cost) => sum + (cost.amount ?? 0),
+        0
+      ) || 0;
+
+    const subtotal = itemsTotal + laborTotal + additionalTotal;
+    const taxAmount = subtotal * (newInvoice.taxRate ?? 0);
+    const totalAmount = subtotal + taxAmount;
+
+    // ✅ Helper for strict type safety
+    const isPriority = (value: any): value is "high" | "medium" | "low" =>
+      ["high", "medium", "low"].includes(value);
+
+    // ✅ Build CreateEstimatePayload
+    const payload: CreateEstimatePayload = {
+      estimate_title: "New Estimate",
+      customer_id: Number(newInvoice.customerId),
+      priority: isPriority(newInvoice.priority) ? newInvoice.priority : "medium",
+      valid_until: newInvoice.dueDate || "",
+      location: newInvoice.location || "N/A",
+      description: newInvoice.notes || "",
+      service_type: "service_based",
+      email_address: newInvoice.emailAddress || "customer@example.com",
+      estimate_date: newInvoice.issueDate || "",
+
+      materials_cost: itemsTotal,
+      labor_cost: laborTotal,
+      additional_costs: additionalTotal,
+      subtotal,
+      tax_percentage: (newInvoice.taxRate || 0) * 100,
+      tax_amount: taxAmount,
+      total_amount: totalAmount,
+
+      status: "draft",
+      invoice_type: newInvoice.type || "proposal_invoice",
+      invoice_number: `INV-${Date.now()}`,
+      issue_date: newInvoice.issueDate || "",
+      due_date: newInvoice.dueDate || "",
+
+      job_id: Number(newInvoice.jobId),
+
+      additional_cost: newInvoice.additionalCosts?.length
+        ? {
+            description: newInvoice.additionalCosts[0].description || "",
+            amount: newInvoice.additionalCosts.reduce(
+              (sum, c) => sum + c.amount,
+              0
+            ),
+          }
+        : { description: "", amount: 0 },
+
+      custom_labor: laborPayload,
+      custom_products: productsPayload,
+    };
+
+    // ✅ Send to API
+    const createdInvoice = await apiClient.createEstimate(payload);
+
+    // ✅ Update Redux + UI
+    dispatch(addInvoice(createdInvoice));
+    toast.success("Invoice created successfully!");
+    fetchEstimates();
+    setShowNewInvoiceDialog(false);
+
+  } catch (error) {
+    console.error("Error creating invoice:", error);
+    toast.error("Failed to create invoice");
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   const triggerRefresh = () => {
     setRefreshInvoices(prev => !prev);
@@ -1018,7 +1126,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                     </p>
                   )}
                   <p className="text-xs text-blue-600">
-                    {isLoadingDashboard ? "Loading..." : dashboardMetrics?.totalHoursWorked?.unit ?? "hours"}
+                    {isLoadingDashboard ? "Loading" : dashboardMetrics?.totalHoursWorked?.unit ?? "hours"}
                   </p>
                 </div>
                 <Clock className="h-8 w-8 text-blue-600" />
@@ -1042,7 +1150,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                     </p>
                   )}
                   <p className="text-xs text-green-600">
-                    {isLoadingDashboard ? "Loading..." : dashboardMetrics?.totalMaterialUsed?.unit ?? "items"}
+                    {isLoadingDashboard ?  "Loading" : dashboardMetrics?.totalMaterialUsed?.unit ?? "items"}
                   </p>
                 </div>
                 <Package className="h-8 w-8 text-green-600" />
@@ -1066,7 +1174,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                     </p>
                   )}
                   <p className="text-xs text-purple-600">
-                    {isLoadingDashboard ? "Loading..." : dashboardMetrics?.totalLabourEntries?.unit ?? "entries"}
+                    {isLoadingDashboard ? "Loading" : dashboardMetrics?.totalLabourEntries?.unit ?? "entries"}
                   </p>
                 </div>
                 <Users className="h-8 w-8 text-purple-600" />
@@ -1090,7 +1198,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                     </p>
                   )}
                   <p className="text-xs text-orange-600">
-                    {isLoadingDashboard ? "Loading..." : dashboardMetrics?.numberOfInvoices?.unit ?? "invoices"}
+                    {isLoadingDashboard ? "Loading" : dashboardMetrics?.numberOfInvoices?.unit ?? "invoices"}
                   </p>
                 </div>
                 <FileText className="h-8 w-8 text-orange-600" />
@@ -1406,7 +1514,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               </CardHeader>
               <CardContent>
                 {isLoadingEstimates ? (
-                  <p className="text-sm text-gray-500">Loading estimates...</p>
+                  <p className="text-sm text-gray-500"> <LoadingSpinner /></p>
                 ) : estimates.length === 0 ? (
                   <p className="text-sm text-gray-500">No invoices found for this job.</p>
                 ) : (
@@ -1456,7 +1564,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                               className="gap-1"
                               onClick={() => {
                                 console.log("Selected invoice ID:", invoice.id);
-                                setSelectedInvoiceId(invoice.id);
+                                setSelectedInvoiceId(Number(invoice.id));
                                 setShowInvoiceModal(true);
                               }}
 
@@ -1507,7 +1615,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               </CardHeader>
               <CardContent>
                 {isLoadingMaterials ? (
-                  <p className="text-sm text-gray-500">Loading materials...</p>
+                  <p className="text-sm text-gray-500"> <LoadingSpinner /></p>
                 ) : materials.length === 0 ? (
                   <p className="text-sm text-gray-500">No materials found.</p>
                 ) : (
@@ -1717,7 +1825,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500">Loading summary...</p>
+                  <p className="text-sm text-gray-500"> <LoadingSpinner /></p>
                 )}
               </CardContent>
             </Card>
@@ -1755,7 +1863,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         open={showNewInvoiceDialog}
         onOpenChange={setShowNewInvoiceDialog}
         onSave={handleSaveInvoice}
-        jobId={jobId}
+        jobId={Number(jobId)}
         jobs={jobs}
         onInvoiceSaved={triggerRefresh}
       />
@@ -1904,9 +2012,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                     <SelectValue placeholder="Select Supplier" />
                   </SelectTrigger>
                   <SelectContent>
-                    {suppliers.map((supplier) => (
+                    {suppliers?.map((supplier) => (
                       <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                        {supplier.company_name}
+                        {supplier?.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

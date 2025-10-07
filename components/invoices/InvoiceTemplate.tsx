@@ -8,6 +8,7 @@ import { Invoice, Customer } from '../../types/invoice'
 import { customersData } from '../../data/invoiceData'
 import { apiClient } from '../../utils/api'
 import { useSearchParams } from 'next/navigation'
+import { LoadingSpinner } from '../common/LoadingSpinner'
 
 interface InvoiceTemplateProps {
   invoice?: Invoice
@@ -16,23 +17,55 @@ interface InvoiceTemplateProps {
 
 export const InvoiceTemplate = ({ invoice, invoiceId }: InvoiceTemplateProps) => {
   const searchParams = useSearchParams()
-  const id = invoiceId?.toString() || searchParams.get('id')// string | null
-  console.log('ididid', typeof (id), id);
+  const id = invoiceId?.toString() || searchParams.get('id')
+  const [finalId, setFinalId] = useState<string | null>(null)// string | null
   const [invoiceData, setInvoiceData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+
+  // useEffect(() => {
+  //   const fetchInvoice = async () => {
+  //     try {
+  //       setLoading(true)
+  //       setError(null)
+  //       if (!id) return
+  //       const res = await apiClient.getEstimateById(Number(id))
+  //       setInvoiceData((res?.data || res))
+  //       console.log("API Response:", res);
+  //       console.log("Invoice being set:", res?.data || res);
+  //     } catch (e) {
+  //       console.error(e)
+  //       setError("Failed to load invoice")
+  //     } finally {
+  //       setLoading(false)
+  //     }
+  //   }
+  //   if (!invoice && id) {
+  //     fetchInvoice()
+  //   }
+  // }, [id, invoice])
+
+
+    useEffect(() => {
+    const urlId = searchParams.get('id')
+    if (invoiceId) {
+      setFinalId(invoiceId.toString())
+    } else if (urlId) {
+      setFinalId(urlId)
+    }
+  }, [searchParams, invoiceId])
 
   useEffect(() => {
     const fetchInvoice = async () => {
       try {
         setLoading(true)
         setError(null)
-        if (!id) return
-        const res = await apiClient.getEstimateById(Number(id))
-        setInvoiceData((res?.data || res))
-        console.log("API Response:", res);
-        console.log("Invoice being set:", res?.data || res);
+
+        if (!finalId) return
+
+        const res = await apiClient.getEstimateById(Number(finalId))
+        setInvoiceData(res?.data || res)
       } catch (e) {
         console.error(e)
         setError("Failed to load invoice")
@@ -40,12 +73,13 @@ export const InvoiceTemplate = ({ invoice, invoiceId }: InvoiceTemplateProps) =>
         setLoading(false)
       }
     }
-    if (!invoice && id) {
+
+    if (!invoice && finalId) {
       fetchInvoice()
     }
-  }, [id, invoice])
+  }, [finalId, invoice])
 
-  if (loading) return <p>Loading invoice...</p>
+  if (loading) return <p> <LoadingSpinner />  Loading invoice...</p>
   if (error) return <p className="text-red-500">{error}</p>
   if (!invoiceData) return <p>No invoice found</p>
 
