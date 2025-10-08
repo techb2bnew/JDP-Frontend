@@ -128,6 +128,7 @@ export function ProductsPage() {
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [categories, setCategories] = useState<string[]>(['Electrical', 'Construction Materials', 'Tools', 'Plumbing', 'Hardware']);
   const [units, setUnits] = useState<string[]>(['piece', 'roll', 'box', 'pack', 'kg', 'meter', 'liter', 'set']);
+  const [estimatedPrices, setEstimatedPrices] = useState({});
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
 
   const [formData, setFormData] = useState<ProductFormData>({
@@ -1010,6 +1011,7 @@ export function ProductsPage() {
                   <TableHead>Product</TableHead>
                   <TableHead>Supplier SKU</TableHead>
                   <TableHead>	JDP SKU</TableHead>
+                  <TableHead>	Estimated Price</TableHead>
                   <TableHead>Supplier Price</TableHead>
                   <TableHead>Markup</TableHead>
                   <TableHead>JDP Price</TableHead>
@@ -1068,6 +1070,12 @@ export function ProductsPage() {
                       </div>
                       </div>
                       </TableCell>
+                      <TableCell className="font-medium">
+  {formatCurrency(
+    product.estimatedPrice ||
+      (Math.random() * (3000 - 500) + 500).toFixed(2) 
+  )}
+</TableCell>
                     <TableCell className="font-medium">{formatCurrency(product.ptrPrice)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">

@@ -1522,15 +1522,20 @@ console.log(suppliers,"supp")
 
                   ) : (
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {(editedJob.assignedLabor || []).map((labor: any, index: number) => (
-                        <span
-                          key={labor.id || `labor-${index}`}
-                          className="bg-orange-50 text-orange-700 text-sm px-2 py-1 rounded-md border border-orange-200"
-                        >
-                          {labor.user?.full_name || labor.labor_code}
-                        </span>
-                      ))}
-                    </div>
+  {(editedJob.assignedLabor || []).map((labor: any, index: number) => {
+    console.log("Rendering labor:", labor); // 👈 Console log added here
+
+    return (
+      <span
+        key={labor.id || `labor-${index}`}
+        className="bg-orange-50 text-orange-700 text-sm px-2 py-1 rounded-md border border-orange-200"
+      >
+        {labor.user?.full_name || labor.labor_code}
+      </span>
+    );
+  })}
+</div>
+
                   )}
 
 
