@@ -982,7 +982,528 @@ export function OrdersPage() {
     </div>
   ) : selectedOrder ? (
     <div className="space-y-6">
-      {/* …the whole existing invoice content… */}
+      {/* Header */}
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Orders Management</h1>
+          <p className="text-muted-foreground">Track and manage customer orders with comprehensive invoice details</p>
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Orders</CardTitle>
+                  <div className="text-2xl font-semibold text-foreground">
+                    {isLoadingStats ? (
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    ) : (
+                      totalOrdersCount
+                    )}
+                  </div>
+              </div>
+              <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                <Receipt className="w-5 h-5 text-primary" />
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
+                
+                <div className="text-2xl font-semibold text-yellow-600">
+                  {isLoadingStats ? (
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-yellow-600"></div>
+                    ) : (
+                      pendingOrders
+                  )}
+                  </div>
+              </div>
+              <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <Clock className="w-5 h-5 text-yellow-600" />
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Processing</CardTitle>
+                <div className="text-2xl font-semibold text-blue-600">
+                  {isLoadingStats ? (
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                    ) : (
+                      processingOrders
+                  )}
+                  </div>
+              </div>
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <AlertCircle className="w-5 h-5 text-blue-600" />
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Completed</CardTitle>
+                <div className="text-2xl font-semibold text-green-600">
+                  {isLoadingStats ? (
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
+                    ) : (
+                      completedOrders
+                  )}
+                  </div>
+              </div>
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
+      </div>
+
+      {/* Filters and Search */}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+            <div className="flex flex-col sm:flex-row gap-4 flex-1">
+              {/* Search */}
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by order number"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              
+              {/* Status Filter */}
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[160px]">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="processing">Processing</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Date Range Filter */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-[240px] justify-start text-left font-normal">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateRange.from ? (
+                      dateRange.to ? (
+                        <>
+                          {format(dateRange.from, "LLL dd, y")} -{" "}
+                          {format(dateRange.to, "LLL dd, y")}
+                        </>
+                      ) : (
+                        format(dateRange.from, "LLL dd, y")
+                      )
+                    ) : (
+                      <span>Pick a date range</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={dateRange.from}
+                    selected={dateRange as any}
+                    onSelect={(range: any) => setDateRange(range)}
+                    numberOfMonths={2}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            
+            {/* Sort and Export */}
+            <div className="flex gap-2">
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Sort By" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Time</SelectItem>
+                  <SelectItem value="last_week">Last Week</SelectItem>
+                  <SelectItem value="this_month">This Month</SelectItem>
+                  <SelectItem value="this_year">This Year</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {hasPermission('orders', 'view') && (
+                <Button variant="outline" onClick={() => handleExport('csv')}>
+                  <FileDown className="h-4 w-4 mr-2" />
+                  CSV
+                </Button>
+              )}
+              
+              {hasPermission('orders', 'view') && (
+                <Button variant="outline" onClick={() => handleExport('pdf')}>
+                  <Download className="h-4 w-4 mr-2" />
+                  PDF
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        
+        <CardContent>
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Order ID</TableHead>
+                  <TableHead>Job ID</TableHead>
+                  <TableHead>Customer / Contractor</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Order Date</TableHead>
+                  <TableHead>Invoice</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoadingOrders ?(
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8">
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                        <span className="ml-2">Loading orders...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ): filteredOrders.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      No orders found
+                    </TableCell>
+                  </TableRow>
+                ): (
+                  filteredOrders.map((order) => (
+                  <TableRow key={order.id}>
+                    <TableCell>
+                      <div className="font-medium font-mono">{order.orderNumber}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium text-primary">{order.jobId}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{order.customerName}</div>
+                        {order.contractorName && (
+                          <div className="text-sm text-muted-foreground">Contractor: {order.contractorName}</div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={`${getStatusColor(order.status)} flex items-center gap-1 w-fit hover:${getStatusColor(order.status)}`}>
+                        {getStatusIcon(order.status)}
+                        {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{formatDate(order.orderDate)}</TableCell>
+                    <TableCell>
+                      {hasPermission('orders', 'view') && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleViewInvoice(order)}
+                        >
+                          <Receipt className="h-3 w-3 mr-1" />
+                          View Invoice
+                        </Button>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {hasPermission('orders', 'view') && (
+                        <Button variant="ghost" size="sm" onClick={() => fetchOrderById(order.id)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+                )}
+                {}
+              </TableBody>
+            </Table>
+          </div>
+          {/* Pagination Controls */}
+          
+          {totalOrders > itemsPerPage && (
+            <div className="flex items-center justify-between px-4 py-3 border-t">
+              <div className="text-sm text-muted-foreground">
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalOrders)} of {totalOrders} products
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1 || isLoadingOrders}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm">
+                  Page {currentPage} of {Math.ceil(totalOrders / itemsPerPage)}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                  disabled={currentPage >= Math.ceil(totalOrders / itemsPerPage) || isLoadingOrders}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Invoice Modal */}
+      <Dialog open={showInvoiceModal} onOpenChange={setShowInvoiceModal}>
+        <DialogContent className="sm:max-w-[700px] max-w-[700px] max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="h-5 w-5 text-primary" />
+              Order Invoice - {selectedOrder?.id}
+            </DialogTitle>
+            <DialogDescription>
+              Detailed invoice information for order {selectedOrder?.id}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedOrder && (
+            <div className="space-y-6">
+              {/* Invoice Header */}
+              <div className="flex justify-between items-start">
+                <div>
+                  <h2 className="text-2xl font-semibold text-primary">INVOICE</h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Order Date: {formatDate(selectedOrder.createdAt)}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <h3 className="text-lg font-semibold">JDP Corporation</h3>
+                  <p className="text-sm text-muted-foreground">
+                    1234 Business Street<br />
+                    New York, NY 10001<br />
+                    Phone: (555) 123-4567
+                  </p>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Order & Billing Info */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Order Info */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Receipt className="h-4 w-4 text-primary" />
+                      Order Info
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Order ID:</span>
+                      <span className="ml-2 font-medium font-mono">{selectedOrder.orderNumber}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Job ID:</span>
+                      <span className="ml-2 font-medium text-primary">{selectedOrder.jobId}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Order Date:</span>
+                      <span className="ml-2 font-medium">{formatDate(selectedOrder.createdAt)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Status:</span>
+                      <span className="ml-2">
+                        <Badge className={`${getStatusColor(selectedOrder.status)} text-xs`}>
+                          {selectedOrder.status.charAt(0).toUpperCase() + selectedOrder.status.slice(1)}
+                        </Badge>
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Billing Address */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-primary" />
+                      Billing Address
+                    </CardTitle>
+                  </CardHeader>
+                  {/* <CardContent className="space-y-2 text-sm">
+                    <div className="font-medium">{selectedOrder?.billingAddress?.fullName}</div>
+                    <div className="text-muted-foreground">
+                      {selectedOrder?.billingAddress?.address}<br />
+                      {selectedOrder?.billingAddress?.city}, {selectedOrder?.billingAddress?.state} {selectedOrder?.billingAddress?.zipCode}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Mail className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-muted-foreground">{selectedOrder?.billingAddress?.email}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Phone className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-muted-foreground">{selectedOrder?.billingPhone}</span>
+                    </div>
+                  </CardContent> */}
+                </Card>
+
+                {/* Customer/Contractor Info */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <User className="h-4 w-4 text-primary" />
+                      Customer Info
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Customer:</span>
+                      <div className="font-medium">{selectedOrder?.customer?.customerName}</div>
+                    </div>
+                    {/* {selectedOrder.contractorName && (
+                      <div>
+                        <span className="text-muted-foreground">Contractor:</span>
+                        <div className="font-medium">{selectedOrder?.contractorName}</div>
+                      </div>
+                    )} */}
+                    <div className="flex items-center gap-1">
+                      <Mail className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-muted-foreground">{selectedOrder?.customer?.email}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Phone className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-muted-foreground">{selectedOrder?.customer?.phone}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Order Items Table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Order Items</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Item</TableHead>
+                          <TableHead>SKU</TableHead>
+                          <TableHead>Qty</TableHead>
+                          <TableHead>Price</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedOrder?.orderItems?.map((item) => (
+                          <TableRow key={item?.id}>
+                            <TableCell className="font-medium">{item?.name}</TableCell>
+                            <TableCell className="font-mono text-sm">{item?.sku}</TableCell>
+                            <TableCell>{item.quantity}</TableCell>
+                            <TableCell>{formatCurrency(item?.unitPrice)}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(item?.total)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Total Payment */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Payment Summary</CardTitle>
+                </CardHeader>
+                {/* <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span>Subtotal:</span>
+                      <span>{formatCurrency(selectedOrder.subtotal)}</span>
+                    </div>
+                    {selectedOrder.discount > 0 && (
+                      <div className="flex justify-between">
+                        <span>Discount:</span>
+                        <span className="text-green-600">-{formatCurrency(selectedOrder.discount)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span>Tax:</span>
+                      <span>{formatCurrency(selectedOrder.tax)}</span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between font-semibold text-lg">
+                      <span>Total Payment:</span>
+                      <span className="text-primary">{formatCurrency(selectedOrder.totalPayment)}</span>
+                    </div>
+                  </div>
+                </CardContent> */}
+              </Card>
+
+              {/* {selectedOrder.notes && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Notes</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">{selectedOrder.notes}</p>
+                  </CardContent>
+                </Card>
+              )} */}
+            </div>
+          )}
+          
+          <DialogFooter className="flex gap-2">
+            {hasPermission('orders', 'view') && (
+              <Button variant="outline" onClick={handlePrintInvoice}>
+                <Printer className="h-4 w-4 mr-2" />
+                Print
+              </Button>
+            )}
+            {hasPermission('orders', 'view') && (
+              <Button variant="outline" onClick={() => handleExport('pdf')}>
+                <Download className="h-4 w-4 mr-2" />
+                Download PDF
+              </Button>
+            )}
+            {hasPermission('orders', 'edit') && (
+              <Button onClick={handleEmailInvoice} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                <Mail className="h-4 w-4 mr-2" />
+                Email Invoice
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   ) : (
     <div className="text-sm text-muted-foreground py-6">

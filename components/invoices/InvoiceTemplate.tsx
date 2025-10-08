@@ -68,7 +68,7 @@ export const InvoiceTemplate = ({ invoice, invoiceId }: InvoiceTemplateProps) =>
   if (error) return <p className="text-red-500">{error}</p>;
   if (!invoiceData) return <p>No invoice found</p>;
 
-  const fmtMoney = (n: number | string | undefined) => `₹${Number(n || 0).toFixed(2)}`;
+  const fmtMoney = (n: number | string | undefined) => `$${Number(n || 0).toFixed(2)}`;
   const fmtDate = (d?: string) => (d ? new Date(d).toLocaleDateString() : 'N/A');
 
   return (
@@ -121,8 +121,8 @@ export const InvoiceTemplate = ({ invoice, invoiceId }: InvoiceTemplateProps) =>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>SKU</TableHead>
-                <TableHead>Description</TableHead>
+                {/* <TableHead>SKU</TableHead> */}
+                <TableHead>Pruduct Name</TableHead>
                 <TableHead>Qty</TableHead>
                 <TableHead>Unit Price</TableHead>
                 <TableHead className="text-right">Total</TableHead>
@@ -135,8 +135,8 @@ export const InvoiceTemplate = ({ invoice, invoiceId }: InvoiceTemplateProps) =>
                 const total = qty * rate;
                 return (
                   <TableRow key={item.id}>
-                    <TableCell className="font-mono text-sm">{item?.jdp_sku || '-'}</TableCell>
-                    <TableCell>{item?.description || item?.product_name || '-'}</TableCell>
+                    {/* <TableCell className="font-mono text-sm">{item?.jdp_sku || '-'}</TableCell> */}
+                    <TableCell>{ item?.product_name || '-'}</TableCell>
                     <TableCell>{qty}</TableCell>
                     <TableCell>{fmtMoney(rate)}</TableCell>
                     <TableCell className="text-right">{fmtMoney(total)}</TableCell>
@@ -148,40 +148,23 @@ export const InvoiceTemplate = ({ invoice, invoiceId }: InvoiceTemplateProps) =>
         </div>
       )}
 
-      {/* Labor */}
       {Array.isArray(invoiceData?.labor) && invoiceData.labor.length > 0 && (
-        <div className="mb-8">
-          <h3 className="font-semibold mb-4">Labor</h3>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Labor Name</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Hours</TableHead>
-                <TableHead>Rate</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {invoiceData.labor.map((lab: any) => {
-                const hours = Number(lab?.hours_worked) || 0;
-                const rate = Number(lab?.hourly_rate) || 0;
-                const total = hours * rate;
-                return (
-                  <TableRow key={lab.id}>
-                    <TableCell>{lab?.user?.full_name || '-'}</TableCell>
-                    <TableCell>{lab?.description || '-'}</TableCell>
-                    <TableCell>{hours}h</TableCell>
-                    <TableCell>{fmtMoney(rate)}</TableCell>
-                    <TableCell className="text-right">{fmtMoney(total)}</TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-
+  <div className="mb-8">
+    {/* <h3 className="font-semibold mb-4">Time & Material</h3> */}
+    <div className="flex items-center justify-between border rounded-lg p-3 text-sm">
+      <span>Time & Material</span>
+      <span className="font-semibold">
+        {fmtMoney(
+          invoiceData.labor.reduce((sum: number, lab: any) => {
+            const hours = Number(lab?.hours_worked) || 0;
+            const rate = Number(lab?.hourly_rate) || 0;
+            return sum + hours * rate;
+          }, 0)
+        )}
+      </span>
+    </div>
+  </div>
+)}
       {/* Additional Costs */}
       {Array.isArray(invoiceData?.additional_costs_details) &&
         invoiceData.additional_costs_details.length > 0 && (
