@@ -34,6 +34,7 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { globalApiCall } from '@/utils/api'
+import { LoadingSpinner } from './common/LoadingSpinner'
 
 
 
@@ -965,225 +966,52 @@ export function OrdersPage() {
       {/* Invoice Modal */}
       <Dialog open={showInvoiceModal} onOpenChange={setShowInvoiceModal}>
         <DialogContent className="sm:max-w-[700px] max-w-[700px] max-h-[90vh] overflow-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Receipt className="h-5 w-5 text-primary" />
-              Order Invoice - {selectedOrder?.id}
-            </DialogTitle>
-            <DialogDescription>
-              Detailed invoice information for order {selectedOrder?.id}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedOrder && (
-            <div className="space-y-6">
-              {/* Invoice Header */}
-              <div className="flex justify-between items-start">
-                <div>
-                  <h2 className="text-2xl font-semibold text-primary">INVOICE</h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Order Date: {formatDate(selectedOrder.createdAt)}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <h3 className="text-lg font-semibold">JDP Corporation</h3>
-                  <p className="text-sm text-muted-foreground">
-                    1234 Business Street<br />
-                    New York, NY 10001<br />
-                    Phone: (555) 123-4567
-                  </p>
-                </div>
-              </div>
+  <DialogHeader>
+    <DialogTitle className="flex items-center gap-2">
+      <Receipt className="h-5 w-5 text-primary" />
+      Order Invoice - {selectedOrder?.id}
+    </DialogTitle>
+    <DialogDescription>
+      Detailed invoice information for order {selectedOrder?.id}
+    </DialogDescription>
+  </DialogHeader>
 
-              <Separator />
+  {isLoading ? (
+    <div className="flex items-center justify-center py-12">
+      <LoadingSpinner />
+    </div>
+  ) : selectedOrder ? (
+    <div className="space-y-6">
+      {/* …the whole existing invoice content… */}
+    </div>
+  ) : (
+    <div className="text-sm text-muted-foreground py-6">
+      No invoice data found.
+    </div>
+  )}
 
-              {/* Order & Billing Info */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Order Info */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Receipt className="h-4 w-4 text-primary" />
-                      Order Info
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Order ID:</span>
-                      <span className="ml-2 font-medium font-mono">{selectedOrder.orderNumber}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Job ID:</span>
-                      <span className="ml-2 font-medium text-primary">{selectedOrder.jobId}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Order Date:</span>
-                      <span className="ml-2 font-medium">{formatDate(selectedOrder.createdAt)}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Status:</span>
-                      <span className="ml-2">
-                        <Badge className={`${getStatusColor(selectedOrder.status)} text-xs`}>
-                          {selectedOrder.status.charAt(0).toUpperCase() + selectedOrder.status.slice(1)}
-                        </Badge>
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
+  <DialogFooter className="flex gap-2">
+    {hasPermission('orders', 'view') && (
+      <Button variant="outline" onClick={handlePrintInvoice} disabled={isLoading}>
+        <Printer className="h-4 w-4 mr-2" />
+        Print
+      </Button>
+    )}
+    {hasPermission('orders', 'view') && (
+      <Button variant="outline" onClick={() => handleExport('pdf')} disabled={isLoading}>
+        <Download className="h-4 w-4 mr-2" />
+        Download PDF
+      </Button>
+    )}
+    {hasPermission('orders', 'edit') && (
+      <Button onClick={handleEmailInvoice} className="bg-primary text-primary-foreground hover:bg-primary/90" disabled={isLoading}>
+        <Mail className="h-4 w-4 mr-2" />
+        Email Invoice
+      </Button>
+    )}
+  </DialogFooter>
+</DialogContent>
 
-                {/* Billing Address */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-primary" />
-                      Billing Address
-                    </CardTitle>
-                  </CardHeader>
-                  {/* <CardContent className="space-y-2 text-sm">
-                    <div className="font-medium">{selectedOrder?.billingAddress?.fullName}</div>
-                    <div className="text-muted-foreground">
-                      {selectedOrder?.billingAddress?.address}<br />
-                      {selectedOrder?.billingAddress?.city}, {selectedOrder?.billingAddress?.state} {selectedOrder?.billingAddress?.zipCode}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Mail className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-muted-foreground">{selectedOrder?.billingAddress?.email}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Phone className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-muted-foreground">{selectedOrder?.billingPhone}</span>
-                    </div>
-                  </CardContent> */}
-                </Card>
-
-                {/* Customer/Contractor Info */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <User className="h-4 w-4 text-primary" />
-                      Customer Info
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Customer:</span>
-                      <div className="font-medium">{selectedOrder?.customer?.customerName}</div>
-                    </div>
-                    {/* {selectedOrder.contractorName && (
-                      <div>
-                        <span className="text-muted-foreground">Contractor:</span>
-                        <div className="font-medium">{selectedOrder?.contractorName}</div>
-                      </div>
-                    )} */}
-                    <div className="flex items-center gap-1">
-                      <Mail className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-muted-foreground">{selectedOrder?.customer?.email}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Phone className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-muted-foreground">{selectedOrder?.customer?.phone}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Order Items Table */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Order Items</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="border rounded-lg overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Item</TableHead>
-                          <TableHead>SKU</TableHead>
-                          <TableHead>Qty</TableHead>
-                          <TableHead>Price</TableHead>
-                          <TableHead className="text-right">Total</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedOrder?.orderItems?.map((item) => (
-                          <TableRow key={item?.id}>
-                            <TableCell className="font-medium">{item?.name}</TableCell>
-                            <TableCell className="font-mono text-sm">{item?.sku}</TableCell>
-                            <TableCell>{item.quantity}</TableCell>
-                            <TableCell>{formatCurrency(item?.unitPrice)}</TableCell>
-                            <TableCell className="text-right font-medium">{formatCurrency(item?.total)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Total Payment */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Payment Summary</CardTitle>
-                </CardHeader>
-                {/* <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span>Subtotal:</span>
-                      <span>{formatCurrency(selectedOrder.subtotal)}</span>
-                    </div>
-                    {selectedOrder.discount > 0 && (
-                      <div className="flex justify-between">
-                        <span>Discount:</span>
-                        <span className="text-green-600">-{formatCurrency(selectedOrder.discount)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span>Tax:</span>
-                      <span>{formatCurrency(selectedOrder.tax)}</span>
-                    </div>
-                    <Separator />
-                    <div className="flex justify-between font-semibold text-lg">
-                      <span>Total Payment:</span>
-                      <span className="text-primary">{formatCurrency(selectedOrder.totalPayment)}</span>
-                    </div>
-                  </div>
-                </CardContent> */}
-              </Card>
-
-              {/* {selectedOrder.notes && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Notes</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">{selectedOrder.notes}</p>
-                  </CardContent>
-                </Card>
-              )} */}
-            </div>
-          )}
-          
-          <DialogFooter className="flex gap-2">
-            {hasPermission('orders', 'view') && (
-              <Button variant="outline" onClick={handlePrintInvoice}>
-                <Printer className="h-4 w-4 mr-2" />
-                Print
-              </Button>
-            )}
-            {hasPermission('orders', 'view') && (
-              <Button variant="outline" onClick={() => handleExport('pdf')}>
-                <Download className="h-4 w-4 mr-2" />
-                Download PDF
-              </Button>
-            )}
-            {hasPermission('orders', 'edit') && (
-              <Button onClick={handleEmailInvoice} className="bg-primary text-primary-foreground hover:bg-primary/90">
-                <Mail className="h-4 w-4 mr-2" />
-                Email Invoice
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
       </Dialog>
     </div>
   )

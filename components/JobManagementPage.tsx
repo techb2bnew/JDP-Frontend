@@ -83,6 +83,7 @@ export function JobManagementPage() {
   const [totalJobs, setTotalJobs] = useState(0)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [jobToDelete, setJobToDelete] = useState<string | null>(null)
+  const [isLoadingDashboard, setIsLoadingDashboard] = useState(true)
   const [jobStats, setJobStats] = useState({
     total: 0,
     active: 0,
@@ -114,16 +115,18 @@ export function JobManagementPage() {
     }
   }
 
-  // Fetch job statistics from API
+
   const fetchJobStats = async () => {
-    try {
-      const stats = await apiClient.getJobStats()
-      setJobStats(stats)
-    } catch (error) {
-      console.error('Error fetching job statistics:', error)
-      // Don't show toast error for stats as it's not critical
-    }
+  try {
+    setIsLoadingDashboard(true) 
+    const stats = await apiClient.getJobStats()
+    setJobStats(stats)
+  } catch (error) {
+    console.error('Error fetching job statistics:', error)
+  } finally {
+    setIsLoadingDashboard(false) 
   }
+}
 
   // Load jobs and stats on component mount
   useEffect(() => {
@@ -454,64 +457,93 @@ export function JobManagementPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="bg-white shadow-md border-0">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Jobs</p>
-                <p className="text-2xl font-medium text-[#2b2b2b]">{jobStats.total}</p>
-              </div>
-              <div className="w-12 h-12 bg-[#E6F6FF] rounded-lg flex items-center justify-center">
-                <FileText className="h-6 w-6 text-[#00A1FF]" />
-              </div>
+  {/* Total Jobs */}
+  <Card className="bg-white shadow-md border-0">
+    <CardContent className="p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-gray-600">Total Jobs</p>
+          {isLoadingDashboard ? (
+            <div className="flex items-center h-8">
+              <LoadingSpinner />
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white shadow-md border-0">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Active</p>
-                <p className="text-2xl font-medium text-[#2b2b2b]">{jobStats.active}</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
-                <Clock className="h-6 w-6 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white shadow-md border-0">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Completed</p>
-                <p className="text-2xl font-medium text-[#2b2b2b]">{jobStats.completed}</p>
-              </div>
-              <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
-                <CheckSquare className="h-6 w-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white shadow-md border-0">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Revenue</p>
-                <p className="text-2xl font-medium text-[#2b2b2b]">
-                  {formatCurrency(parseFloat(jobStats.totalRevenue))}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          ) : (
+            <p className="text-2xl font-medium text-[#2b2b2b]">{jobStats.total}</p>
+          )}
+        </div>
+        <div className="w-12 h-12 bg-[#E6F6FF] rounded-lg flex items-center justify-center">
+          <FileText className="h-6 w-6 text-[#00A1FF]" />
+        </div>
       </div>
+    </CardContent>
+  </Card>
+
+  {/* Active Jobs */}
+  <Card className="bg-white shadow-md border-0">
+    <CardContent className="p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-gray-600">Active</p>
+          {isLoadingDashboard ? (
+            <div className="flex items-center h-8">
+              <LoadingSpinner />
+            </div>
+          ) : (
+            <p className="text-2xl font-medium text-[#2b2b2b]">{jobStats.active}</p>
+          )}
+        </div>
+        <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
+          <Clock className="h-6 w-6 text-blue-600" />
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+
+  {/* Completed Jobs */}
+  <Card className="bg-white shadow-md border-0">
+    <CardContent className="p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-gray-600">Completed</p>
+          {isLoadingDashboard ? (
+            <div className="flex items-center h-8">
+              <LoadingSpinner />
+            </div>
+          ) : (
+            <p className="text-2xl font-medium text-[#2b2b2b]">{jobStats.completed}</p>
+          )}
+        </div>
+        <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
+          <CheckSquare className="h-6 w-6 text-green-600" />
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+
+  {/* Total Revenue */}
+  <Card className="bg-white shadow-md border-0">
+    <CardContent className="p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-gray-600">Total Revenue</p>
+          {isLoadingDashboard ? (
+            <div className="flex items-center h-8">
+              <LoadingSpinner />
+            </div>
+          ) : (
+            <p className="text-2xl font-medium text-[#2b2b2b]">
+              {formatCurrency(parseFloat(jobStats.totalRevenue))}
+            </p>
+          )}
+        </div>
+        <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
+          <DollarSign className="h-6 w-6 text-green-600" />
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+</div>
+
 
       {/* Filters */}
       <Card className="bg-white shadow-md border-0">
