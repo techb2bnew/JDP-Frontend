@@ -1517,7 +1517,7 @@ console.log(suppliers,"supp")
                       placeholder="Select lead labor"
                       fetchData={apiClient.getLabor}
                       displayField="name"
-                      valueField="id"
+                      valueField="name"
                     />
 
                   ) : (
@@ -1619,7 +1619,7 @@ console.log(suppliers,"supp")
               </CardHeader>
               <CardContent>
                 {isLoadingEstimates ? (
-                  <p className="text-sm text-gray-500"> <LoadingSpinner /></p>
+                  <p className="flex items-center justify-center py-16"> <LoadingSpinner /></p>
                 ) : estimates.length === 0 ? (
                   <p className="text-sm text-gray-500">No invoices found for this job.</p>
                 ) : (
@@ -1728,7 +1728,7 @@ console.log(suppliers,"supp")
               </CardHeader>
               <CardContent>
                 {isLoadingMaterials ? (
-                  <p className="text-sm text-gray-500"> <LoadingSpinner /></p>
+                  <p className="flex items-center justify-center py-16"> <LoadingSpinner /></p>
                 ) : materials.length === 0 ? (
                   <p className="text-sm text-gray-500">No materials found.</p>
                 ) : (
@@ -1947,7 +1947,7 @@ console.log(suppliers,"supp")
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500"> <LoadingSpinner /></p>
+                  <p className="flex items-center justify-center py-16"> <LoadingSpinner /></p>
                 )}
               </CardContent>
             </Card>
