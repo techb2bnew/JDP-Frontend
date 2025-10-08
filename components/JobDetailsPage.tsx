@@ -1517,7 +1517,7 @@ console.log(suppliers,"supp")
                       placeholder="Select lead labor"
                       fetchData={apiClient.getLabor}
                       displayField="name"
-                      valueField="name"
+                      valueField="id"
                     />
 
                   ) : (

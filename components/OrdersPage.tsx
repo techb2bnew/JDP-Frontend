@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -33,19 +33,14 @@ import {
   Phone
 } from 'lucide-react'
 import { format } from 'date-fns'
+import { globalApiCall } from '@/utils/api'
 
-interface OrderItem {
-  id: string
-  name: string
-  sku: string
-  quantity: number
-  unitPrice: number
-  total: number
-}
+
 
 interface Order {
   id: string
   jobId: string
+  orderNumber: string
   customerName: string
   contractorName?: string
   customerEmail: string
@@ -67,13 +62,47 @@ interface Order {
   discount: number
   totalPayment: number
   notes?: string
+  
 }
 
+interface OrderItem {
+  id: string
+  name?: string
+  sku: string
+  quantity: number
+  unitPrice: number
+  total: number
+}
+
+interface Customer {
+  id: string
+  email: string
+  phone: string
+  companyName: string
+  customerName: string
+}
+
+interface OrderFormData {
+    id: string
+    jobId: string
+    orderNumber: string
+    createdAt: string
+    billingAddress: string
+    billingDate: string
+    billingNotes: string
+    billingPhone: string
+    status: 'pending' | 'processing' | 'completed' | 'cancelled'
+    subtotal:string
+    customer: Customer
+    orderItems: OrderItem[]
+
+}
 // Mock data with enhanced structure
 const ordersData: Order[] = [
   {
     id: 'ORD-2025-001',
     jobId: 'PH209_US_JDP',
+    orderNumber: 'ORD-2025-001',
     customerName: 'ABC Corporation',
     contractorName: 'John Carter',
     customerEmail: 'billing@abccorp.com',
@@ -124,6 +153,7 @@ const ordersData: Order[] = [
   {
     id: 'ORD-2025-002',
     jobId: 'PH210_US_JDP',
+    orderNumber:'ORD-2025-002',
     customerName: 'XYZ Company',
     contractorName: 'Sarah Johnson',
     customerEmail: 'orders@xyzcompany.com',
@@ -165,6 +195,7 @@ const ordersData: Order[] = [
   {
     id: 'ORD-2025-003',
     jobId: 'PH211_US_JDP',
+    orderNumber:'ORD-2025-003',
     customerName: 'DEF Industries',
     contractorName: 'Mike Wilson',
     customerEmail: 'procurement@defindustries.com',
@@ -206,6 +237,7 @@ const ordersData: Order[] = [
   {
     id: 'ORD-2025-004',
     jobId: 'PH212_US_JDP',
+    orderNumber:'ORD-2025-004',
     customerName: 'GHI Construction',
     contractorName: 'John Carter',
     customerEmail: 'orders@ghiconstruction.com',
@@ -239,6 +271,7 @@ const ordersData: Order[] = [
   {
     id: 'ORD-2025-005',
     jobId: 'PH213_US_JDP',
+    orderNumber:'ORD-2025-005',
     customerName: 'JKL Enterprises',
     contractorName: 'Sarah Johnson',
     customerEmail: 'purchasing@jklenterprises.com',
@@ -280,6 +313,7 @@ const ordersData: Order[] = [
   {
     id: 'ORD-2025-006',
     jobId: 'PH214_US_JDP',
+    orderNumber:'ORD-2025-006',
     customerName: 'MNO Corporation',
     contractorName: 'Mike Wilson',
     customerEmail: 'orders@mnocorp.com',
@@ -323,19 +357,209 @@ const ordersData: Order[] = [
 export function OrdersPage() {
   const { hasPermission } = usePermissions()
   const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined })
   const [sortBy, setSortBy] = useState('all')
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [selectedOrder, setSelectedOrder] = useState<OrderFormData | null>(null)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(false);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
+  const [orderStats, setOrderStats] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState(false);
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+
+
+  useEffect(() => {
+    fetchOrders(currentPage, itemsPerPage);
+    fetchOrdersStats();
+  },[currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    fetchOrders(1, itemsPerPage);
+  }, [searchTerm, statusFilter, dateFrom, dateTo]);
+
+
+  const fetchOrders = async (page: number, limit: number) => {
+    try {
+      setIsLoadingOrders(true);
+      let url = `${apiBaseUrl}/orders/getAllOrders?page=${page}&limit=${limit}`;
+
+      // If any filter is applied, switch to search API
+      const params: Record<string, string> = {};
+
+      if (searchTerm.trim()) {
+        params.q = searchTerm.trim();
+      }
+
+      if (statusFilter) {
+        params.status = statusFilter;
+      }
+
+      if (dateFrom) {
+        params.order_date_from = dateFrom;
+      }
+
+      if (dateTo) {
+        params.order_date_to = dateTo;
+      }
+
+      const hasFilters = Object.keys(params).length > 0;
+      if (hasFilters) {
+        // Build query string
+        const queryString = new URLSearchParams(params).toString();
+        url = `${apiBaseUrl}/orders/searchOrders?${queryString}`;
+      }
+
+      // const response = await globalApiCall(`${apiBaseUrl}/orders/getAllOrders?page=${page}&limit=${limit}`, {
+      //   method: 'GET'
+      // });
+
+      const response = await globalApiCall(url, { method: 'GET' });
+      const responseData = await response.json();
+      console.log('Orders API Response:', responseData);
+
+      if (responseData.success && responseData.data) {
+        // Transform API response to match component's expected format
+        const transformedOrders = responseData.data?.orders.map((apiOrder:any) => ({
+          id: apiOrder.id?.toString(),
+          orderNumber: apiOrder.order_number,
+          jobId: apiOrder.job_id?.toString(),
+          customerName: apiOrder.customer.customer_name,
+          contractorName: apiOrder.contractor || apiOrder.customer.company_name,
+          status: apiOrder.status,
+          orderDate: apiOrder.order_date,
+        }));
+
+        setOrders(transformedOrders);
+        setTotalOrders(responseData.data.total || transformedOrders.length);
+        
+      } else {
+        console.error('Invalid orders API response structure:', responseData);
+        setOrders([]);
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      // Error is already handled by globalApiCall (token revocation, etc.)
+      if (!(error instanceof Error && error.message?.includes('Session expired'))) {
+        setOrders([]);
+      }
+    } finally {
+      setIsLoadingOrders(false);
+    }
+  };
+
+  const fetchOrdersStats = async () => {
+    try {
+      setIsLoadingStats(true);
+      
+      const response = await globalApiCall(`${apiBaseUrl}/orders/getOrderStats`, {
+        method: 'GET'
+      });
+
+      const responseData = await response.json();
+      console.log('Order Stats API Response:', responseData);
+
+      if (responseData.success && responseData.data) {
+        setOrderStats(responseData.data);
+      } else {
+        console.error('Invalid order stats API response structure:', responseData);
+        setOrderStats(null);
+      }
+    } catch (error) {
+      console.error('Error fetching order stats:', error);
+      if (!(error instanceof Error && error.message?.includes('Session expired'))) {
+        setOrderStats(null);
+      }
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
+
+  const fetchOrderById = async (orderId: string) => {
+    try {
+      setIsLoading(true);
+      
+      const response = await globalApiCall(`${apiBaseUrl}/orders/getOrderById/${orderId}`, {
+        method: 'GET'
+      });
+
+      const responseData = await response.json();
+      console.log('Order by ID API Response:', responseData);
+
+      if (responseData.success && responseData.data) {
+        const apiOrder = responseData.data;
+        
+        
+        // Transform API response to match form data format
+        const orderData: OrderFormData = {
+          id: apiOrder.id.toString(),
+          orderNumber: apiOrder.order_number || '',
+          jobId: apiOrder.job_id?.toString() || '',
+          status: apiOrder.status as 'pending' | 'processing' | 'completed' | 'cancelled' || 'pending',
+          subtotal: apiOrder.subtotal?.toString() || '0',
+          createdAt: apiOrder.created_at || '',
+          // Top-level customer fields
+         
+          billingAddress: apiOrder.delivery_address || '',
+          billingDate: apiOrder.delivery_date || '',
+          billingNotes: apiOrder.delivery_notes || '',
+          billingPhone: apiOrder.delivery_phone || '',
+
+          // Nested customer object
+          customer: {
+            id: apiOrder.customer?.id?.toString() || '',
+            email: apiOrder.customer?.email || '',
+            phone: apiOrder.customer?.phone || '',
+            companyName: apiOrder.company_name || '',
+            customerName: apiOrder.customer_name || '',
+          },
+
+          // Order items
+          orderItems: apiOrder.order_items?.map((item: any) => ({
+            id: item.id.toString(),
+            name: item.product?.name || '',        // required by OrderItem
+            sku: item.product?.jdp_sku || '',
+            quantity: item.quantity || 0,
+            unitPrice: item.product?.unit_cost || 0,
+            total: item.total_price || 0,          // renamed from totalPrice to total
+          })) || []
+        };
+
+
+        setSelectedOrder(orderData);
+        // return orderData;
+      } else {
+        throw new Error(responseData.message || 'Failed to fetch product details');
+      }
+    } catch (error) {
+      console.error('Error fetching product by ID:', error);
+      if (typeof window !== 'undefined') {
+        const { toast } = await import('sonner');
+        toast.error(error instanceof Error ? error.message : 'Failed to fetch product details');
+      }
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
 
   // Filter orders based on search, status, date range, and sort
-  const filteredOrders = ordersData.filter(order => {
+  const filteredOrders = orders.filter(order => {
     const matchesSearch = 
       order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.jobId.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (order.contractorName && order.contractorName.toLowerCase().includes(searchTerm.toLowerCase()))
+      (order.contractorName && order.contractorName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      orders
     
     const matchesStatus = selectedStatus === 'all' || order.status === selectedStatus
     
@@ -395,8 +619,9 @@ export function OrdersPage() {
   }
 
   const handleViewInvoice = (order: Order) => {
-    setSelectedOrder(order)
+    // setSelectedOrder(order)
     setShowInvoiceModal(true)
+    fetchOrderById(order.id)
   }
 
   const handleExport = (format: 'csv' | 'pdf') => {
@@ -429,11 +654,12 @@ export function OrdersPage() {
     })
   }
 
-  // Calculate summary statistics
-  const totalOrders = ordersData.length
-  const pendingOrders = ordersData.filter(o => o.status === 'pending').length
-  const processingOrders = ordersData.filter(o => o.status === 'processing').length
-  const completedOrders = ordersData.filter(o => o.status === 'completed').length
+
+  // Calculate summary statistics from API data
+  const totalOrdersCount = orderStats?.total || totalOrders;
+  const pendingOrders = orderStats?.pending || orders.filter(o => o.status === 'pending').length
+  const processingOrders = orderStats?.processing || orders.filter(o => o.status === 'processing').length
+  const completedOrders = orderStats?.completed || orders.filter(o => o.status === 'completed').length
 
   return (
     <div className="space-y-6">
@@ -452,7 +678,13 @@ export function OrdersPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-sm font-medium text-muted-foreground">Total Orders</CardTitle>
-                <div className="text-2xl font-semibold text-foreground">{totalOrders}</div>
+                  <div className="text-2xl font-semibold text-foreground">
+                    {isLoadingStats ? (
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    ) : (
+                      totalOrdersCount
+                    )}
+                  </div>
               </div>
               <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
                 <Receipt className="w-5 h-5 text-primary" />
@@ -466,7 +698,14 @@ export function OrdersPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
-                <div className="text-2xl font-semibold text-yellow-600">{pendingOrders}</div>
+                
+                <div className="text-2xl font-semibold text-yellow-600">
+                  {isLoadingStats ? (
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-yellow-600"></div>
+                    ) : (
+                      pendingOrders
+                  )}
+                  </div>
               </div>
               <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
                 <Clock className="w-5 h-5 text-yellow-600" />
@@ -480,7 +719,13 @@ export function OrdersPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-sm font-medium text-muted-foreground">Processing</CardTitle>
-                <div className="text-2xl font-semibold text-blue-600">{processingOrders}</div>
+                <div className="text-2xl font-semibold text-blue-600">
+                  {isLoadingStats ? (
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                    ) : (
+                      processingOrders
+                  )}
+                  </div>
               </div>
               <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
                 <AlertCircle className="w-5 h-5 text-blue-600" />
@@ -494,7 +739,13 @@ export function OrdersPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-sm font-medium text-muted-foreground">Completed</CardTitle>
-                <div className="text-2xl font-semibold text-green-600">{completedOrders}</div>
+                <div className="text-2xl font-semibold text-green-600">
+                  {isLoadingStats ? (
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
+                    ) : (
+                      completedOrders
+                  )}
+                  </div>
               </div>
               <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
                 <CheckCircle className="w-5 h-5 text-green-600" />
@@ -513,7 +764,7 @@ export function OrdersPage() {
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search orders, jobs, customers..."
+                  placeholder="Search by order number"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -521,7 +772,7 @@ export function OrdersPage() {
               </div>
               
               {/* Status Filter */}
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-[160px]">
                   <Filter className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Status" />
@@ -613,10 +864,26 @@ export function OrdersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredOrders.map((order) => (
+                {isLoadingOrders ?(
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8">
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                        <span className="ml-2">Loading orders...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ): filteredOrders.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      No orders found
+                    </TableCell>
+                  </TableRow>
+                ): (
+                  filteredOrders.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell>
-                      <div className="font-medium font-mono">{order.id}</div>
+                      <div className="font-medium font-mono">{order.orderNumber}</div>
                     </TableCell>
                     <TableCell>
                       <div className="font-medium text-primary">{order.jobId}</div>
@@ -650,16 +917,48 @@ export function OrdersPage() {
                     </TableCell>
                     <TableCell>
                       {hasPermission('orders', 'view') && (
-                        <Button variant="ghost" size="sm" onClick={() => setSelectedOrder(order)}>
+                        <Button variant="ghost" size="sm" onClick={() => fetchOrderById(order.id)}>
                           <Eye className="h-4 w-4" />
                         </Button>
                       )}
                     </TableCell>
                   </TableRow>
-                ))}
+                ))
+                )}
+                {}
               </TableBody>
             </Table>
           </div>
+          {/* Pagination Controls */}
+          
+          {totalOrders > itemsPerPage && (
+            <div className="flex items-center justify-between px-4 py-3 border-t">
+              <div className="text-sm text-muted-foreground">
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalOrders)} of {totalOrders} products
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1 || isLoadingOrders}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm">
+                  Page {currentPage} of {Math.ceil(totalOrders / itemsPerPage)}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                  disabled={currentPage >= Math.ceil(totalOrders / itemsPerPage) || isLoadingOrders}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -683,7 +982,7 @@ export function OrdersPage() {
                 <div>
                   <h2 className="text-2xl font-semibold text-primary">INVOICE</h2>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Order Date: {formatDate(selectedOrder.orderDate)}
+                    Order Date: {formatDate(selectedOrder.createdAt)}
                   </p>
                 </div>
                 <div className="text-right">
@@ -711,7 +1010,7 @@ export function OrdersPage() {
                   <CardContent className="space-y-2 text-sm">
                     <div>
                       <span className="text-muted-foreground">Order ID:</span>
-                      <span className="ml-2 font-medium font-mono">{selectedOrder.id}</span>
+                      <span className="ml-2 font-medium font-mono">{selectedOrder.orderNumber}</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Job ID:</span>
@@ -719,7 +1018,7 @@ export function OrdersPage() {
                     </div>
                     <div>
                       <span className="text-muted-foreground">Order Date:</span>
-                      <span className="ml-2 font-medium">{formatDate(selectedOrder.orderDate)}</span>
+                      <span className="ml-2 font-medium">{formatDate(selectedOrder.createdAt)}</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Status:</span>
@@ -740,21 +1039,21 @@ export function OrdersPage() {
                       Billing Address
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
-                    <div className="font-medium">{selectedOrder.billingAddress.fullName}</div>
+                  {/* <CardContent className="space-y-2 text-sm">
+                    <div className="font-medium">{selectedOrder?.billingAddress?.fullName}</div>
                     <div className="text-muted-foreground">
-                      {selectedOrder.billingAddress.address}<br />
-                      {selectedOrder.billingAddress.city}, {selectedOrder.billingAddress.state} {selectedOrder.billingAddress.zipCode}
+                      {selectedOrder?.billingAddress?.address}<br />
+                      {selectedOrder?.billingAddress?.city}, {selectedOrder?.billingAddress?.state} {selectedOrder?.billingAddress?.zipCode}
                     </div>
                     <div className="flex items-center gap-1">
                       <Mail className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-muted-foreground">{selectedOrder.billingAddress.email}</span>
+                      <span className="text-muted-foreground">{selectedOrder?.billingAddress?.email}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Phone className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-muted-foreground">{selectedOrder.billingAddress.phone}</span>
+                      <span className="text-muted-foreground">{selectedOrder?.billingPhone}</span>
                     </div>
-                  </CardContent>
+                  </CardContent> */}
                 </Card>
 
                 {/* Customer/Contractor Info */}
@@ -768,21 +1067,21 @@ export function OrdersPage() {
                   <CardContent className="space-y-2 text-sm">
                     <div>
                       <span className="text-muted-foreground">Customer:</span>
-                      <div className="font-medium">{selectedOrder.customerName}</div>
+                      <div className="font-medium">{selectedOrder?.customer?.customerName}</div>
                     </div>
-                    {selectedOrder.contractorName && (
+                    {/* {selectedOrder.contractorName && (
                       <div>
                         <span className="text-muted-foreground">Contractor:</span>
-                        <div className="font-medium">{selectedOrder.contractorName}</div>
+                        <div className="font-medium">{selectedOrder?.contractorName}</div>
                       </div>
-                    )}
+                    )} */}
                     <div className="flex items-center gap-1">
                       <Mail className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-muted-foreground">{selectedOrder.customerEmail}</span>
+                      <span className="text-muted-foreground">{selectedOrder?.customer?.email}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Phone className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-muted-foreground">{selectedOrder.customerPhone}</span>
+                      <span className="text-muted-foreground">{selectedOrder?.customer?.phone}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -806,13 +1105,13 @@ export function OrdersPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {selectedOrder.items.map((item) => (
-                          <TableRow key={item.id}>
-                            <TableCell className="font-medium">{item.name}</TableCell>
-                            <TableCell className="font-mono text-sm">{item.sku}</TableCell>
+                        {selectedOrder?.orderItems?.map((item) => (
+                          <TableRow key={item?.id}>
+                            <TableCell className="font-medium">{item?.name}</TableCell>
+                            <TableCell className="font-mono text-sm">{item?.sku}</TableCell>
                             <TableCell>{item.quantity}</TableCell>
-                            <TableCell>{formatCurrency(item.unitPrice)}</TableCell>
-                            <TableCell className="text-right font-medium">{formatCurrency(item.total)}</TableCell>
+                            <TableCell>{formatCurrency(item?.unitPrice)}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(item?.total)}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -826,7 +1125,7 @@ export function OrdersPage() {
                 <CardHeader>
                   <CardTitle className="text-base">Payment Summary</CardTitle>
                 </CardHeader>
-                <CardContent>
+                {/* <CardContent>
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <span>Subtotal:</span>
@@ -848,10 +1147,10 @@ export function OrdersPage() {
                       <span className="text-primary">{formatCurrency(selectedOrder.totalPayment)}</span>
                     </div>
                   </div>
-                </CardContent>
+                </CardContent> */}
               </Card>
 
-              {selectedOrder.notes && (
+              {/* {selectedOrder.notes && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">Notes</CardTitle>
@@ -860,7 +1159,7 @@ export function OrdersPage() {
                     <p className="text-sm text-muted-foreground">{selectedOrder.notes}</p>
                   </CardContent>
                 </Card>
-              )}
+              )} */}
             </div>
           )}
           
