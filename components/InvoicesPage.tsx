@@ -165,6 +165,7 @@ export function InvoicesPage() {
   const [refreshInvoices, setRefreshInvoices] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [dashboardCards, setDashboardCards] = useState<DashboardCards | null>(null)
+  const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
   const [detailedStats, setDetailedStats] = useState(null);
   const dispatch = useDispatch();
   const router = useRouter();
@@ -333,24 +334,25 @@ export function InvoicesPage() {
   }, []);
 
 
-  useEffect(() => {
-    const fetchEstimateStats = async () => {
-      setIsLoadingEstimates(true);
-      try {
-        const response = await apiClient.getEstimateStats();
-        console.log('estimatestas:', response);
-        const dashboardCards = response.data.dashboard_cards;
-        const detailedStats = response.data.detailed_stats;
-        setDashboardCards(dashboardCards);
-        setDetailedStats(detailedStats);
-      } catch (error) {
-        console.error('Failed to fetch estimate stats:', error);
-      } finally {
-        setIsLoadingEstimates(false);
-      }
-    };
-    fetchEstimateStats();
-  }, []);
+ useEffect(() => {
+  const fetchEstimateStats = async () => {
+    setIsLoadingDashboard(true);
+    try {
+      const response = await apiClient.getEstimateStats();
+      console.log('estimatestas:', response);
+      const dashboardCards = response.data.dashboard_cards;
+      const detailedStats = response.data.detailed_stats;
+      setDashboardCards(dashboardCards);
+      setDetailedStats(detailedStats);
+    } catch (error) {
+      console.error('Failed to fetch estimate stats:', error);
+    } finally {
+      setIsLoadingDashboard(false);
+    }
+  };
+  fetchEstimateStats();
+}, []);
+
 
 
 
@@ -455,55 +457,99 @@ export function InvoicesPage() {
 
           <div className="space-y-6">
             {/* Summary Cards */}
-            {dashboardCards && (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <Card>
-                  <CardContent className="p-6 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Invoices</p>
-                      <p className="text-2xl font-semibold">{dashboardCards.total_invoices.value}</p>
-                    </div>
-                    <div className="p-3 bg-blue-100 rounded-lg">
-                      <Receipt className="h-6 w-6 text-blue-600" />
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-6 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Billed</p>
-                      <p className="text-2xl font-semibold text-primary">{dashboardCards.total_billed.value}</p>
-                    </div>
-                    <div className="p-3 bg-green-100 rounded-lg">
-                      <DollarSign className="h-6 w-6 text-green-600" />
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-6 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Paid Invoices</p>
+           {(isLoadingDashboard || dashboardCards) && (
+  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+    {/* Total Invoices */}
+    <Card>
+      <CardContent className="p-6 flex items-center justify-between">
+        <div>
+          <p className="text-sm text-muted-foreground">Total Invoices</p>
+          {isLoadingDashboard ? (
+            <div className="flex items-center h-8">
+              <LoadingSpinner />
+            </div>
+          ) : (
+            <p className="text-2xl font-semibold">
+              {dashboardCards?.total_invoices?.value ?? 0}
+            </p>
+          )}
+        </div>
+        <div className="p-3 bg-blue-100 rounded-lg">
+          <Receipt className="h-6 w-6 text-blue-600" />
+        </div>
+      </CardContent>
+    </Card>
 
-                      <p className="text-2xl font-semibold text-green-600">{dashboardCards.paid_invoices.value}</p>
-                    </div>
-                    <div className="p-3 bg-green-100 rounded-lg">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-6 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Pending</p>
-                      <p className="text-2xl font-semibold text-orange-600">{dashboardCards.pending_invoices.value}</p>
-                    </div>
-                    <div className="p-3 bg-orange-100 rounded-lg">
-                      <AlertCircle className="h-6 w-6 text-orange-600" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
+    {/* Total Billed */}
+    <Card>
+      <CardContent className="p-6 flex items-center justify-between">
+        <div>
+          <p className="text-sm text-muted-foreground">Total Billed</p>
+          {isLoadingDashboard ? (
+            <div className="flex items-center h-8">
+              <LoadingSpinner />
+            </div>
+          ) : (
+            <p className="text-2xl font-semibold text-primary">
+              {typeof dashboardCards?.total_billed?.value === "number"
+                ? `$${dashboardCards.total_billed.value.toFixed(2)}`
+                : (dashboardCards?.total_billed?.value ?? 0)}
+            </p>
+          )}
+        </div>
+        <div className="p-3 bg-green-100 rounded-lg">
+          <DollarSign className="h-6 w-6 text-green-600" />
+        </div>
+      </CardContent>
+    </Card>
+
+    {/* Paid Invoices */}
+    <Card>
+      <CardContent className="p-6 flex items-center justify-between">
+        <div>
+          <p className="text-sm text-muted-foreground">Paid Invoices</p>
+          {isLoadingDashboard ? (
+            <div className="flex items-center h-8">
+              <LoadingSpinner />
+            </div>
+          ) : (
+            <p className="text-2xl font-semibold text-green-600">
+              {dashboardCards?.paid_invoices?.value ?? 0}
+            </p>
+          )}
+        </div>
+        <div className="p-3 bg-green-100 rounded-lg">
+          <CheckCircle className="h-6 w-6 text-green-600" />
+        </div>
+      </CardContent>
+    </Card>
+
+    {/* Pending */}
+    <Card>
+      <CardContent className="p-6 flex items-center justify-between">
+        <div>
+          <p className="text-sm text-muted-foreground">Pending</p>
+          {isLoadingDashboard ? (
+            <div className="flex items-center h-8">
+              <LoadingSpinner />
+            </div>
+          ) : (
+            <p className="text-2xl font-semibold text-orange-600">
+              {dashboardCards?.pending_invoices?.value ?? 0}
+            </p>
+          )}
+        </div>
+        <div className="p-3 bg-orange-100 rounded-lg">
+          <AlertCircle className="h-6 w-6 text-orange-600" />
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+)}
+
+
+
+
 
 
             {/* Filters and Search */}

@@ -362,7 +362,6 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
 
     onInvoiceSaved?.(createdInvoice);
 
-    // Reset invoice
     setNewInvoice({
       customerId: "",
       jobId: undefined,
@@ -407,40 +406,8 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
   }, [])
 
 
-  // useEffect(() => {
-  //   const fetchJobs = async () => {
-  //     // setLoadingJobs(true);
-  //     try {
-  //       const res = await apiClient.getJobs();  
-  //       console.log(res,)
-  //       setJobs(res.data.data || []);
-  //     } catch (err) {
-  //       console.error("Error fetching jobs:", err);
-  //     // } finally {
-  //     //   setLoadingJobs(false);
-  //     // }
-  //   };
-  //   fetchJobs();
-  // }, []);
-
-  // useEffect(() => {
-  //   const fetchJobs = async () => {
-  //     try {
-  //       const res = await apiClient.getJobs();
-  //       console.log('jonsjobssss', res);
-  //       setLocalJobs(res.data?.data?.jobs || []);
-  //     } catch (err) {
-  //       console.error("Error fetching jobs:", err);
-  //     }
-  //   }
-  //   fetchJobs();
-  // }, []);
-
-  // console.log(jobs,"jobsss")
 
 
-console.log("jobs:", jobs);
-console.log("Matching job:", jobs.find((j) => j.id === String(jobId)));
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
@@ -781,53 +748,58 @@ console.log("Matching job:", jobs.find((j) => j.id === String(jobId)));
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label>Unit Price</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={item.unitPrice === 0 ? "" : item.unitPrice}
-                onChange={(e) =>
-                  updateInvoiceItem(
-                    index,
-                    "unitPrice",
-                    e.target.value === "" ? 0 : parseFloat(e.target.value)
-                  )
-                }
-                placeholder="0.00"
-              />
-              {errors[`item_${index}_price`] && (
-                <p className="text-red-500 text-sm">
-                  {errors[`item_${index}_price`]}
-                </p>
-              )}
-            </div>
+           <div className="space-y-2">
+  <Label>Unit Price</Label>
+  <div className="relative">
+    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+    <Input
+      type="number"
+      step="0.01"
+      className="pl-7"
+      value={item.unitPrice === 0 ? "" : item.unitPrice}
+      onChange={(e) =>
+        updateInvoiceItem(
+          index,
+          "unitPrice",
+          e.target.value === "" ? 0 : parseFloat(e.target.value)
+        )
+      }
+      placeholder="0.00"
+    />
+  </div>
+  {errors[`item_${index}_price`] && <p className="text-red-500 text-sm">{errors[`item_${index}_price`]}</p>}
+</div>
 
-            <div className="space-y-2">
-              <Label>Total</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={item.total === 0 ? "" : item.total}
-                  onChange={(e) =>
-                    updateInvoiceItem(
-                      index,
-                      "total",
-                      e.target.value === "" ? 0 : parseFloat(e.target.value)
-                    )
-                  }
-                  placeholder="0.00"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => removeInvoiceItem(index)}
-                >
-                  <Trash2 className="w-3 h-3" />
-                </Button>
-              </div>
-            </div>
+           <div className="space-y-2">
+  <Label>Total</Label>
+  <div className="flex items-center gap-2">
+    <div className="relative flex-1">
+      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+      <Input
+        type="number"
+        step="0.01"
+        className="pl-7"
+        value={item.total === 0 ? "" : item.total}
+        onChange={(e) =>
+          updateInvoiceItem(
+            index,
+            "total",
+            e.target.value === "" ? 0 : parseFloat(e.target.value)
+          )
+        }
+        placeholder="0.00"
+      />
+    </div>
+    <Button
+      variant="outline"
+      size="sm"
+      className="bg-transparent border-gray-300 text-gray-700 hover:bg-red-50 hover:border-red-500 hover:text-red-600 transition-colors"
+      onClick={() => removeInvoiceItem(index)}
+    >
+      <Trash2 className="w-3 h-3" />
+    </Button>
+  </div>
+</div>
           </div>
         </CardContent>
       </Card>
@@ -903,47 +875,53 @@ console.log("Matching job:", jobs.find((j) => j.id === String(jobId)));
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label>Hourly Rate</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={labor.hourlyRate === 0 ? "" : labor.hourlyRate}
-                onChange={(e) =>
-                  updateLaborEntry(
-                    index,
-                    "hourlyRate",
-                    e.target.value === "" ? 0 : parseFloat(e.target.value)
-                  )
-                }
-                placeholder="0.00"
-              />
-              {errors[`labor_${index}_rate`] && (
-                <p className="text-red-500 text-sm">{errors[`labor_${index}_rate`]}</p>
-              )}
-            </div>
+           <div className="space-y-2">
+  <Label>Hourly Rate</Label>
+  <div className="relative">
+    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+    <Input
+      type="number"
+      step="0.01"
+      className="pl-7"
+      value={labor.hourlyRate === 0 ? "" : labor.hourlyRate}
+      onChange={(e) =>
+        updateLaborEntry(
+          index,
+          "hourlyRate",
+          e.target.value === "" ? 0 : parseFloat(e.target.value)
+        )
+      }
+      placeholder="0.00"
+    />
+  </div>
+  {errors[`labor_${index}_rate`] && <p className="text-red-500 text-sm">{errors[`labor_${index}_rate`]}</p>}
+</div>
 
-            <div className="space-y-2">
-              <Label>Total</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={labor.total === 0 ? "" : labor.total}
-                  onChange={(e) =>
-                    updateLaborEntry(
-                      index,
-                      "total",
-                      e.target.value === "" ? 0 : parseFloat(e.target.value)
-                    )
-                  }
-                  placeholder="0.00"
-                />
-                <Button variant="outline" size="sm" onClick={() => removeLaborEntry(index)}>
-                  <Trash2 className="w-3 h-3" />
-                </Button>
-              </div>
-            </div>
+           <div className="space-y-2">
+  <Label>Total</Label>
+  <div className="flex items-center gap-2">
+    <div className="relative flex-1">
+      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+      <Input
+        type="number"
+        step="0.01"
+        className="pl-7"
+        value={labor.total === 0 ? "" : labor.total}
+        onChange={(e) =>
+          updateLaborEntry(
+            index,
+            "total",
+            e.target.value === "" ? 0 : parseFloat(e.target.value)
+          )
+        }
+        placeholder="0.00"
+      />
+    </div>
+    <Button variant="outline" size="sm" className="bg-transparent border-gray-300 text-gray-700 hover:bg-red-50 hover:border-red-500 hover:text-red-600 transition-colors" onClick={() => removeLaborEntry(index)}>
+      <Trash2 className="w-3 h-3" />
+    </Button>
+  </div>
+</div>
           </div>
         </CardContent>
       </Card>
@@ -980,29 +958,45 @@ console.log("Matching job:", jobs.find((j) => j.id === String(jobId)));
                         />
                         {errors[`cost_${index}_desc`] && <p className="text-red-500 text-sm">{errors[`cost_${index}_desc`]}</p>}
                       </div>
-                      <div className="space-y-2">
-                        <Label>Amount</Label>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={cost.amount === 0 ? "" : cost.amount}
-                            onChange={(e) =>
-                              updateAdditionalCost(
-                                index,
-                                "amount",
-                                e.target.value === "" ? 0 : parseFloat(e.target.value)
-                              )
-                            }
-                            placeholder="0.00"
-                          />
+                  <div className="space-y-2">
+                  <Label>Amount</Label>
 
-                          {errors[`cost_${index}_amt`] && <p className="text-red-500 text-sm">{errors[`cost_${index}_amt`]}</p>}
-                          <Button variant="outline" size="sm" onClick={() => removeAdditionalCost(index)}>
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="pl-7"         
+                        value={cost.amount === 0 ? "" : cost.amount}
+                        onChange={(e) =>
+                          updateAdditionalCost(
+                            index,
+                            "amount",
+                            e.target.value === "" ? 0 : parseFloat(e.target.value)
+                          )
+                        }
+                        placeholder="0.00"
+                      />
+                    </div>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeAdditionalCost(index)}
+                          className="bg-transparent border-gray-300 text-gray-700 hover:bg-red-50 hover:border-red-500 hover:text-red-600 transition-colors"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
                       </div>
+
+                      {/* error ko row ke bahar rakho */}
+                      {errors[`cost_${index}_amt`] && (
+                        <p className="text-red-500 text-sm">{errors[`cost_${index}_amt`]}</p>
+                      )}
+                    </div>
+
                     </div>
                   </CardContent>
                 </Card>
@@ -1110,7 +1104,7 @@ console.log("Matching job:", jobs.find((j) => j.id === String(jobId)));
           </div>
           <div className="flex gap-2">
             {currentStep < 6 ? (
-              <Button onClick={handleNext} disabled={loading}>
+              <Button onClick={handleNext} disabled={loading} className="bg-primary text-white">
                 Next
               </Button>
             ) : (

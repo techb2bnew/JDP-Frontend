@@ -24,27 +24,6 @@ export const InvoiceTemplate = ({ invoice, invoiceId }: InvoiceTemplateProps) =>
   const [error, setError] = useState<string | null>(null)
 
 
-  // useEffect(() => {
-  //   const fetchInvoice = async () => {
-  //     try {
-  //       setLoading(true)
-  //       setError(null)
-  //       if (!id) return
-  //       const res = await apiClient.getEstimateById(Number(id))
-  //       setInvoiceData((res?.data || res))
-  //       console.log("API Response:", res);
-  //       console.log("Invoice being set:", res?.data || res);
-  //     } catch (e) {
-  //       console.error(e)
-  //       setError("Failed to load invoice")
-  //     } finally {
-  //       setLoading(false)
-  //     }
-  //   }
-  //   if (!invoice && id) {
-  //     fetchInvoice()
-  //   }
-  // }, [id, invoice])
 
 
     useEffect(() => {
@@ -79,11 +58,15 @@ export const InvoiceTemplate = ({ invoice, invoiceId }: InvoiceTemplateProps) =>
     }
   }, [finalId, invoice])
 
-  if (loading) return <p> <LoadingSpinner />  Loading invoice...</p>
+if (loading) return (
+  <div className="flex flex-col items-center justify-center h-screen">
+    <LoadingSpinner />
+  </div>
+);
+
   if (error) return <p className="text-red-500">{error}</p>
   if (!invoiceData) return <p>No invoice found</p>
 
-  console.log(invoiceData, "innss")
   // const customer = customersData.find(c => c.id === invoice.customerId)
 
   return (

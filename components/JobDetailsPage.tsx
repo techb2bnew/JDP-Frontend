@@ -52,6 +52,7 @@ import { InvoiceTemplate } from './invoices/InvoiceTemplate'
 import html2canvas from 'html2canvas'
 import { Invoice,CreateEstimatePayload } from '@/types/invoice'
 import { LoadingSpinner } from './common/LoadingSpinner'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog'
 // Sample data structure - replace with your actual data
 const sampleJobData = {
   "job": {
@@ -199,7 +200,14 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const invoices = sampleJobData.invoices // Keep sample data for now as we don't have invoices API
 
   // Calculate totals using real job data
-  const totalMaterialCost = materials.reduce((sum: number, material: any) => sum + (material.unit_cost || material.totalCost || 0), 0)
+ const totalMaterialCost = materials.reduce(
+  (sum: number, material: any) =>
+    sum +
+    ((Number(material.stock_quantity ?? material.quantity ?? 0) || 0) *
+     (Number(material.unit_cost ?? material.unitCost ?? material.price ?? 0) || 0)),
+  0
+);
+
   const totalLaborCost = job.assignedLaborDetails && job.assignedLaborDetails.length > 0 ?
     job.assignedLaborDetails.reduce((sum: number, labor: any) => {
       const hourlyRate = labor.hourly_rate || 0;
@@ -222,7 +230,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const [showAddInvoiceModal, setShowAddInvoiceModal] = useState(false);
   const [showAddMaterialModal, setShowAddMaterialModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [suppliers, setSuppliers] = useState<{ id: number, company_name: string }[]>([]);
+const [suppliers, setSuppliers] = useState<{
+  id: number;
+  company_name: string;
+  users: {
+    full_name: string;
+  };
+}[]>([]);
   const dispatch = useDispatch();
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -236,6 +250,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<number | null>(null)
   const printRef = useRef<HTMLDivElement>(null);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [showDeleteProductDialog, setShowDeleteProductDialog] = useState(false);
+const [productToDelete, setProductToDelete] = useState<any | null>(null); 
+const [showDeleteEstimateDialog, setShowDeleteEstimateDialog] = useState(false);
+const [estimateToDelete, setEstimateToDelete] = useState<any | null>(null);
+const [printInvoiceId, setPrintInvoiceId] = useState<number | null>(null);
+const [showPrintMount, setShowPrintMount] = useState(false);
+
   const [projectSummary, setProjectSummary] = useState<{
     jobEstimate: number;
     materialsCost: number;
@@ -503,62 +524,116 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     setShowTimeLogModal(true);
   };
 
-  const handleAddProduct = async () => {
-    setIsLoading(true);
-    try {
-      const newProduct = await apiClient.createProduct({
-        product_name: materialFormData.name,
-        supplier_id: Number(materialFormData.supplier) || 0,
-        supplier_sku: materialFormData.sku,
-        jdp_sku: '',
-        stock_quantity: materialFormData.quantity,
-        unit: materialFormData.unit,
-        job_id: job.id || 2,
-        is_custom: true,
-        unit_cost: materialFormData.unitCost,
-      });
+const isValidForm = () => {
+  if (!materialFormData.name.trim()) {
+    toast.error("Product name is required");
+    return false;
+  }
 
-      triggerRefreshMaterials();
+  if (!materialFormData.sku.trim()) {
+    toast.error("SKU is required");
+    return false;
+  }
 
-      dispatch(addProduct(newProduct));
-      toast.success('Product added successfully!');
-      setShowAddMaterialModal(false);
-      setMaterialFormData({
-        name: '',
-        quantity: 0,
-        unitCost: 0,
-        sku: '',
-        unit: 'Pieces',
-        supplier: ''
-      });
-    } catch (error) {
-      console.error('Error adding product:', error);
-      toast.error('Failed to add product');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  if (!materialFormData.quantity || materialFormData.quantity <= 0) {
+    toast.error("Quantity must be greater than 0");
+    return false;
+  }
+
+  if (!materialFormData.unitCost || materialFormData.unitCost <= 0) {
+    toast.error("Unit cost must be greater than 0");
+    return false;
+  }
+
+  if (!materialFormData.unit) {
+    toast.error("Unit is required");
+    return false;
+  }
+
+  if (!materialFormData.supplier) {
+    toast.error("Supplier is required");
+    return false;
+  }
+
+  return true;
+};
 
 
+const handleAddProduct = async () => {
+  if (!isValidForm()) return;
 
-  const handleDeleteProduct = async (productId: string | number) => {
-    try {
-      const confirmDelete = window.confirm("Are you sure you want to delete this product?");
-      if (!confirmDelete) return;
+  setIsLoading(true);
+  try {
+    const newProduct = await apiClient.createProduct({
+      product_name: materialFormData.name,
+      supplier_id: Number(materialFormData.supplier) || 0,
+      supplier_sku: materialFormData.sku,
+      jdp_sku: '',
+      stock_quantity: materialFormData.quantity,
+      unit: materialFormData.unit,
+      job_id: job.id || 2,
+      is_custom: true,
+      unit_cost: materialFormData.unitCost,
+    });
 
-      setIsDeleting(true);
+    triggerRefreshMaterials();
 
-      await apiClient.deleteProduct(productId);
-      dispatch(deleteProduct(String(productId)));
+    dispatch(addProduct(newProduct));
+    toast.success('Product added successfully!');
+    setShowAddMaterialModal(false); 
+  } catch (error) {
+    console.error('Error adding product:', error);
+    toast.error('Failed to add product');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
-      toast.success("Product deleted successfully!");
-    } catch (error) {
-      console.error("Error deleting product:", error);
-      toast.error("Failed to delete product");
-    } finally {
-      setIsDeleting(false);
-    }
-  };
+
+
+
+  // const handleDeleteProduct = async (productId: string | number) => {
+  //   try {
+  //     const confirmDelete = window.confirm("Are you sure you want to delete this product?");
+  //     if (!confirmDelete) return;
+
+  //     setIsDeleting(true);
+
+  //     await apiClient.deleteProduct(productId);
+  //     dispatch(deleteProduct(String(productId)));
+
+  //     toast.success("Product deleted successfully!");
+  //   } catch (error) {
+  //     console.error("Error deleting product:", error);
+  //     toast.error("Failed to delete product");
+  //   } finally {
+  //     setIsDeleting(false);
+  //   }
+  // };
+
+  const handleDeleteProduct = (product: any) => {
+  setProductToDelete(product);
+  setShowDeleteProductDialog(true);
+};
+
+const confirmDeleteProduct = async () => {
+  if (!productToDelete) return;
+  setIsDeleting(true);
+  try {
+    await apiClient.deleteProduct(productToDelete.id);
+    dispatch(deleteProduct(String(productToDelete.id)));
+    triggerRefreshMaterials();
+    toast.success("Product deleted successfully!");
+  } catch (error) {
+    console.error("Error deleting product:", error);
+    toast.error("Failed to delete product");
+  } finally {
+    setIsDeleting(false);
+    setShowDeleteProductDialog(false);
+    setProductToDelete(null);
+  }
+};
+
 
   const fetchEstimates = async () => {
     setIsLoadingEstimates(true);
@@ -580,6 +655,18 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     fetchEstimates();
   }, [jobId, refreshInvoices]);
 
+useEffect(() => {
+  if (showAddMaterialModal) {
+    setMaterialFormData({
+      name: '',
+      quantity: 0,
+      unitCost: 0,
+      sku: '',
+      unit: 'Pieces',
+      supplier: ''
+    });
+  }
+}, [showAddMaterialModal]);
 
 
 
@@ -644,7 +731,6 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
  const handleSaveInvoice = async (newInvoice: Partial<Invoice>) => {
   setIsLoading(true);
   try {
-    // ✅ Labor payload
     const laborPayload =
       newInvoice.labor?.map((l) => ({
         full_name: l.laborName,
@@ -655,7 +741,6 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         is_custom: true,
       })) || [];
 
-    // ✅ Product payload
     const productsPayload =
       newInvoice.items?.map((i) => ({
         product_name: i.description,
@@ -669,7 +754,6 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         unit_cost: i.unitPrice,
       })) || [];
 
-    // ✅ Totals & Calculations
     const itemsTotal =
       newInvoice.items?.reduce(
         (sum, item) => sum + (item.quantity ?? 0) * (item.unitPrice ?? 0),
@@ -692,11 +776,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     const taxAmount = subtotal * (newInvoice.taxRate ?? 0);
     const totalAmount = subtotal + taxAmount;
 
-    // ✅ Helper for strict type safety
     const isPriority = (value: any): value is "high" | "medium" | "low" =>
       ["high", "medium", "low"].includes(value);
 
-    // ✅ Build CreateEstimatePayload
     const payload: CreateEstimatePayload = {
       estimate_title: "New Estimate",
       customer_id: Number(newInvoice.customerId),
@@ -738,10 +820,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       custom_products: productsPayload,
     };
 
-    // ✅ Send to API
     const createdInvoice = await apiClient.createEstimate(payload);
 
-    // ✅ Update Redux + UI
     dispatch(addInvoice(createdInvoice));
     toast.success("Invoice created successfully!");
     fetchEstimates();
@@ -762,23 +842,47 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
 
 
-  const handleDeleteEstimate = async (estimateId: any) => {
-    try {
-      const confirmDelete = window.confirm("Are you sure you want to delete this estimate?");
-      if (!confirmDelete) return;
-      setIsDeleting(true);
-      await apiClient.deleteEstimate(estimateId);
-      console.log(estimateId, "IDD")
-      dispatch(deleteInvoice(String(estimateId)));
-      toast.success("Estimate deleted successfully!");
-      setRefreshInvoices(prev => !prev);
-    } catch (error) {
-      console.error("Error deleting estimate:", error);
-      toast.error("Failed to delete estimate");
-    } finally {
-      setIsDeleting(false);
-    }
-  };
+  // const handleDeleteEstimate = async (estimateId: any) => {
+  //   try {
+  //     const confirmDelete = window.confirm("Are you sure you want to delete this estimate?");
+  //     if (!confirmDelete) return;
+  //     setIsDeleting(true);
+  //     await apiClient.deleteEstimate(estimateId);
+  //     console.log(estimateId, "IDD")
+  //     dispatch(deleteInvoice(String(estimateId)));
+  //     toast.success("Estimate deleted successfully!");
+  //     setRefreshInvoices(prev => !prev);
+  //   } catch (error) {
+  //     console.error("Error deleting estimate:", error);
+  //     toast.error("Failed to delete estimate");
+  //   } finally {
+  //     setIsDeleting(false);
+  //   }
+  // };
+
+  const handleDeleteEstimate = (estimate: any) => {
+  setEstimateToDelete(estimate);
+  setShowDeleteEstimateDialog(true);
+};
+const confirmDeleteEstimate = async () => {
+  if (!estimateToDelete) return;
+
+  setIsDeleting(true);
+  try {
+    await apiClient.deleteEstimate(estimateToDelete.id);
+    dispatch(deleteInvoice(String(estimateToDelete.id)));
+    toast.success("Estimate deleted successfully!");
+    setRefreshInvoices(prev => !prev); 
+  } catch (error) {
+    console.error("Error deleting estimate:", error);
+    toast.error("Failed to delete estimate");
+  } finally {
+    setIsDeleting(false);
+    setShowDeleteEstimateDialog(false);
+    setEstimateToDelete(null);
+  }
+};
+
 
 
 
@@ -1526,31 +1630,39 @@ console.log(suppliers,"supp")
                           <div className="h-10 w-10 bg-gray-200 rounded-lg flex items-center justify-center">
                             <FileText className="h-5 w-5 text-gray-700" />
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-medium">{invoice.estimate_title}</h4>
-                              <span className={`px-2 py-1 rounded text-xs font-medium ${invoice.invoice_type === 'estimate'
-                                ? 'bg-blue-100 text-blue-800'
-                                : invoice.invoice_type === 'proposal_invoice'
-                                  ? 'bg-purple-100 text-purple-800'
-                                  : invoice.invoice_type === 'progressive_invoice'
-                                    ? 'bg-orange-100 text-orange-800'
-                                    : 'bg-green-100 text-green-800'
-                                }`}>
-                                {invoice.invoice_type.replace('_', ' ')}
-                              </span>
-                            </div>
-                            <p className="text-sm text-gray-600">{invoice.description}</p>
-                            <p className="text-xs text-gray-500">
-                              #{invoice.invoice_number} • Created: {invoice.issue_date} • Due: {invoice.due_date}
-                            </p>
-                          </div>
+                                              <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-medium">{invoice.estimate_title}</h4>
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-medium ${
+                            invoice.invoice_type === 'estimate'
+                              ? 'bg-blue-100 text-blue-800'
+                              : invoice.invoice_type === 'proposal_invoice'
+                              ? 'bg-purple-100 text-purple-800'
+                              : invoice.invoice_type === 'progressive_invoice'
+                              ? 'bg-orange-100 text-orange-800'
+                              : 'bg-green-100 text-green-800'
+                          }`}
+                        >
+                          {invoice.invoice_type.replace('_', ' ')}
+                        </span>
+                      </div>
+
+                      <p className="text-sm text-gray-600">{invoice.description}</p>
+                      <p className="text-xs text-gray-500 font-medium">
+                        #{invoice.invoice_number}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Created: {invoice.issue_date} • Due: {invoice.due_date}
+                      </p>
+                    </div>
+
                         </div>
                         <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <p className="font-semibold mb-1">{formatCurrency(invoice.total_amount)}</p>
-                            <span>{getStatusBadge(invoice.status)}</span>
-                          </div>
+                          <div className="flex items-center gap-2 font-semibold">
+                          <span>{formatCurrency(invoice.total_amount)}</span>
+                          <span>{getStatusBadge(invoice.status)}</span>
+                        </div>
                           <div className="flex items-center gap-2">
                             {/* <Button variant="outline" size="sm" className="gap-1" onClick={() => {
                               setSelectedInvoice(invoice);
@@ -1581,7 +1693,7 @@ console.log(suppliers,"supp")
                               variant="outline"
                               size="sm"
                               className="gap-1"
-                              onClick={() => handleDeleteEstimate(invoice.id)}
+                              onClick={() => handleDeleteEstimate(invoice)}
                             >
                               <Trash2 className="h-3 w-3 text-red-600" />
                             </Button>
@@ -1636,10 +1748,19 @@ console.log(suppliers,"supp")
                         </div>
                         <div className="flex items-center gap-4">
                           <div className="text-right">
-                            <p className="font-semibold">{formatCurrency(material.unit_cost || material.totalCost || 0)}</p>
+                            <p className="font-semibold">
+                          {formatCurrency(
+                            (Number(material.stock_quantity ?? material.quantity ?? 0) || 0) *
+                            (Number(material.unit_cost ?? material.unitCost ?? material.price ?? 0) || 0)
+                          )}
+                        </p>
+
                             <p className="text-sm text-gray-600">{material.stock_quantity || material.quantity || 0} {material.unit}</p>
                           </div>
-                          <Button variant="outline" size="sm" className="gap-1" onClick={() => handleDeleteProduct(material.id)}>
+                          <Button variant="outline" size="sm" className="gap-1" onClick={() => {
+                                setProductToDelete(material);
+                                setShowDeleteProductDialog(true);
+                              }}>
                             <Trash2 className="h-3 w-3 text-red-600" />
                           </Button>
                         </div>
@@ -1809,7 +1930,7 @@ console.log(suppliers,"supp")
                     </div>
 
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Projects Cost</span>
+                      <span className="text-sm text-gray-600">Products Cost</span>
                       <span className="font-medium">{formatCurrency(projectSummary.materialsCost)}</span>
                     </div>
 
@@ -2015,7 +2136,7 @@ console.log(suppliers,"supp")
                   <SelectContent>
                     {suppliers?.map((supplier) => (
                       <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                        {supplier?.company_name}
+                        {supplier?.users?.full_name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -2234,7 +2355,7 @@ console.log(suppliers,"supp")
             </div>
           )}
 
-          <div className="flex justify-end mt-6">
+          <div className="flex justify-end mt-6 gap-4">
             <Button variant="outline" onClick={() => setShowInvoiceModal(false)}>
               Close
             </Button>
@@ -2246,100 +2367,69 @@ console.log(suppliers,"supp")
         </DialogContent>
       </Dialog>
 
-      {selectedInvoiceId && (
-        <div
-          ref={printRef}
-          className="p-6 bg-white border border-black-400 rounded print:p-0 print:bg-white"
-          style={{
-            margin: '0 auto',
-            width: '22cm',
-          }}
-        >
-          <InvoiceTemplate invoiceId={selectedInvoiceId} />
-        </div>
-      )}
+    {selectedInvoiceId && (
+  <div
+    ref={printRef}
+    aria-hidden="true"
+    style={{
+      position: 'absolute',
+      left: '-10000px',
+      top: 0,
+      width: '22cm',
+      background: '#ffffff',
+      padding: '24px',
+      pointerEvents: 'none',
+    }}
+  >
+    <InvoiceTemplate invoiceId={selectedInvoiceId} />
+  </div>
+)}
 
 
 
-      {/* <Dialog open={showInvoiceModal} onOpenChange={setShowInvoiceModal}>
-  <DialogContent className="sm:max-w-[600px]">
-    <DialogHeader>
-      <DialogTitle className="text-2xl font-bold">
-        Estimate Details
-      </DialogTitle>
-      <DialogDescription className="text-sm font-semibold">
-        {selectedInvoice?.invoice_type} - #{selectedInvoice?.invoice_number}
-      </DialogDescription>
-    </DialogHeader>
-
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h3 className="font-semibold text-lg">Estimate Information</h3>
-        <div className="border-t border-gray-200 my-4"></div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-sm text-gray-600">Type</p>
-            <p className="font-medium capitalize">{selectedInvoice?.invoice_type}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Estimate Number</p>
-            <p className="font-medium">{selectedInvoice?.invoice_number}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Total Amount</p>
-            <p className="font-medium">{formatCurrency(selectedInvoice?.total_amount || 0)}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Status</p>
-            {selectedInvoice && getStatusBadge(selectedInvoice.status)}
-          </div>
-        </div>
-      </div>
+      <AlertDialog open={showDeleteProductDialog} onOpenChange={setShowDeleteProductDialog}>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>Are you sure you want to delete this product?</AlertDialogTitle>
+      <AlertDialogDescription>
+        This action cannot be undone. This will permanently delete the product.
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel disabled={isDeleting}>No</AlertDialogCancel>
+      <AlertDialogAction
+        onClick={confirmDeleteProduct}
+        disabled={isDeleting}
+        className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+      >
+        {isDeleting ? 'Deleting...' : 'Yes, delete'}
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
 
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <p className="text-sm text-gray-600">Created At</p>
-          <p className="font-medium">{new Date(selectedInvoice?.created_at).toLocaleDateString()}</p>
-        </div>
-        <div>
-          <p className="text-sm text-gray-600">Due Date</p>
-          <p className="font-medium">{new Date(selectedInvoice?.due_date).toLocaleDateString()}</p>
-        </div>
-      </div>
+<AlertDialog open={showDeleteEstimateDialog} onOpenChange={setShowDeleteEstimateDialog}>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>Are you sure you want to delete this estimate?</AlertDialogTitle>
+      <AlertDialogDescription>
+        This action cannot be undone. This will permanently delete the estimate &quot;{estimateToDelete?.name || estimateToDelete?.id}&quot; from your records.
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel disabled={isDeleting}>No</AlertDialogCancel>
+      <AlertDialogAction
+        onClick={confirmDeleteEstimate}
+        disabled={isDeleting}
+        className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+      >
+        {isDeleting ? 'Deleting...' : 'Yes, delete'}
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <p className="text-sm text-gray-600">Customer</p>
-          <p className="font-medium">{selectedInvoice?.customer?.customer_name}</p>
-        </div>
-        <div>
-          <p className="text-sm text-gray-600">Email</p>
-          <p className="font-medium">{selectedInvoice?.email_address}</p>
-        </div>
-      </div>
-
- 
-      <div>
-        <h3 className="font-semibold text-lg">Description</h3>
-        <p className="text-sm mt-2">{selectedInvoice?.description}</p>
-      </div>
-
-
-      <div className="border-t border-gray-200 my-4"></div>
-      <div className="flex flex-wrap justify-end gap-2">
-        <Button variant="outline" className="gap-2" onClick={() => setShowInvoiceModal(false)}>
-          <X className="h-4 w-4" />
-          Close
-        </Button>
-        <Button variant="outline" className="gap-2 bg-primary text-primary-foreground">
-          <Printer className="h-4 w-4" />
-          Print Estimate
-        </Button>
-      </div>
-    </div>
-  </DialogContent>
-</Dialog> */}
 
     </div>
   )
