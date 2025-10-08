@@ -222,7 +222,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const [showAddInvoiceModal, setShowAddInvoiceModal] = useState(false);
   const [showAddMaterialModal, setShowAddMaterialModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [suppliers, setSuppliers] = useState<{ id: number, name: string }[]>([]);
+  const [suppliers, setSuppliers] = useState<{ id: number, company_name: string }[]>([]);
   const dispatch = useDispatch();
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -908,12 +908,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
 
 
-
+console.log(suppliers,"supp")
   useEffect(() => {
     const fetchSuppliers = async () => {
       try {
         const response = await apiClient.getAllSuppliers();
         // response structure: { success, message, data: { data: [ ...suppliers ] } }
+        
         setSuppliers(response.data.data);
       } catch (error) {
         console.error('Error fetching suppliers:', error);
@@ -2014,7 +2015,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                   <SelectContent>
                     {suppliers?.map((supplier) => (
                       <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                        {supplier?.name}
+                        {supplier?.company_name}
                       </SelectItem>
                     ))}
                   </SelectContent>

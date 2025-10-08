@@ -439,7 +439,8 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
   // console.log(jobs,"jobsss")
 
 
-
+console.log("jobs:", jobs);
+console.log("Matching job:", jobs.find((j) => j.id === String(jobId)));
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
@@ -511,7 +512,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
                 {jobId ? (
                   <>
                     <Input
-                      value={jobs.find((j) => j.id === jobId)?.title || ""}
+                      value={jobs.find((j) => j.id === String(jobId))?.title || ""}
                       disabled
                     />
                     {newInvoice.jobId !== jobId && setNewInvoice(prev => ({ ...prev, jobId: jobId }))}
