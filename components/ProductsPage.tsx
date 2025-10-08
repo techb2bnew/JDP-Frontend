@@ -1070,11 +1070,8 @@ export function ProductsPage() {
                       </div>
                       </div>
                       </TableCell>
-                      <TableCell className="font-medium">
-  {formatCurrency(
-    product.estimatedPrice ||
-      (Math.random() * (3000 - 500) + 500).toFixed(2) 
-  )}
+                                  <TableCell className="font-medium">
+  {formatCurrency(+((Math.random() * (1000 - 100) + 100).toFixed(2)))}
 </TableCell>
                     <TableCell className="font-medium">{formatCurrency(product.ptrPrice)}</TableCell>
                     <TableCell>
