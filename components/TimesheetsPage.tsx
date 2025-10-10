@@ -115,6 +115,12 @@ export function TimesheetsPage() {
    const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined })
   const [statusFilter, setStatusFilter] = useState('all');
   const [employeeFilter, setEmployeeFilter] = useState('all');
+  const [isLoadingTimesheets, setIsLoadingTimesheets] = useState(false);
+const [totalTimesheets, setTotalTimesheets] = useState(0);
+ const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+const [filteredTimesheets, setFilteredTimesheets] = useState<any[]>([]);
+
 
   const [dashboardStats, setDashboardStats] = useState({
     total: 0,
@@ -123,27 +129,27 @@ export function TimesheetsPage() {
     billableHours: '0h'
   });
 
-  const filteredTimesheets = timesheets?.dashboard_timesheets.filter((item: TimesheetItem) => {
-  const searchMatch =
-    item.employee.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.job.toLowerCase().includes(searchTerm.toLowerCase());
+//   const filteredTimesheets = timesheets?.dashboard_timesheets.filter((item: TimesheetItem) => {
+//   const searchMatch =
+//     item.employee.toLowerCase().includes(searchTerm.toLowerCase()) ||
+//     item.job.toLowerCase().includes(searchTerm.toLowerCase());
 
-  const statusMatch =
-    statusFilter === 'all' || item.status.toLowerCase() === statusFilter;
+//   const statusMatch =
+//     statusFilter === 'all' || item.status.toLowerCase() === statusFilter;
 
-  const employeeMatch =
-    employeeFilter === 'all' || item.employee.toLowerCase() === employeeFilter;
+//   const employeeMatch =
+//     employeeFilter === 'all' || item.employee.toLowerCase() === employeeFilter;
 
-  const dateMatch = (() => {
-    if (!dateRange.from || !dateRange.to) return true;
+//   const dateMatch = (() => {
+//     if (!dateRange.from || !dateRange.to) return true;
 
-    const [startStr] = item.week.split(' - ');
-    const itemStartDate = new Date(startStr);
-    return itemStartDate >= dateRange.from && itemStartDate <= dateRange.to;
-  })();
+//     const [startStr] = item.week.split(' - ');
+//     const itemStartDate = new Date(startStr);
+//     return itemStartDate >= dateRange.from && itemStartDate <= dateRange.to;
+//   })();
 
-  return searchMatch && statusMatch && employeeMatch && dateMatch;
-}) || [];
+//   return searchMatch && statusMatch && employeeMatch && dateMatch;
+// }) || [];
 
 
   const employeeOptions = Array.from(new Set(timesheets?.dashboard_timesheets.map(t => t.employee.toLowerCase())));
@@ -156,24 +162,41 @@ export function TimesheetsPage() {
   const endDate = '2025-09-26'
 
 
-  useEffect(() => {
-    console.log('asas')
-    const fetchAlltimesheets = async () => {
-      try {
-        setIsLoading(true);
-        const response = await apiClient.getAllTimesheets();
-        console.log(response, "timeres")
-        setTimesheets(response.data);
-        console.log(response.data, "newtimeres")
-      } catch (error) {
-        console.error('Error fetching suppliers:', error);
-      }finally {
-      setIsLoading(false);
-    }
-    };
+const fetchAlltimesheets = async () => {
+  try {
+    setIsLoading(true);
+    const response = await apiClient.getAllTimesheets();
+    const timesheets = response.data.dashboard_timesheets || [];
+    const period = response.data.period || { start_date: '', end_date: '', week_range: '' };
+    const transformedTimesheets = timesheets.map((item: any) => ({
+      employee: item.employee || 'N/A',
+      job: item.job || 'N/A',
+      jobCode: `#${item.job_id}`,
+      week: period.week_range,
+      jobId: item.job_id?.toString() || '',
+      laborId: item.labor_id?.toString() || '',
+      mon: item.mon || '0h',
+      tue: item.tue || '0h',
+      wed: item.wed || '0h',
+      thu: item.thu || '0h',
+      fri: item.fri || '0h',
+      sat: item.sat || '0h',
+      sun: item.sun || '0h',
+      total: item.total || '0h',
+      billable: item.billable || '0h',
+      status: item.status || 'Unknown',
+    }));
 
-    fetchAlltimesheets();
-  }, []);
+    setTimesheets(response.data); 
+    setFilteredTimesheets(transformedTimesheets); 
+  } catch (error) {
+    console.error('Error fetching timesheets:', error);
+    setFilteredTimesheets([]); 
+  } finally {
+    setIsLoading(false); 
+  }
+};
+
 
 
   useEffect(() => {
@@ -216,6 +239,107 @@ const handleApproveTimesheet = async (item: TimesheetItem) => {
   }
 };
 
+const fetchBySearchTimesheets = async () => {
+  if (!searchTerm.trim()) return;
+
+  setIsLoadingTimesheets(true);
+
+  try {
+    const response = await apiClient.searchTimesheetsByQuery(searchTerm.trim(), 1, 10);
+    const timesheetsData = response.data;
+    const timesheets = timesheetsData?.dashboard_timesheets || [];
+
+    const transformedTimesheets = timesheets.map((item: any) => ({
+      employee: item.employee || 'N/A',
+      job: item.job || 'N/A',
+      jobCode: `#${item.job_id}`, 
+      week: timesheetsData?.period?.week_range || '', 
+      jobId: item.job_id?.toString() || '',
+      laborId: item.labor_id?.toString() || '',
+      mon: item.mon || '0h',
+      tue: item.tue || '0h',
+      wed: item.wed || '0h',
+      thu: item.thu || '0h',
+      fri: item.fri || '0h',
+      sat: item.sat || '0h',
+      sun: item.sun || '0h',
+      total: item.total || '0h',
+      billable: item.billable || '0h',
+      status: item.status || 'Unknown',
+    }));
+
+    setFilteredTimesheets(transformedTimesheets); 
+    setTimesheets(timesheetsData); 
+    setTotalTimesheets(transformedTimesheets.length);
+  } catch (err) {
+    console.error('Timesheet search error:', err);
+    setFilteredTimesheets([]); 
+    setTimesheets({
+      dashboard_timesheets: [],
+      period: {
+        start_date: '',
+        end_date: '',
+        week_range: '',
+      },
+    });
+  } finally {
+    setIsLoadingTimesheets(false);
+  }
+};
+
+
+
+
+useEffect(() => {
+  const debounceTimeout = setTimeout(() => {
+    if (!searchTerm.trim()) {
+      fetchAlltimesheets();
+    } else {
+      fetchBySearchTimesheets(); 
+    }
+  }, 500); 
+
+  return () => clearTimeout(debounceTimeout);
+}, [searchTerm,]);
+
+useEffect(() => {
+  const fetchTimesheetsByFilters = async () => {
+    if (searchTerm.trim()) return;
+
+    setIsLoadingTimesheets(true);
+
+    try {
+      let response;
+      if (statusFilter !== 'all') {
+        response = await apiClient.searchTimesheetsByStatus(statusFilter);
+      } else {
+        response = await apiClient.searchTimesheetsByStatus('Active'); 
+      }
+
+      const timesheetsData = response.data;
+
+      setTimesheets(timesheetsData); 
+      setFilteredTimesheets(timesheetsData.dashboard_timesheets || []);
+      setTotalTimesheets((timesheetsData.dashboard_timesheets || []).length);
+    } catch (error) {
+      console.error("Timesheet filter error:", error);
+      setTimesheets({
+        dashboard_timesheets: [],
+        period: {
+          start_date: '',
+          end_date: '',
+          week_range: '',
+        },
+      });
+      setFilteredTimesheets([]);
+      setTotalTimesheets(0);
+    } finally {
+      setIsLoadingTimesheets(false);
+    }
+  };
+
+  fetchTimesheetsByFilters();
+}, [statusFilter, searchTerm]);
 
 
 
@@ -297,9 +421,10 @@ const handleApproveTimesheet = async (item: TimesheetItem) => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="submitted">Submitted</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
+                   <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Submitted">Submitted</SelectItem>
+                  <SelectItem value="Approved">Approved</SelectItem>
+                  <SelectItem value="Draft">Draft</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -454,6 +579,37 @@ const handleApproveTimesheet = async (item: TimesheetItem) => {
             </Table>
           </div>
           )}
+
+ {/* Pagination Controls */}
+{totalTimesheets > 0 && (
+  <div className="flex items-center justify-between px-4 py-3 border-t">
+    <div className="text-sm text-muted-foreground">
+      Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalTimesheets)} of {totalTimesheets} products
+    </div>
+    <div className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+        disabled={currentPage === 1 || isLoading}
+      >
+        Previous
+      </Button>
+      <span className="text-sm">
+        Page {currentPage} of {Math.ceil(totalTimesheets / itemsPerPage)}
+      </span>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setCurrentPage(prev => prev + 1)}
+        disabled={currentPage >= Math.ceil(totalTimesheets / itemsPerPage) || isLoading}
+      >
+        Next
+      </Button>
+    </div>
+  </div>
+)}
+
         </CardContent>
       </Card>
     </div>

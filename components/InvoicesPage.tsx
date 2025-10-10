@@ -86,13 +86,12 @@ interface Estimate {
   total_amount?: number
   description?: string
   status?: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
-  invoice_type?: 'proposal_invoice' | 'roughen' | 'progressive' | 'final'
+  invoice_type?: 'proposal_invoice' | 'roughen' | 'progressive_invoice' | 'final_invoice' |'estimate' |'down_payment'
   issue_date?: string
   due_date?: string
   created_by?: string
   created_at?: string
 }
-
 type DashboardCards = {
   total_invoices: { value: number }
   total_billed: { value: string | number }
@@ -147,7 +146,7 @@ export function InvoicesPage() {
   const [activeTab, setActiveTab] = useState('invoices');
   const [invoices, setInvoices] = useState<Invoice[]>(invoicesData)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [pendingApprovalCount, setPendingApprovalCount] = useState(2)
   const [showNewInvoiceDialog, setShowNewInvoiceDialog] = useState(false)
@@ -167,24 +166,30 @@ export function InvoicesPage() {
   const [dashboardCards, setDashboardCards] = useState<DashboardCards | null>(null)
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
   const [detailedStats, setDetailedStats] = useState(null);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [totalEstimates, setTotalEstimates] = useState(0);
+  const [invoiceTypeFilter, setInvoiceTypeFilter] = useState('');
+
   const dispatch = useDispatch();
   const router = useRouter();
 
-  const filteredInvoices = invoices.filter(invoice => {
-    const matchesSearch = invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.jobTitle.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter
-    const matchesType = typeFilter === 'all' || invoice.type === typeFilter
-    return matchesSearch && matchesStatus && matchesType
-  })
+  // const filteredInvoices = invoices.filter(invoice => {
+  //   const matchesSearch = invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //     invoice.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //     invoice.jobTitle.toLowerCase().includes(searchTerm.toLowerCase())
+  //   const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter
+  //   const matchesType = typeFilter === 'all' || invoice.type === typeFilter
+  //   return matchesSearch && matchesStatus && matchesType
+  // })
 
-  console.log(invoice, "newfilter")
+  // console.log(invoice, "newfilter")
 
   const handleSaveInvoice = (newInvoiceData: Partial<Invoice>) => {
     const subtotal =
-      (newInvoiceData.items?.reduce((sum, item) => sum + item.total, 0) || 0) +
-      (newInvoiceData.labor?.reduce((sum, labor) => sum + labor.total, 0) || 0) +
+      (newInvoiceData.items?.reduce((sum, item) => sum + item.total_cost, 0) || 0) +
+      (newInvoiceData.labor?.reduce((sum, labor) => sum + labor.total_cost, 0) || 0) +
       (newInvoiceData.additionalCosts?.reduce((sum, cost) => sum + cost.amount, 0) || 0)
     const taxAmount = subtotal * (newInvoiceData.taxRate || 0)
     const totalAmount = subtotal + taxAmount
@@ -316,12 +321,15 @@ export function InvoicesPage() {
   ]
 
   useEffect(() => {
-    const fetchEstimates = async () => {
+    fetchEstimates();
+  }, []);
+  const fetchEstimates = async () => {
       setIsLoadingEstimates(true);
       try {
         const response = await apiClient.getAllEstimates();
         console.log('API Response:', response);
         setEstimates(response.data.estimates || []);
+        setTotalEstimates((response.data?.estimates?.length ?? 0));
         console.log("API Estimates:", response.data.estimates);
       } catch (error) {
         console.error('Failed to fetch estimates:', error);
@@ -329,9 +337,6 @@ export function InvoicesPage() {
         setIsLoadingEstimates(false);
       }
     };
-
-    fetchEstimates();
-  }, []);
 
 
  useEffect(() => {
@@ -356,23 +361,23 @@ export function InvoicesPage() {
 
 
 
-  const filteredEstimates = estimates.filter((invoice: Estimate) => {
-    const term = searchTerm.toLowerCase();
+  // const filteredEstimates = estimates.filter((invoice: Estimate) => {
+  //   const term = searchTerm.toLowerCase();
 
-    const matchesSearch =
-      invoice.invoice_number?.toLowerCase().includes(term) ||
-      invoice.customer?.customer_name?.toLowerCase().includes(term) ||
-      invoice.job?.job_title?.toLowerCase().includes(term);
+  //   const matchesSearch =
+  //     invoice.invoice_number?.toLowerCase().includes(term) ||
+  //     invoice.customer?.customer_name?.toLowerCase().includes(term) ||
+  //     invoice.job?.job_title?.toLowerCase().includes(term);
 
-    const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
-    const matchesType = typeFilter === 'all' || invoice.invoice_type === typeFilter;
+  //   const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
+  //   const matchesType = typeFilter === 'all' || invoice.invoice_type === typeFilter;
 
-    return matchesSearch && matchesStatus && matchesType;
-  });
+  //   return matchesSearch && matchesStatus && matchesType;
+  // });
 
 
 
-  console.log(filteredEstimates, "filterrrr")
+  // console.log(filteredEstimates, "filterrrr")
 
 
 
@@ -400,7 +405,6 @@ export function InvoicesPage() {
     const fetchJobs = async () => {
       try {
         const res = await apiClient.getJobs();
-        // console.log("jonsjobssss", res, res.data);
         setLocalJobs(res.data || []);
       } catch (err) {
         console.error("Error fetching jobs:", err);
@@ -409,6 +413,136 @@ export function InvoicesPage() {
 
     fetchJobs();
   }, []);
+
+
+const fetchBySearchEstimates = async () => {
+  if (!searchTerm.trim()) return;
+
+  setIsLoadingEstimates(true);
+
+  try {
+    const response = await apiClient.searchEstimatesByQuery(searchTerm.trim(), 1, 10);
+    const estimates = response.data?.estimates || [];
+    console.log(estimates,'filteressss')
+
+    const transformedEstimates = estimates.map((estimate: any) => ({
+  id: estimate.id?.toString(),
+  estimate_title: estimate.estimate_title || 'Untitled',
+  invoice_number: estimate.invoice_number || 'N/A',
+  status: estimate.status || 'N/A',
+  priority: estimate.priority || 'N/A',
+  issue_date: estimate.issue_date || 'N/A',
+  due_date: estimate.due_date || 'N/A',
+  total_amount: estimate.total_amount ?? 0,
+  email_address: estimate.email_address || '',
+  location: estimate.location || '',
+  invoice_type: estimate.invoice_type || '',
+  description: estimate.description || '',
+  customer: estimate.customer
+    ? {
+        customer_name: estimate.customer.customer_name || 'Unknown',
+        email: estimate.customer.email || '',
+        phone: estimate.customer.phone || '',
+        company_name: estimate.customer.company_name || '',
+      }
+    : {
+        name: 'Unknown',
+        email: '',
+        phone: '',
+        company: '',
+      },
+  job: estimate.job
+    ? {
+        id: estimate.job.id?.toString() || '',
+        job_title: estimate.job.job_title || '',
+        job_type: estimate.job.job_type || '',
+        status: estimate.job.status || '',
+      }
+    : {
+        id: '',
+        title: '',
+        type: '',
+        status: '',
+      },
+}));
+
+
+    setEstimates(transformedEstimates);
+    setTotalEstimates(transformedEstimates.length);
+  } catch (err) {
+    console.error('Estimate search error:', err);
+    setEstimates([]);
+  } finally {
+    setIsLoadingEstimates(false);
+  }
+};
+
+useEffect(() => {
+  const debounceTimeout = setTimeout(() => {
+    if (!searchTerm.trim()) {
+      fetchEstimates();
+      // fetchEstimates(currentPage, itemsPerPage); 
+    } else {
+      fetchBySearchEstimates(); 
+    }
+  }, 500); 
+
+  return () => clearTimeout(debounceTimeout);
+}, [searchTerm, currentPage]);
+
+
+useEffect(() => {
+  const fetchEstimatesByFilters = async () => {
+    if (searchTerm.trim()) return;
+
+    setIsLoadingEstimates(true);
+
+    try {
+      let estimates: any[] = [];
+
+      const hasStatus = statusFilter !== '';
+      const hasInvoiceType = invoiceTypeFilter !== '';
+      if (hasStatus && hasInvoiceType) {
+        const [statusRes, typeRes] = await Promise.all([
+          apiClient.searchEstimatesByStatus(statusFilter),
+          apiClient.searchEstimatesByInvoiceType(invoiceTypeFilter),
+        ]);
+
+        const statusEstimates = statusRes?.data?.estimates || [];
+        const typeEstimates = typeRes?.data?.estimates || [];
+        estimates = statusEstimates.filter((statusEstimate:any) =>
+          typeEstimates.some((typeEstimate:any) => typeEstimate.id === statusEstimate.id)
+        );
+      }
+      else if (hasStatus) {
+        const res = await apiClient.searchEstimatesByStatus(statusFilter);
+        estimates = res?.data?.estimates || [];
+      }
+      else if (hasInvoiceType) {
+        const res = await apiClient.searchEstimatesByInvoiceType(invoiceTypeFilter);
+        estimates = res?.data?.estimates || [];
+      }
+
+      setEstimates(estimates);
+      setTotalEstimates(estimates.length);
+    } catch (error) {
+      console.error("Estimate filter error:", error);
+      setEstimates([]);
+    } finally {
+      setIsLoadingEstimates(false);
+    }
+  };
+
+  fetchEstimatesByFilters();
+}, [statusFilter, invoiceTypeFilter, searchTerm]);
+
+
+
+
+
+
+
+
 
   return (
     <div className="space-y-6">
@@ -452,14 +586,11 @@ export function InvoicesPage() {
           })}
         </TabsList>
 
-        {/* Invoices Tab Content */}
         <TabsContent value="invoices" className="mt-6">
 
           <div className="space-y-6">
-            {/* Summary Cards */}
            {(isLoadingDashboard || dashboardCards) && (
   <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-    {/* Total Invoices */}
     <Card>
       <CardContent className="p-6 flex items-center justify-between">
         <div>
@@ -584,16 +715,17 @@ export function InvoicesPage() {
                         <SelectItem value="cancelled">Cancelled</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Select value={typeFilter} onValueChange={setTypeFilter}>
+                    <Select value={invoiceTypeFilter} onValueChange={setInvoiceTypeFilter}>
                       <SelectTrigger className="w-auto min-w-[150px]">
                         <SelectValue placeholder="All Types" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Types</SelectItem>
                         <SelectItem value="proposal_invoice">Proposed</SelectItem>
-                        <SelectItem value="roughen">Roughen</SelectItem>
-                        <SelectItem value="progressive">Progressive</SelectItem>
-                        <SelectItem value="final">Final</SelectItem>
+                        <SelectItem value="estimate">Estimate</SelectItem>
+                        <SelectItem value="progressive_invoice">Progressive</SelectItem>
+                        <SelectItem value="final_invoice">Final</SelectItem>
+                        <SelectItem value="down_payment">Down Payment</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -621,8 +753,8 @@ export function InvoicesPage() {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {filteredEstimates.length > 0 ? (
-          filteredEstimates.map((invoice: any) => (
+        {estimates.length > 0 ? (
+          estimates.map((invoice: any) => (
             <TableRow key={invoice.id}>
               <TableCell className="font-mono">{invoice.invoice_number}</TableCell>
               <TableCell>{invoice.customer?.customer_name || 'N/A'}</TableCell>
@@ -680,10 +812,44 @@ export function InvoicesPage() {
     </Table>
   )}
 </div>
+ {/* Pagination Controls */}
+{totalEstimates > 0 && (
+  <div className="flex items-center justify-between px-4 py-3 border-t">
+    <div className="text-sm text-muted-foreground">
+      Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalEstimates)} of {totalEstimates} products
+    </div>
+    <div className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+        disabled={currentPage === 1 || isLoadingEstimates}
+      >
+        Previous
+      </Button>
+      <span className="text-sm">
+        Page {currentPage} of {Math.ceil(totalEstimates / itemsPerPage)}
+      </span>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setCurrentPage(prev => prev + 1)}
+        disabled={currentPage >= Math.ceil(totalEstimates / itemsPerPage) || isLoadingEstimates}
+      >
+        Next
+      </Button>
+    </div>
+  </div>
+)}
+
+
+
+       
 
               </CardContent>
             </Card>
           </div>
+           
 
 
         </TabsContent>

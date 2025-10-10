@@ -21,10 +21,11 @@ export interface InvoiceItem {
   description: string;
   quantity: number;
   unitPrice: number;
-  total: number;
+  total_cost: number;
   supplierId?: number;
   jdp_sku?: string;
   unit?: string;
+  productId:number
 }
 
 export interface LaborEntry {
@@ -32,7 +33,7 @@ export interface LaborEntry {
   laborName: string;
   hours: number;
   hourlyRate: number;
-  total: number;
+  total_cost: number;
   description: string;
    email?: string;
 }
@@ -70,6 +71,7 @@ export interface Invoice {
   materialsCost?: number;
   laborCost?: number;
   additionalCostAmount?: number;
+  
 }
 
 export interface TimesheetEntry {

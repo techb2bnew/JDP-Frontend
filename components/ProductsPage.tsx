@@ -55,6 +55,7 @@ import {
 import { Product, Branch } from '../types/product'
 import { globalApiCall } from '../utils/globalApiHandler'
 import { AutoSuggestInput } from './ui/auto-suggest-input'
+import { apiClient } from '@/utils/api'
 
 interface ProductFormData {
   name: string;
@@ -72,6 +73,7 @@ interface ProductFormData {
   unit: string;
   branchIds: string[];
   status: 'active' | 'inactive' | 'draft';
+  unitcost:number;
 }
 
 interface Supplier {
@@ -146,15 +148,24 @@ export function ProductsPage() {
     stockQuantity: 0,
     unit: 'piece',
     branchIds: [],
-    status: 'draft'
+    status: 'draft',
+    unitcost:0
   })
   // Auto-generate JDP SKU when supplier SKU changes
-  useEffect(() => {
-    if (formData.supplierSku) {
-      const generatedJdpSku = `JDP-${formData.supplierSku.split('-').slice(1).join('-')}`;
-      setFormData(prev => ({ ...prev, jdpSku: generatedJdpSku }));
+ useEffect(() => {
+  if (formData.supplierSku) {
+    let generatedJdpSku = '';
+
+    if (formData.supplierSku.includes('-')) {
+      generatedJdpSku = `JDP-${formData.supplierSku.split('-').slice(1).join('-')}`;
+    } else {
+      generatedJdpSku = `JDP-${formData.supplierSku}`;
     }
-  }, [formData.supplierSku]);
+
+    setFormData(prev => ({ ...prev, jdpSku: generatedJdpSku }));
+  }
+}, [formData.supplierSku]);
+
 
   // Calculate pricing when cost or markup changes
   useEffect(() => {
@@ -177,32 +188,134 @@ export function ProductsPage() {
     fetchProductStats(); // Fetch product statistics
   }, [currentPage, itemsPerPage]);
 
-  // Filter and sort products
-  const filteredProducts = products
-    .filter(product => {
-    const matchesSearch =
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (product.sku && product.sku.toLowerCase().includes(searchTerm.toLowerCase()))
 
-    const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory
-    const matchesStatus = selectedStatus === 'all' || product.status === selectedStatus
+const fetchBySearch = async () => {
+  if (!searchTerm.trim()) return;
 
-    const matchesBranches = selectedBranches.length === 0 ||
-      product.branches.some(branch => selectedBranches.includes(branch.id))
+  setIsLoadingProducts(true);
+  try {
+    const response = await apiClient.searchProductsByQuery(searchTerm.trim());
+    let result = response.data?.products || [];
+    const transformedProducts = result.map((apiProduct: any) => ({
+      id: apiProduct.id?.toString() || `PRD-${Date.now()}`,
+      name: apiProduct.product_name || '',
+      category: apiProduct.category || '',
+      ptrPrice: apiProduct.supplier_cost_price || 0,
+      jdp_price: apiProduct.jdp_price || 0,
+      stock: apiProduct.stock_quantity || 0,
+      markup_amount: apiProduct.markup_amount || 0,
+      status: apiProduct.status || 'active',
+      jdpSku: apiProduct.jdp_sku || '', 
+      branches: apiProduct.branches || [],
+      image: apiProduct.image || '',
+      description: apiProduct.description || '',
+      sku: apiProduct.supplier_sku || '',
+      unit: apiProduct.unit || 'piece',
+      createdDate: apiProduct.created_at ? new Date(apiProduct.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      lastUpdated: apiProduct.updated_at ? new Date(apiProduct.updated_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      minStockLevel: 0,
+      maxStockLevel: 100,
+      supplier: apiProduct.supplier_name || 'Unknown Supplier'
+    }));
 
-    return matchesSearch && matchesCategory && matchesStatus && matchesBranches
-  })
-    .sort((a, b) => {
-      // Only sort if sortBy is set (button clicked)
-      if (!sortBy) return 0;
-      
-      if (sortOrder === 'asc') {
-        return a.name.localeCompare(b.name)
-      } else {
-        return b.name.localeCompare(a.name)
+    let filtered = transformedProducts;
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter((p: any) => p.category === selectedCategory);
+    }
+
+    if (selectedBranches.length > 0) {
+      filtered = filtered.filter((p: any) =>
+        p.branches?.some((branch: any) => selectedBranches.includes(branch.id))
+      );
+    }
+
+    setProducts(filtered);
+    setTotalProducts(filtered.length);
+
+  } catch (err) {
+    console.error('Search error:', err);
+    setProducts([]);
+  } finally {
+    setIsLoadingProducts(false);
+  }
+};
+
+
+
+useEffect(() => {
+  const fetchByStatus = async () => {
+    if (searchTerm.trim()) return;
+
+    setIsLoadingProducts(true);
+    try {
+      const statusToUse = selectedStatus === 'all' ? 'active' : selectedStatus;
+      const response = await apiClient.searchProductsByStatus(statusToUse);
+      let result = response.data?.products || [];
+
+      if (selectedCategory !== 'all') {
+        result = result.filter((p:any) => p.category === selectedCategory);
       }
-  })
+
+      if (selectedBranches.length > 0) {
+        result = result.filter((p :any)=>
+          p.branches?.some((branch:any) => selectedBranches.includes(branch.id))
+        );
+      }
+
+      setProducts(result);
+      setTotalProducts(result.length);
+    } catch (err) {
+      console.error('Status filter error:', err);
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  };
+
+  fetchByStatus();
+}, [selectedStatus, selectedCategory, selectedBranches]); 
+
+useEffect(() => {
+  const debounceTimeout = setTimeout(() => {
+    if (!searchTerm.trim()) {
+      fetchProductsData(currentPage, itemsPerPage);
+    } else {
+      fetchBySearch();
+    }
+  }, 500); 
+
+  return () => clearTimeout(debounceTimeout);
+}, [searchTerm, selectedCategory, selectedBranches, currentPage]);
+
+
+
+
+
+  // Filter and sort products
+  // const filteredProducts = products
+  //   .filter(product => {
+  //   const matchesSearch =
+  //     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //     product.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //     (product.sku && product.sku.toLowerCase().includes(searchTerm.toLowerCase()))
+
+  //   const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory
+  //   const matchesStatus = selectedStatus === 'all' || product.status === selectedStatus
+
+  //   const matchesBranches = selectedBranches.length === 0 ||
+  //     product.branches.some(branch => selectedBranches.includes(branch.id))
+
+  //   return matchesSearch && matchesCategory && matchesStatus && matchesBranches
+  // })
+  //   .sort((a, b) => {
+  //     // Only sort if sortBy is set (button clicked)
+  //     if (!sortBy) return 0;
+      
+  //     if (sortOrder === 'asc') {
+  //       return a.name.localeCompare(b.name)
+  //     } else {
+  //       return b.name.localeCompare(a.name)
+  //     }
+  // })
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -263,7 +376,8 @@ export function ProductsPage() {
         stockQuantity: 0,
         unit: 'piece',
         branchIds: [],
-        status: 'draft'
+        status: 'draft',
+        unitcost:0
       });
       setShowProductModal(true);
     }
@@ -481,7 +595,8 @@ export function ProductsPage() {
       stockQuantity: 0,
       unit: 'piece',
       branchIds: [],
-      status: 'draft'
+      status: 'draft',
+      unitcost:0
     })
     setSelectedProduct(null)
     setCurrentAction('add')
@@ -712,8 +827,9 @@ export function ProductsPage() {
           profitMargin: apiProduct.profit_margin || 0,
           stockQuantity: apiProduct.stock_quantity || 0,
           unit: apiProduct.unit || 'piece',
-          branchIds: [], // Will be populated if branch data is available
-          status: apiProduct.status || 'draft' // Use API status or default to draft
+          branchIds: [], 
+          status: apiProduct.status || 'draft' ,
+          unitcost:apiProduct.unicost || 0
         };
 
         setFormData(productData);
@@ -788,6 +904,7 @@ export function ProductsPage() {
       setIsLoadingStats(false);
     }
   };
+  
 
   // Calculate summary statistics from API data
   const totalProductsCount = productStats?.total || totalProducts
@@ -943,7 +1060,7 @@ export function ProductsPage() {
 
             {/* Category Filter */}
             <div className='flex flex-wrap gap-2'>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              {/* <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger className="w-[fit-content]">
                   <Filter className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Category" />
@@ -956,7 +1073,7 @@ export function ProductsPage() {
                     </SelectItem>
                   ))}
                 </SelectContent>
-              </Select>
+              </Select> */}
 
               {/* Status Filter */}
               <Select value={selectedStatus} onValueChange={(value: FilterStatus) => setSelectedStatus(value)}>
@@ -1011,10 +1128,10 @@ export function ProductsPage() {
                   <TableHead>Product</TableHead>
                   <TableHead>Supplier SKU</TableHead>
                   <TableHead>	JDP SKU</TableHead>
-                  <TableHead>	Estimated Price</TableHead>
                   <TableHead>Supplier Price</TableHead>
                   <TableHead>Markup</TableHead>
                   <TableHead>JDP Price</TableHead>
+                  <TableHead>	Estimated Price</TableHead>
                   <TableHead>Stock</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
@@ -1030,14 +1147,14 @@ export function ProductsPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : filteredProducts.length === 0 ? (
+                ) : products.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No products found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredProducts.map((product) => (
+                  products.map((product) => (
                   <TableRow key={product.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -1070,9 +1187,7 @@ export function ProductsPage() {
                       </div>
                       </div>
                       </TableCell>
-                                  <TableCell className="font-medium">
-  {formatCurrency(+((Math.random() * (1000 - 100) + 100).toFixed(2)))}
-</TableCell>
+                                  
                     <TableCell className="font-medium">{formatCurrency(product.ptrPrice)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -1082,6 +1197,10 @@ export function ProductsPage() {
                     </TableCell>
 
                     <TableCell className="font-medium">{formatCurrency(product.jdp_price || 0)}</TableCell>
+                          <TableCell className="font-medium">
+                          {formatCurrency(+((Math.random() * 300).toFixed(2)))}
+                        </TableCell>
+
 
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -1121,35 +1240,36 @@ export function ProductsPage() {
             </Table>
           </div>
           
-          {/* Pagination Controls */}
-          {totalProducts > itemsPerPage && (
-            <div className="flex items-center justify-between px-4 py-3 border-t">
-              <div className="text-sm text-muted-foreground">
-                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalProducts)} of {totalProducts} products
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1 || isLoadingProducts}
-                >
-                  Previous
-                </Button>
-                <span className="text-sm">
-                  Page {currentPage} of {Math.ceil(totalProducts / itemsPerPage)}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => prev + 1)}
-                  disabled={currentPage >= Math.ceil(totalProducts / itemsPerPage) || isLoadingProducts}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          )}
+         {/* Pagination Controls */}
+{totalProducts > 0 && (
+  <div className="flex items-center justify-between px-4 py-3 border-t">
+    <div className="text-sm text-muted-foreground">
+      {/* Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalProducts)} of {totalProducts} products */}
+    </div>
+    <div className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+        disabled={currentPage === 1 || isLoadingProducts}
+      >
+        Previous
+      </Button>
+      <span className="text-sm">
+        Page {currentPage} of {Math.ceil(totalProducts / itemsPerPage)}
+      </span>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setCurrentPage(prev => prev + 1)}
+        disabled={currentPage >= Math.ceil(totalProducts / itemsPerPage) || isLoadingProducts}
+      >
+        Next
+      </Button>
+    </div>
+  </div>
+)}
+
         </CardContent>
       </Card>
 
@@ -1487,7 +1607,7 @@ export function ProductsPage() {
                           type="number"
                           step="0.01"
                           min="0"
-                          value={formData.supplierCostPrice}
+                          value={formData.supplierCostPrice=== 0 ? "" :formData.supplierCostPrice}
                           onChange={(e) => {
                             setFormData(prev => ({ ...prev, supplierCostPrice: parseFloat(e.target.value) || 0 }));
                             clearValidationError('supplierCostPrice');
@@ -1513,7 +1633,7 @@ export function ProductsPage() {
                           type="number"
                           step="1"
                           min="0"
-                          value={formData.markupPercentage}
+                          value={formData.markupPercentage === 0 ? "":formData.markupPercentage}
                           onChange={(e) => {
                             setFormData(prev => ({ ...prev, markupPercentage: parseInt(e.target.value) || 0 }));
                             clearValidationError('markupPercentage');
@@ -1540,31 +1660,32 @@ export function ProductsPage() {
                         placeholder="Enter unit"
                       />
                     </div>
-                    {/* <div>
-                      <Label htmlFor="markupPercentage" className="flex items-center gap-1"> 
-                        Markup Percentage *
+                    <div>
+                      <Label htmlFor="supplierCostPrice" className="flex items-center gap-1">
+                        {/* <DollarSignIcon className="h-4 w-4 text-blue-500" /> */}
+                        Unit Cost
                       </Label>
                       <div className="relative mt-2">
-                        <span className="absolute right-3 top-1/2 transform -translate-y-1/2">%</span>
+                        {/* <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span> */}
                         <Input
-                          id="markupPercentage"
+                          id="unitcost"
                           type="number"
-                          step="1"
+                          step="0.01"
                           min="0"
-                          value={formData.markupPercentage}
+                          value={formData.unitcost=== 0 ? "" :formData.unitcost}
                           onChange={(e) => {
-                            setFormData(prev => ({ ...prev, markupPercentage: parseInt(e.target.value) || 0 }));
-                            clearValidationError('markupPercentage');
+                            setFormData(prev => ({ ...prev, unitcost: parseFloat(e.target.value) || 0 }));
+                            clearValidationError('unitcost');
                           }}
-                          placeholder="0"
-                          className={`pr-8 ${validationErrors.markupPercentage ? 'border-red-500' : ''}`}
+                          placeholder="0.00"
+                          className={`pl-8 ${validationErrors.unitcost ? 'border-red-500' : ''}`}
                           required
                         />
                       </div>
-                      {validationErrors.markupPercentage && (
-                        <p className="text-red-500 text-sm mt-1">{validationErrors.markupPercentage}</p>
+                      {validationErrors.unitcost && (
+                        <p className="text-red-500 text-sm mt-1">{validationErrors.unitcost}</p>
                       )}
-                    </div> */}
+                    </div>
                   </div>
                 </div>
 
@@ -1641,7 +1762,7 @@ export function ProductsPage() {
                         id="stockQuantity"
                         type="number"
                         min="0"
-                        value={formData.stockQuantity}
+                        value={formData.stockQuantity === 0 ? "":formData.stockQuantity }
                         onChange={(e) => setFormData(prev => ({ ...prev, stockQuantity: parseInt(e.target.value) || 0 }))}
                         placeholder="0"
                         className="mt-1"

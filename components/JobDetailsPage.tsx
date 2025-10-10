@@ -208,12 +208,19 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   0
 );
 
-  const totalLaborCost = job.assignedLaborDetails && job.assignedLaborDetails.length > 0 ?
-    job.assignedLaborDetails.reduce((sum: number, labor: any) => {
-      const hourlyRate = labor.hourly_rate || 0;
-      const estimatedHours = job.estimatedHours || 0;
-      return sum + (hourlyRate * estimatedHours);
-    }, 0) :
+ const totalLaborCost =
+  [...(job.assignedLaborDetails || []), ...(job.customLabor || [])].reduce(
+    (sum: number, labor: any) => {
+      const rate = Number(labor.hourly_rate ?? 0);
+      const hours = Number(labor.hours_worked ?? 0);
+      return sum + rate * hours;
+    },
+    0
+  );
+
+
+  console.log(job?.assignedLaborDetails, "deeeee")
+
     job.estimatedCost || 0
   const totalHours = timeLogs.reduce((sum, log) => sum + log.hoursWorked, 0)
   const totalMaterialItems = materials.reduce((sum: number, material: any) => sum + (material.stock_quantity || material.quantity || 0), 0)
@@ -271,11 +278,19 @@ const [showPrintMount, setShowPrintMount] = useState(false);
     contractor: job.contractor || job.customer,
     startDate: '01/15/2025',
     priority: 'High',
+    status:'draft',
     assignedLabor: job.assignedLaborDetails || [],
     assignedLeadLabor: job.assignedLeadLaborDetails || [],
   });
+
+
+const allowedStatuses = ['draft', 'active', 'in_progress', 'completed', 'cancelled', 'on_hold'];
+
   const handleSave = async () => {
     try {
+      const status = allowedStatuses.includes(editedJob.status)
+      ? editedJob.status
+      : 'draft';
       const updatePayload = {
         job_title: editedJob.title,
         job_type: editedJob.type === 'service-based' ? 'service_based' : 'contract_based',
@@ -307,14 +322,15 @@ const [showPrintMount, setShowPrintMount] = useState(false);
         assigned_material_ids: job.materials && job.materials.length > 0
           ? JSON.stringify(job.materials)
           : undefined,
+          status,
 
-        status: ['pending', 'in-progress', 'completed'].includes(job.status)
-          ? job.status === 'pending'
-            ? 'active'
-            : job.status === 'in-progress'
-              ? 'in_progress'
-              : job.status
-          : 'unknown',
+        // status: ['pending', 'in-progress', 'completed'].includes(job.status)
+        //   ? job.status === 'pending'
+        //     ? 'active'
+        //     : job.status === 'in-progress'
+        //       ? 'in_progress'
+        //       : job.status
+        //   : 'unknown',
       };
 
       console.log('Updating job with payload:', updatePayload);
@@ -353,6 +369,7 @@ const [showPrintMount, setShowPrintMount] = useState(false);
       contractor: job.contractor || job.customer,
       startDate: '01/15/2025',
       priority: 'High',
+      status:'draft',
       assignedLabor: job.assignedLaborDetails || [],
       assignedLeadLabor: job.assignedLeadLaborDetails || [],
     });
@@ -417,7 +434,8 @@ const [showPrintMount, setShowPrintMount] = useState(false);
           hourly_rate: timeLogFormData.hourlyRate,
           notes: timeLogFormData.description,
           date_of_joining: timeLogFormData.date,
-          is_custom: true
+          is_custom: true,
+          total_cost:timeLogFormData.hoursWorked * timeLogFormData.hourlyRate,
         };
 
         await apiClient.createLaborTimeLog(timeLogPayload);
@@ -574,6 +592,7 @@ const handleAddProduct = async () => {
       job_id: job.id || 2,
       is_custom: true,
       unit_cost: materialFormData.unitCost,
+      total_cost: materialFormData.quantity * materialFormData.unitCost,
     });
 
     triggerRefreshMaterials();
@@ -1002,6 +1021,7 @@ const confirmDeleteEstimate = async () => {
       contractor: job.contractor || job.customer,
       startDate: '01/15/2025',
       priority: job.priority || 'High',
+      status:job.status || 'draft',
       assignedLabor: job.assignedLaborDetails || [],
       assignedLeadLabor: job.assignedLeadLaborDetails || [],
     });
@@ -1426,6 +1446,53 @@ console.log(suppliers,"supp")
                     )}
 
                   </div>
+                  <div className="space-y-4">
+                    <div className={`flex-1 ${!isEditing ? 'bg-[#dbdaff30] p-3 rounded-md' : ''}`}>
+                      <p className="text-sm text-gray-600">Status</p>
+                      {isEditing ? (
+                        <Select
+                          value={editedJob.status}
+                          onValueChange={(value) => setEditedJob({ ...editedJob, status: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="draft">Draft</SelectItem>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="in_progress">In-Progress</SelectItem>
+                            <SelectItem value="completed">Completed</SelectItem>
+                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                            <SelectItem value="on_hold">On Hold</SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        // <Input
+                        //   value={editedJob.type}
+                        //   onChange={(e) => setEditedJob({ ...editedJob, type: e.target.value })}
+                        // />
+                      ) : (
+                        <p className="font-medium">{editedJob.status}</p>
+                      )}
+                    </div>
+                    {!isEditing && (
+                      <div className={`flex-1 ${!isEditing ? 'bg-[#fff7ed8c] p-3 rounded-md' : ''}`}>
+                        <p className="text-sm text-gray-600">Job Estimate</p>
+                        <p className="font-medium">{formatCurrency(job.estimatedCost)}</p>
+                      </div>
+                    )}
+                    {!isEditing && (
+
+                      <div className={`flex-1 ${!isEditing ? 'bg-[#9f6b290d] p-3 rounded-md' : ''}`}>
+                        <p className="text-sm text-gray-600">Priority</p>
+                        <span className="inline-block px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                          {editedJob.priority}
+                        </span>
+                      </div>
+                    )}
+
+                  </div>
+
                 </div>
                 {isEditing && (
                   <div className="flex items-center gap-3">
@@ -1523,7 +1590,7 @@ console.log(suppliers,"supp")
                   ) : (
                     <div className="flex flex-wrap gap-2 mt-2">
   {(editedJob.assignedLabor || []).map((labor: any, index: number) => {
-    console.log("Rendering labor:", labor); // 👈 Console log added here
+    console.log("Rendering labor:", labor); 
 
     return (
       <span
@@ -2284,7 +2351,7 @@ console.log(suppliers,"supp")
                   type="number"
                   min="0"
                   step="0.5"
-                  value={timeLogFormData.hoursWorked}
+                  value={timeLogFormData.hoursWorked === 0 ?"":timeLogFormData.hoursWorked}
                   onChange={(e) => setTimeLogFormData({ ...timeLogFormData, hoursWorked: Number(e.target.value) })}
                   placeholder="0"
                   disabled={timeLogModalMode === 'view'}
@@ -2299,7 +2366,7 @@ console.log(suppliers,"supp")
                   type="number"
                   min="0"
                   step="0.01"
-                  value={timeLogFormData.hourlyRate}
+                  value={timeLogFormData.hourlyRate=== 0?"":timeLogFormData.hourlyRate}
                   onChange={(e) => setTimeLogFormData({ ...timeLogFormData, hourlyRate: Number(e.target.value) })}
                   placeholder="0.00"
                   disabled={timeLogModalMode === 'view'}

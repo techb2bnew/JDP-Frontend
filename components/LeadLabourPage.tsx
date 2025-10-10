@@ -32,6 +32,7 @@ import {
   Briefcase
 } from 'lucide-react'
 import Image from 'next/image'
+import { apiClient } from '@/utils/api'
 
 interface LeadLabour {
   id: string | number
@@ -148,6 +149,8 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
   const canCreateLeadLabour = isAdmin || hasPermission('lead_labour', 'create')
   const canEditLeadLabour = isAdmin || hasPermission('lead_labour', 'edit')
   const canDeleteLeadLabour = isAdmin || hasPermission('lead_labour', 'delete')
+  const [filteredLeadLabours, setFilteredLeadLabours] = useState<any[]>([]);
+
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
 
   const [formData, setFormData] = useState<LeadLabourFormData>({
@@ -216,18 +219,18 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     }
   }
 
-  const filteredLeadLabours = leadLabours.filter(labour => {
-    const matchesSearch = labour.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      labour.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      labour.phone.includes(searchTerm) ||
-      labour.leadLabourId.includes(searchTerm) ||
-      labour.specialization.toLowerCase().includes(searchTerm.toLowerCase())
+  // const filteredLeadLabours = leadLabours.filter(labour => {
+  //   const matchesSearch = labour.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //     labour.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //     labour.phone.includes(searchTerm) ||
+  //     labour.leadLabourId.includes(searchTerm) ||
+  //     labour.specialization.toLowerCase().includes(searchTerm.toLowerCase())
 
-    const matchesSpecialization = filterSpecialization === 'all' || labour.specialization === filterSpecialization
-    const matchesStatus = filterStatus === 'all' || labour.status === filterStatus
+  //   const matchesSpecialization = filterSpecialization === 'all' || labour.specialization === filterSpecialization
+  //   const matchesStatus = filterStatus === 'all' || labour.status === filterStatus
 
-    return matchesSearch && matchesSpecialization && matchesStatus
-  })
+  //   return matchesSearch && matchesSpecialization && matchesStatus
+  // })
 
 
   const paginatedLeadLabours = filteredLeadLabours
@@ -879,7 +882,8 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
           }));
 
           setLeadLabours(mappedData);
-          setTotalLead(responseData.data.pagination.totalItems || mappedData.length);
+setFilteredLeadLabours(mappedData); 
+setTotalLead(responseData.data.pagination.totalItems || mappedData.length);
 
           // Extract unique departments and specializations
           const uniqueDepartments = Array.from(new Set(responseData.data?.data?.map((item: any) => item.department).filter(Boolean))) as string[];
@@ -897,6 +901,91 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       setIsLoadingLeadLabour(false);
     }
   };
+
+  const fetchBySearchLeadLabor = async () => {
+  if (!searchTerm.trim()) return;
+
+  setIsLoadingLeadLabour(true);
+
+  try {
+    const response = await apiClient.searchLeadLaborByQuery(searchTerm.trim(), 1, 10);
+    const leadLaborData = response.data;
+    const leadLaborList = leadLaborData?.leadLabor || [];
+
+    const transformedData = leadLaborList.map((labor: any) => ({
+      id: labor.id,
+      userId: labor.user_id,
+      name: labor.users?.full_name || 'N/A',
+      email: labor.users?.email || 'N/A',
+      phone: labor.users?.phone || 'N/A',
+      role: labor.users?.role || 'N/A',
+      status: labor.users?.status || 'N/A',
+      dob: labor.dob || 'N/A',
+      address: labor.address || 'N/A',
+      department: labor.department || 'N/A',
+      dateOfJoining: labor.date_of_joining || 'N/A',
+      specialization: labor.specialization || 'N/A',
+      trade: labor.trade || 'N/A',
+      experience: labor.experience || 'N/A',
+      laborCode: labor.labor_code || 'N/A',
+      idProofUrl: labor.id_proof_url || null,
+      resumeUrl: labor.resume_url || null,
+      photoUrl: labor.photo_url || null,
+      notes: labor.notes || '',
+    }));
+
+   setFilteredLeadLabours(transformedData); 
+setTotalLead(transformedData.length);  
+  } catch (error) {
+    console.error('Lead labor search error:', error);
+    setFilteredLeadLabours([]);
+  } finally {
+    setIsLoadingLeadLabour(false);
+  }
+};
+
+useEffect(() => {
+  const debounceTimeout = setTimeout(() => {
+    if (!searchTerm.trim()) {
+      fetchLeadLabourData(currentPage, itemsPerPage); 
+    } else {
+      fetchBySearchLeadLabor();
+    }
+  }, 500);
+
+  return () => clearTimeout(debounceTimeout);
+}, [searchTerm, currentPage, itemsPerPage]);
+
+
+useEffect(() => {
+  const fetchLeadLaborsByStatus = async () => {
+    if (!filterStatus || filterStatus === 'all') {
+      // If "all" selected, clear the list or fetch all, depending on your logic
+      setLeadLabours([]);
+      setTotalLead(0);
+      return;
+    }
+
+    setIsLoadingLeadLabour(true);
+    try {
+      const res = await apiClient.searchLeadLaborByStatus(filterStatus, 1, 10); 
+      const laborList = res.data?.leadLabors || []; 
+      setLeadLabours(laborList);
+      setTotalLead(laborList.length);
+    } catch (err) {
+      console.error("Lead Labor filter error:", err);
+      setLeadLabours([]);
+      setTotalLead(0);
+    } finally {
+      setIsLoadingLeadLabour(false);
+    }
+  };
+
+  fetchLeadLaborsByStatus();
+}, [filterStatus]);
+
+
+
 
   const fetchLeadLabourById = async (id: number) => {
     try {
@@ -1483,7 +1572,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       </Card>
 
       {/* Pagination */}
-      {totalPages > 1 && (
+      {totalLead > 0 && (
         <div className="flex items-center justify-center gap-2">
           <Button
             variant="outline"
@@ -1497,7 +1586,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
             Previous
           </Button>
 
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+          {Array.from({ length: totalLead }, (_, i) => i + 1).map((page) => (
             <Button
               key={page}
               variant={currentPage === page ? "default" : "outline"}
@@ -1514,11 +1603,11 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
           <Button
             variant="outline"
             onClick={() => {
-              const newPage = Math.min(currentPage + 1, totalPages);
+              const newPage = Math.min(currentPage + 1, totalLead);
               setCurrentPage(newPage);
               fetchLeadLabourData(newPage, itemsPerPage);
             }}
-            disabled={currentPage === totalPages}
+            disabled={currentPage === totalLead}
           >
             Next
           </Button>

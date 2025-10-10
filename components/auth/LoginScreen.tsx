@@ -127,11 +127,14 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
   }
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    setEmail(e.target.value)
-    if (errors.email) {
-      setErrors(prev => ({ ...prev, email: undefined }))
-    }
+  const lowercaseEmail = e.target.value.toLowerCase();
+  setEmail(lowercaseEmail);
+  
+  if (errors.email) {
+    setErrors(prev => ({ ...prev, email: undefined }));
   }
+};
+
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     setPassword(e.target.value)

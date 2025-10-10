@@ -84,6 +84,7 @@ export function JobManagementPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [jobToDelete, setJobToDelete] = useState<string | null>(null)
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(true)
+  const [isLoadingJobs, setIsLoadingJobs] = useState(false);
   const [jobStats, setJobStats] = useState({
     total: 0,
     active: 0,
@@ -139,20 +140,127 @@ export function JobManagementPage() {
     fetchJobs(page)
   }
 
-  // Client-side filtering for search and other filters
-  const filteredJobs = jobs.filter(job => {
-    const matchesSearch = job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.contractorName?.toLowerCase().includes(searchTerm.toLowerCase())
+  const fetchBySearchJobs = async () => {
+  if (!searchTerm.trim()) return;
 
-    const matchesType = filterType === 'all' || job.type === filterType
-    const matchesStatus = filterStatus === 'all' || job.status === filterStatus
-    const matchesLabor = filterLabor === 'all' || job.assignedLabor.includes(filterLabor)
-    const matchesPriority = filterPriority === 'all' || job.priority === filterPriority
+  setIsLoadingJobs(true);
 
-    return matchesSearch && matchesType && matchesStatus && matchesLabor && matchesPriority
-  })
+  try {
+    const response = await apiClient.searchJobsByQuery(searchTerm.trim(), 1, 10);
+    const jobs = response.data?.jobs || [];
+
+    const transformedJobs = jobs.map((job: any) => ({
+      id: job.id?.toString() || `JOB-${Date.now()}`,
+      title: job.job_title || '',
+      type: job.job_type || '',
+      description: job.description || '',
+      priority: job.priority || '',
+      status: job.status || 'pending',
+      address: job.address || '',
+      cityZip: job.city_zip || '',
+      phone: job.phone || '',
+      email: job.email || '',
+      billToAddress: job.bill_to_address || '',
+      billToCityZip: job.bill_to_city_zip || '',
+      billToPhone: job.bill_to_phone || '',
+      billToEmail: job.bill_to_email || '',
+      dueDate: job.due_date || '',
+      estimatedHours: job.estimated_hours || 0,
+      estimatedCost: job.estimated_cost || 0,
+      createdDate: job.created_at ? new Date(job.created_at).toISOString().split('T')[0] : '',
+      updatedDate: job.updated_at ? new Date(job.updated_at).toISOString().split('T')[0] : '',
+      customer: job.customer?.customer_name || 'Unknown Customer',
+      contractor: job.contractor?.full_name || 'Unassigned',
+      assignedLeadLabor: job.assigned_lead_labor?.map((l: any) => ({
+        id: l.id,
+        name: l.user?.full_name || '',
+        email: l.user?.email || '',
+        phone: l.user?.phone || '',
+      })) || [],
+      assignedLabor: job.assigned_labor?.map((l: any) => ({
+        id: l.id,
+        name: l.user?.full_name || '',
+        email: l.user?.email || '',
+        phone: l.user?.phone || '',
+        hourlyRate: l.hourly_rate,
+        totalCost: l.total_cost,
+      })) || [],
+    }));
+
+
+    setJobs(transformedJobs);
+    setTotalJobs(transformedJobs.length);
+  } catch (err) {
+    console.error('Job search error:', err);
+    setJobs([]);
+  } finally {
+    setIsLoadingJobs(false);
+  }
+};
+
+useEffect(() => {
+  const debounceTimeout = setTimeout(() => {
+    if (!searchTerm.trim()) {
+      fetchJobs(currentPage);
+    } else {
+      fetchBySearchJobs();
+    }
+  }, 500); 
+
+  return () => clearTimeout(debounceTimeout);
+}, [searchTerm, currentPage]);
+
+
+useEffect(() => {
+  const fetchJobsByFilters = async () => {
+    if (searchTerm.trim()) return;
+
+    setIsLoadingJobs(true);
+    try {
+      let jobs: any[] = [];
+
+      const hasPriority = filterPriority !== 'all';
+      const hasType = filterType !== 'all';
+      const hasStatus = filterStatus !== 'all';
+
+      if (hasPriority) {
+        const res = await apiClient.searchJobsByPriority(filterPriority);
+        jobs = res.data?.jobs || [];
+      } else if (hasType) {
+        const res = await apiClient.searchJobsByType(filterType);
+        jobs = res.data?.jobs || [];
+      } else if (hasStatus) {
+        const res = await apiClient.searchJobsByStatus(filterStatus);
+        jobs = res.data?.jobs || [];
+      } else {
+        const res = await apiClient.searchJobsByStatus('active');
+        jobs = res.data?.jobs || [];
+      }
+
+      if (filterLabor !== 'all') {
+        jobs = jobs.filter((job) =>
+          job.assignedLaborDetails?.some((labor: any) =>
+            labor.user?.full_name?.toLowerCase() === filterLabor.toLowerCase()
+          )
+        );
+      }
+
+      setJobs(jobs);
+      setTotalJobs(jobs.length);
+    } catch (err) {
+      console.error('Job filter error:', err);
+      setJobs([]);
+    } finally {
+      setIsLoadingJobs(false);
+    }
+  };
+
+  fetchJobsByFilters();
+}, [filterPriority, filterStatus, filterType, searchTerm]);
+
+
+
+
 
   const uniqueLabor = Array.from(new Set(jobs.flatMap(job => job.assignedLaborDetails?.map(l => l.user?.full_name) || [])))
 
@@ -576,10 +684,17 @@ export function JobManagementPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="in-progress">In Progress</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem> 
+                  <SelectItem value="on_hold">On Hold</SelectItem>
+                {/* <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="in-progress">In Progress</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem> */}
               </SelectContent>
             </Select>
 
@@ -609,20 +724,20 @@ export function JobManagementPage() {
 
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <Filter className="h-4 w-4" />
-              <span>{filteredJobs.length} jobs</span>
+              <span>{jobs.length} jobs</span>
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Jobs Grid */}
-      {loading ? (
+      {isLoadingJobs ? (
         <div className="flex justify-center items-center py-12">
           <LoadingSpinner />
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredJobs.map((job) => (
+          {jobs.map((job) => (
             <Card key={job.id} className="bg-white shadow-md border-0 hover:shadow-md transition-shadow">
               <CardHeader className="pb-4">
                 <div className="flex items-start justify-between">
@@ -721,8 +836,9 @@ export function JobManagementPage() {
         </div>
       )}
 
+
       {/* Empty State */}
-      {filteredJobs.length === 0 && (
+      {!isLoadingJobs && jobs.length === 0 && (
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-12 text-center">
             <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />

@@ -37,6 +37,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from "@/components/ui/label"
 import { Textarea } from './ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
+import { apiClient } from '@/utils/api'
 
 // Static customers data removed - now using API data from /customer/getCustomers
 
@@ -82,6 +83,7 @@ export function CustomersPage() {
   const [viewCustomerData, setViewCustomerData] = useState<any>(null);
   const [isLoadingView, setIsLoadingView] = useState(false);
   const [currentAction, setCurrentAction] = useState<'add' | 'edit' | 'view'>('add');
+  const [filteredCustomers, setFilteredCustomers] = useState<any>(null);
   const [customerStats, setCustomerStats] = useState({
     total: 0,
     active: 0,
@@ -271,6 +273,7 @@ export function CustomersPage() {
         }));
 
         setCustomersData(transformedCustomers);
+        setFilteredCustomers(transformedCustomers);
         setTotalCustomers(responseData.data.pagination?.total || transformedCustomers.length);
         console.log('Total customers:', responseData.data.pagination?.total);
         console.log('Items per page:', itemsPerPage);
@@ -289,6 +292,52 @@ export function CustomersPage() {
       setIsLoadingCustomers(false);
     }
   };
+
+  const fetchBySearchCustomers = async () => {
+  if (!searchTerm.trim()) return;
+
+  setIsLoadingCustomers(true);
+
+  try {
+    const response = await apiClient.searchCutomerByQuery(searchTerm.trim(), 1, 10);
+    const customersData = response.data;
+    const customersList = customersData?.customers || [];
+
+    const transformedData = customersList.map((customer: any) => ({
+      id: customer.id,
+      customerName: customer.customer_name || 'N/A',
+      companyName: customer.company_name || 'N/A',
+      email: customer.email || 'N/A',
+      phone: customer.phone || 'N/A',
+      contactPerson: customer.contact_person || 'N/A',
+      address: customer.address || 'N/A',
+      status: customer.status || 'N/A',
+      createdAt: customer.created_at || '',
+      createdByUser: customer.created_by_user?.full_name || 'N/A',
+    }));
+
+    setFilteredCustomers(transformedData);
+    setTotalCustomers(customersData.pagination.total || transformedData.length);
+  } catch (error) {
+    console.error('Customer search error:', error);
+    setFilteredCustomers([]);
+  } finally {
+    setIsLoadingCustomers(false);
+  }
+};
+
+useEffect(() => {
+  const debounceTimeout = setTimeout(() => {
+    if (!searchTerm.trim()) {
+      fetchCustomersData(currentPage, itemsPerPage); 
+    } else {
+      fetchBySearchCustomers();
+    }
+  }, 500);
+
+  return () => clearTimeout(debounceTimeout);
+}, [searchTerm, currentPage, itemsPerPage]);
+
 
   const handleUpdateCustomer = async () => {
     if (!validateForm()) {
@@ -536,40 +585,40 @@ export function CustomersPage() {
     document.body.removeChild(link);
   };
 
-  const filteredCustomers = customersData
-    .filter(customer => {
-      // Search filter
-      const matchesSearch =
-        customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer.email.toLowerCase().includes(searchTerm.toLowerCase());
+  // const filteredCustomers = customersData
+  //   .filter(customer => {
+  //     // Search filter
+  //     const matchesSearch =
+  //       customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //       customer.email.toLowerCase().includes(searchTerm.toLowerCase());
 
-      // Status filter
-      const matchesStatus =
-        statusFilter === 'all' ||
-        customer.status === statusFilter;
+  //     // Status filter
+  //     const matchesStatus =
+  //       statusFilter === 'all' ||
+  //       customer.status === statusFilter;
 
-      return matchesSearch && matchesStatus;
-    })
-    .sort((a, b) => {
-      // Only sort if sortBy is set (button clicked)
-      if (!sortBy) return 0;
+  //     return matchesSearch && matchesStatus;
+  //   })
+  //   .sort((a, b) => {
+  //     // Only sort if sortBy is set (button clicked)
+  //     if (!sortBy) return 0;
       
-      // Sorting logic
-      if (sortBy === 'name') {
-        return sortOrder === 'asc'
-          ? a.name.localeCompare(b.name)
-          : b.name.localeCompare(a.name);
-      } else if (sortBy === 'orders') {
-        return sortOrder === 'asc'
-          ? a.orders - b.orders
-          : b.orders - a.orders;
-      } else if (sortBy === 'joinDate') {
-        return sortOrder === 'asc'
-          ? new Date(a.joinDate).getTime() - new Date(b.joinDate).getTime()
-          : new Date(b.joinDate).getTime() - new Date(a.joinDate).getTime();
-      }
-      return 0;
-    });
+  //     // Sorting logic
+  //     if (sortBy === 'name') {
+  //       return sortOrder === 'asc'
+  //         ? a.name.localeCompare(b.name)
+  //         : b.name.localeCompare(a.name);
+  //     } else if (sortBy === 'orders') {
+  //       return sortOrder === 'asc'
+  //         ? a.orders - b.orders
+  //         : b.orders - a.orders;
+  //     } else if (sortBy === 'joinDate') {
+  //       return sortOrder === 'asc'
+  //         ? new Date(a.joinDate).getTime() - new Date(b.joinDate).getTime()
+  //         : new Date(b.joinDate).getTime() - new Date(a.joinDate).getTime();
+  //     }
+  //     return 0;
+  //   });
 
   return (
     <div className="space-y-6">
@@ -741,14 +790,14 @@ export function CustomersPage() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : filteredCustomers.length === 0 ? (
+              ) : filteredCustomers?.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     No customers found
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredCustomers.map((customer) => (
+                filteredCustomers?.map((customer:any) => (
                 <TableRow key={customer.id}>
                   <TableCell>
                     <div className="flex items-center gap-3"> 
@@ -841,7 +890,7 @@ export function CustomersPage() {
           </Table>
           
           {/* Pagination Controls */}
-          {totalCustomers > itemsPerPage && (
+          {totalCustomers > 0 && (
             <div className="flex items-center justify-between px-4 py-3 border-t">
               <div className="text-sm text-muted-foreground">
                 Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalCustomers)} of {totalCustomers} customers

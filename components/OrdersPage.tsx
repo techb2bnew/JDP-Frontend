@@ -33,7 +33,7 @@ import {
   Phone
 } from 'lucide-react'
 import { format } from 'date-fns'
-import { globalApiCall } from '@/utils/api'
+import { apiClient, globalApiCall } from '@/utils/api'
 import { LoadingSpinner } from './common/LoadingSpinner'
 
 
@@ -379,83 +379,74 @@ export function OrdersPage() {
 
 
   useEffect(() => {
-    fetchOrders(currentPage, itemsPerPage);
+    fetchOrders(1, itemsPerPage);
     fetchOrdersStats();
   },[currentPage, itemsPerPage]);
+  
 
-  useEffect(() => {
-    fetchOrders(1, itemsPerPage);
-  }, [searchTerm, statusFilter, dateFrom, dateTo]);
+useEffect(() => {
+  const delay = setTimeout(() => {
+    fetchOrders(1,itemsPerPage); 
+  }, 500);
+
+  return () => clearTimeout(delay);
+}, [searchTerm, statusFilter, dateFrom, dateTo, currentPage]);
 
 
-  const fetchOrders = async (page: number, limit: number) => {
-    try {
-      setIsLoadingOrders(true);
-      let url = `${apiBaseUrl}/orders/getAllOrders?page=${page}&limit=${limit}`;
 
-      // If any filter is applied, switch to search API
-      const params: Record<string, string> = {};
+ const fetchOrders = async (page: number = 1, limit: number = 50) => {
+  try {
+    setIsLoadingOrders(true);
 
-      if (searchTerm.trim()) {
-        params.q = searchTerm.trim();
-      }
+    const params: Record<string, string> = {
+      page: page.toString(),
+      limit: limit.toString(),
+    };
 
-      if (statusFilter) {
-        params.status = statusFilter;
-      }
+    if (searchTerm.trim()) params.q = searchTerm.trim();
+    if (statusFilter) params.status = statusFilter;
+    if (dateFrom) params.order_date_from = dateFrom;
+    if (dateTo) params.order_date_to = dateTo;
 
-      if (dateFrom) {
-        params.order_date_from = dateFrom;
-      }
+    const endpoint =
+      Object.keys(params).some((key) => key !== 'page' && key !== 'limit')
+        ? 'orders/searchOrders'
+        : 'orders/getAllOrders';
 
-      if (dateTo) {
-        params.order_date_to = dateTo;
-      }
+    const queryString = new URLSearchParams(params).toString();
+    const url = `${apiBaseUrl}/${endpoint}?${queryString}`;
 
-      const hasFilters = Object.keys(params).length > 0;
-      if (hasFilters) {
-        // Build query string
-        const queryString = new URLSearchParams(params).toString();
-        url = `${apiBaseUrl}/orders/searchOrders?${queryString}`;
-      }
+    const response = await globalApiCall(url, { method: 'GET' });
+    const responseData = await response.json();
+    console.log('Orders API Response:', responseData);
 
-      // const response = await globalApiCall(`${apiBaseUrl}/orders/getAllOrders?page=${page}&limit=${limit}`, {
-      //   method: 'GET'
-      // });
+    if (responseData.success && responseData.data?.orders) {
+      const transformedOrders = responseData.data.orders.map((apiOrder: any) => ({
+        id: apiOrder.id?.toString(),
+        orderNumber: apiOrder.order_number,
+        jobId: apiOrder.job_id?.toString() || 'N/A',
+        customerName: apiOrder.customer?.customer_name || 'Unknown',
+        contractorName: apiOrder.contractor || apiOrder.customer?.company_name || 'N/A',
+        status: apiOrder.status,
+        orderDate: apiOrder.order_date,
+      }));
 
-      const response = await globalApiCall(url, { method: 'GET' });
-      const responseData = await response.json();
-      console.log('Orders API Response:', responseData);
-
-      if (responseData.success && responseData.data) {
-        // Transform API response to match component's expected format
-        const transformedOrders = responseData.data?.orders.map((apiOrder:any) => ({
-          id: apiOrder.id?.toString(),
-          orderNumber: apiOrder.order_number,
-          jobId: apiOrder.job_id?.toString(),
-          customerName: apiOrder.customer.customer_name,
-          contractorName: apiOrder.contractor || apiOrder.customer.company_name,
-          status: apiOrder.status,
-          orderDate: apiOrder.order_date,
-        }));
-
-        setOrders(transformedOrders);
-        setTotalOrders(responseData.data.total || transformedOrders.length);
-        
-      } else {
-        console.error('Invalid orders API response structure:', responseData);
-        setOrders([]);
-      }
-    } catch (error) {
-      console.error('Error fetching orders:', error);
-      // Error is already handled by globalApiCall (token revocation, etc.)
-      if (!(error instanceof Error && error.message?.includes('Session expired'))) {
-        setOrders([]);
-      }
-    } finally {
-      setIsLoadingOrders(false);
+      setOrders(transformedOrders);
+      setTotalOrders(responseData.data.total || transformedOrders.length);
+    } else {
+      console.error('Invalid response:', responseData);
+      setOrders([]);
     }
-  };
+  } catch (error) {
+    console.error('Error fetching orders:', error);
+    if (!(error instanceof Error && error.message?.includes('Session expired'))) {
+      setOrders([]);
+    }
+  } finally {
+    setIsLoadingOrders(false);
+  }
+};
+
 
   const fetchOrdersStats = async () => {
     try {
@@ -503,7 +494,7 @@ export function OrdersPage() {
         const orderData: OrderFormData = {
           id: apiOrder.id.toString(),
           orderNumber: apiOrder.order_number || '',
-          jobId: apiOrder.job_id?.toString() || '',
+          jobId: apiOrder.job_id?.toString() || 'N/A',
           status: apiOrder.status as 'pending' | 'processing' | 'completed' | 'cancelled' || 'pending',
           subtotal: apiOrder.subtotal?.toString() || '0',
           createdAt: apiOrder.created_at || '',
@@ -526,17 +517,16 @@ export function OrdersPage() {
           // Order items
           orderItems: apiOrder.order_items?.map((item: any) => ({
             id: item.id.toString(),
-            name: item.product?.name || '',        // required by OrderItem
+            name: item.product?.name || '',        
             sku: item.product?.jdp_sku || '',
             quantity: item.quantity || 0,
             unitPrice: item.product?.unit_cost || 0,
-            total: item.total_price || 0,          // renamed from totalPrice to total
+            total: item.total_price || 0,        
           })) || []
         };
 
 
         setSelectedOrder(orderData);
-        // return orderData;
       } else {
         throw new Error(responseData.message || 'Failed to fetch product details');
       }
@@ -553,46 +543,7 @@ export function OrdersPage() {
   };
   
 
-  // Filter orders based on search, status, date range, and sort
-  const filteredOrders = orders.filter(order => {
-    const matchesSearch = 
-      order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.jobId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (order.contractorName && order.contractorName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      orders
-    
-    const matchesStatus = selectedStatus === 'all' || order.status === selectedStatus
-    
-    let matchesDate = true
-    if (dateRange.from && dateRange.to) {
-      const orderDate = new Date(order.orderDate)
-      matchesDate = orderDate >= dateRange.from && orderDate <= dateRange.to
-    }
-    
-    let matchesSort = true
-    if (sortBy !== 'all') {
-      const orderDate = new Date(order.orderDate)
-      const now = new Date()
-      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-      const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
-      const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
-      
-      switch (sortBy) {
-        case 'last_week':
-          matchesSort = orderDate >= oneWeekAgo
-          break
-        case 'this_month':
-          matchesSort = orderDate >= oneMonthAgo
-          break
-        case 'this_year':
-          matchesSort = orderDate >= oneYearAgo
-          break
-      }
-    }
-    
-    return matchesSearch && matchesStatus && matchesDate && matchesSort
-  })
+ 
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -654,6 +605,109 @@ export function OrdersPage() {
       day: 'numeric'
     })
   }
+
+const fetchBySearchOrders = async () => {
+  if (!searchTerm.trim()) return;
+
+  setIsLoadingOrders(true);
+
+  try {
+    const response = await apiClient.searchOrdersByQuery(searchTerm.trim(), 1, 10);
+    const orders = response.data?.orders || [];
+
+  const transformedOrders = orders.map((apiOrder: any) => ({
+  id: apiOrder.id?.toString(),
+  orderNumber: apiOrder.order_number || 'N/A',
+  jobId: apiOrder.job_id?.toString() || 'N/A',
+  customerName: apiOrder.customer?.customer_name || 'Unknown Customer',
+  contractorName:
+    apiOrder.contractor?.full_name ||
+    apiOrder.customer?.company_name ||
+    'N/A',
+  status: apiOrder.status || 'Unknown',
+  paymentStatus: apiOrder.payment_status || 'Unpaid',
+  orderDate: apiOrder.order_date || 'N/A',
+  deliveryDate: apiOrder.delivery_date || 'N/A',
+  totalItems: apiOrder.total_items ?? 0,
+  totalAmount: apiOrder.total_amount ?? 0,
+  deliveryAddress: apiOrder.delivery_address || 'N/A',
+  leadLabor: {
+    name: apiOrder.lead_labor?.users?.full_name || '',
+    email: apiOrder.lead_labor?.users?.email || '',
+    phone: apiOrder.lead_labor?.users?.phone || '',
+    code: apiOrder.lead_labor?.labor_code || '',
+    specialization: apiOrder.lead_labor?.specialization || '',
+  },
+  createdBy: {
+    name: apiOrder.created_by_user?.full_name || '',
+    email: apiOrder.created_by_user?.email || '',
+  },
+}));
+
+
+    setOrders(transformedOrders);
+    setTotalOrders(transformedOrders.length);
+  } catch (err) {
+    console.error('Order search error:', err);
+    setOrders([]);
+  } finally {
+    setIsLoadingOrders(false);
+  }
+};
+
+useEffect(() => {
+  const debounceTimeout = setTimeout(() => {
+    if (!searchTerm.trim()) {
+      fetchOrders(1,itemsPerPage); 
+    } else {
+      fetchBySearchOrders(); 
+    }
+  }, 500); 
+
+  return () => clearTimeout(debounceTimeout);
+}, [searchTerm, currentPage]);
+
+
+
+useEffect(() => {
+  const fetchOrdersByFilters = async () => {
+    if (searchTerm.trim()) return;
+
+    setIsLoadingOrders(true);
+
+    try {
+      let orders: any[] = [];
+
+      const hasStatus = statusFilter !== '';
+      const hasDateRange = dateFrom && dateTo;
+
+      if (hasStatus && hasDateRange) {
+        const res = await apiClient.searchOrdersByDateRange(dateFrom, dateTo);
+        orders = res.data?.orders || [];
+      } else if (hasStatus) {
+        const res = await apiClient.searchOrdersByStatus(statusFilter);
+        orders = res.data?.orders || [];
+      } else if (hasDateRange) {
+        const res = await apiClient.searchOrdersByDateRange(dateFrom, dateTo);
+        orders = res.data?.orders || [];
+      } 
+
+      setOrders(orders);
+      setTotalOrders(orders.length);
+    } catch (error) {
+      console.error("Order filter error:", error);
+      setOrders([]);
+    } finally {
+      setIsLoadingOrders(false);
+    }
+  };
+
+  fetchOrdersByFilters();
+}, [statusFilter, dateFrom, dateTo, searchTerm]);
+
+
+
+
 
 
   // Calculate summary statistics from API data
@@ -808,13 +862,21 @@ export function OrdersPage() {
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={dateRange.from}
-                    selected={dateRange as any}
-                    onSelect={(range: any) => setDateRange(range)}
-                    numberOfMonths={2}
-                  />
+      initialFocus
+      mode="range"
+      defaultMonth={dateRange.from}
+      selected={dateRange as any}
+      onSelect={(range: any) => {
+        setDateRange(range);
+    
+        if (range?.from) setDateFrom(format(range.from, "yyyy-MM-dd"));
+        else setDateFrom("");
+
+        if (range?.to) setDateTo(format(range.to, "yyyy-MM-dd"));
+        else setDateTo("");
+      }}
+      numberOfMonths={2}
+    />
                 </PopoverContent>
               </Popover>
             </div>
@@ -874,14 +936,14 @@ export function OrdersPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ): filteredOrders.length === 0 ? (
+                ): orders.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No orders found
                     </TableCell>
                   </TableRow>
                 ): (
-                  filteredOrders.map((order) => (
+                  orders.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell>
                       <div className="font-medium font-mono">{order.orderNumber}</div>
@@ -932,7 +994,7 @@ export function OrdersPage() {
           </div>
           {/* Pagination Controls */}
           
-          {totalOrders > itemsPerPage && (
+          {totalOrders > 0 && (
             <div className="flex items-center justify-between px-4 py-3 border-t">
               <div className="text-sm text-muted-foreground">
                 Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalOrders)} of {totalOrders} products
@@ -1192,14 +1254,14 @@ export function OrdersPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ): filteredOrders.length === 0 ? (
+                ): orders.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No orders found
                     </TableCell>
                   </TableRow>
                 ): (
-                  filteredOrders.map((order) => (
+                  orders.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell>
                       <div className="font-medium font-mono">{order.orderNumber}</div>
@@ -1250,7 +1312,7 @@ export function OrdersPage() {
           </div>
           {/* Pagination Controls */}
           
-          {totalOrders > itemsPerPage && (
+          {totalOrders > 0 && (
             <div className="flex items-center justify-between px-4 py-3 border-t">
               <div className="text-sm text-muted-foreground">
                 Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalOrders)} of {totalOrders} products

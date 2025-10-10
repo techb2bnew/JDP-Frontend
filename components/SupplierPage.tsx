@@ -27,6 +27,7 @@ import {
   MapPin,
   Package
 } from 'lucide-react'
+import { apiClient } from '@/utils/api'
 
 interface Supplier {
   id: string
@@ -82,6 +83,7 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
   const [viewingSupplier, setViewingSupplier] = useState<Supplier | null>(null)
   const [supplierDetails, setSupplierDetails] = useState<any>(null)
   const [isLoadingDetails, setIsLoadingDetails] = useState(false)
+  const [filteredSuppliers, setFilteredSuppliers] = useState<any[]>([])
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
   const [roles, setRoles] = useState<any[]>([])
 
@@ -142,18 +144,18 @@ export function SupplierPage({ onViewDetails }: SupplierPageProps) {
   }
 
 
-  const filteredSuppliers = suppliers.filter(supplier => {
-    const matchesSearch = supplier.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      supplier.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         supplier.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         supplier.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         supplier.phone.includes(searchTerm) ||
-                         supplier.supplierId.includes(searchTerm)
+  // const filteredSuppliers = suppliers.filter(supplier => {
+  //   const matchesSearch = supplier.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //     supplier.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //                        supplier.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //                        supplier.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //                        supplier.phone.includes(searchTerm) ||
+  //                        supplier.supplierId.includes(searchTerm)
     
-    const matchesStatus = filterStatus === 'all' || supplier.status === filterStatus
+  //   const matchesStatus = filterStatus === 'all' || supplier.status === filterStatus
     
-    return matchesSearch && matchesStatus
-  })
+  //   return matchesSearch && matchesStatus
+  // })
 
   // For API-based pagination, we don't need to slice the data
   const paginatedSuppliers = filteredSuppliers
@@ -640,7 +642,8 @@ const fetchRoles = async () => {
           notes: apiSupplier.notes || ''
         }));
 
-        setSuppliers(transformedSuppliers);  
+        setSuppliers(transformedSuppliers); 
+        setFilteredSuppliers(transformedSuppliers); 
         setTotalSuppliers(responseData.data.pagination.totalItems || transformedSuppliers.length);
       } else {
         console.error('Invalid suppliers API response structure:', responseData);
@@ -656,6 +659,84 @@ const fetchRoles = async () => {
       setIsLoading(false);
     }
   };
+  const fetchBySearchSuppliers = async () => {
+  if (!searchTerm.trim()) return;
+
+  setIsLoading(true);
+
+  try {
+    const response = await apiClient.searchSuppliersByQuery(searchTerm.trim(), 1, 10);
+    const suppliersData = response.data;
+    const suppliersList = suppliersData?.suppliers || [];
+
+    const transformedData = suppliersList.map((supplier: any) => ({
+      id: supplier.id.toString(),
+      userId: supplier.user_id,
+      supplierCode: supplier.supplier_code || 'N/A',
+      companyName: supplier.company_name || 'N/A',
+      contactPerson: supplier.contact_person || 'N/A',
+      address: supplier.address || 'N/A',
+      contractStart: supplier.contract_start || 'N/A',
+      contractEnd: supplier.contract_end || 'N/A',
+      notes: supplier.notes || '',
+      createdAt: supplier.created_at || '',
+      email: supplier.users?.email || 'N/A',
+      phone: supplier.users?.phone || 'N/A',
+      status: supplier.users?.status || 'N/A',
+      fullName: supplier.users?.full_name || 'N/A',
+      role: supplier.users?.role || 'N/A',
+      photoUrl: supplier.users?.photo_url || null
+    }));
+
+    setFilteredSuppliers(transformedData);
+    setTotalSuppliers(suppliersData.pagination.total || transformedData.length);
+  } catch (error) {
+    console.error('Suppliers search error:', error);
+    setFilteredSuppliers([]);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+useEffect(() => {
+  const debounceTimeout = setTimeout(() => {
+    if (!searchTerm.trim()) {
+      fetchSuppliersData(currentPage, itemsPerPage); 
+    } else {
+      fetchBySearchSuppliers();
+    }
+  }, 500);
+
+  return () => clearTimeout(debounceTimeout);
+}, [searchTerm, currentPage, itemsPerPage]);
+
+useEffect(() => {
+  const fetchSuppliersByStatus = async () => {
+    if (!filterStatus || filterStatus === 'all') {
+      setSuppliers([]);
+      setTotalSuppliers(0);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await apiClient.searchSuppliersByStatus(filterStatus, 1, 10); 
+      const supplierList = res.data?.suppliers || []; 
+      setSuppliers(supplierList);
+      setTotalSuppliers(supplierList.length);
+    } catch (err) {
+      console.error("Supplier filter error:", err);
+      setSuppliers([]);
+      setTotalSuppliers(0);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  fetchSuppliersByStatus();
+}, [filterStatus]);
+
+
 
   const fetchSupplierDetails = async (supplierId: string) => {
     try {
@@ -1094,7 +1175,7 @@ const fetchRoles = async () => {
       </Card>
 
       {/* Pagination */}
-      {totalPages > 1 && (
+      {totalSuppliers > 0 && (
         <div className="flex items-center justify-center gap-2">
           <Button
             variant="outline"
@@ -1125,11 +1206,11 @@ const fetchRoles = async () => {
           <Button
             variant="outline"
             onClick={() => {
-              const newPage = Math.min(currentPage + 1, totalPages);
+              const newPage = Math.min(currentPage + 1, totalSuppliers);
               setCurrentPage(newPage);
               fetchSuppliersData(newPage, itemsPerPage);
             }}
-            disabled={currentPage === totalPages}
+            disabled={currentPage === totalSuppliers}
           >
             Next
           </Button>

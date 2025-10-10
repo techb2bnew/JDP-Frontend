@@ -111,6 +111,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
   const [showDetails, setShowDetails] = useState(false)
   const itemsPerPage = 10
   const [totalStaff, setTotalStaff] = useState(0) 
+  const [filteredStaff, setFilteredStaff] = useState<any[]>([]);
 
   // Check if user is admin (has no specific permissions but should see all actions)
   const isAdmin = !permissionsLoading && permissions.length === 0
@@ -338,6 +339,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
         }));
         
         setStaff(transformedStaff);
+        setFilteredStaff(transformedStaff);
         setTotalStaff(responseData.data.pagination.totalItems || transformedStaff.length);
         
         // Extract unique departments and positions from the staff data
@@ -405,17 +407,17 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
     }
   }
 
-  const filteredStaff = staff.filter(member => {
-    const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         member.phone.includes(searchTerm) ||
-                         member.id.includes(searchTerm)
+  // const filteredStaff = staff.filter(member => {
+  //   const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //                        member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //                        member.phone.includes(searchTerm) ||
+  //                        member.id.includes(searchTerm)
     
-    const matchesDepartment = filterDepartment === 'all' || member.department === filterDepartment
-    const matchesStatus = filterStatus === 'all' || member.status === filterStatus
+  //   const matchesDepartment = filterDepartment === 'all' || member.department === filterDepartment
+  //   const matchesStatus = filterStatus === 'all' || member.status === filterStatus
     
-    return matchesSearch && matchesDepartment && matchesStatus
-  })
+  //   return matchesSearch && matchesDepartment && matchesStatus
+  // })
 
   
   const paginatedStaff = filteredStaff
@@ -759,6 +761,89 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
   document.body.removeChild(link);
 };
 
+
+
+const fetchBySearchStaff = async () => {
+  if (!searchTerm.trim()) return;
+
+  setIsLoadingStaff(true);
+
+  try {
+    const response = await apiClient.searchStaffByQuery(searchTerm.trim(), 1, 10);
+    const staffData = response.data;
+    const staffList = staffData?.staff || [];
+
+    const transformedStaff = staffList.map((staff: any) => ({
+      id: staff.id,
+      userId: staff.user_id,
+      name: staff.users?.full_name || 'N/A',
+      email: staff.users?.email || 'N/A',
+      phone: staff.users?.phone || 'N/A',
+      role: staff.users?.role || 'N/A',
+      status: staff.users?.status || 'N/A',
+      position: staff.position || 'N/A',
+      department: staff.department || 'N/A',
+      dateOfJoining: staff.date_of_joining || 'N/A',
+      dob: staff.dob || 'N/A',
+      address: staff.address || 'N/A',
+    }));
+
+    setFilteredStaff(transformedStaff); 
+    setTotalStaff(transformedStaff.length); 
+  } catch (error) {
+    console.error('Staff search error:', error);
+    setFilteredStaff([]);
+  } finally {
+    setIsLoadingStaff(false);
+  }
+};
+useEffect(() => {
+  const debounceTimeout = setTimeout(() => {
+    if (!searchTerm.trim()) {
+      fetchStaffData(currentPage, itemsPerPage);
+    } else {
+      fetchBySearchStaff();
+    }
+  }, 500);
+
+  return () => clearTimeout(debounceTimeout);
+}, [searchTerm, currentPage, itemsPerPage]);
+
+useEffect(() => {
+  const fetchStaffByStatus = async () => {
+    if (!filterStatus || filterStatus === 'all') {
+      setStaff([]);
+      setTotalStaff(0);
+      return;
+    }
+
+    setIsLoadingStaff(true);
+    try {
+      const res = await apiClient.searchStaffByStatus(filterStatus, 1, 10);
+      const staffList = res.data?.staff || [];
+
+      // Always update state, even if empty
+      setStaff(staffList);
+      setTotalStaff(staffList.length);
+    } catch (err) {
+      console.error('Staff filter error:', err);
+      setStaff([]);         // Clear staff on error
+      setTotalStaff(0);
+    } finally {
+      setIsLoadingStaff(false);
+    }
+  };
+
+  fetchStaffByStatus();
+}, [filterStatus]);
+
+
+
+
+
+
+
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -913,7 +998,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       </Card>
 
       {/* Pagination */}
-      {totalPages > 1 && (
+      {totalStaff > 0 && (
         <div className="flex items-center justify-center gap-2">
           <Button
             variant="outline"
@@ -927,7 +1012,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
             Previous
           </Button>
           
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+          {Array.from({ length: totalStaff }, (_, i) => i + 1).map((page) => (
             <Button
               key={page}
               variant={currentPage === page ? "default" : "outline"}
@@ -944,11 +1029,11 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
           <Button
             variant="outline"
             onClick={() => {
-              const newPage = Math.min(currentPage + 1, totalPages);
+              const newPage = Math.min(currentPage + 1, totalStaff);
               setCurrentPage(newPage);
               fetchStaffData(newPage, itemsPerPage);
             }}
-            disabled={currentPage === totalPages}
+            disabled={currentPage === totalStaff}
           >
             Next
           </Button>
