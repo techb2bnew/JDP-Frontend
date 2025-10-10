@@ -69,7 +69,8 @@ export const invoicesData: Invoice[] = [
         description: 'Main Electrical Panel 200A',
         quantity: 1,
         unitPrice: 450,
-        total: 450
+        total_cost:23 ,
+        productId:2
       },
       {
         id: 'ITEM-002',
@@ -77,7 +78,8 @@ export const invoicesData: Invoice[] = [
         description: 'Circuit Breakers 20A (10 Pack)',
         quantity: 1,
         unitPrice: 180,
-        total: 180
+        total_cost:23 ,
+        productId:2
       }
     ],
     labor: [
@@ -86,7 +88,7 @@ export const invoicesData: Invoice[] = [
         laborName: 'David Wilson',
         hours: 12,
         hourlyRate: 35,
-        total: 420,
+        total_cost: 420,
         description: 'Panel installation and testing'
       },
       {
@@ -94,7 +96,7 @@ export const invoicesData: Invoice[] = [
         laborName: 'Tom Anderson',
         hours: 10,
         hourlyRate: 32,
-        total: 320,
+        total_cost: 320,
         description: 'Wiring assistance and cleanup'
       }
     ],
@@ -128,7 +130,8 @@ export const invoicesData: Invoice[] = [
         description: 'Advanced Main Unit 5000W',
         quantity: 1,
         unitPrice: 2200,
-        total: 2200
+        total_cost: 2200,
+        productId:34
       }
     ],
     labor: [
@@ -137,7 +140,7 @@ export const invoicesData: Invoice[] = [
         laborName: 'Alex Turner',
         hours: 8,
         hourlyRate: 38,
-        total: 304,
+        total_cost: 304,
         description: 'Initial installation setup'
       }
     ],
@@ -170,7 +173,8 @@ export const invoicesData: Invoice[] = [
         description: 'Project Estimation - Complete Installation',
         quantity: 1,
         unitPrice: 5000,
-        total: 5000
+        total_cost: 5000,
+        productId:45
       }
     ],
     labor: [],
