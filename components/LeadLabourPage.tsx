@@ -1572,7 +1572,7 @@ useEffect(() => {
       </Card>
 
       {/* Pagination */}
-      {totalLead > 0 && (
+      {totalPages > 0 && (
         <div className="flex items-center justify-center gap-2">
           <Button
             variant="outline"
@@ -1586,7 +1586,7 @@ useEffect(() => {
             Previous
           </Button>
 
-          {Array.from({ length: totalLead }, (_, i) => i + 1).map((page) => (
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
             <Button
               key={page}
               variant={currentPage === page ? "default" : "outline"}
@@ -1603,11 +1603,11 @@ useEffect(() => {
           <Button
             variant="outline"
             onClick={() => {
-              const newPage = Math.min(currentPage + 1, totalLead);
+              const newPage = Math.min(currentPage + 1, totalPages);
               setCurrentPage(newPage);
               fetchLeadLabourData(newPage, itemsPerPage);
             }}
-            disabled={currentPage === totalLead}
+            disabled={currentPage === totalPages}
           >
             Next
           </Button>

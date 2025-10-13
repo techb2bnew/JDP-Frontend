@@ -126,6 +126,7 @@ export function ProductsPage() {
   const [viewProductData, setViewProductData] = useState<any>(null);
   const [isLoadingView, setIsLoadingView] = useState(false);
   const [sortBy, setSortBy] = useState('');
+   const [totalPages, setTotalPages] = useState(1)
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [productStats, setProductStats] = useState<any>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
@@ -171,8 +172,8 @@ export function ProductsPage() {
 
   // Calculate pricing when cost or markup changes
   useEffect(() => {
-    const markupAmount = formData.supplierCostPrice * (formData.markupPercentage / 100);
-    const jdpPrice = formData.supplierCostPrice + markupAmount;
+    const markupAmount = formData.unit_cost * (formData.markupPercentage / 100);
+    const jdpPrice = formData.unit_cost + markupAmount;
     const profitMargin = (markupAmount / jdpPrice) * 100;
 
     setFormData(prev => ({
@@ -232,6 +233,7 @@ const fetchBySearch = async () => {
     }
 
     setProducts(filtered);
+    setTotalPages(filtered);
     setTotalProducts(filtered.length);
 
   } catch (err) {
@@ -264,8 +266,31 @@ useEffect(() => {
         );
       }
 
-      setProducts(result);
-      setTotalProducts(result.length);
+     const transformedProducts = result.map((apiProduct: any) => ({
+  id: apiProduct.id?.toString() || `PRD-${Date.now()}`,
+  name: apiProduct.product_name || '',
+  category: apiProduct.category || '',
+  ptrPrice: apiProduct.supplier_cost_price || 0,
+  jdp_price: apiProduct.jdp_price || 0,
+  stock: apiProduct.stock_quantity || 0,
+  markup_amount: apiProduct.markup_amount || 0,
+  status: apiProduct.status || 'active',
+  jdpSku: apiProduct.jdp_sku || '', 
+  branches: apiProduct.branches || [],
+  image: apiProduct.image || '',
+  description: apiProduct.description || '',
+  sku: apiProduct.supplier_sku || '',
+  unit: apiProduct.unit || 'piece',
+  createdDate: apiProduct.created_at ? new Date(apiProduct.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+  lastUpdated: apiProduct.updated_at ? new Date(apiProduct.updated_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+  minStockLevel: 0,
+  maxStockLevel: 100,
+  supplier: apiProduct.supplier_name || 'Unknown Supplier'
+}));
+
+setProducts(transformedProducts);
+setTotalProducts(transformedProducts.length);
+
     } catch (err) {
       console.error('Status filter error:', err);
     } finally {
@@ -1201,7 +1226,7 @@ useEffect(() => {
                       </div>
                       </TableCell>
                                   
-                    <TableCell className="font-medium">{formatCurrency(product.ptrPrice)}</TableCell>
+                    <TableCell className="font-medium">{formatCurrency(product.unit_cost)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span>{product.markup_amount}</span>
@@ -1256,7 +1281,7 @@ useEffect(() => {
           </div>
           
          {/* Pagination Controls */}
-{totalProducts > 0 && (
+{totalPages > 0 && (
   <div className="flex items-center justify-between px-4 py-3 border-t">
     <div className="text-sm text-muted-foreground">
       {/* Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalProducts)} of {totalProducts} products */}
@@ -1271,13 +1296,13 @@ useEffect(() => {
         Previous
       </Button>
       <span className="text-sm">
-        Page {currentPage} of {Math.ceil(totalProducts / itemsPerPage)}
+        Page {currentPage} of {Math.ceil(totalPages / itemsPerPage)}
       </span>
       <Button
         variant="outline"
         size="sm"
         onClick={() => setCurrentPage(prev => prev + 1)}
-        disabled={currentPage >= Math.ceil(totalProducts / itemsPerPage) || isLoadingProducts}
+        disabled={currentPage >= Math.ceil(totalPages / itemsPerPage) || isLoadingProducts}
       >
         Next
       </Button>
@@ -1616,32 +1641,20 @@ useEffect(() => {
                     <h3 className="font-semibold">Pricing Information</h3>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="supplierCostPrice" className="flex items-center gap-1">
-                        {/* <DollarSignIcon className="h-4 w-4 text-blue-500" /> */}
-                        Unit Cost
+                     <div>
+                      <Label htmlFor="unit" className="flex items-center gap-1 mb-2">
+                        {/* <RulerIcon className="h-4 w-4 text-blue-500" /> */}
+                        Unit
                       </Label>
-                      <div className="relative mt-2">
-                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span>
-                        <Input
-                          id="unit_cost"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={formData.unit_cost=== 0 ? "" :formData.unit_cost}
-                          onChange={(e) => {
-                            setFormData(prev => ({ ...prev, unit_cost: parseFloat(e.target.value) || 0 }));
-                            clearValidationError('unit_cost');
-                          }}
-                          placeholder="0.00"
-                          className={`pl-8 ${validationErrors.unitcost ? 'border-red-500' : ''}`}
-                          required
-                        />
-                      </div>
-                      {validationErrors.unitcost && (
-                        <p className="text-red-500 text-sm mt-1">{validationErrors.unitcost}</p>
-                      )}
+                      <AutoSuggestInput
+                        label=""
+                        value={formData.unit}
+                        onChange={(value) => setFormData(prev => ({ ...prev, unit: value }))}
+                        suggestions={units}
+                        placeholder="Enter unit"
+                      />
                     </div>
+                   
                     <div>
                       <Label htmlFor="markupPercentage" className="flex items-center gap-1">
                         {/* <PercentIcon className="h-4 w-4 text-blue-500" /> */}
@@ -1668,19 +1681,33 @@ useEffect(() => {
                         <p className="text-red-500 text-sm mt-1">{validationErrors.markupPercentage}</p>
                       )}
                     </div>
-                    <div>
-                      <Label htmlFor="unit" className="flex items-center gap-1 mb-2">
-                        {/* <RulerIcon className="h-4 w-4 text-blue-500" /> */}
-                        Unit
+                     <div>
+                      <Label htmlFor="supplierCostPrice" className="flex items-center gap-1">
+                        {/* <DollarSignIcon className="h-4 w-4 text-blue-500" /> */}
+                        Unit Cost
                       </Label>
-                      <AutoSuggestInput
-                        label=""
-                        value={formData.unit}
-                        onChange={(value) => setFormData(prev => ({ ...prev, unit: value }))}
-                        suggestions={units}
-                        placeholder="Enter unit"
-                      />
+                      <div className="relative mt-2">
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span>
+                        <Input
+                          id="unit_cost"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={formData.unit_cost=== 0 ? "" :formData.unit_cost}
+                          onChange={(e) => {
+                            setFormData(prev => ({ ...prev, unit_cost: parseFloat(e.target.value) || 0 }));
+                            clearValidationError('unit_cost');
+                          }}
+                          placeholder="0.00"
+                          className={`pl-8 ${validationErrors.unitcost ? 'border-red-500' : ''}`}
+                          required
+                        />
+                      </div>
+                      {validationErrors.unitcost && (
+                        <p className="text-red-500 text-sm mt-1">{validationErrors.unitcost}</p>
+                      )}
                     </div>
+                   
                     <div>
                       <Label htmlFor="supplierCostPrice" className="flex items-center gap-1">
                         {/* <DollarSignIcon className="h-4 w-4 text-blue-500" /> */}

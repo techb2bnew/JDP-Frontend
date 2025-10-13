@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -96,16 +96,17 @@ const positions = ['Electrical Engineer', 'Senior Technician', 'Technician', 'Pr
 interface StaffPageProps {
   onViewDetails?: (id: string) => void
 }
+type FilterStatus = 'all' | 'active' | 'inactive';
 
 export function StaffPage({ onViewDetails }: StaffPageProps) {
   const { hasPermission, isLoading: permissionsLoading, permissions } = usePermissions()
-  const [staff, setStaff] = useState<Staff[]>(initialStaffData)
+  const [staff, setStaff] = useState<Staff[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [isStaffDialogOpen, setIsStaffDialogOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null)
   const [filterDepartment, setFilterDepartment] = useState<string>('all')
-  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null)
   const [showDetails, setShowDetails] = useState(false)
@@ -807,67 +808,53 @@ useEffect(() => {
   }, 500);
 
   return () => clearTimeout(debounceTimeout);
-}, [searchTerm,filterStatus, currentPage, itemsPerPage]);
-
-const searchReqIdRef = useRef(0);
+}, [searchTerm, filterStatus,currentPage, itemsPerPage]);
 
 useEffect(() => {
-  // Status filter active ho to search/default kuch na kare
-  if (filterStatus && filterStatus !== 'all') return;
+  const fetchStaffByStatus = async () => {
+    setIsLoadingStaff(true);
 
-  const myId = ++searchReqIdRef.current;
-
-  let t: any;
-  const run = async () => {
     try {
-      setIsLoadingStaff(true);
-
-      if (searchTerm.trim()) {
-        // Debounce
-        t = setTimeout(async () => {
-          const res = await apiClient.searchStaffByQuery(searchTerm.trim(), 1, 10);
-          if (myId !== searchReqIdRef.current) return;
-
-          const staffList = res?.data?.staff || [];
-          const transformed = staffList.map((s: any) => ({
-            id: String(s.id),
-            userId: s.user_id,
-            name: s.users?.full_name || 'N/A',
-            email: s.users?.email || 'N/A',
-            phone: s.users?.phone || 'N/A',
-            role: s.users?.role || 'N/A',
-            status: s.users?.status || 'N/A',
-            position: s.position || 'N/A',
-            department: s.department || 'N/A',
-            dateOfJoining: s.date_of_joining || 'N/A',
-            dob: s.dob || 'N/A',
-            address: s.address || 'N/A',
-          }));
-
-          setFilteredStaff(transformed);
-          setTotalStaff(transformed.length);
-          setIsLoadingStaff(false);
-        }, 500);
+      let res
+      if (!filterStatus || filterStatus === 'all') {
+        res = fetchStaffData(currentPage, itemsPerPage); 
       } else {
-        // Default list (pagination)
-        setFilteredStaff([]); // optional clear
-        await fetchStaffData(currentPage, itemsPerPage); // yeh function already filteredStaff + totalStaff set karta hai
+        res = await apiClient.searchStaffByStatus(filterStatus, 1, 10);
       }
-    } catch (e) {
-      if (myId !== searchReqIdRef.current) return;
-      console.error(e);
-      setFilteredStaff([]);
+
+      const staffList = res.data?.staff || [];
+      console.log(staffList,"stff")
+
+      const transformedStaff = staffList.map((staff: any) => ({
+        id: staff.id,
+        userId: staff.user_id,
+        name: staff.users?.full_name || 'N/A',
+        email: staff.users?.email || 'N/A',
+        phone: staff.users?.phone || 'N/A',
+        role: staff.users?.role || 'N/A',
+        status: staff.users?.status || 'N/A',
+        position: staff.position || 'N/A',
+        department: staff.department || 'N/A',
+        dateOfJoining: staff.date_of_joining || 'N/A',
+        dob: staff.dob || 'N/A',
+        address: staff.address || 'N/A',
+      }));
+      console.log(transformedStaff,"tarnss")
+
+      setStaff(transformedStaff);
+      setTotalStaff(transformedStaff.length);
+
+    } catch (err) {
+      console.error('Staff filter error:', err);
+      setStaff([]);
       setTotalStaff(0);
     } finally {
-      if (myId === searchReqIdRef.current && !searchTerm.trim()) {
-        setIsLoadingStaff(false);
-      }
+      setIsLoadingStaff(false);
     }
   };
 
-  run();
-  return () => clearTimeout(t);
-}, [searchTerm, currentPage, itemsPerPage, filterStatus]);
+  fetchStaffByStatus();
+}, [filterStatus]);
 
 
 
@@ -930,7 +917,7 @@ useEffect(() => {
                 </SelectContent>
               </Select> */}
 
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <Select value={filterStatus} onValueChange={(value: FilterStatus) =>setFilterStatus(value)}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="Filter by Status" />
                 </SelectTrigger>
@@ -1031,7 +1018,7 @@ useEffect(() => {
       </Card>
 
       {/* Pagination */}
-      {totalStaff > 0 && (
+      {totalPages > 0 && (
         <div className="flex items-center justify-center gap-2">
           <Button
             variant="outline"
@@ -1045,7 +1032,7 @@ useEffect(() => {
             Previous
           </Button>
           
-          {Array.from({ length: totalStaff }, (_, i) => i + 1).map((page) => (
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
             <Button
               key={page}
               variant={currentPage === page ? "default" : "outline"}
@@ -1062,11 +1049,11 @@ useEffect(() => {
           <Button
             variant="outline"
             onClick={() => {
-              const newPage = Math.min(currentPage + 1, totalStaff);
+              const newPage = Math.min(currentPage + 1, totalPages);
               setCurrentPage(newPage);
               fetchStaffData(newPage, itemsPerPage);
             }}
-            disabled={currentPage === totalStaff}
+            disabled={currentPage === totalPages}
           >
             Next
           </Button>

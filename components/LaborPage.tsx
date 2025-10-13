@@ -1402,7 +1402,7 @@ const fetchLaborById = async (id: string) => {
       </Card>
 
       {/* Pagination */}
-      {totalLabor > 1 && (
+      {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
           <Button
             variant="outline"
@@ -1416,7 +1416,7 @@ const fetchLaborById = async (id: string) => {
             Previous
           </Button>
           
-          {Array.from({ length: totalLabor }, (_, i) => i + 1).map((page) => (
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
             <Button
               key={page}
               variant={currentPage === page ? "default" : "outline"}
@@ -1433,11 +1433,11 @@ const fetchLaborById = async (id: string) => {
           <Button
             variant="outline"
             onClick={() => {
-              const newPage = Math.min(currentPage + 1, totalLabor);
+              const newPage = Math.min(currentPage + 1, totalPages);
               setCurrentPage(newPage);
               fetchLaborData(newPage, itemsPerPage);
             }}
-            disabled={currentPage === totalLabor}
+            disabled={currentPage === totalPages}
           >
             Next
           </Button>

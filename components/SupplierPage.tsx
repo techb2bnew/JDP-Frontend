@@ -1175,7 +1175,7 @@ useEffect(() => {
       </Card>
 
       {/* Pagination */}
-      {totalSuppliers > 0 && (
+      {totalPages > 0 && (
         <div className="flex items-center justify-center gap-2">
           <Button
             variant="outline"
@@ -1206,11 +1206,11 @@ useEffect(() => {
           <Button
             variant="outline"
             onClick={() => {
-              const newPage = Math.min(currentPage + 1, totalSuppliers);
+              const newPage = Math.min(currentPage + 1, totalPages);
               setCurrentPage(newPage);
               fetchSuppliersData(newPage, itemsPerPage);
             }}
-            disabled={currentPage === totalSuppliers}
+            disabled={currentPage === totalPages}
           >
             Next
           </Button>
