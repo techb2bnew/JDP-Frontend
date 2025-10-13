@@ -29,6 +29,8 @@ export interface Product {
   maxStockLevel?: number
   supplier?: string
   weight?: number
+  estimated_price:number
+  unit_cost:number
   dimensions?: {
     length: number
     width: number

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -807,35 +807,68 @@ useEffect(() => {
   }, 500);
 
   return () => clearTimeout(debounceTimeout);
-}, [searchTerm, currentPage, itemsPerPage]);
+}, [searchTerm,filterStatus, currentPage, itemsPerPage]);
+
+const searchReqIdRef = useRef(0);
 
 useEffect(() => {
-  const fetchStaffByStatus = async () => {
-    if (!filterStatus || filterStatus === 'all') {
-      setStaff([]);
-      setTotalStaff(0);
-      return;
-    }
+  // Status filter active ho to search/default kuch na kare
+  if (filterStatus && filterStatus !== 'all') return;
 
-    setIsLoadingStaff(true);
+  const myId = ++searchReqIdRef.current;
+
+  let t: any;
+  const run = async () => {
     try {
-      const res = await apiClient.searchStaffByStatus(filterStatus, 1, 10);
-      const staffList = res.data?.staff || [];
+      setIsLoadingStaff(true);
 
-      // Always update state, even if empty
-      setStaff(staffList);
-      setTotalStaff(staffList.length);
-    } catch (err) {
-      console.error('Staff filter error:', err);
-      setStaff([]);         // Clear staff on error
+      if (searchTerm.trim()) {
+        // Debounce
+        t = setTimeout(async () => {
+          const res = await apiClient.searchStaffByQuery(searchTerm.trim(), 1, 10);
+          if (myId !== searchReqIdRef.current) return;
+
+          const staffList = res?.data?.staff || [];
+          const transformed = staffList.map((s: any) => ({
+            id: String(s.id),
+            userId: s.user_id,
+            name: s.users?.full_name || 'N/A',
+            email: s.users?.email || 'N/A',
+            phone: s.users?.phone || 'N/A',
+            role: s.users?.role || 'N/A',
+            status: s.users?.status || 'N/A',
+            position: s.position || 'N/A',
+            department: s.department || 'N/A',
+            dateOfJoining: s.date_of_joining || 'N/A',
+            dob: s.dob || 'N/A',
+            address: s.address || 'N/A',
+          }));
+
+          setFilteredStaff(transformed);
+          setTotalStaff(transformed.length);
+          setIsLoadingStaff(false);
+        }, 500);
+      } else {
+        // Default list (pagination)
+        setFilteredStaff([]); // optional clear
+        await fetchStaffData(currentPage, itemsPerPage); // yeh function already filteredStaff + totalStaff set karta hai
+      }
+    } catch (e) {
+      if (myId !== searchReqIdRef.current) return;
+      console.error(e);
+      setFilteredStaff([]);
       setTotalStaff(0);
     } finally {
-      setIsLoadingStaff(false);
+      if (myId === searchReqIdRef.current && !searchTerm.trim()) {
+        setIsLoadingStaff(false);
+      }
     }
   };
 
-  fetchStaffByStatus();
-}, [filterStatus]);
+  run();
+  return () => clearTimeout(t);
+}, [searchTerm, currentPage, itemsPerPage, filterStatus]);
+
 
 
 
@@ -885,7 +918,7 @@ useEffect(() => {
                 />
               </div>
               
-              <Select value={filterDepartment} onValueChange={setFilterDepartment}>
+              {/* <Select value={filterDepartment} onValueChange={setFilterDepartment}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="Filter by Department" />
                 </SelectTrigger>
@@ -895,7 +928,7 @@ useEffect(() => {
                     <SelectItem key={dept} value={dept}>{dept}</SelectItem>
                   ))}
                 </SelectContent>
-              </Select>
+              </Select> */}
 
               <Select value={filterStatus} onValueChange={setFilterStatus}>
                 <SelectTrigger className="w-48">

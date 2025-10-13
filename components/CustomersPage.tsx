@@ -741,7 +741,7 @@ useEffect(() => {
                   <SelectItem value="inactive">Inactive</SelectItem> 
                 </SelectContent>
               </Select>
-              <Select value={sortBy} onValueChange={setSortBy}>
+              {/* <Select value={sortBy} onValueChange={setSortBy}>
                 <SelectTrigger className="w-auto min-w-[150px]">
                   <SelectValue placeholder="Sort By Name" />
                 </SelectTrigger>
@@ -762,7 +762,7 @@ useEffect(() => {
               >
                 <ArrowUpAZ className="w-4 h-4" />
                 {sortOrder === 'asc' ? 'A-Z' : 'Z-A'}
-              </Button>
+              </Button> */}
             </div>
           </div>
         </CardHeader>

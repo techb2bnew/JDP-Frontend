@@ -73,7 +73,8 @@ interface ProductFormData {
   unit: string;
   branchIds: string[];
   status: 'active' | 'inactive' | 'draft';
-  unitcost:number;
+  unit_cost:number;
+  estimated_price:number
 }
 
 interface Supplier {
@@ -149,7 +150,8 @@ export function ProductsPage() {
     unit: 'piece',
     branchIds: [],
     status: 'draft',
-    unitcost:0
+    unit_cost:0,
+    estimated_price:0
   })
   // Auto-generate JDP SKU when supplier SKU changes
  useEffect(() => {
@@ -377,7 +379,8 @@ useEffect(() => {
         unit: 'piece',
         branchIds: [],
         status: 'draft',
-        unitcost:0
+        unit_cost:0,
+        estimated_price:0
       });
       setShowProductModal(true);
     }
@@ -424,9 +427,9 @@ useEffect(() => {
     if (!formData.supplierSku.trim()) {
       errors.supplierSku = 'Supplier SKU is required';
     }
-    if (!formData.supplierCostPrice || formData.supplierCostPrice <= 0) {
-      errors.supplierCostPrice = 'Supplier cost price must be greater than 0';
-    }
+    // if (!formData.supplierCostPrice || formData.supplierCostPrice <= 0) {
+    //   errors.supplierCostPrice = 'Supplier cost price must be greater than 0';
+    // }
     if (!formData.markupPercentage || formData.markupPercentage < 0) {
       errors.markupPercentage = 'Markup percentage must be 0 or greater';
     }
@@ -469,7 +472,9 @@ useEffect(() => {
         stock_quantity: formData.stockQuantity,
         unit: formData.unit,
         status: formData.status,
-        system_ip: systemIP
+        system_ip: systemIP,
+        unit_cost:formData.unit_cost,
+      estimated_price:formData.estimated_price
       };
 
       let response;
@@ -596,7 +601,8 @@ useEffect(() => {
       unit: 'piece',
       branchIds: [],
       status: 'draft',
-      unitcost:0
+      unit_cost:0,
+      estimated_price:0
     })
     setSelectedProduct(null)
     setCurrentAction('add')
@@ -643,6 +649,7 @@ useEffect(() => {
     product.branches.map(b => b.name).join(', '),
     product.description || '',
     product.createdDate,
+    product.unit_cost,
     product.lastUpdated
   ]);
 
@@ -712,7 +719,10 @@ useEffect(() => {
           contractStart: apiSupplier.contract_start || '',
           contractEnd: apiSupplier.contract_end || '',
           totalOrders: apiSupplier.total_orders || 0,
+          unit_cost:apiSupplier.unit_cost || 0,
+          estimated_price:apiSupplier.estimated_price || 0,
           notes: apiSupplier.notes || ''
+
         }));
 
         setSuppliers(transformedSuppliers);  
@@ -764,7 +774,9 @@ useEffect(() => {
           lastUpdated: apiProduct.updated_at ? new Date(apiProduct.updated_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
           minStockLevel: 0, // Default value, can be updated if available in API
           maxStockLevel: 100, // Default value, can be updated if available in API
-          supplier: apiProduct.supplier_name || 'Unknown Supplier'
+          supplier: apiProduct.supplier_name || 'Unknown Supplier',
+          estimated_price:apiProduct.estimated_price || 0,
+          unit_cost:apiProduct.unit_cost ||0
         }));
 
         setProducts(transformedProducts);
@@ -829,7 +841,8 @@ useEffect(() => {
           unit: apiProduct.unit || 'piece',
           branchIds: [], 
           status: apiProduct.status || 'draft' ,
-          unitcost:apiProduct.unicost || 0
+          unit_cost:apiProduct.unicost || 0,
+          estimated_price:apiProduct.estimated_price|| 0
         };
 
         setFormData(productData);
@@ -1198,7 +1211,9 @@ useEffect(() => {
 
                     <TableCell className="font-medium">{formatCurrency(product.jdp_price || 0)}</TableCell>
                           <TableCell className="font-medium">
-                          {formatCurrency(+((Math.random() * 300).toFixed(2)))}
+                             <span>{formatCurrency(product.estimated_price || 0)}</span>
+                            
+                          {/* {formatCurrency(+((Math.random() * 300).toFixed(2)))} */}
                         </TableCell>
 
 
@@ -1369,6 +1384,12 @@ useEffect(() => {
                         <Label className="text-sm font-medium text-gray-700 mb-2 block">Unit</Label>
                         <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 capitalize">
                           {viewProductData.unit}
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Unit Cost</Label>
+                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 capitalize">
+                          {viewProductData.unit_cost}
                         </div>
                       </div>
                     </div>
@@ -1598,27 +1619,27 @@ useEffect(() => {
                     <div>
                       <Label htmlFor="supplierCostPrice" className="flex items-center gap-1">
                         {/* <DollarSignIcon className="h-4 w-4 text-blue-500" /> */}
-                        Supplier Cost Price *
+                        Unit Cost
                       </Label>
                       <div className="relative mt-2">
                         <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span>
                         <Input
-                          id="supplierCostPrice"
+                          id="unit_cost"
                           type="number"
                           step="0.01"
                           min="0"
-                          value={formData.supplierCostPrice=== 0 ? "" :formData.supplierCostPrice}
+                          value={formData.unit_cost=== 0 ? "" :formData.unit_cost}
                           onChange={(e) => {
-                            setFormData(prev => ({ ...prev, supplierCostPrice: parseFloat(e.target.value) || 0 }));
-                            clearValidationError('supplierCostPrice');
+                            setFormData(prev => ({ ...prev, unit_cost: parseFloat(e.target.value) || 0 }));
+                            clearValidationError('unit_cost');
                           }}
                           placeholder="0.00"
-                          className={`pl-8 ${validationErrors.supplierCostPrice ? 'border-red-500' : ''}`}
+                          className={`pl-8 ${validationErrors.unitcost ? 'border-red-500' : ''}`}
                           required
                         />
                       </div>
-                      {validationErrors.supplierCostPrice && (
-                        <p className="text-red-500 text-sm mt-1">{validationErrors.supplierCostPrice}</p>
+                      {validationErrors.unitcost && (
+                        <p className="text-red-500 text-sm mt-1">{validationErrors.unitcost}</p>
                       )}
                     </div>
                     <div>
@@ -1663,22 +1684,22 @@ useEffect(() => {
                     <div>
                       <Label htmlFor="supplierCostPrice" className="flex items-center gap-1">
                         {/* <DollarSignIcon className="h-4 w-4 text-blue-500" /> */}
-                        Unit Cost
+                        Estimate Price
                       </Label>
                       <div className="relative mt-2">
-                        {/* <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span> */}
+                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span>
                         <Input
-                          id="unitcost"
+                          id="estimated_price"
                           type="number"
                           step="0.01"
                           min="0"
-                          value={formData.unitcost=== 0 ? "" :formData.unitcost}
+                          value={formData.estimated_price=== 0 ? "" :formData.estimated_price}
                           onChange={(e) => {
-                            setFormData(prev => ({ ...prev, unitcost: parseFloat(e.target.value) || 0 }));
-                            clearValidationError('unitcost');
+                            setFormData(prev => ({ ...prev, estimated_price: parseFloat(e.target.value) || 0 }));
+                            clearValidationError('estimated_price');
                           }}
                           placeholder="0.00"
-                          className={`pl-8 ${validationErrors.unitcost ? 'border-red-500' : ''}`}
+                          className={`pl-8 ${validationErrors.estimateprice ? 'border-red-500' : ''}`}
                           required
                         />
                       </div>

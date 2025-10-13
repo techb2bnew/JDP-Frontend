@@ -199,7 +199,7 @@ export const InvoiceTemplate = ({ invoice, invoiceId }: InvoiceTemplateProps) =>
             </div>
             <div className="flex justify-between">
               <span>
-                Tax ({Number((invoiceData?.tax_percentage || 0) * 100).toFixed(1)}%):
+                Tax ({Number((invoiceData?.tax_percentage || 0) ).toFixed(1)}%):
               </span>
               <span>{fmtMoney(invoiceData?.tax_amount)}</span>
             </div>

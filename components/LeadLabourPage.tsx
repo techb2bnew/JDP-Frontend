@@ -1448,7 +1448,7 @@ useEffect(() => {
                 />
               </div>
 
-              <Select value={filterSpecialization} onValueChange={setFilterSpecialization}>
+              {/* <Select value={filterSpecialization} onValueChange={setFilterSpecialization}>
                 <SelectTrigger className="w-56">
                   <SelectValue placeholder="Filter by Specialization" />
                 </SelectTrigger>
@@ -1458,7 +1458,7 @@ useEffect(() => {
                     <SelectItem key={spec} value={spec}>{spec}</SelectItem>
                   ))}
                 </SelectContent>
-              </Select>
+              </Select> */}
 
               <Select value={filterStatus} onValueChange={setFilterStatus}>
                 <SelectTrigger className="w-48">

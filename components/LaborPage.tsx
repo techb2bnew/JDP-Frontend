@@ -1276,7 +1276,7 @@ const fetchLaborById = async (id: string) => {
                 />
               </div>
               
-              <Select value={filterTrade} onValueChange={setFilterTrade}>
+              {/* <Select value={filterTrade} onValueChange={setFilterTrade}>
                 <SelectTrigger className="w-56">
                   <SelectValue placeholder="Filter by Trade" />
                 </SelectTrigger>
@@ -1286,7 +1286,7 @@ const fetchLaborById = async (id: string) => {
                     <SelectItem key={trade} value={trade}>{trade}</SelectItem>
                   ))}
                 </SelectContent>
-              </Select>
+              </Select> */}
 
               <Select value={filterAvailability} onValueChange={setFilterAvailability}>
                 <SelectTrigger className="w-48">
