@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -35,6 +35,8 @@ import {
 import { format } from 'date-fns'
 import { apiClient, globalApiCall } from '@/utils/api'
 import { LoadingSpinner } from './common/LoadingSpinner'
+import html2canvas from 'html2canvas'
+import jsPDF from 'jspdf'
 
 
 
@@ -59,9 +61,9 @@ interface Order {
   orderDate: string
   items: OrderItem[]
   subtotal: number
-  tax: number
-  discount: number
-  totalPayment: number
+  tax_amount: number
+  discount_amount: number
+  total_amount: number
   notes?: string
   
 }
@@ -81,17 +83,19 @@ interface OrderItem {
   // billingEmail?: string;
   // billingPhone?: string;
 }
-
 interface Job {
   id: number;
   job_title: string;
-  job_type: string;
-  status: string;
-  bill_to_address: string;
-  bill_to_city_zip: string;
-  bill_to_email: string;
-  bill_to_phone: string;
+  job_type: 'service_based' | 'product_based' | string;
+  status: 'active' | 'inactive' | string;
+
+  bill_to_email?: string;
+  bill_to_phone?: string;
+  bill_to_address?: string;
+  bill_to_city_zip?: string;
 }
+
+
 
 
 interface Customer {
@@ -113,13 +117,17 @@ interface OrderFormData {
     billingPhone: string
     status: 'pending' | 'processing' | 'completed' | 'cancelled'
     subtotal:number
+    total_amount:number
+    tax_amount:number
+    discount_amount:number
     customer: Customer
     orderItems: OrderItem[]
-    job?: Job;
-    total_amount:number
-    discount_amount:number
-    tax_amount:number
-    totalPayment:number
+    job: Job
+    notes:string
+    
+    // discount_amount:number
+    // tax_amount:number
+    // totalPayment:number
 
 
 }
@@ -400,6 +408,8 @@ export function OrdersPage() {
   const [orderStats, setOrderStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
 
 
@@ -522,8 +532,11 @@ useEffect(() => {
           jobId: apiOrder.job_id?.toString() || 'N/A',
           status: apiOrder.status as 'pending' | 'processing' | 'completed' | 'cancelled' || 'pending',
           subtotal: apiOrder.subtotal?.toString() || '0',
+          tax_amount:apiOrder.tax_amount?.toString() || '0' , 
+          discount_amount:apiOrder.discount_amount?.toString() || '0',
           createdAt: apiOrder.created_at || '',
-          totalPayment:apiOrder.totalPayment?.toString() || '0',
+          total_amount:apiOrder.total_amount || 0,
+          notes:apiOrder.notes,
           // Top-level customer fields
          
           billingAddress: apiOrder.delivery_address || '',
@@ -532,9 +545,17 @@ useEffect(() => {
           billingPhone: apiOrder.delivery_phone || '',
 
 
-          job:{
+                job: {
+          id: apiOrder.job?.id?.toString() || '',
+          job_title: apiOrder.job?.job_title || '',
+          job_type: apiOrder.job?.job_type || '',
+          status: apiOrder.job?.status || '',
+          bill_to_email: apiOrder.job?.bill_to_email || '',
+          bill_to_phone: apiOrder.job?.bill_to_phone || '',
+          bill_to_address: apiOrder.job?.bill_to_address || '',
+          bill_to_city_zip: apiOrder.job?.bill_to_city_zip || '',
+        },
 
-          },
 
           // Nested customer object
           customer: {
@@ -548,12 +569,12 @@ useEffect(() => {
           // Order items
           orderItems: apiOrder.order_items?.map((item: any) => ({
             id: item.id.toString(),
-            name: item.product_name || '',        
+            product_name: item.product.product_name || '',        
             sku: item.product?.jdp_sku || '',
             quantity: item.quantity || 0,
             unitPrice: item.product?.unit_cost || 0,
             total: item.total_price || 0,  
-            // product_name:item.product_name || 0    
+  
           })) || []
         };
 
@@ -608,11 +629,226 @@ useEffect(() => {
     fetchOrderById(order.id)
   }
 
-  const handleExport = (format: 'csv' | 'pdf') => {
-    // Implementation for CSV/PDF export
-    console.log(`Exporting orders as ${format.toUpperCase()}...`)
-    // Here you would implement actual export functionality
+  const csvEscape = (val: any) => {
+  const s = (val ?? "").toString();
+  const hasSpecial = /[",\n]/.test(s);
+  return hasSpecial ? `"${s.replace(/"/g, '""')}"` : s;
+};
+const dateSlug = () => {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}`;
+};
+
+
+const handleDownload = async () => {
+  // Must have an open order + a ref pointing to the INVOICE container (not the list)
+  if (!selectedOrder) {
+    const { toast } = await import('sonner');
+    toast.warning('Open an order to download its invoice.');
+    return;
   }
+  if (!printRef.current) return;
+
+  setIsGeneratingPdf(true);
+
+  // (A4 @ 72dpi in jsPDF units is 210x297 mm). We'll add small margins.
+  const PAGE_W_MM = 210;
+  const PAGE_H_MM = 297;
+  const MARGIN_MM = 10;
+  const CONTENT_W_MM = PAGE_W_MM - MARGIN_MM * 2;
+
+  // Temporarily force a stable width so html2canvas renders predictably
+  const el = printRef.current as HTMLElement;
+  const prevStyle = el.getAttribute('style') || '';
+  el.style.width = '794px';          // ~A4 width @ 96dpi; adjust as you like
+  el.style.background = '#fff';
+  el.classList.add('pdf-export');     // optional: for color-correct CSS
+
+  try {
+    // Ensure DOM is committed (modal content fully rendered)
+    await new Promise(requestAnimationFrame);
+
+    const canvas = await html2canvas(el, {
+      scale: 2,                // crisp output
+      backgroundColor: '#fff',
+      useCORS: true,
+      logging: false,
+      ignoreElements: (node) =>
+        (node as HTMLElement)?.classList?.contains?.('no-export'), // exclude UI-only bits
+    });
+
+    // Convert canvas -> multi-page PDF with margins
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+
+    // Convert canvas px -> mm using the target content width
+    const pxToMm = (px: number) => (px * CONTENT_W_MM) / canvas.width;
+    const imgWmm = CONTENT_W_MM;
+    const imgHmm = pxToMm(canvas.height);
+
+    let remainingHmm = imgHmm;
+    let y = MARGIN_MM;
+
+    // First page
+    pdf.addImage(imgData, 'PNG', MARGIN_MM, y, imgWmm, imgHmm);
+    remainingHmm -= (PAGE_H_MM - MARGIN_MM * 2);
+
+    // Extra pages
+    while (remainingHmm > 0) {
+      pdf.addPage();
+      y = MARGIN_MM - (imgHmm - remainingHmm);
+      pdf.addImage(imgData, 'PNG', MARGIN_MM, y, imgWmm, imgHmm);
+      remainingHmm -= (PAGE_H_MM - MARGIN_MM * 2);
+    }
+
+    const fileName = `invoice_${selectedOrder.orderNumber || selectedOrder.id || dateSlug()}.pdf`;
+    pdf.save(fileName);
+  } catch (e) {
+    console.error('Error generating PDF:', e);
+    const { toast } = await import('sonner');
+    toast.error('Failed to generate PDF.');
+  } finally {
+    // Restore styles no matter what
+    el.setAttribute('style', prevStyle);
+    el.classList.remove('pdf-export');
+    setIsGeneratingPdf(false);
+  }
+};
+
+
+const exportOrdersCSV = (orders: Order[]) => {
+  // Define the columns you want in CSV
+  const headers = [
+    "Order ID",
+    "Job ID",
+    "Customer",
+    "Contractor",
+    "Status",
+    "Order Date"
+  ];
+  const rows = orders.map(o => [
+    o.orderNumber,
+    o.jobId,
+    o.customerName,
+    o.contractorName ?? "",
+    o.status,
+    o.orderDate
+  ]);
+
+  const csv = [headers, ...rows].map(r => r.map(csvEscape).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }); // \uFEFF = BOM for Excel
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `orders_${dateSlug()}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+// LIST HANDLER (buttons in filters bar)
+const handleExportList = async (format: "csv" | "pdf") => {
+  try {
+    if (!orders || orders.length === 0) {
+      const { toast } = await import("sonner");
+      toast.warning("No orders to export.");
+      return;
+    }
+    if (format === "csv") {
+      // aapka existing CSV function call kar do (exportOrdersCSV)
+      exportOrdersCSV(orders);
+    } else {
+      await exportOrdersPDF(orders);
+    }
+  } catch (e: any) {
+    console.error("List export error:", e);
+    const { toast } = await import("sonner");
+    toast.error(e?.message || "Failed to export.");
+  }
+};
+
+// LIST PDF (orders table)
+const exportOrdersPDF = async (orders: Order[]) => {
+  try {
+    const { default: jsPDFmod } = await import("jspdf");
+    // @ts-ignore
+    const { default: autoTable } = await import("jspdf-autotable");
+    // @ts-ignore
+    const doc = new jsPDFmod({ orientation: "landscape", unit: "pt", format: "a4" });
+
+    doc.setFontSize(14);
+    doc.text("Orders Export", 40, 30);
+
+    const head = [["Order ID", "Job ID", "Customer", "Contractor", "Status", "Order Date"]];
+    const body = orders.map(o => [
+      o.orderNumber,
+      o.jobId,
+      o.customerName,
+      o.contractorName ?? "",
+      o.status?.charAt(0).toUpperCase() + o.status?.slice(1),
+      new Date(o.orderDate).toLocaleDateString()
+    ]);
+
+    // @ts-ignore
+    autoTable(doc, {
+      head,
+      body,
+      startY: 50,
+      styles: { fontSize: 9, cellPadding: 6, overflow: "linebreak" },
+      headStyles: { fillColor: [0,0,0] },
+      columnStyles: { 0: { cellWidth: 120 } }
+    });
+
+    doc.save(`orders_${dateSlug()}.pdf`);
+  } catch (err) {
+    console.error("List PDF export failed:", err);
+    // Fallback: print current table
+    const tableHtml = document.querySelector("table")?.outerHTML ?? "<p>No table found</p>";
+    const w = window.open("", "_blank");
+    if (w) {
+      w.document.write(`
+        <html><head><title>Orders Export</title>
+        <style>
+          body{font-family:Arial,sans-serif;padding:16px}
+          table{width:100%;border-collapse:collapse}
+          th,td{border:1px solid #ddd;padding:8px;font-size:12px}
+          th{background:#000;color:#fff}
+        </style></head>
+        <body><h2>Orders Export</h2>${tableHtml}
+        <script>window.onload=()=>window.print()</script></body></html>
+      `);
+      w.document.close();
+    }
+  }
+};
+
+
+  const handleExport = async (format: "csv" | "pdf") => {
+  try {
+    if (!orders || orders.length === 0) {
+      if (typeof window !== "undefined") {
+        const { toast } = await import("sonner");
+        toast.warning("No orders to export.");
+      }
+      return;
+    }
+
+    if (format === "csv") {
+      exportOrdersCSV(orders);
+    } else {
+      await exportOrdersPDF(orders);
+    }
+  } catch (e: any) {
+    console.error("Export error:", e);
+    if (typeof window !== "undefined") {
+      const { toast } = await import("sonner");
+      toast.error(e?.message || "Failed to export.");
+    }
+  }
+};
 
   const handlePrintInvoice = () => {
     window.print()
@@ -661,7 +897,7 @@ const fetchBySearchOrders = async () => {
   orderDate: apiOrder.order_date || 'N/A',
   deliveryDate: apiOrder.delivery_date || 'N/A',
   totalItems: apiOrder.total_items ?? 0,
-  totalAmount: apiOrder.total_amount ?? 0,
+  total_amount: apiOrder.total_amount ?? 0,
   deliveryAddress: apiOrder.delivery_address || 'N/A',
   leadLabor: {
     name: apiOrder.lead_labor?.users?.full_name || '',
@@ -1076,7 +1312,7 @@ useEffect(() => {
       <LoadingSpinner />
     </div>
   ) : selectedOrder ? (
-    <div className="space-y-6">
+    <div ref={printRef} id="invoice-print-area" className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
@@ -1390,6 +1626,19 @@ useEffect(() => {
           </DialogHeader>
           
           {selectedOrder && (
+  //           <div
+  //   ref={printRef}
+  //   id="print-only-invoice"
+  //   style={{
+  //     position: 'fixed',
+  //     left: '-10000px',   // display:none mat use karna; render nahi hoga
+  //     top: 0,
+  //     width: '794px',     // ~ A4 width @ 96dpi; ya 21cm if you prefer
+  //     background: '#fff',
+  //     zIndex: -1
+  //   }}
+  //   className="pdf-export-root"
+  // >
             <div className="space-y-6">
               {/* Invoice Header */}
               <div className="flex justify-between items-start">
@@ -1457,15 +1706,15 @@ useEffect(() => {
                     <div className="font-medium">{selectedOrder?.job?.bill_to_address}</div>
                     <div className="text-muted-foreground">
                       {selectedOrder?.job?.bill_to_city_zip}<br />
-                      {selectedOrder?.billingAddress?.city}, {selectedOrder?.billingAddress?.state} {selectedOrder?.billingAddress?.zipCode}
+                      {/* {selectedOrder?.billingAddress?.city}, {selectedOrder?.billingAddress?.state} {selectedOrder?.billingAddress?.zipCode} */}
                     </div>
                     <div className="flex items-center gap-1">
                       <Mail className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-muted-foreground">{selectedOrder?.billingAddress?.email}</span>
+                      <span className="text-muted-foreground">{selectedOrder?.job?.bill_to_email}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Phone className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-muted-foreground">{selectedOrder?.billingPhone}</span>
+                      <span className="text-muted-foreground">{selectedOrder?.job?.bill_to_phone}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -1521,7 +1770,7 @@ useEffect(() => {
                       <TableBody>
                         {selectedOrder?.orderItems?.map((item) => (
                           <TableRow key={item?.id}>
-                            <TableCell className="font-medium">{item?.name}</TableCell>
+                            <TableCell className="font-medium">{item?.product_name}</TableCell>
                             <TableCell className="font-mono text-sm">{item?.sku}</TableCell>
                             <TableCell>{item.quantity}</TableCell>
                             <TableCell>{formatCurrency(item?.unitPrice)}</TableCell>
@@ -1558,13 +1807,13 @@ useEffect(() => {
                     <Separator />
                     <div className="flex justify-between font-semibold text-lg">
                       <span>Total Payment:</span>
-                      <span className="text-primary">{formatCurrency(selectedOrder.totalPayment)}</span>
+                      <span className="text-primary">{formatCurrency(selectedOrder.total_amount)}</span>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* {selectedOrder.notes && (
+              {selectedOrder.notes && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">Notes</CardTitle>
@@ -1573,8 +1822,9 @@ useEffect(() => {
                     <p className="text-sm text-muted-foreground">{selectedOrder.notes}</p>
                   </CardContent>
                 </Card>
-              )} */}
+              )}
             </div>
+            // </div>
           )}
           
           <DialogFooter className="flex gap-2">
@@ -1585,11 +1835,11 @@ useEffect(() => {
               </Button>
             )}
             {hasPermission('orders', 'view') && (
-              <Button variant="outline" onClick={() => handleExport('pdf')}>
-                <Download className="h-4 w-4 mr-2" />
-                Download PDF
-              </Button>
-            )}
+        <Button variant="outline" onClick={handleDownload} disabled={isLoading || isGeneratingPdf}>
+          <Download className="h-4 w-4 mr-2" />
+          {isGeneratingPdf ? 'Generating...' : 'Download PDF'}
+        </Button>
+      )}
             {hasPermission('orders', 'edit') && (
               <Button onClick={handleEmailInvoice} className="bg-primary text-primary-foreground hover:bg-primary/90">
                 <Mail className="h-4 w-4 mr-2" />
@@ -1606,7 +1856,8 @@ useEffect(() => {
     </div>
   )}
 
-  <DialogFooter className="flex gap-2">
+
+  {/* <DialogFooter className="flex gap-2">
     {hasPermission('orders', 'view') && (
       <Button variant="outline" onClick={handlePrintInvoice} disabled={isLoading}>
         <Printer className="h-4 w-4 mr-2" />
@@ -1614,18 +1865,18 @@ useEffect(() => {
       </Button>
     )}
     {hasPermission('orders', 'view') && (
-      <Button variant="outline" onClick={() => handleExport('pdf')} disabled={isLoading}>
-        <Download className="h-4 w-4 mr-2" />
-        Download PDF
-      </Button>
-    )}
+        <Button variant="outline" onClick={handleDownload} disabled={isLoading || isGeneratingPdf}>
+          <Download className="h-4 w-4 mr-2" />
+          {isGeneratingPdf ? 'Generating...' : 'Download PDF'}
+        </Button>
+      )}
     {hasPermission('orders', 'edit') && (
       <Button onClick={handleEmailInvoice} className="bg-primary text-primary-foreground hover:bg-primary/90" disabled={isLoading}>
         <Mail className="h-4 w-4 mr-2" />
         Email Invoice
       </Button>
     )}
-  </DialogFooter>
+  </DialogFooter> */}
 </DialogContent>
 
       </Dialog>
