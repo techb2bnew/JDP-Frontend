@@ -66,14 +66,33 @@ interface Order {
   
 }
 
+
+
 interface OrderItem {
   id: string
   name?: string
+  product_name:string
   sku: string
   quantity: number
   unitPrice: number
   total: number
+  //  billingAddress?: string;
+  // billingCityZip?: string;
+  // billingEmail?: string;
+  // billingPhone?: string;
 }
+
+interface Job {
+  id: number;
+  job_title: string;
+  job_type: string;
+  status: string;
+  bill_to_address: string;
+  bill_to_city_zip: string;
+  bill_to_email: string;
+  bill_to_phone: string;
+}
+
 
 interface Customer {
   id: string
@@ -93,267 +112,273 @@ interface OrderFormData {
     billingNotes: string
     billingPhone: string
     status: 'pending' | 'processing' | 'completed' | 'cancelled'
-    subtotal:string
+    subtotal:number
     customer: Customer
     orderItems: OrderItem[]
+    job?: Job;
+    total_amount:number
+    discount_amount:number
+    tax_amount:number
+    totalPayment:number
+
 
 }
 // Mock data with enhanced structure
-const ordersData: Order[] = [
-  {
-    id: 'ORD-2025-001',
-    jobId: 'PH209_US_JDP',
-    orderNumber: 'ORD-2025-001',
-    customerName: 'ABC Corporation',
-    contractorName: 'John Carter',
-    customerEmail: 'billing@abccorp.com',
-    customerPhone: '+1 (555) 123-4567',
-    billingAddress: {
-      fullName: 'ABC Corporation',
-      address: '1160 N Willow Dr Near Res.',
-      city: 'New York',
-      state: 'NY',
-      zipCode: '10001',
-      email: 'billing@abccorp.com',
-      phone: '+1 (555) 123-4567'
-    },
-    status: 'completed',
-    orderDate: '2025-01-20',
-    items: [
-      {
-        id: 'ITEM-001',
-        name: 'Main Electrical Panel 200A',
-        sku: 'ELC-PNL-200A',
-        quantity: 1,
-        unitPrice: 450,
-        total: 450
-      },
-      {
-        id: 'ITEM-002',
-        name: 'Circuit Breakers 20A (10 Pack)',
-        sku: 'CB-20A-10PK',
-        quantity: 2,
-        unitPrice: 180,
-        total: 360
-      },
-      {
-        id: 'ITEM-003',
-        name: 'Copper Wire 12 AWG (500 ft)',
-        sku: 'CW-12AWG-500FT',
-        quantity: 3,
-        unitPrice: 125,
-        total: 375
-      }
-    ],
-    subtotal: 1185,
-    tax: 94.8,
-    discount: 0,
-    totalPayment: 1279.8,
-    notes: 'Rush order for electrical panel installation project'
-  },
-  {
-    id: 'ORD-2025-002',
-    jobId: 'PH210_US_JDP',
-    orderNumber:'ORD-2025-002',
-    customerName: 'XYZ Company',
-    contractorName: 'Sarah Johnson',
-    customerEmail: 'orders@xyzcompany.com',
-    customerPhone: '+1 (555) 234-5678',
-    billingAddress: {
-      fullName: 'XYZ Company',
-      address: '11613 W Shores RD NW Jursa Res.',
-      city: 'New York',
-      state: 'NY',
-      zipCode: '10002',
-      email: 'orders@xyzcompany.com',
-      phone: '+1 (555) 234-5678'
-    },
-    status: 'processing',
-    orderDate: '2025-01-21',
-    items: [
-      {
-        id: 'ITEM-004',
-        name: 'Advanced Main Unit 5000W',
-        sku: 'MU-ADV-5000',
-        quantity: 1,
-        unitPrice: 2200,
-        total: 2200
-      },
-      {
-        id: 'ITEM-005',
-        name: 'Digital Control Panel (3 Pack)',
-        sku: 'CP-DIG-TRIO',
-        quantity: 1,
-        unitPrice: 450,
-        total: 450
-      }
-    ],
-    subtotal: 2650,
-    tax: 212,
-    discount: 100,
-    totalPayment: 2762
-  },
-  {
-    id: 'ORD-2025-003',
-    jobId: 'PH211_US_JDP',
-    orderNumber:'ORD-2025-003',
-    customerName: 'DEF Industries',
-    contractorName: 'Mike Wilson',
-    customerEmail: 'procurement@defindustries.com',
-    customerPhone: '+1 (555) 345-6789',
-    billingAddress: {
-      fullName: 'DEF Industries',
-      address: '4211 Aiden Dr Frakes Res.',
-      city: 'Brooklyn',
-      state: 'NY',
-      zipCode: '11201',
-      email: 'procurement@defindustries.com',
-      phone: '+1 (555) 345-6789'
-    },
-    status: 'pending',
-    orderDate: '2025-01-22',
-    items: [
-      {
-        id: 'ITEM-006',
-        name: 'Fine Sand (5 Cubic Yards)',
-        sku: 'SND-FNE-5YD',
-        quantity: 2,
-        unitPrice: 150,
-        total: 300
-      },
-      {
-        id: 'ITEM-007',
-        name: 'Pea Gravel (3 Cubic Yards)',
-        sku: 'GRV-PEA-3YD',
-        quantity: 1,
-        unitPrice: 120,
-        total: 120
-      }
-    ],
-    subtotal: 420,
-    tax: 33.6,
-    discount: 0,
-    totalPayment: 453.6
-  },
-  {
-    id: 'ORD-2025-004',
-    jobId: 'PH212_US_JDP',
-    orderNumber:'ORD-2025-004',
-    customerName: 'GHI Construction',
-    contractorName: 'John Carter',
-    customerEmail: 'orders@ghiconstruction.com',
-    customerPhone: '+1 (555) 456-7890',
-    billingAddress: {
-      fullName: 'GHI Construction',
-      address: '789 Construction Ave',
-      city: 'Manhattan',
-      state: 'NY',
-      zipCode: '10003',
-      email: 'orders@ghiconstruction.com',
-      phone: '+1 (555) 456-7890'
-    },
-    status: 'cancelled',
-    orderDate: '2025-01-18',
-    items: [
-      {
-        id: 'ITEM-008',
-        name: 'Professional Testing Kit',
-        sku: 'TST-KIT-PRO',
-        quantity: 1,
-        unitPrice: 350,
-        total: 350
-      }
-    ],
-    subtotal: 350,
-    tax: 28,
-    discount: 0,
-    totalPayment: 378
-  },
-  {
-    id: 'ORD-2025-005',
-    jobId: 'PH213_US_JDP',
-    orderNumber:'ORD-2025-005',
-    customerName: 'JKL Enterprises',
-    contractorName: 'Sarah Johnson',
-    customerEmail: 'purchasing@jklenterprises.com',
-    customerPhone: '+1 (555) 567-8901',
-    billingAddress: {
-      fullName: 'JKL Enterprises',
-      address: '456 Business Plaza',
-      city: 'Queens',
-      state: 'NY',
-      zipCode: '11004',
-      email: 'purchasing@jklenterprises.com',
-      phone: '+1 (555) 567-8901'
-    },
-    status: 'processing',
-    orderDate: '2025-01-19',
-    items: [
-      {
-        id: 'ITEM-009',
-        name: 'ROMEX Cable 14 AWG (250 ft)',
-        sku: 'RMX-14-250FT',
-        quantity: 4,
-        unitPrice: 95,
-        total: 380
-      },
-      {
-        id: 'ITEM-010',
-        name: 'Standard Outlets (20 Pack)',
-        sku: 'OUT-STD-20PK',
-        quantity: 2,
-        unitPrice: 85,
-        total: 170
-      }
-    ],
-    subtotal: 550,
-    tax: 44,
-    discount: 25,
-    totalPayment: 569
-  },
-  {
-    id: 'ORD-2025-006',
-    jobId: 'PH214_US_JDP',
-    orderNumber:'ORD-2025-006',
-    customerName: 'MNO Corporation',
-    contractorName: 'Mike Wilson',
-    customerEmail: 'orders@mnocorp.com',
-    customerPhone: '+1 (555) 678-9012',
-    billingAddress: {
-      fullName: 'MNO Corporation',
-      address: '321 Corporate Blvd',
-      city: 'Bronx',
-      state: 'NY',
-      zipCode: '10005',
-      email: 'orders@mnocorp.com',
-      phone: '+1 (555) 678-9012'
-    },
-    status: 'pending',
-    orderDate: '2025-01-23',
-    items: [
-      {
-        id: 'ITEM-011',
-        name: 'Single Pole Switches (15 Pack)',
-        sku: 'SW-SGL-15PK',
-        quantity: 2,
-        unitPrice: 60,
-        total: 120
-      },
-      {
-        id: 'ITEM-012',
-        name: 'Junction Boxes 4" (25 Pack)',
-        sku: 'JB-4IN-25PK',
-        quantity: 3,
-        unitPrice: 45,
-        total: 135
-      }
-    ],
-    subtotal: 255,
-    tax: 20.4,
-    discount: 0,
-    totalPayment: 275.4
-  }
-]
+// const ordersData: Order[] = [
+//   {
+//     id: 'ORD-2025-001',
+//     jobId: 'PH209_US_JDP',
+//     orderNumber: 'ORD-2025-001',
+//     customerName: 'ABC Corporation',
+//     contractorName: 'John Carter',
+//     customerEmail: 'billing@abccorp.com',
+//     customerPhone: '+1 (555) 123-4567',
+//     billingAddress: {
+//       fullName: 'ABC Corporation',
+//       address: '1160 N Willow Dr Near Res.',
+//       city: 'New York',
+//       state: 'NY',
+//       zipCode: '10001',
+//       email: 'billing@abccorp.com',
+//       phone: '+1 (555) 123-4567'
+//     },
+//     status: 'completed',
+//     orderDate: '2025-01-20',
+//     items: [
+//       {
+//         id: 'ITEM-001',
+//         name: 'Main Electrical Panel 200A',
+//         sku: 'ELC-PNL-200A',
+//         quantity: 1,
+//         unitPrice: 450,
+//         total: 450
+//       },
+//       {
+//         id: 'ITEM-002',
+//         name: 'Circuit Breakers 20A (10 Pack)',
+//         sku: 'CB-20A-10PK',
+//         quantity: 2,
+//         unitPrice: 180,
+//         total: 360
+//       },
+//       {
+//         id: 'ITEM-003',
+//         name: 'Copper Wire 12 AWG (500 ft)',
+//         sku: 'CW-12AWG-500FT',
+//         quantity: 3,
+//         unitPrice: 125,
+//         total: 375
+//       }
+//     ],
+//     subtotal: 1185,
+//     tax: 94.8,
+//     discount: 0,
+//     totalPayment: 1279.8,
+//     notes: 'Rush order for electrical panel installation project'
+//   },
+//   {
+//     id: 'ORD-2025-002',
+//     jobId: 'PH210_US_JDP',
+//     orderNumber:'ORD-2025-002',
+//     customerName: 'XYZ Company',
+//     contractorName: 'Sarah Johnson',
+//     customerEmail: 'orders@xyzcompany.com',
+//     customerPhone: '+1 (555) 234-5678',
+//     billingAddress: {
+//       fullName: 'XYZ Company',
+//       address: '11613 W Shores RD NW Jursa Res.',
+//       city: 'New York',
+//       state: 'NY',
+//       zipCode: '10002',
+//       email: 'orders@xyzcompany.com',
+//       phone: '+1 (555) 234-5678'
+//     },
+//     status: 'processing',
+//     orderDate: '2025-01-21',
+//     items: [
+//       {
+//         id: 'ITEM-004',
+//         name: 'Advanced Main Unit 5000W',
+//         sku: 'MU-ADV-5000',
+//         quantity: 1,
+//         unitPrice: 2200,
+//         total: 2200
+//       },
+//       {
+//         id: 'ITEM-005',
+//         name: 'Digital Control Panel (3 Pack)',
+//         sku: 'CP-DIG-TRIO',
+//         quantity: 1,
+//         unitPrice: 450,
+//         total: 450
+//       }
+//     ],
+//     subtotal: 2650,
+//     tax: 212,
+//     discount: 100,
+//     totalPayment: 2762
+//   },
+//   {
+//     id: 'ORD-2025-003',
+//     jobId: 'PH211_US_JDP',
+//     orderNumber:'ORD-2025-003',
+//     customerName: 'DEF Industries',
+//     contractorName: 'Mike Wilson',
+//     customerEmail: 'procurement@defindustries.com',
+//     customerPhone: '+1 (555) 345-6789',
+//     billingAddress: {
+//       fullName: 'DEF Industries',
+//       address: '4211 Aiden Dr Frakes Res.',
+//       city: 'Brooklyn',
+//       state: 'NY',
+//       zipCode: '11201',
+//       email: 'procurement@defindustries.com',
+//       phone: '+1 (555) 345-6789'
+//     },
+//     status: 'pending',
+//     orderDate: '2025-01-22',
+//     items: [
+//       {
+//         id: 'ITEM-006',
+//         name: 'Fine Sand (5 Cubic Yards)',
+//         sku: 'SND-FNE-5YD',
+//         quantity: 2,
+//         unitPrice: 150,
+//         total: 300
+//       },
+//       {
+//         id: 'ITEM-007',
+//         name: 'Pea Gravel (3 Cubic Yards)',
+//         sku: 'GRV-PEA-3YD',
+//         quantity: 1,
+//         unitPrice: 120,
+//         total: 120
+//       }
+//     ],
+//     subtotal: 420,
+//     tax: 33.6,
+//     discount: 0,
+//     totalPayment: 453.6
+//   },
+//   {
+//     id: 'ORD-2025-004',
+//     jobId: 'PH212_US_JDP',
+//     orderNumber:'ORD-2025-004',
+//     customerName: 'GHI Construction',
+//     contractorName: 'John Carter',
+//     customerEmail: 'orders@ghiconstruction.com',
+//     customerPhone: '+1 (555) 456-7890',
+//     billingAddress: {
+//       fullName: 'GHI Construction',
+//       address: '789 Construction Ave',
+//       city: 'Manhattan',
+//       state: 'NY',
+//       zipCode: '10003',
+//       email: 'orders@ghiconstruction.com',
+//       phone: '+1 (555) 456-7890'
+//     },
+//     status: 'cancelled',
+//     orderDate: '2025-01-18',
+//     items: [
+//       {
+//         id: 'ITEM-008',
+//         name: 'Professional Testing Kit',
+//         sku: 'TST-KIT-PRO',
+//         quantity: 1,
+//         unitPrice: 350,
+//         total: 350
+//       }
+//     ],
+//     subtotal: 350,
+//     tax: 28,
+//     discount: 0,
+//     totalPayment: 378
+//   },
+//   {
+//     id: 'ORD-2025-005',
+//     jobId: 'PH213_US_JDP',
+//     orderNumber:'ORD-2025-005',
+//     customerName: 'JKL Enterprises',
+//     contractorName: 'Sarah Johnson',
+//     customerEmail: 'purchasing@jklenterprises.com',
+//     customerPhone: '+1 (555) 567-8901',
+//     billingAddress: {
+//       fullName: 'JKL Enterprises',
+//       address: '456 Business Plaza',
+//       city: 'Queens',
+//       state: 'NY',
+//       zipCode: '11004',
+//       email: 'purchasing@jklenterprises.com',
+//       phone: '+1 (555) 567-8901'
+//     },
+//     status: 'processing',
+//     orderDate: '2025-01-19',
+//     items: [
+//       {
+//         id: 'ITEM-009',
+//         name: 'ROMEX Cable 14 AWG (250 ft)',
+//         sku: 'RMX-14-250FT',
+//         quantity: 4,
+//         unitPrice: 95,
+//         total: 380
+//       },
+//       {
+//         id: 'ITEM-010',
+//         name: 'Standard Outlets (20 Pack)',
+//         sku: 'OUT-STD-20PK',
+//         quantity: 2,
+//         unitPrice: 85,
+//         total: 170
+//       }
+//     ],
+//     subtotal: 550,
+//     tax: 44,
+//     discount: 25,
+//     totalPayment: 569
+//   },
+//   {
+//     id: 'ORD-2025-006',
+//     jobId: 'PH214_US_JDP',
+//     orderNumber:'ORD-2025-006',
+//     customerName: 'MNO Corporation',
+//     contractorName: 'Mike Wilson',
+//     customerEmail: 'orders@mnocorp.com',
+//     customerPhone: '+1 (555) 678-9012',
+//     billingAddress: {
+//       fullName: 'MNO Corporation',
+//       address: '321 Corporate Blvd',
+//       city: 'Bronx',
+//       state: 'NY',
+//       zipCode: '10005',
+//       email: 'orders@mnocorp.com',
+//       phone: '+1 (555) 678-9012'
+//     },
+//     status: 'pending',
+//     orderDate: '2025-01-23',
+//     items: [
+//       {
+//         id: 'ITEM-011',
+//         name: 'Single Pole Switches (15 Pack)',
+//         sku: 'SW-SGL-15PK',
+//         quantity: 2,
+//         unitPrice: 60,
+//         total: 120
+//       },
+//       {
+//         id: 'ITEM-012',
+//         name: 'Junction Boxes 4" (25 Pack)',
+//         sku: 'JB-4IN-25PK',
+//         quantity: 3,
+//         unitPrice: 45,
+//         total: 135
+//       }
+//     ],
+//     subtotal: 255,
+//     tax: 20.4,
+//     discount: 0,
+//     totalPayment: 275.4
+//   }
+// ]
 
 export function OrdersPage() {
   const { hasPermission } = usePermissions()
@@ -498,12 +523,18 @@ useEffect(() => {
           status: apiOrder.status as 'pending' | 'processing' | 'completed' | 'cancelled' || 'pending',
           subtotal: apiOrder.subtotal?.toString() || '0',
           createdAt: apiOrder.created_at || '',
+          totalPayment:apiOrder.totalPayment?.toString() || '0',
           // Top-level customer fields
          
           billingAddress: apiOrder.delivery_address || '',
           billingDate: apiOrder.delivery_date || '',
           billingNotes: apiOrder.delivery_notes || '',
           billingPhone: apiOrder.delivery_phone || '',
+
+
+          job:{
+
+          },
 
           // Nested customer object
           customer: {
@@ -517,11 +548,12 @@ useEffect(() => {
           // Order items
           orderItems: apiOrder.order_items?.map((item: any) => ({
             id: item.id.toString(),
-            name: item.product?.name || '',        
+            name: item.product_name || '',        
             sku: item.product?.jdp_sku || '',
             quantity: item.quantity || 0,
             unitPrice: item.product?.unit_cost || 0,
-            total: item.total_price || 0,        
+            total: item.total_price || 0,  
+            // product_name:item.product_name || 0    
           })) || []
         };
 
@@ -691,6 +723,7 @@ useEffect(() => {
         const res = await apiClient.searchOrdersByDateRange(dateFrom, dateTo);
         orders = res.data?.orders || [];
       } 
+      console.log(orders,"orders")
 
       setOrders(orders);
       setTotalOrders(orders.length);
@@ -1420,10 +1453,10 @@ useEffect(() => {
                       Billing Address
                     </CardTitle>
                   </CardHeader>
-                  {/* <CardContent className="space-y-2 text-sm">
-                    <div className="font-medium">{selectedOrder?.billingAddress?.fullName}</div>
+                  <CardContent className="space-y-2 text-sm">
+                    <div className="font-medium">{selectedOrder?.job?.bill_to_address}</div>
                     <div className="text-muted-foreground">
-                      {selectedOrder?.billingAddress?.address}<br />
+                      {selectedOrder?.job?.bill_to_city_zip}<br />
                       {selectedOrder?.billingAddress?.city}, {selectedOrder?.billingAddress?.state} {selectedOrder?.billingAddress?.zipCode}
                     </div>
                     <div className="flex items-center gap-1">
@@ -1434,7 +1467,7 @@ useEffect(() => {
                       <Phone className="h-3 w-3 text-muted-foreground" />
                       <span className="text-muted-foreground">{selectedOrder?.billingPhone}</span>
                     </div>
-                  </CardContent> */}
+                  </CardContent>
                 </Card>
 
                 {/* Customer/Contractor Info */}
@@ -1506,21 +1539,21 @@ useEffect(() => {
                 <CardHeader>
                   <CardTitle className="text-base">Payment Summary</CardTitle>
                 </CardHeader>
-                {/* <CardContent>
+                <CardContent>
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <span>Subtotal:</span>
                       <span>{formatCurrency(selectedOrder.subtotal)}</span>
                     </div>
-                    {selectedOrder.discount > 0 && (
+                    {selectedOrder.discount_amount > 0 && (
                       <div className="flex justify-between">
                         <span>Discount:</span>
-                        <span className="text-green-600">-{formatCurrency(selectedOrder.discount)}</span>
+                        <span className="text-green-600">-{formatCurrency(selectedOrder.discount_amount)}</span>
                       </div>
                     )}
                     <div className="flex justify-between">
                       <span>Tax:</span>
-                      <span>{formatCurrency(selectedOrder.tax)}</span>
+                      <span>{formatCurrency(selectedOrder.tax_amount)}</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between font-semibold text-lg">
@@ -1528,7 +1561,7 @@ useEffect(() => {
                       <span className="text-primary">{formatCurrency(selectedOrder.totalPayment)}</span>
                     </div>
                   </div>
-                </CardContent> */}
+                </CardContent>
               </Card>
 
               {/* {selectedOrder.notes && (
