@@ -322,14 +322,15 @@ export function InvoicesPage() {
 
   useEffect(() => {
     fetchEstimates();
-  }, []);
+  }, [currentPage]);
+  
   const fetchEstimates = async () => {
       setIsLoadingEstimates(true);
       try {
-        const response = await apiClient.getAllEstimates();
+        const response = await apiClient.getAllEstimates(currentPage, itemsPerPage);
         console.log('API Response:', response);
         setEstimates(response.data.estimates || []);
-        setTotalEstimates((response.data?.estimates?.length ?? 0));
+        setTotalEstimates(response.data.total || 0);
         console.log("API Estimates:", response.data.estimates);
       } catch (error) {
         console.error('Failed to fetch estimates:', error);
@@ -481,14 +482,14 @@ useEffect(() => {
   const debounceTimeout = setTimeout(() => {
     if (!searchTerm.trim()) {
       fetchEstimates();
-      // fetchEstimates(currentPage, itemsPerPage); 
     } else {
+      setCurrentPage(1); // Reset to first page when searching
       fetchBySearchEstimates(); 
     }
   }, 500); 
 
   return () => clearTimeout(debounceTimeout);
-}, [searchTerm, currentPage]);
+}, [searchTerm]);
 
 
 useEffect(() => {
@@ -496,6 +497,7 @@ useEffect(() => {
     if (searchTerm.trim()) return;
 
     setIsLoadingEstimates(true);
+    setCurrentPage(1); // Reset to first page when filters change
 
     try {
       let estimates: any[] = [];
@@ -521,6 +523,15 @@ useEffect(() => {
       else if (hasInvoiceType) {
         const res = await apiClient.searchEstimatesByInvoiceType(invoiceTypeFilter);
         estimates = res?.data?.estimates || [];
+      }
+      else {
+        // No filters applied, fetch with pagination
+        const res = await apiClient.getAllEstimates(1, itemsPerPage);
+        estimates = res?.data?.estimates || [];
+        setTotalEstimates(res?.data?.total || 0);
+        setEstimates(estimates);
+        setIsLoadingEstimates(false);
+        return;
       }
 
       setEstimates(estimates);
@@ -816,7 +827,7 @@ useEffect(() => {
 {totalEstimates > 0 && (
   <div className="flex items-center justify-between px-4 py-3 border-t">
     <div className="text-sm text-muted-foreground">
-      Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalEstimates)} of {totalEstimates} products
+      Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalEstimates)} of {totalEstimates} invoices
     </div>
     <div className="flex items-center gap-2">
       <Button
@@ -828,7 +839,7 @@ useEffect(() => {
         Previous
       </Button>
       <span className="text-sm">
-        Page {currentPage} of {Math.ceil(totalEstimates / itemsPerPage)}
+        Page {currentPage} of {Math.ceil(totalEstimates / itemsPerPage) || 1}
       </span>
       <Button
         variant="outline"
@@ -875,6 +886,10 @@ useEffect(() => {
         onOpenChange={setShowNewInvoiceDialog}
         onSave={handleSaveInvoice}
         jobs={localJobs}
+        onInvoiceSaved={() => {
+          setCurrentPage(1);
+          fetchEstimates();
+        }}
       />
 
 

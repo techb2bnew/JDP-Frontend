@@ -837,7 +837,7 @@ getAllProducts: async () => {
     return response.json();
   },
   // Get All Estimates
-  getAllEstimates: async () => {
+  getAllEstimates: async (page = 1, limit = 10) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
     const token = getAuthToken();
 
@@ -845,7 +845,7 @@ getAllProducts: async () => {
       throw new Error("No authentication token found");
     }
 
-    const response = await fetch(`${apiBaseUrl}/estimates/getEstimates`, {
+    const response = await fetch(`${apiBaseUrl}/estimates/getEstimates?page=${page}&limit=${limit}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -2175,6 +2175,78 @@ getTimesheetDashboardStats: async () => {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.message || "Failed to create estimate");
+    }
+
+    return response.json();
+  },
+
+  updateEstimate: async (estimateId: number, estimateData: {
+    estimate_title?: string;
+    customer_id?: number;
+    priority?: "low" | "medium" | "high";
+    valid_until?: string;
+    location?: string;
+    description?: string;
+    service_type?: string;
+    email_address?: string;
+    estimate_date?: string;
+
+    materials_cost?: number;
+    labor_cost?: number;
+    additional_costs?: number;
+    subtotal?: number;
+    tax_percentage?: number;
+    tax_amount?: number;
+    total_amount?: number;
+
+    status?: string;
+    invoice_type?: string;
+    invoice_number?: string;
+    issue_date?: string;
+    due_date?: string;
+
+    job_id?: number;
+
+    custom_labor?: {
+      full_name: string;
+      email: string;
+      hours_worked: number;
+      hourly_rate: number;
+      job_id: number;
+      is_custom: boolean;
+    }[];
+
+    custom_products?: {
+      product_name: string;
+      supplier_id: number;
+      supplier_sku: string;
+      jdp_sku: string;
+      stock_quantity: number;
+      unit: string;
+      job_id: number;
+      is_custom: boolean;
+      unit_cost: number;
+    }[];
+  }) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const response = await fetch(`${apiBaseUrl}/estimates/updateEstimate/${estimateId}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(estimateData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to update estimate");
     }
 
     return response.json();

@@ -24,7 +24,10 @@ import {
   X,
   Check,
   MapPin,
-  UserCheck
+  UserCheck,
+  PlusCircle,
+  Receipt,
+  Search
 } from 'lucide-react'
 import {
   Dialog,
@@ -53,6 +56,9 @@ import html2canvas from 'html2canvas'
 import { Invoice,CreateEstimatePayload } from '@/types/invoice'
 import { LoadingSpinner } from './common/LoadingSpinner'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog'
+import { motion } from 'framer-motion'
+import { Logo } from './common/Logo'
+
 // Sample data structure - replace with your actual data
 const sampleJobData = {
   "job": {
@@ -226,10 +232,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const totalMaterialItems = materials.reduce((sum: number, material: any) => sum + (material.stock_quantity || material.quantity || 0), 0)
   const totalLaborEntries = job.assignedLaborDetails ? job.assignedLaborDetails.length : timeLogs.length;
   const totalInvoices = invoices.length;
-  const [showEditJobModal, setShowEditJobModal] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
-  console.log(selectedInvoice, 'invoice')
-
+  const [showEditJobModal, setShowEditJobModal] = useState(false); 
+ 
 
   const [refreshMaterials, setRefreshMaterials] = useState(false);
   const [isLoadingMaterials, setIsLoadingMaterials] = useState(false);
@@ -283,7 +287,50 @@ const [showPrintMount, setShowPrintMount] = useState(false);
     assignedLeadLabor: job.assignedLeadLaborDetails || [],
   });
 
+  // Form states
+  const [showAddInvoiceDialog, setShowAddInvoiceDialog] = useState(false)
+  const [showInlineInvoiceForm, setShowInlineInvoiceForm] = useState(false)
+  const [showAddMaterialDialog, setShowAddMaterialDialog] = useState(false)
+  const [showAddLaborDialog, setShowAddLaborDialog] = useState(false)
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null)
+  const [showInvoiceViewDialog, setShowInvoiceViewDialog] = useState(false)
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false)
+  const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null)
+  const [selectedEstimateId, setSelectedEstimateId] = useState<string | null>(null)
+  const [products, setProducts] = useState<any[]>([])
+  const [suppliersList, setSuppliersList] = useState<any[]>([])
+  const [selectedSupplierId, setSelectedSupplierId] = useState<number>(1)
+  const [invoiceValidationErrors, setInvoiceValidationErrors] = useState<Record<string, string>>({})
 
+  // Inline Invoice Data State
+  const [inlineInvoiceData, setInlineInvoiceData] = useState({
+    date: new Date().toISOString().split('T')[0],
+    estimateNumber: '',
+    customerName: job.customerName || '',
+    customerAddress: job.location || '',
+    poNumber: '',
+    project: job.title || '',
+    lineItems: [{
+      id: Math.random().toString(36).substring(2, 9),
+      productId: null,
+      qty: 1,
+      item: '',
+      description: '',
+      rate: 0,
+      estimatedPrice: 0,
+      total: 0,
+      searchQuery: '',
+      showSearchResults: false,
+      supplierId: 1
+    }],
+    notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
+    signatureText: 'ACCEPTED BY________________DATE_____',
+    invoiceType: 'Estimate',
+    paymentPercentage: 0,
+    estimateTotal: 0,
+    paymentHistory: [] as any[]
+  })
+  
 const allowedStatuses = ['draft', 'active', 'in_progress', 'completed', 'cancelled', 'on_hold'];
 
   const handleSave = async () => {
@@ -1178,7 +1225,549 @@ console.log(suppliers,"supp")
     )
   }
 
-  console.log("Parent selectedInvoiceId:", selectedInvoiceId);
+  // Invoice Helper Functions
+  const calculateInvoiceSubtotal = () => {
+    return inlineInvoiceData.lineItems.reduce((sum, item) => sum + item.total, 0)
+  }
+
+  const updateInvoiceLineItem = (itemId: string, field: string, value: any) => {
+    setInlineInvoiceData(prev => ({
+      ...prev,
+      lineItems: prev.lineItems.map(item => {
+        if (item.id === itemId) {
+          const updated = { ...item, [field]: value }
+          if (field === 'qty' || field === 'estimatedPrice') {
+            updated.total = (updated.qty || 0) * (updated.estimatedPrice || 0)
+          }
+          return updated
+        }
+        return item
+      })
+    }))
+  }
+
+  const addInvoiceLineItem = () => {
+    setInlineInvoiceData(prev => ({
+      ...prev,
+      lineItems: [...prev.lineItems, {
+        id: Math.random().toString(36).substring(2, 9),
+        productId: null,
+        qty: 1,
+        item: '',
+        description: '',
+        rate: 0,
+        estimatedPrice: 0,
+        total: 0,
+        searchQuery: '',
+        showSearchResults: false,
+        supplierId: selectedSupplierId || 1
+      }]
+    }))
+  }
+
+  const removeInvoiceLineItem = (itemId: string) => {
+    setInlineInvoiceData(prev => ({
+      ...prev,
+      lineItems: prev.lineItems.filter(item => item.id !== itemId)
+    }))
+  }
+
+  const getFilteredProducts = (query: string) => {
+    if (!query) return []
+    return products.filter(product =>
+      product.name?.toLowerCase().includes(query.toLowerCase()) ||
+      product.jdpSKU?.toLowerCase().includes(query.toLowerCase())
+    )
+  }
+
+  const selectProduct = (itemId: string, product: any) => {
+    setInlineInvoiceData(prev => ({
+      ...prev,
+      lineItems: prev.lineItems.map(item => {
+        if (item.id === itemId) {
+          return {
+            ...item,
+            item: product.name,
+            description: product.description || '',
+            rate: product.jdpPrice || 0,
+            estimatedPrice: product.estimatedPrice || product.jdpPrice || 0,
+            total: (item.qty || 1) * (product.estimatedPrice || product.jdpPrice || 0),
+            showSearchResults: false,
+            searchQuery: '',
+            supplierId: product.supplierId || selectedSupplierId || 1
+          }
+        }
+        return item
+      })
+    }))
+  }
+
+  const addCustomProduct = (itemId: string, productName: string) => {
+    setInlineInvoiceData(prev => ({
+      ...prev,
+      lineItems: prev.lineItems.map(item => {
+        if (item.id === itemId) {
+          return {
+            ...item,
+            item: productName,
+            showSearchResults: false,
+            searchQuery: ''
+          }
+        }
+        return item
+      })
+    }))
+  }
+
+  const getAvailableEstimates = () => {
+    return estimates.filter((est: any) => est.invoice_type === 'Estimate')
+  }
+
+  const handleEstimateSelection = (estimateId: string) => {
+    setSelectedEstimateId(estimateId)
+    const estimate: any = estimates.find((e: any) => e.id === estimateId)
+    if (estimate) {
+      setInlineInvoiceData(prev => ({
+        ...prev,
+        estimateTotal: estimate.total_amount || 0,
+        paymentHistory: estimate.paymentHistory || []
+      }))
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    })
+  }
+
+  const getInvoiceTypeColor = (type: string) => {
+    const colors: any = {
+      'Estimate': 'border-blue-200 bg-blue-50 text-blue-700',
+      'Downpayment Invoice': 'border-green-200 bg-green-50 text-green-700',
+      'Rough Invoice': 'border-orange-200 bg-orange-50 text-orange-700',
+      'Progressive Invoice': 'border-purple-200 bg-purple-50 text-purple-700',
+      'Final Invoice': 'border-gray-200 bg-gray-50 text-gray-700'
+    }
+    return colors[type] || 'border-gray-200 bg-gray-50 text-gray-700'
+  }
+
+  const getStatusBadgeColor = (status: string) => {
+    const colors: any = {
+      'Draft': 'border-gray-300 bg-gray-100 text-gray-700',
+      'Sent': 'border-blue-300 bg-blue-100 text-blue-700',
+      'Paid': 'border-green-300 bg-green-100 text-green-700'
+    }
+    return colors[status] || 'border-gray-300 bg-gray-100 text-gray-700'
+  }
+
+  const handleViewInvoice = async (invoice: any) => {
+    try {
+      setIsLoading(true)
+      const response = await apiClient.getEstimateById(invoice.id)
+      setSelectedInvoice(response?.data || response)
+      setSelectedInvoiceId(invoice.id)
+      setShowInvoiceModal(true)
+    } catch (error) {
+      console.error('Error fetching invoice details:', error)
+      toast.error('Failed to load invoice details')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handlePrintInvoice = (invoice: any) => {
+    setSelectedInvoiceId(invoice.id)
+    setTimeout(() => handlePrint(invoice), 100)
+  }
+
+  const handleDeleteInvoice = async (invoiceId: string) => {
+    setEstimateToDelete({ id: invoiceId })
+    setShowDeleteEstimateDialog(true)
+  }
+
+  // Map UI invoice types to API values
+  const mapInvoiceTypeToAPI = (uiType: string): string => {
+    const mapping: Record<string, string> = {
+      'Estimate': 'estimate',
+      'Downpayment Invoice': 'down_payment',
+      'Rough Invoice': 'proposal_invoice',
+      'Progressive Invoice': 'progressive_invoice',
+      'Final Invoice': 'final_invoice'
+    }
+    return mapping[uiType] || 'estimate'
+  }
+
+  // Map API invoice type to UI format
+  const mapInvoiceTypeToUI = (apiType: string): string => {
+    const mapping: Record<string, string> = {
+      'estimate': 'Estimate',
+      'down_payment': 'Downpayment Invoice',
+      'proposal_invoice': 'Rough Invoice',
+      'progressive_invoice': 'Progressive Invoice',
+      'final_invoice': 'Final Invoice'
+    }
+    return mapping[apiType] || 'Estimate'
+  }
+
+  // Fetch suppliers with search
+  const fetchSuppliers = async (searchQuery: string = '') => {
+    try {
+      const response = searchQuery 
+        ? await apiClient.searchSuppliersByQuery(searchQuery)
+        : await apiClient.getAllSuppliers()
+      
+      const suppliersData = response.data?.suppliers || response.data?.data || []
+      setSuppliersList(suppliersData.map((s: any) => ({
+        id: s.id,
+        name: s.company_name || s.users?.full_name || 'Unknown',
+        fullName: s.users?.full_name || '',
+        companyName: s.company_name || ''
+      })))
+    } catch (error) {
+      console.error('Error fetching suppliers:', error)
+    }
+  }
+
+  // Fetch products with search
+  const fetchProducts = async (searchQuery: string = '') => {
+    try {
+      const response = searchQuery 
+        ? await apiClient.searchProductsByQuery(searchQuery)
+        : await apiClient.getAllProducts()
+      
+      const productsData = response.data?.products || response.data?.data || []
+      setProducts(productsData.map((p: any) => ({
+        id: p.id,
+        name: p.product_name,
+        description: p.description || '',
+        jdpSKU: p.jdp_sku,
+        jdpPrice: p.jdp_price || p.unit_cost || 0,
+        estimatedPrice: p.estimated_price || 0,
+        supplierId: p.supplier_id || 1
+      })))
+    } catch (error) {
+      console.error('Error fetching products:', error)
+    }
+  }
+
+  useEffect(() => {
+    fetchProducts()
+    fetchSuppliers()
+  }, [])
+
+  const handleSaveInvoiceAsDraft = async () => {
+    // Validation
+    const errors: Record<string, string> = {}
+
+    if (!inlineInvoiceData.project) {
+      errors.project = 'Project field is required'
+    }
+
+    if (!inlineInvoiceData.poNumber) {
+      errors.poNumber = 'P.O. Number is required'
+    }
+
+    if (!inlineInvoiceData.estimateNumber) {
+      errors.estimateNumber = 'Invoice/Estimate number is required'
+    }
+
+    if (inlineInvoiceData.lineItems.length === 0 || !inlineInvoiceData.lineItems[0].item) {
+      errors.lineItems = 'Please add at least one product item'
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setInvoiceValidationErrors(errors)
+      toast.error('Please fix the validation errors')
+      return
+    }
+
+    setInvoiceValidationErrors({})
+    setIsLoading(true)
+    try {
+    const subtotal = calculateInvoiceSubtotal()
+    
+      const customProducts = inlineInvoiceData.lineItems.map(item => {
+        const productPayload: any = {
+          product_name: item.item,
+          supplier_id: item.supplierId || selectedSupplierId || 1,
+          description: item.item.substring(0, 10),
+          jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          stock_quantity: item.qty,
+          unit: 'unit',
+          job_id: Number(jobId),
+          unit_cost: item.rate,
+          jdp_price: item.rate,
+          estimated_price: item.estimatedPrice || 0,
+          total_cost: item.total
+        }
+        
+        // Add product ID if editing existing product
+        if (item.productId) {
+          productPayload.id = item.productId
+        }
+        
+        return productPayload
+      })
+
+      const payload = {
+        job_id: Number(jobId),
+        estimate_title: inlineInvoiceData.project || job.title,
+        customer_id: Number(job.customer) || 0,
+        priority: 'medium' as 'low' | 'medium' | 'high',
+        service_type: 'service_based',
+        email_address: job.email || 'customer@example.com',
+        estimate_date: inlineInvoiceData.date,
+        billing_address_po_number: inlineInvoiceData.poNumber || '',
+        status: 'draft',
+        invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
+        notes: inlineInvoiceData.notes || '',
+        custom_products: customProducts
+      }
+
+      // Check if we're editing an existing invoice
+      if (editingInvoiceId) {
+        await apiClient.updateEstimate(Number(editingInvoiceId), payload as any)
+      toast.success('Invoice updated successfully!')
+    } else {
+        await apiClient.createEstimate(payload as any)
+      toast.success('Invoice saved as draft!')
+    }
+      
+      // Refresh estimates list
+      await fetchEstimates()
+    
+    setShowInlineInvoiceForm(false)
+    setEditingInvoiceId(null)
+      
+      // Reset form
+      setInlineInvoiceData({
+        date: new Date().toISOString().split('T')[0],
+        estimateNumber: '',
+        customerName: job.customerName || '',
+        customerAddress: job.location || '',
+        poNumber: '',
+        project: job.title || '',
+        lineItems: [{
+          id: Math.random().toString(36).substring(2, 9),
+          productId: null,
+          qty: 1,
+          item: '',
+          description: '',
+          rate: 0,
+          estimatedPrice: 0,
+          total: 0,
+          searchQuery: '',
+          showSearchResults: false,
+          supplierId: 1
+        }],
+        notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
+        signatureText: 'ACCEPTED BY________________DATE_____',
+        invoiceType: 'Estimate',
+        paymentPercentage: 0,
+        estimateTotal: 0,
+        paymentHistory: []
+      })
+      setInvoiceValidationErrors({})
+    } catch (error) {
+      console.error('Error saving invoice:', error)
+      toast.error('Failed to save invoice')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handlePreviewAndSend = async () => {
+    // Validation
+    const errors: Record<string, string> = {}
+
+    if (!inlineInvoiceData.project) {
+      errors.project = 'Project field is required'
+    }
+
+    if (!inlineInvoiceData.poNumber) {
+      errors.poNumber = 'P.O. Number is required'
+    }
+
+    if (!inlineInvoiceData.estimateNumber) {
+      errors.estimateNumber = 'Invoice/Estimate number is required'
+    }
+
+    if (inlineInvoiceData.lineItems.length === 0 || !inlineInvoiceData.lineItems[0].item) {
+      errors.lineItems = 'Please add at least one product item'
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setInvoiceValidationErrors(errors)
+      toast.error('Please fix the validation errors')
+      return
+    }
+
+    setInvoiceValidationErrors({})
+    setIsLoading(true)
+    try {
+    const subtotal = calculateInvoiceSubtotal()
+      
+      const customProducts = inlineInvoiceData.lineItems.map(item => {
+        const productPayload: any = {
+          product_name: item.item,
+          supplier_id: item.supplierId || selectedSupplierId || 1,
+          description: item.item.substring(0, 10),
+          jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          stock_quantity: item.qty,
+          unit: 'unit',
+          job_id: Number(jobId),
+          unit_cost: item.rate,
+          jdp_price: item.rate,
+          estimated_price: item.estimatedPrice || 0,
+          total_cost: item.total
+        }
+        
+        // Add product ID if editing existing product
+        if (item.productId) {
+          productPayload.id = item.productId
+        }
+        
+        return productPayload
+      })
+
+      const payload = {
+        job_id: Number(jobId),
+        estimate_title: inlineInvoiceData.project || job.title,
+        customer_id: Number(job.customer) || 0,
+        priority: 'medium' as 'low' | 'medium' | 'high',
+        service_type: 'service_based',
+        email_address: job.email || 'customer@example.com',
+        estimate_date: inlineInvoiceData.date,
+        billing_address_po_number: inlineInvoiceData.poNumber || '',
+        status: 'sent',
+        invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
+        notes: inlineInvoiceData.notes || '',
+        custom_products: customProducts
+      }
+
+      // Check if we're editing an existing invoice
+      if (editingInvoiceId) {
+        await apiClient.updateEstimate(Number(editingInvoiceId), payload as any)
+        toast.success('Invoice updated and sent to customer!')
+      } else {
+        await apiClient.createEstimate(payload as any)
+      toast.success('Invoice sent to customer!')
+    }
+      
+      // Refresh estimates list
+      await fetchEstimates()
+    
+    setShowInlineInvoiceForm(false)
+    setShowPreviewDialog(false)
+    setEditingInvoiceId(null)
+
+      // Reset form
+    setInlineInvoiceData({
+        date: new Date().toISOString().split('T')[0],
+        estimateNumber: '',
+        customerName: job.customerName || '',
+        customerAddress: job.location || '',
+      poNumber: '',
+        project: job.title || '',
+      lineItems: [{
+        id: Math.random().toString(36).substring(2, 9),
+          productId: null,
+        qty: 1,
+        item: '',
+          description: '',
+          rate: 0,
+          estimatedPrice: 0,
+          total: 0,
+          searchQuery: '',
+          showSearchResults: false,
+          supplierId: 1
+        }],
+        notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
+      signatureText: 'ACCEPTED BY________________DATE_____',
+        invoiceType: 'Estimate',
+        paymentPercentage: 0,
+        estimateTotal: 0,
+        paymentHistory: []
+      })
+      setInvoiceValidationErrors({})
+    } catch (error) {
+      console.error('Error sending invoice:', error)
+      toast.error('Failed to send invoice')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSendFromPreview = handlePreviewAndSend
+
+  const handleEditInvoice = async (invoice: any) => {
+    try {
+      setIsLoading(true)
+      
+      // Fetch full estimate details from API
+      const response = await apiClient.getEstimateById(invoice.id)
+      const estimateData = response?.data || response
+      
+      console.log('Fetched estimate data:', estimateData)
+      
+      // Map products to line items
+      const lineItems = estimateData.products && estimateData.products.length > 0
+        ? estimateData.products.map((product: any) => ({
+            id: Math.random().toString(36).substring(2, 9),
+            productId: product.id, // Store original product ID for updates
+            qty: product.stock_quantity || 1,
+            item: product.product_name || '',
+            description: product.description || '',
+            rate: product.unit_cost || 0,
+            estimatedPrice: product.estimated_price || product.unit_cost || 0,
+            total: (product.stock_quantity || 1) * (product.estimated_price || product.unit_cost || 0),
+            searchQuery: '',
+            showSearchResults: false,
+            supplierId: product.supplier_id || 1
+          }))
+        : [{
+            id: Math.random().toString(36).substring(2, 9),
+            productId: null,
+            qty: 1,
+            item: '',
+            description: '',
+            rate: 0,
+            estimatedPrice: 0,
+            total: 0,
+            searchQuery: '',
+            showSearchResults: false,
+            supplierId: 1
+          }]
+      
+      setInlineInvoiceData({
+        date: estimateData.estimate_date || new Date().toISOString().split('T')[0],
+        estimateNumber: estimateData.invoice_number || '',
+        customerName: estimateData.customer?.customer_name || job.customerName || '',
+        customerAddress: estimateData.customer?.address || job.location || '',
+        poNumber: estimateData.billing_address_po_number || '',
+        project: estimateData.estimate_title || job.title || '',
+        lineItems: lineItems,
+        notes: estimateData.notes || 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
+        signatureText: 'ACCEPTED BY________________DATE_____',
+        invoiceType: mapInvoiceTypeToUI(estimateData.invoice_type) || 'Estimate',
+        paymentPercentage: 0,
+        estimateTotal: estimateData.total_amount || 0,
+        paymentHistory: []
+      })
+      
+    setEditingInvoiceId(invoice.id)
+    setShowInlineInvoiceForm(true)
+      toast.info('Loading invoice for editing...')
+    } catch (error) {
+      console.error('Error fetching invoice details:', error)
+      toast.error('Failed to load invoice details')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
 
   return (
@@ -1677,105 +2266,642 @@ console.log(suppliers,"supp")
               </CardFooter>
             </Card>
 
-            {/* Transaction History */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Transaction History
-                </CardTitle>
-                <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowNewInvoiceDialog(true)}>
-                  <Plus className="h-4 w-4" />
-                  Add Invoice
-                </Button>
+            {/* Transaction History Section */}
+            <Card className="bg-white shadow-sm border border-primary/10">
+              <CardHeader className="bg-gradient-to-r from-primary/5 to-blue-50/50 border-b border-primary/10">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-primary flex items-center gap-2">
+                    <Receipt className="h-5 w-5" />
+                    Transaction History
+                  </CardTitle>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="border-primary/30 text-primary hover:bg-primary hover:text-white"
+                    onClick={() => setShowInlineInvoiceForm(!showInlineInvoiceForm)}
+                  >
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                    {showInlineInvoiceForm ? 'Cancel' : 'Add Invoice'}
+                  </Button>
+                </div>
               </CardHeader>
-              <CardContent>
-                {isLoadingEstimates ? (
-                  <p className="flex items-center justify-center py-16"> <LoadingSpinner /></p>
-                ) : estimates.length === 0 ? (
-                  <p className="text-sm text-gray-500">No invoices found for this job.</p>
-                ) : (
-                  <div className="space-y-4">
-                    {estimates.map((invoice: any, index: any) => (
-                      <div key={invoice.id} className="flex items-center justify-between p-4 border rounded-lg">
+              <CardContent className="p-6">
+                {/* Inline Invoice Form - Matches AddInvoiceForm.tsx exactly */}
+                {showInlineInvoiceForm && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4 }}
+                    className="mb-6"
+                  >
+                    <Card className="bg-white shadow-lg border-2 border-primary/20">
+                      {/* Invoice Type Selector */}
+                      <div className="p-6 border-b border-gray-200 bg-gray-50">
                         <div className="flex items-center gap-4">
-                          <div className="h-10 w-10 bg-gray-200 rounded-lg flex items-center justify-center">
-                            <FileText className="h-5 w-5 text-gray-700" />
-                          </div>
-                                              <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-medium">{invoice.estimate_title}</h4>
-                        <span
-                          className={`px-2 py-1 rounded text-xs font-medium ${
-                            invoice.invoice_type === 'estimate'
-                              ? 'bg-blue-100 text-blue-800'
-                              : invoice.invoice_type === 'proposal_invoice'
-                              ? 'bg-purple-100 text-purple-800'
-                              : invoice.invoice_type === 'progressive_invoice'
-                              ? 'bg-orange-100 text-orange-800'
-                              : 'bg-green-100 text-green-800'
-                          }`}
-                        >
-                          {invoice.invoice_type.replace('_', ' ')}
-                        </span>
+                          <Label className="text-primary font-semibold">Invoice Type:</Label>
+                          <Select 
+                            value={inlineInvoiceData.invoiceType} 
+                            onValueChange={(value: any) => setInlineInvoiceData(prev => ({ ...prev, invoiceType: value }))}
+                          >
+                            <SelectTrigger className="w-[250px] border-primary/30">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Estimate">Estimate</SelectItem>
+                              <SelectItem value="Downpayment Invoice">Downpayment Invoice</SelectItem>
+                              <SelectItem value="Rough Invoice">Rough Invoice</SelectItem>
+                              <SelectItem value="Progressive Invoice">Progressive Invoice</SelectItem>
+                              <SelectItem value="Final Invoice">Final Invoice</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
 
-                      <p className="text-sm text-gray-600">{invoice.description}</p>
-                      <p className="text-xs text-gray-500 font-medium">
-                        #{invoice.invoice_number}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Created: {invoice.issue_date} • Due: {invoice.due_date}
-                      </p>
-                    </div>
+                      <div className="p-8">
+                        {/* Header */}
+                        <div className="flex justify-between items-start mb-8">
+                          <div className="flex-shrink-0">
+                            <Logo width={200} height={75} />
+                            <p className="text-sm font-semibold mt-2">952-449-1088</p>
+                          </div>
 
+                          <div className="text-right">
+                            <h1 className="text-2xl font-bold mb-4">{inlineInvoiceData.invoiceType}</h1>
+                            <div className="grid grid-cols-2 gap-2">
+                              <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">Date</Label>
+                              <Input
+                                value={inlineInvoiceData.date}
+                                onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, date: e.target.value }))}
+                                className="px-3 py-2 text-sm"
+                              />
+                              <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">
+                                {inlineInvoiceData.invoiceType === 'Estimate' ? 'Estimate #' : 'Invoice #'}
+                              </Label>
+                              <div>
+                              <Input
+                                value={inlineInvoiceData.estimateNumber}
+                                  onChange={(e) => {
+                                    setInlineInvoiceData(prev => ({ ...prev, estimateNumber: e.target.value }))
+                                    setInvoiceValidationErrors(prev => ({ ...prev, estimateNumber: '' }))
+                                  }}
+                                  className={`px-3 py-2 text-sm ${invoiceValidationErrors.estimateNumber ? 'border-red-500' : ''}`}
+                                />
+                                {invoiceValidationErrors.estimateNumber && (
+                                  <p className="text-red-500 text-xs mt-1 px-2">{invoiceValidationErrors.estimateNumber}</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
+
+                        {/* Customer Information */}
+                        <div className="mb-6">
+                          <Label className="block bg-gray-600 text-white px-3 py-2 mb-0 text-sm font-semibold">Name / Address</Label>
+                          <div className="border border-gray-300 p-4 min-h-[120px]">
+                            <Input
+                              value={inlineInvoiceData.customerName}
+                              onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customerName: e.target.value }))}
+                              className="mb-2 border-0 p-0 focus-visible:ring-0"
+                              placeholder="Customer Name"
+                            />
+                            <Textarea
+                              value={inlineInvoiceData.customerAddress}
+                              onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customerAddress: e.target.value }))}
+                              className="border-0 p-0 resize-none focus-visible:ring-0"
+                              rows={3}
+                              placeholder="Customer Address"
+                            />
+                          </div>
+                        </div>
+
+                        {/* PO and Project */}
+                        <div className="mb-6">
+                          <div className="grid grid-cols-2 gap-0">
+                            <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">P.O. No.</Label>
+                            <Label className="bg-gray-600 text-white px-3 py-2 text-center text-sm font-semibold">Project</Label>
+                          </div>
+                          <div className="grid grid-cols-2 gap-0">
+                            <div>
+                            <Input
+                              value={inlineInvoiceData.poNumber}
+                                onChange={(e) => {
+                                  setInlineInvoiceData(prev => ({ ...prev, poNumber: e.target.value }))
+                                  setInvoiceValidationErrors(prev => ({ ...prev, poNumber: '' }))
+                                }}
+                                className={`px-3 py-2 text-sm rounded-none border-t-0 ${invoiceValidationErrors.poNumber ? 'border-red-500' : ''}`}
+                              placeholder="PO Number"
+                            />
+                              {invoiceValidationErrors.poNumber && (
+                                <p className="text-red-500 text-xs mt-1 px-2">{invoiceValidationErrors.poNumber}</p>
+                              )}
+                            </div>
+                            <Input
+                              value={inlineInvoiceData.project}
+                              onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, project: e.target.value }))}
+                              className="px-3 py-2 text-sm rounded-none border-t-0"
+                            />
+                          </div>
+                        </div>
+                      {/* Estimate Selection - Only show for payment invoices */}
+                      {/* {inlineInvoiceData.invoiceType !== 'Estimate' && (
+                        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                          <Label className="text-primary font-semibold mb-2 block">Select Estimate</Label>
+                          <Select 
+                            value={selectedEstimateId || ''} 
+                            onValueChange={(value) => handleEstimateSelection(value)}
+                          >
+                            <SelectTrigger className="border-primary/30 focus:border-primary bg-white">
+                              <SelectValue placeholder="Select an estimate to link..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {getAvailableEstimates().map((estimate: any) => (
+                                <SelectItem key={estimate.id} value={estimate.id}>
+                                  {estimate.invoice_number} - {estimate.estimate_title} (${(estimate.total_amount || 0).toLocaleString()})
+                                </SelectItem>
+                              ))}
+                              {getAvailableEstimates().length === 0 && (
+                                <SelectItem value="none" disabled>No estimates available</SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                          {selectedEstimateId && (
+                            <p className="text-sm text-muted-foreground mt-2">
+                              Estimate Total: ${inlineInvoiceData.estimateTotal?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                              {inlineInvoiceData.paymentHistory && inlineInvoiceData.paymentHistory.length > 0 && (
+                                <> • Previous Payments: ${inlineInvoiceData.paymentHistory.reduce((sum, p) => sum + p.amount, 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</>
+                              )}
+                            </p>
+                          )}
+                        </div>
+                      )} */}
+
+                      {/* Header Section */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-primary">Invoice Type</Label>
+                          <Select 
+                            value={inlineInvoiceData.invoiceType} 
+                            onValueChange={(value: any) => {
+                              // Set default payment percentage based on invoice type
+                              let defaultPercentage = 0.5
+                              if (value === 'Downpayment Invoice') defaultPercentage = 0.5
+                              else if (value === 'Rough Invoice') defaultPercentage = 0.3
+                              else if (value === 'Progressive Invoice') defaultPercentage = 0.15
+                              else if (value === 'Final Invoice') defaultPercentage = 0.05
+                              
+                              setInlineInvoiceData(prev => ({ 
+                                ...prev, 
+                                invoiceType: value,
+                                paymentPercentage: value !== 'Estimate' ? defaultPercentage : 0
+                              }))
+                            }}
+                          >
+                            <SelectTrigger className="border-primary/30 focus:border-primary">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Estimate">Estimate</SelectItem>
+                              <SelectItem value="Downpayment Invoice">Downpayment Invoice</SelectItem>
+                              <SelectItem value="Rough Invoice">Rough Invoice</SelectItem>
+                              <SelectItem value="Progressive Invoice">Progressive Invoice</SelectItem>
+                              <SelectItem value="Final Invoice">Final Invoice</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {inlineInvoiceData.invoiceType !== 'Estimate' && (
+                          <div className="space-y-2">
+                            <Label className="text-primary">Payment %</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={(inlineInvoiceData.paymentPercentage || 0) * 100}
+                              onChange={(e) => setInlineInvoiceData(prev => ({ 
+                                ...prev, 
+                                paymentPercentage: parseFloat(e.target.value) / 100 
+                              }))}
+                              className="border-primary/30 focus:border-primary"
+                              placeholder="e.g., 50"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              {inlineInvoiceData.invoiceType === 'Downpayment Invoice' && 'Default: 50%'}
+                              {inlineInvoiceData.invoiceType === 'Rough Invoice' && 'Default: 30%'}
+                              {inlineInvoiceData.invoiceType === 'Progressive Invoice' && 'Default: 15%'}
+                              {inlineInvoiceData.invoiceType === 'Final Invoice' && 'Remaining balance'}
+                            </p>
+                          </div>
+                        )}
+                        <div className="space-y-2">
+                          <Label className="text-primary">Date</Label>
+                          <Input
+                            value={inlineInvoiceData.date}
+                            onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, date: e.target.value }))}
+                            className="border-primary/30 focus:border-primary"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-primary">Invoice Number</Label>
+                          <Input
+                            value={inlineInvoiceData.estimateNumber}
+                            onChange={(e) => {
+                              setInlineInvoiceData(prev => ({ ...prev, estimateNumber: e.target.value }))
+                              setInvoiceValidationErrors(prev => ({ ...prev, estimateNumber: '' }))
+                            }}
+                            className={`border-primary/30 focus:border-primary ${invoiceValidationErrors.estimateNumber ? 'border-red-500' : ''}`}
+                          />
+                          {invoiceValidationErrors.estimateNumber && (
+                            <p className="text-red-500 text-xs mt-1">{invoiceValidationErrors.estimateNumber}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Customer Information */}
+                      <div className="space-y-2 mt-3">
+                        <Label className="text-primary">Customer Name</Label>
+                        <Input
+                          value={inlineInvoiceData.customerName}
+                          onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customerName: e.target.value }))}
+                          className="border-primary/30 focus:border-primary"
+                        />
+                      </div>
+                      <div className="space-y-2 mt-3 mb-4">
+                        <Label className="text-primary">Customer Address</Label>
+                        <Textarea
+                          value={inlineInvoiceData.customerAddress}
+                          onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customerAddress: e.target.value }))}
+                          className="border-primary/30 focus:border-primary"
+                          rows={2}
+                        />
+                      </div> 
+
+                        {/* Line Items Table */}
+                        <div className="mb-6 overflow-x-auto">
+                          <table className="w-full border-collapse">
+                            <thead>
+                              <tr className="bg-gray-600 text-white">
+                                <th className="border border-gray-300 px-3 py-2 w-16 text-sm font-semibold">Qty</th>
+                                <th className="border border-gray-300 px-3 py-2 w-48 text-sm font-semibold">Item</th>
+                                <th className="border border-gray-300 px-3 py-2 text-sm font-semibold">Description</th>
+                                <th className="border border-gray-300 px-3 py-2 w-40 text-sm font-semibold">Supplier</th>
+                                <th className="border border-gray-300 px-3 py-2 w-28 text-sm font-semibold">Rate</th>
+                                <th className="border border-gray-300 px-3 py-2 w-32 text-sm font-semibold">Estimated Price</th>
+                                <th className="border border-gray-300 px-3 py-2 w-28 text-sm font-semibold">Total</th>
+                                <th className="border border-gray-300 px-3 py-2 w-16"></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {inlineInvoiceData.lineItems.map((item) => (
+                                <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                                  <td className="border border-gray-300 p-1">
+                                    <Input
+                                      type="number"
+                                      value={item.qty}
+                                      onChange={(e) => updateInvoiceLineItem(item.id, 'qty', parseFloat(e.target.value) || 0)}
+                                      className="text-center border-0 p-2"
+                                      min="0"
+                                    />
+                                  </td>
+                                  <td className="border border-gray-300 p-1 relative">
+                                    <div className="relative product-search-container">
+                                      <Input
+                                        value={item.item}
+                                        onChange={(e) => {
+                                          updateInvoiceLineItem(item.id, 'item', e.target.value)
+                                          updateInvoiceLineItem(item.id, 'searchQuery', e.target.value)
+                                          updateInvoiceLineItem(item.id, 'showSearchResults', true)
+                                        }}
+                                        onFocus={() => {
+                                          if (item.item) {
+                                            updateInvoiceLineItem(item.id, 'searchQuery', item.item)
+                                            updateInvoiceLineItem(item.id, 'showSearchResults', true)
+                                          }
+                                        }}
+                                        className="border-0 p-2 pr-8"
+                                        placeholder="Search or enter product name..."
+                                      />
+                                      <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    </div>
+                                    {item.showSearchResults && item.searchQuery && (
+                                      <div className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1">
+                                        {(() => {
+                                          const filtered = getFilteredProducts(item.searchQuery || '')
+                                          
+                                          // Trigger API search
+                                          if (item.searchQuery && item.searchQuery.length > 2) {
+                                            fetchProducts(item.searchQuery)
+                                          }
+
+                                          return (
+                                            <>
+                                              {filtered.length > 0 ? (
+                                                filtered.map(product => (
+                                                  <div
+                                                    key={product.id}
+                                                    onMouseDown={(e) => {
+                                                      e.preventDefault()
+                                                      selectProduct(item.id, product)
+                                                    }}
+                                                    className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100 transition-colors"
+                                                  >
+                                                    <div className="font-medium text-sm mb-1">{product.name}</div>
+                                                    <div className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
+                                                      {product.description}
+                                                    </div>
+                                                    <div className="text-xs text-primary mt-2">
+                                                      {product.jdpSKU} • ${product.jdpPrice.toFixed(2)}
+                                                      {product.estimatedPrice && product.estimatedPrice > 0 && ` • Est: $${product.estimatedPrice.toFixed(2)}`}
+                                                    </div>
+                                                  </div>
+                                                ))
+                                              ) : (
+                                                <div className="p-3">
+                                                  <div className="text-sm text-muted-foreground mb-2">No products found</div>
+                                                  <Button
+                                                    size="sm"
+                                                    onMouseDown={(e) => {
+                                                      e.preventDefault()
+                                                      addCustomProduct(item.id, item.searchQuery || '')
+                                                    }}
+                                                    className="w-full bg-primary hover:bg-primary/90"
+                                                  >
+                                                    <Plus className="h-3 w-3 mr-1" />
+                                                    Add "{item.searchQuery}"
+                                                  </Button>
+                                                </div>
+                                              )}
+                                            </>
+                                          )
+                                        })()}
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td className="border border-gray-300 p-1">
+                                    <Textarea
+                                      value={item.description}
+                                      onChange={(e) => updateInvoiceLineItem(item.id, 'description', e.target.value)}
+                                      className="border-0 p-2 min-h-[80px] resize-none leading-relaxed"
+                                      placeholder="Enter product description (up to 4 lines)"
+                                      rows={4}
+                                    />
+                                  </td>
+                                  <td className="border border-gray-300 p-1">
+                                    <Select
+                                      value={item.supplierId?.toString() || '1'}
+                                      onValueChange={(value) => updateInvoiceLineItem(item.id, 'supplierId', Number(value))}
+                                    >
+                                      <SelectTrigger className="border-0">
+                                        <SelectValue placeholder="Supplier" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {suppliersList.length > 0 ? (
+                                          suppliersList.map((supplier) => (
+                                            <SelectItem key={supplier.id} value={supplier.id.toString()}>
+                                              {supplier.name}
+                                            </SelectItem>
+                                          ))
+                                        ) : (
+                                          <SelectItem value="1">Loading...</SelectItem>
+                                        )}
+                                      </SelectContent>
+                                    </Select>
+                                  </td>
+                                  <td className="border border-gray-300 p-1">
+                                    <Input
+                                      type="number"
+                                      value={item.rate}
+                                      onChange={(e) => updateInvoiceLineItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
+                                      className="text-right border-0 p-2"
+                                      min="0"
+                                      step="0.01"
+                                    />
+                                  </td>
+                                  <td className="border border-gray-300 p-1">
+                                    <Input
+                                      type="number"
+                                      value={item.estimatedPrice || ""}
+                                      onChange={(e) => updateInvoiceLineItem(item.id, 'estimatedPrice', parseFloat(e.target.value) || 0)}
+                                      className="text-right border-0 p-2"
+                                      min="0"
+                                      step="0.01"
+                                      placeholder="0.00"
+                                    />
+                                  </td>
+                                  <td className="border border-gray-300 p-2 text-right">
+                                    ${item.total.toFixed(2)}
+                                  </td>
+                                  <td className="border border-gray-300 p-1 text-center">
+                                    {inlineInvoiceData.lineItems.length > 1 && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => removeInvoiceLineItem(item.id)}
+                                        className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                              {/* Subtotal Row */}
+                              <tr>
+                                <td colSpan={6} className="border border-gray-300 p-2"></td>
+                                <td className="border border-gray-300 p-2 text-right font-bold">
+                                  ${calculateInvoiceSubtotal().toFixed(2)}
+                                </td>
+                                <td className="border border-gray-300 p-1"></td>
+                              </tr>
+                            </tbody>
+                          </table>
+
+                          {/* Add Line Item Button */}
+                          <Button
+                            onClick={addInvoiceLineItem}
+                            variant="outline"
+                            className="mt-4 border-dashed border-2 border-primary text-primary hover:bg-primary/5"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Line Item
+                          </Button>
+                          {invoiceValidationErrors.lineItems && (
+                            <p className="text-red-500 text-xs mt-2">{invoiceValidationErrors.lineItems}</p>
+                          )}
+                        </div>
+
+                        {/* Notes Section */}
+                        <div className="mb-6 overflow-x-auto">
+                          <table className="w-full border-collapse">
+                            <tbody>
+                              <tr>
+                                <td className="border border-gray-300 p-3 bg-white text-sm" style={{ minHeight: '120px' }}>
+                                  <Textarea
+                                    value={inlineInvoiceData.notes}
+                                    onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, notes: e.target.value }))}
+                                    className="w-full min-h-[100px] border-0 p-0 focus-visible:ring-0 resize-none"
+                                    placeholder="NOTES&#10;JDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE"
+                                  />
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Footer disclaimer and Total */}
+                        <div className="mb-6">
+                          <div className="border border-gray-300 p-3 text-xs text-center bg-white">
+                            <p>
+                              JDP is not responsible for repair of lamps & landscaping, house owner utilities including
+                              cables, sprinkler systems, television or telephone cables, etc. that may be cut or damaged
+                              during installation. Price are subject to change prior to receipt of down payment.
+                            </p>
+                          </div>
+                          <div className="flex justify-end mt-4">
+                            <div className="text-right">
+                              <div className="flex items-center gap-4">
+                                <span className="text-xl font-bold">Total</span>
+                                <span className="text-2xl font-bold">
+                                  ${calculateInvoiceSubtotal().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Company Footer */}
+                        {/* <div className="text-center text-xs">
+                          <p className="text-blue-600 font-semibold">
+                            1432 Oakpointe Drive Waconia, MN 55387 <span className="text-blue-700">paul@jdpelectric.us</span>
+                          </p>
+                        </div> */}
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="border-t bg-gray-50 px-8 py-6">
+                        <div className="flex items-center justify-between">
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setShowInlineInvoiceForm(false)
+                              setEditingInvoiceId(null)
+                              setInvoiceValidationErrors({})
+                            }}
+                            className="border-gray-300"
+                          >
+                            <X className="h-4 w-4 mr-2" />
+                            Cancel
+                          </Button>
+                          <div className="flex gap-3">
+                            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                              <Button
+                                onClick={handleSaveInvoiceAsDraft}
+                                variant="outline"
+                                size="lg"
+                                className="border-primary text-primary hover:bg-primary/5"
+                              >
+                                <FileText className="h-5 w-5 mr-2" />
+                                Save as Draft
+                              </Button>
+                            </motion.div>
+
+                            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                              <Button
+                                onClick={handlePreviewAndSend}
+                                size="lg"
+                                className="bg-primary hover:bg-primary/90 text-white"
+                              >
+                                <Eye className="h-5 w-5 mr-2" />
+                                Preview & Send to Customer
+                              </Button>
+                            </motion.div>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  </motion.div>
+                )}
+
+                <div className="space-y-4">
+                  {isLoadingEstimates ? (
+                    <div className="flex justify-center py-8"><LoadingSpinner /></div>
+                  ) : estimates.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <Receipt className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                      <p>No invoices found for this job</p>
+                    </div>
+                  ) : (
+                    estimates.map((invoice: any) => (
+                    <div key={invoice.id} className="p-4 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow bg-gradient-to-r from-white to-gray-50/30">
+                      <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-2 font-semibold">
-                          <span>{formatCurrency(invoice.total_amount)}</span>
-                          <span>{getStatusBadge(invoice.status)}</span>
+                          <div className="w-14 h-14 bg-primary/10 rounded-lg flex items-center justify-center">
+                            <FileText className="h-7 w-7 text-primary" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-3 mb-1">
+                                <h4 className="font-semibold text-foreground">{invoice.invoice_type || 'Estimate'}</h4>
+                                <Badge className={`${getInvoiceTypeColor(invoice.invoice_type)} text-xs font-medium`} variant="outline">
+                                  {invoice.invoice_type || 'Estimate'}
+                              </Badge>
+                            </div>
+                              <p className="text-sm text-muted-foreground mb-2">{invoice.description || invoice.estimate_title}</p>
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                <span>#{invoice.invoice_number}</span>
+                                <span>Created: {formatDate(invoice.estimate_date || invoice.created_at)}</span>
+                            </div>
+                          </div>
                         </div>
-                          <div className="flex items-center gap-2">
-                            {/* <Button variant="outline" size="sm" className="gap-1" onClick={() => {
-                              setSelectedInvoice(invoice);
-                              setShowInvoiceModal(true);
-                            }}>
-                              <Eye className="h-3 w-3" />
-                              View
-                            </Button> */}
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                              <p className="font-semibold text-lg text-foreground">{formatCurrency(invoice.total_amount || 0)}</p>
+                            <Badge className={getStatusBadgeColor(invoice.status)} variant="outline">
+                                {invoice.status || 'draft'}
+                            </Badge>
+                          </div>
+                          <div className="flex gap-2">
+                              {invoice.status === 'draft' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEditInvoice(invoice)}
+                                className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-300"
+                              >
+                                <Edit className="h-4 w-4 mr-1" />
+                                Edit
+                              </Button>
+                            )}
                             <Button
                               variant="outline"
                               size="sm"
-                              className="gap-1"
-                              onClick={() => {
-                                console.log("Selected invoice ID:", invoice.id);
-                                setSelectedInvoiceId(Number(invoice.id));
-                                setShowInvoiceModal(true);
-                              }}
-
+                              onClick={() => handleViewInvoice(invoice)}
+                              className="text-primary hover:text-primary hover:bg-primary/10 border-primary/30"
                             >
-                              <Eye className="h-3 w-3" />
+                              <Eye className="h-4 w-4 mr-1" />
                               View
                             </Button>
-                            <Button variant="outline" size="sm" className="gap-1" onClick={() => handlePrint(currentInvoice)}>
-                              <Printer className="h-3 w-3" />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handlePrintInvoice(invoice)}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-300"
+                            >
+                              <Printer className="h-4 w-4 mr-1" />
                               Print
                             </Button>
                             <Button
-                              variant="outline"
+                              variant="ghost"
                               size="sm"
-                              className="gap-1"
-                              onClick={() => handleDeleteEstimate(invoice)}
+                              onClick={() => handleDeleteInvoice(invoice.id)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
                             >
-                              <Trash2 className="h-3 w-3 text-red-600" />
+                              <Trash2 className="h-4 w-4" />
                             </Button>
-
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                    ))
+                  )}
+                </div>
               </CardContent>
             </Card>
 
@@ -2411,33 +3537,62 @@ console.log(suppliers,"supp")
         </DialogContent>
       </Dialog>
       <Dialog open={showInvoiceModal} onOpenChange={setShowInvoiceModal}>
-        <DialogContent className="sm:max-w-[800px]">
+          <DialogContent className="w-[500px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-bold">
-              Invoice Preview
-            </DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground">
-              Preview of selected invoice
+              <DialogTitle className="text-primary">Invoice Details</DialogTitle>
+            <DialogDescription>
+              {selectedInvoice && `${selectedInvoice.invoice_type?.charAt(0).toUpperCase() + selectedInvoice.invoice_type?.slice(1).replace('_', ' ')} - ${selectedInvoice.invoice_number}`}
             </DialogDescription>
           </DialogHeader>
-
-          {selectedInvoiceId && (
-            <div className="mt-4 max-h-[70vh] overflow-auto">
-              <InvoiceTemplate invoiceId={selectedInvoiceId} />
+            {selectedInvoice && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-gray-50 rounded-lg">
+                  <div>
+                    <Label className="text-primary">Invoice Information</Label>
+                    <div className="mt-2 space-y-2">
+                      <p><span className="font-medium">Type:</span> {selectedInvoice.invoice_type?.charAt(0).toUpperCase() + selectedInvoice.invoice_type?.slice(1).replace('_', ' ')}</p>
+                      <p><span className="font-medium">Number:</span> {selectedInvoice.invoice_number}</p>
+                      <p><span className="font-medium">Amount:</span> {formatCurrency(selectedInvoice.total_amount)}</p>
+                      <p><span className="font-medium">Status:</span> 
+                        <Badge className={`ml-2 ${getStatusBadgeColor(selectedInvoice.status)}`} variant="outline">
+                          {selectedInvoice.status}
+                        </Badge>
+                      </p>
             </div>
-          )}
-
-          <div className="flex justify-end mt-6 gap-4">
-            <Button variant="outline" onClick={() => setShowInvoiceModal(false)}>
+                  </div>
+                  <div>
+                    <Label className="text-primary">Dates</Label>
+                    <div className="mt-2 space-y-2">
+                      <p><span className="font-medium">Created:</span> {formatDate(selectedInvoice.created_at)}</p>
+                      {selectedInvoice.due_date && (
+                        <p><span className="font-medium">Due Date:</span> {formatDate(selectedInvoice.due_date)}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-primary">Description</Label>
+                  <p className="mt-2 p-4 bg-gray-50 rounded-lg">{selectedInvoice.description}</p>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setShowInvoiceModal(false)
+                setSelectedInvoice(null)
+              }}>
               Close
             </Button>
-            <Button variant="outline" className="gap-2 bg-primary text-primary-foreground" onClick={() => handlePrint(currentInvoice)}>
-              <Printer className="h-4 w-4" />
-              Print Estimate
+              {selectedInvoice && (
+                <Button onClick={() => handlePrintInvoice(selectedInvoice)} className="bg-primary hover:bg-primary/90">
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print Invoice
             </Button>
-          </div>
+              )}
+            </DialogFooter>
         </DialogContent>
       </Dialog>
+      
 
     {selectedInvoiceId && (
   <div

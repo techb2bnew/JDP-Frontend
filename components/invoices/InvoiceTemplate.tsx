@@ -193,7 +193,7 @@ export const InvoiceTemplate = ({ invoice, invoiceId }: InvoiceTemplateProps) =>
       <div className="flex justify-end">
         <div className="w-64">
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
+            {/* <div className="flex justify-between">
               <span>Subtotal:</span>
               <span>{fmtMoney(invoiceData?.subtotal)}</span>
             </div>
@@ -202,7 +202,7 @@ export const InvoiceTemplate = ({ invoice, invoiceId }: InvoiceTemplateProps) =>
                 Tax ({Number((invoiceData?.tax_percentage || 0) ).toFixed(1)}%):
               </span>
               <span>{fmtMoney(invoiceData?.tax_amount)}</span>
-            </div>
+            </div> */}
             <Separator />
             <div className="flex justify-between font-semibold text-lg">
               <span>Total Amount:</span>
