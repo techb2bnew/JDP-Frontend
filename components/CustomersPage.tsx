@@ -584,6 +584,41 @@ useEffect(() => {
     link.click();
     document.body.removeChild(link);
   };
+useEffect(() => {
+  const fetchCustomersByStatus = async () => {
+    if (!statusFilter) return;
+
+    setIsLoadingCustomers(true);
+
+    try {
+      const res = await apiClient.getCustomersByStatus(statusFilter);
+      const customers = res.data?.customers || [];
+
+      console.log(customers, "customers");
+
+      setCustomerFormData(customers);
+      setTotalCustomers(customers.length);
+    } catch (error) {
+      console.error("Customer fetch error:", error);
+      setCustomerFormData({
+          name: '',
+          email: '',
+          phone: '',
+          contactPerson: '',
+          address: '',
+          company: '',
+          status: 'active'
+        });
+    } finally {
+      setIsLoadingCustomers(false);
+    }
+  };
+
+  fetchCustomersByStatus();
+}, [statusFilter]);
+
+
+
 
   // const filteredCustomers = customersData
   //   .filter(customer => {

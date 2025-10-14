@@ -1473,6 +1473,32 @@ searchSuppliersByStatus: async (status: string, page = 1, limit = 10) => {
 
   return response.json();
 },
+getCustomersByStatus: async (status: string, page = 1, limit = 10) => {
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+  const token = getAuthToken();
+
+  if (!token) {
+    throw new Error("No authentication token found");
+  }
+
+  const url = `${apiBaseUrl}/customer/getCustomers?status=${encodeURIComponent(status)}&page=${page}&limit=${limit}`;
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || "Failed to fetch customers by status");
+  }
+
+  return response.json();
+},
+
 
 
 
