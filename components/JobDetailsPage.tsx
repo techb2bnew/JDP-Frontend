@@ -1486,7 +1486,7 @@ console.log(suppliers,"supp")
 
     setInvoiceValidationErrors({})
     setIsLoading(true)
-    try {
+    try { 
     const subtotal = calculateInvoiceSubtotal()
     
       const customProducts = inlineInvoiceData.lineItems.map(item => {

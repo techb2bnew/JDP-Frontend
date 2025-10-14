@@ -478,7 +478,7 @@ const fetchBySearchEstimates = async () => {
   }
 };
 
-useEffect(() => {
+useEffect(() => { 
   const debounceTimeout = setTimeout(() => {
     if (!searchTerm.trim()) {
       fetchEstimates();

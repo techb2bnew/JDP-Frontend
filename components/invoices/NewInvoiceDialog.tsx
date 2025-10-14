@@ -432,7 +432,7 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
         unit_cost: item.rate,
         jdp_price: item.rate,
         estimated_price: item.estimatedPrice || 0,
-        total_cost: item.total
+        total_cost: item.total 
       }))
 
       const payload = {

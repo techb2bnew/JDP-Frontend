@@ -194,7 +194,7 @@ export const InvoiceTemplate = ({ invoice, invoiceId }: InvoiceTemplateProps) =>
         <div className="w-64">
           <div className="space-y-2 text-sm">
             {/* <div className="flex justify-between">
-              <span>Subtotal:</span>
+              <span>Subtotal:</span> 
               <span>{fmtMoney(invoiceData?.subtotal)}</span>
             </div>
             <div className="flex justify-between">
