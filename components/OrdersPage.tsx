@@ -461,7 +461,7 @@ useEffect(() => {
         orderNumber: apiOrder.order_number,
         jobId: apiOrder.job_id?.toString() || 'N/A',
         customerName: apiOrder.customer?.customer_name || 'Unknown',
-        contractorName: apiOrder.contractor || apiOrder.customer?.company_name || 'N/A',
+        contractorName: apiOrder.contractor?.full_name || apiOrder.contractor?.company_name || apiOrder.customer?.company_name || 'N/A',
         status: apiOrder.status,
         orderDate: apiOrder.order_date,
       }));
