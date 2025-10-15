@@ -53,7 +53,8 @@ import { addProduct, deleteProduct, deleteInvoice } from '@/redux/slices/jobsSli
 import { NewInvoiceDialog } from './invoices/NewInvoiceDialog'
 import { InvoiceTemplate } from './invoices/InvoiceTemplate'
 import html2canvas from 'html2canvas'
-import { Invoice,CreateEstimatePayload } from '@/types/invoice'
+import jsPDF from 'jspdf'
+import { Invoice, CreateEstimatePayload } from '@/types/invoice'
 import { LoadingSpinner } from './common/LoadingSpinner'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog'
 import { motion } from 'framer-motion'
@@ -206,34 +207,34 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const invoices = sampleJobData.invoices // Keep sample data for now as we don't have invoices API
 
   // Calculate totals using real job data
- const totalMaterialCost = materials.reduce(
-  (sum: number, material: any) =>
-    sum +
-    ((Number(material.stock_quantity ?? material.quantity ?? 0) || 0) *
-     (Number(material.unit_cost ?? material.unitCost ?? material.price ?? 0) || 0)),
-  0
-);
-
- const totalLaborCost =
-  [...(job.assignedLaborDetails || []), ...(job.customLabor || [])].reduce(
-    (sum: number, labor: any) => {
-      const rate = Number(labor.hourly_rate ?? 0);
-      const hours = Number(labor.hours_worked ?? 0);
-      return sum + rate * hours;
-    },
+  const totalMaterialCost = materials.reduce(
+    (sum: number, material: any) =>
+      sum +
+      ((Number(material.stock_quantity ?? material.quantity ?? 0) || 0) *
+        (Number(material.unit_cost ?? material.unitCost ?? material.price ?? 0) || 0)),
     0
   );
+
+  const totalLaborCost =
+    [...(job.assignedLaborDetails || []), ...(job.customLabor || [])].reduce(
+      (sum: number, labor: any) => {
+        const rate = Number(labor.hourly_rate ?? 0);
+        const hours = Number(labor.hours_worked ?? 0);
+        return sum + rate * hours;
+      },
+      0
+    );
 
 
   console.log(job?.assignedLaborDetails, "deeeee")
 
-    job.estimatedCost || 0
+  job.estimatedCost || 0
   const totalHours = timeLogs.reduce((sum, log) => sum + log.hoursWorked, 0)
   const totalMaterialItems = materials.reduce((sum: number, material: any) => sum + (material.stock_quantity || material.quantity || 0), 0)
   const totalLaborEntries = job.assignedLaborDetails ? job.assignedLaborDetails.length : timeLogs.length;
   const totalInvoices = invoices.length;
-  const [showEditJobModal, setShowEditJobModal] = useState(false); 
- 
+  const [showEditJobModal, setShowEditJobModal] = useState(false);
+
 
   const [refreshMaterials, setRefreshMaterials] = useState(false);
   const [isLoadingMaterials, setIsLoadingMaterials] = useState(false);
@@ -241,13 +242,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const [showAddInvoiceModal, setShowAddInvoiceModal] = useState(false);
   const [showAddMaterialModal, setShowAddMaterialModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-const [suppliers, setSuppliers] = useState<{
-  id: number;
-  company_name: string;
-  users: {
-    full_name: string;
-  };
-}[]>([]);
+  const [suppliers, setSuppliers] = useState<{
+    id: number;
+    company_name: string;
+    users: {
+      full_name: string;
+    };
+  }[]>([]);
   const dispatch = useDispatch();
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -262,11 +263,11 @@ const [suppliers, setSuppliers] = useState<{
   const printRef = useRef<HTMLDivElement>(null);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [showDeleteProductDialog, setShowDeleteProductDialog] = useState(false);
-const [productToDelete, setProductToDelete] = useState<any | null>(null); 
-const [showDeleteEstimateDialog, setShowDeleteEstimateDialog] = useState(false);
-const [estimateToDelete, setEstimateToDelete] = useState<any | null>(null);
-const [printInvoiceId, setPrintInvoiceId] = useState<number | null>(null);
-const [showPrintMount, setShowPrintMount] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<any | null>(null);
+  const [showDeleteEstimateDialog, setShowDeleteEstimateDialog] = useState(false);
+  const [estimateToDelete, setEstimateToDelete] = useState<any | null>(null);
+  const [printInvoiceId, setPrintInvoiceId] = useState<number | null>(null);
+  const [showPrintMount, setShowPrintMount] = useState(false);
 
   const [projectSummary, setProjectSummary] = useState<{
     jobEstimate: number;
@@ -282,7 +283,7 @@ const [showPrintMount, setShowPrintMount] = useState(false);
     contractor: job.contractor || job.customer,
     startDate: '01/15/2025',
     priority: 'High',
-    status:'draft',
+    status: 'draft',
     assignedLabor: job.assignedLaborDetails || [],
     assignedLeadLabor: job.assignedLeadLaborDetails || [],
   });
@@ -302,12 +303,16 @@ const [showPrintMount, setShowPrintMount] = useState(false);
   const [selectedSupplierId, setSelectedSupplierId] = useState<number>(1)
   const [invoiceValidationErrors, setInvoiceValidationErrors] = useState<Record<string, string>>({})
 
+  // Debug: Log job data to see structure
+  console.log('Job data:', job) 
+
   // Inline Invoice Data State
   const [inlineInvoiceData, setInlineInvoiceData] = useState({
     date: new Date().toISOString().split('T')[0],
     estimateNumber: '',
     customerName: job.customerName || '',
-    customerAddress: job.location || '',
+    customerAddress: job.address || '',
+    billToAddress: job.billToAddress || '',
     poNumber: '',
     project: job.title || '',
     lineItems: [{
@@ -330,14 +335,14 @@ const [showPrintMount, setShowPrintMount] = useState(false);
     estimateTotal: 0,
     paymentHistory: [] as any[]
   })
-  
-const allowedStatuses = ['draft', 'active', 'in_progress', 'completed', 'cancelled', 'on_hold'];
+
+  const allowedStatuses = ['draft', 'active', 'in_progress', 'completed', 'cancelled', 'on_hold'];
 
   const handleSave = async () => {
     try {
       const status = allowedStatuses.includes(editedJob.status)
-      ? editedJob.status
-      : 'draft';
+        ? editedJob.status
+        : 'draft';
       const updatePayload = {
         job_title: editedJob.title,
         job_type: editedJob.type === 'service-based' ? 'service_based' : 'contract_based',
@@ -369,7 +374,7 @@ const allowedStatuses = ['draft', 'active', 'in_progress', 'completed', 'cancell
         assigned_material_ids: job.materials && job.materials.length > 0
           ? JSON.stringify(job.materials)
           : undefined,
-          status,
+        status,
 
         // status: ['pending', 'in-progress', 'completed'].includes(job.status)
         //   ? job.status === 'pending'
@@ -401,8 +406,8 @@ const allowedStatuses = ['draft', 'active', 'in_progress', 'completed', 'cancell
 
   console.log(invoice, "invs")
   const currentInvoice = selectedInvoiceId == null
-  ? undefined
-  : estimates.find(inv => Number(inv.id) === selectedInvoiceId);
+    ? undefined
+    : estimates.find(inv => Number(inv.id) === selectedInvoiceId);
 
   console.log(currentInvoice, "current")
 
@@ -416,7 +421,7 @@ const allowedStatuses = ['draft', 'active', 'in_progress', 'completed', 'cancell
       contractor: job.contractor || job.customer,
       startDate: '01/15/2025',
       priority: 'High',
-      status:'draft',
+      status: 'draft',
       assignedLabor: job.assignedLaborDetails || [],
       assignedLeadLabor: job.assignedLeadLaborDetails || [],
     });
@@ -482,7 +487,7 @@ const allowedStatuses = ['draft', 'active', 'in_progress', 'completed', 'cancell
           notes: timeLogFormData.description,
           date_of_joining: timeLogFormData.date,
           is_custom: true,
-          total_cost:timeLogFormData.hoursWorked * timeLogFormData.hourlyRate,
+          total_cost: timeLogFormData.hoursWorked * timeLogFormData.hourlyRate,
         };
 
         await apiClient.createLaborTimeLog(timeLogPayload);
@@ -589,71 +594,71 @@ const allowedStatuses = ['draft', 'active', 'in_progress', 'completed', 'cancell
     setShowTimeLogModal(true);
   };
 
-const isValidForm = () => {
-  if (!materialFormData.name.trim()) {
-    toast.error("Product name is required");
-    return false;
-  }
+  const isValidForm = () => {
+    if (!materialFormData.name.trim()) {
+      toast.error("Product name is required");
+      return false;
+    }
 
-  if (!materialFormData.sku.trim()) {
-    toast.error("SKU is required");
-    return false;
-  }
+    if (!materialFormData.sku.trim()) {
+      toast.error("SKU is required");
+      return false;
+    }
 
-  if (!materialFormData.quantity || materialFormData.quantity <= 0) {
-    toast.error("Quantity must be greater than 0");
-    return false;
-  }
+    if (!materialFormData.quantity || materialFormData.quantity <= 0) {
+      toast.error("Quantity must be greater than 0");
+      return false;
+    }
 
-  if (!materialFormData.unitCost || materialFormData.unitCost <= 0) {
-    toast.error("Unit cost must be greater than 0");
-    return false;
-  }
+    if (!materialFormData.unitCost || materialFormData.unitCost <= 0) {
+      toast.error("Unit cost must be greater than 0");
+      return false;
+    }
 
-  if (!materialFormData.unit) {
-    toast.error("Unit is required");
-    return false;
-  }
+    if (!materialFormData.unit) {
+      toast.error("Unit is required");
+      return false;
+    }
 
-  if (!materialFormData.supplier) {
-    toast.error("Supplier is required");
-    return false;
-  }
+    if (!materialFormData.supplier) {
+      toast.error("Supplier is required");
+      return false;
+    }
 
-  return true;
-};
+    return true;
+  };
 
 
-const handleAddProduct = async () => {
-  if (!isValidForm()) return;
+  const handleAddProduct = async () => {
+    if (!isValidForm()) return;
 
-  setIsLoading(true);
-  try {
-    const newProduct = await apiClient.createProduct({
-      product_name: materialFormData.name,
-      supplier_id: Number(materialFormData.supplier) || 0,
-      supplier_sku: materialFormData.sku,
-      jdp_sku: '',
-      stock_quantity: materialFormData.quantity,
-      unit: materialFormData.unit,
-      job_id: job.id || 2,
-      is_custom: true,
-      unit_cost: materialFormData.unitCost,
-      total_cost: materialFormData.quantity * materialFormData.unitCost,
-    });
+    setIsLoading(true);
+    try {
+      const newProduct = await apiClient.createProduct({
+        product_name: materialFormData.name,
+        supplier_id: Number(materialFormData.supplier) || 0,
+        supplier_sku: materialFormData.sku,
+        jdp_sku: '',
+        stock_quantity: materialFormData.quantity,
+        unit: materialFormData.unit,
+        job_id: job.id || 2,
+        is_custom: true,
+        unit_cost: materialFormData.unitCost,
+        total_cost: materialFormData.quantity * materialFormData.unitCost,
+      });
 
-    triggerRefreshMaterials();
+      triggerRefreshMaterials();
 
-    dispatch(addProduct(newProduct));
-    toast.success('Product added successfully!');
-    setShowAddMaterialModal(false); 
-  } catch (error) {
-    console.error('Error adding product:', error);
-    toast.error('Failed to add product');
-  } finally {
-    setIsLoading(false);
-  }
-};
+      dispatch(addProduct(newProduct));
+      toast.success('Product added successfully!');
+      setShowAddMaterialModal(false);
+    } catch (error) {
+      console.error('Error adding product:', error);
+      toast.error('Failed to add product');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
 
 
@@ -678,27 +683,27 @@ const handleAddProduct = async () => {
   // };
 
   const handleDeleteProduct = (product: any) => {
-  setProductToDelete(product);
-  setShowDeleteProductDialog(true);
-};
+    setProductToDelete(product);
+    setShowDeleteProductDialog(true);
+  };
 
-const confirmDeleteProduct = async () => {
-  if (!productToDelete) return;
-  setIsDeleting(true);
-  try {
-    await apiClient.deleteProduct(productToDelete.id);
-    dispatch(deleteProduct(String(productToDelete.id)));
-    triggerRefreshMaterials();
-    toast.success("Product deleted successfully!");
-  } catch (error) {
-    console.error("Error deleting product:", error);
-    toast.error("Failed to delete product");
-  } finally {
-    setIsDeleting(false);
-    setShowDeleteProductDialog(false);
-    setProductToDelete(null);
-  }
-};
+  const confirmDeleteProduct = async () => {
+    if (!productToDelete) return;
+    setIsDeleting(true);
+    try {
+      await apiClient.deleteProduct(productToDelete.id);
+      dispatch(deleteProduct(String(productToDelete.id)));
+      triggerRefreshMaterials();
+      toast.success("Product deleted successfully!");
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      toast.error("Failed to delete product");
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteProductDialog(false);
+      setProductToDelete(null);
+    }
+  };
 
 
   const fetchEstimates = async () => {
@@ -721,18 +726,18 @@ const confirmDeleteProduct = async () => {
     fetchEstimates();
   }, [jobId, refreshInvoices]);
 
-useEffect(() => {
-  if (showAddMaterialModal) {
-    setMaterialFormData({
-      name: '',
-      quantity: 0,
-      unitCost: 0,
-      sku: '',
-      unit: 'Pieces',
-      supplier: ''
-    });
-  }
-}, [showAddMaterialModal]);
+  useEffect(() => {
+    if (showAddMaterialModal) {
+      setMaterialFormData({
+        name: '',
+        quantity: 0,
+        unitCost: 0,
+        sku: '',
+        unit: 'Pieces',
+        supplier: ''
+      });
+    }
+  }, [showAddMaterialModal]);
 
 
 
@@ -794,112 +799,112 @@ useEffect(() => {
   };
 
 
- const handleSaveInvoice = async (newInvoice: Partial<Invoice>) => {
-  setIsLoading(true);
-  try {
-    const laborPayload =
-      newInvoice.labor?.map((l) => ({
-        full_name: l.laborName,
-        email: l.email || "customer@example.com",
-        hours_worked: l.hours,
-        hourly_rate: l.hourlyRate,
+  const handleSaveInvoice = async (newInvoice: Partial<Invoice>) => {
+    setIsLoading(true);
+    try {
+      const laborPayload =
+        newInvoice.labor?.map((l) => ({
+          full_name: l.laborName,
+          email: l.email || "customer@example.com",
+          hours_worked: l.hours,
+          hourly_rate: l.hourlyRate,
+          job_id: Number(newInvoice.jobId),
+          is_custom: true,
+        })) || [];
+
+      const productsPayload =
+        newInvoice.items?.map((i) => ({
+          product_name: i.description,
+          supplier_id: i.supplierId && i.supplierId > 0 ? i.supplierId : 1,
+          supplier_sku: i.sku || "",
+          jdp_sku: i.jdp_sku || "SKU-DEFAULT",
+          stock_quantity: i.quantity,
+          job_id: Number(newInvoice.jobId),
+          unit: i.unit ? i.unit.toString() : "1",
+          is_custom: true,
+          unit_cost: i.unitPrice,
+        })) || [];
+
+      const itemsTotal =
+        newInvoice.items?.reduce(
+          (sum, item) => sum + (item.quantity ?? 0) * (item.unitPrice ?? 0),
+          0
+        ) || 0;
+
+      const laborTotal =
+        newInvoice.labor?.reduce(
+          (sum, labor) => sum + (labor.hours ?? 0) * (labor.hourlyRate ?? 0),
+          0
+        ) || 0;
+
+      const additionalTotal =
+        newInvoice.additionalCosts?.reduce(
+          (sum, cost) => sum + (cost.amount ?? 0),
+          0
+        ) || 0;
+
+      const subtotal = itemsTotal + laborTotal + additionalTotal;
+      const taxAmount = subtotal * (newInvoice.taxRate ?? 0);
+      const totalAmount = subtotal + taxAmount;
+
+      const isPriority = (value: any): value is "high" | "medium" | "low" =>
+        ["high", "medium", "low"].includes(value);
+
+      const payload: CreateEstimatePayload = {
+        estimate_title: "New Estimate",
+        customer_id: Number(newInvoice.customerId),
+        priority: isPriority(newInvoice.priority) ? newInvoice.priority : "medium",
+        valid_until: newInvoice.dueDate || "",
+        location: newInvoice.location || "N/A",
+        description: newInvoice.notes || "",
+        service_type: "service_based",
+        email_address: newInvoice.emailAddress || "customer@example.com",
+        estimate_date: newInvoice.issueDate || "",
+
+        materials_cost: itemsTotal,
+        labor_cost: laborTotal,
+        additional_costs: additionalTotal,
+        subtotal,
+        tax_percentage: (newInvoice.taxRate || 0) * 100,
+        tax_amount: taxAmount,
+        total_amount: totalAmount,
+
+        status: "draft",
+        invoice_type: newInvoice.type || "proposal_invoice",
+        invoice_number: `INV-${Date.now()}`,
+        issue_date: newInvoice.issueDate || "",
+        due_date: newInvoice.dueDate || "",
+
         job_id: Number(newInvoice.jobId),
-        is_custom: true,
-      })) || [];
 
-    const productsPayload =
-      newInvoice.items?.map((i) => ({
-        product_name: i.description,
-        supplier_id: i.supplierId && i.supplierId > 0 ? i.supplierId : 1,
-        supplier_sku: i.sku || "",
-        jdp_sku: i.jdp_sku || "SKU-DEFAULT",
-        stock_quantity: i.quantity,
-        job_id: Number(newInvoice.jobId),
-        unit: i.unit ? i.unit.toString() : "1",
-        is_custom: true,
-        unit_cost: i.unitPrice,
-      })) || [];
-
-    const itemsTotal =
-      newInvoice.items?.reduce(
-        (sum, item) => sum + (item.quantity ?? 0) * (item.unitPrice ?? 0),
-        0
-      ) || 0;
-
-    const laborTotal =
-      newInvoice.labor?.reduce(
-        (sum, labor) => sum + (labor.hours ?? 0) * (labor.hourlyRate ?? 0),
-        0
-      ) || 0;
-
-    const additionalTotal =
-      newInvoice.additionalCosts?.reduce(
-        (sum, cost) => sum + (cost.amount ?? 0),
-        0
-      ) || 0;
-
-    const subtotal = itemsTotal + laborTotal + additionalTotal;
-    const taxAmount = subtotal * (newInvoice.taxRate ?? 0);
-    const totalAmount = subtotal + taxAmount;
-
-    const isPriority = (value: any): value is "high" | "medium" | "low" =>
-      ["high", "medium", "low"].includes(value);
-
-    const payload: CreateEstimatePayload = {
-      estimate_title: "New Estimate",
-      customer_id: Number(newInvoice.customerId),
-      priority: isPriority(newInvoice.priority) ? newInvoice.priority : "medium",
-      valid_until: newInvoice.dueDate || "",
-      location: newInvoice.location || "N/A",
-      description: newInvoice.notes || "",
-      service_type: "service_based",
-      email_address: newInvoice.emailAddress || "customer@example.com",
-      estimate_date: newInvoice.issueDate || "",
-
-      materials_cost: itemsTotal,
-      labor_cost: laborTotal,
-      additional_costs: additionalTotal,
-      subtotal,
-      tax_percentage: (newInvoice.taxRate || 0) * 100,
-      tax_amount: taxAmount,
-      total_amount: totalAmount,
-
-      status: "draft",
-      invoice_type: newInvoice.type || "proposal_invoice",
-      invoice_number: `INV-${Date.now()}`,
-      issue_date: newInvoice.issueDate || "",
-      due_date: newInvoice.dueDate || "",
-
-      job_id: Number(newInvoice.jobId),
-
-      additional_cost: newInvoice.additionalCosts?.length
-        ? {
+        additional_cost: newInvoice.additionalCosts?.length
+          ? {
             description: newInvoice.additionalCosts[0].description || "",
             amount: newInvoice.additionalCosts.reduce(
               (sum, c) => sum + c.amount,
               0
             ),
           }
-        : { description: "", amount: 0 },
+          : { description: "", amount: 0 },
 
-      custom_labor: laborPayload,
-      custom_products: productsPayload,
-    };
+        custom_labor: laborPayload,
+        custom_products: productsPayload,
+      };
 
-    const createdInvoice = await apiClient.createEstimate(payload);
+      const createdInvoice = await apiClient.createEstimate(payload);
 
-    dispatch(addInvoice(createdInvoice));
-    toast.success("Invoice created successfully!");
-    fetchEstimates();
-    setShowNewInvoiceDialog(false);
+      dispatch(addInvoice(createdInvoice));
+      toast.success("Invoice created successfully!");
+      fetchEstimates();
+      setShowNewInvoiceDialog(false);
 
-  } catch (error) {
-    console.error("Error creating invoice:", error);
-    toast.error("Failed to create invoice");
-  } finally {
-    setIsLoading(false);
-  }
-};
+    } catch (error) {
+      console.error("Error creating invoice:", error);
+      toast.error("Failed to create invoice");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
 
   const triggerRefresh = () => {
@@ -927,27 +932,27 @@ useEffect(() => {
   // };
 
   const handleDeleteEstimate = (estimate: any) => {
-  setEstimateToDelete(estimate);
-  setShowDeleteEstimateDialog(true);
-};
-const confirmDeleteEstimate = async () => {
-  if (!estimateToDelete) return;
+    setEstimateToDelete(estimate);
+    setShowDeleteEstimateDialog(true);
+  };
+  const confirmDeleteEstimate = async () => {
+    if (!estimateToDelete) return;
 
-  setIsDeleting(true);
-  try {
-    await apiClient.deleteEstimate(estimateToDelete.id);
-    dispatch(deleteInvoice(String(estimateToDelete.id)));
-    toast.success("Estimate deleted successfully!");
-    setRefreshInvoices(prev => !prev); 
-  } catch (error) {
-    console.error("Error deleting estimate:", error);
-    toast.error("Failed to delete estimate");
-  } finally {
-    setIsDeleting(false);
-    setShowDeleteEstimateDialog(false);
-    setEstimateToDelete(null);
-  }
-};
+    setIsDeleting(true);
+    try {
+      await apiClient.deleteEstimate(estimateToDelete.id);
+      dispatch(deleteInvoice(String(estimateToDelete.id)));
+      toast.success("Estimate deleted successfully!");
+      setRefreshInvoices(prev => !prev);
+    } catch (error) {
+      console.error("Error deleting estimate:", error);
+      toast.error("Failed to delete estimate");
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteEstimateDialog(false);
+      setEstimateToDelete(null);
+    }
+  };
 
 
 
@@ -1068,7 +1073,7 @@ const confirmDeleteEstimate = async () => {
       contractor: job.contractor || job.customer,
       startDate: '01/15/2025',
       priority: job.priority || 'High',
-      status:job.status || 'draft',
+      status: job.status || 'draft',
       assignedLabor: job.assignedLaborDetails || [],
       assignedLeadLabor: job.assignedLeadLaborDetails || [],
     });
@@ -1079,13 +1084,13 @@ const confirmDeleteEstimate = async () => {
 
 
 
-console.log(suppliers,"supp")
+  console.log(suppliers, "supp")
   useEffect(() => {
     const fetchSuppliers = async () => {
       try {
         const response = await apiClient.getAllSuppliers();
         // response structure: { success, message, data: { data: [ ...suppliers ] } }
-        
+
         setSuppliers(response.data.data);
       } catch (error) {
         console.error('Error fetching suppliers:', error);
@@ -1226,7 +1231,7 @@ console.log(suppliers,"supp")
   }
 
   // Invoice Helper Functions
-  const calculateInvoiceSubtotal = () => {
+  const calculateInvoiceSubtotal = (): number => {
     return inlineInvoiceData.lineItems.reduce((sum, item) => sum + item.total, 0)
   }
 
@@ -1378,9 +1383,190 @@ console.log(suppliers,"supp")
     }
   }
 
-  const handlePrintInvoice = (invoice: any) => {
-    setSelectedInvoiceId(invoice.id)
-    setTimeout(() => handlePrint(invoice), 100)
+  const handlePrintInvoice = async (invoice: any) => {
+    try {
+      // Debug: Log invoice data to see structure
+      console.log('Invoice data for printing:', invoice)
+      console.log('Products data:', invoice.products)
+
+      // Create a temporary invoice preview element with invoice data
+      const tempElement = document.createElement('div')
+      tempElement.id = 'temp-invoice-preview'
+      tempElement.style.position = 'absolute'
+      tempElement.style.left = '-10000px'
+      tempElement.style.top = '0'
+      tempElement.style.width = '8.5in'
+      tempElement.style.background = '#ffffff'
+      tempElement.style.padding = '32px'
+      tempElement.style.pointerEvents = 'none'
+
+      // Generate invoice preview HTML
+      const invoiceHtml = `
+        <div style="font-family: Arial, sans-serif;">
+          <!-- Header -->
+          <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 32px;">
+            <div>
+              <div style="font-size: 24px; font-weight: bold; color: #1e40af;">JDP</div>
+              <p style="font-size: 14px; color: #6b7280; margin: 8px 0;">952-449-1088</p>
+              <!-- Invoice Number Display -->
+              ${editingInvoiceId ? `
+                <div style="margin-top: 12px;">
+                  <div style="font-size: 14px; font-weight: 600; color: #374151;">
+                    ${invoice.invoice_type || 'Invoice'} #: ${invoice.invoice_number}
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+            <div style="text-align: right;">
+              <div style="background: #1f2937; color: white; padding: 16px; text-align: center; margin-bottom: 8px;">
+                <div style="font-size: 18px; font-weight: bold;">${invoice.invoice_type?.toUpperCase() || 'INVOICE'}</div>
+                <div style="font-size: 14px;">${new Date(invoice.created_at).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</div>
+              </div>
+              <div style="background: #1f2937; color: white; padding: 16px; text-align: center;">
+                <div style="font-size: 18px; font-weight: bold;">${invoice.invoice_type?.toUpperCase() || 'INVOICE'} #</div>
+                <div style="font-size: 14px;">${invoice.invoice_number}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- To Section -->
+          <div style="background: #1f2937; color: white; padding: 12px; margin-bottom: 16px;">
+            <div style="font-size: 14px; font-weight: bold;">TO</div>
+          </div>
+          <div style="margin-bottom: 24px;">
+            <div style="font-weight: 600; font-size: 16px;">${invoice.customer_name || invoice.customer?.name || job.customerName || 'Customer'}</div>
+            <div style="color: #6b7280; font-size: 14px; margin-top: 4px;">${invoice.customer_address || invoice.customer?.address || job.location || 'Address'}</div>
+            <div style="color: #6b7280; font-size: 14px; margin-top: 8px; font-weight: 500;">Bill To: ${invoice.bill_to_address || invoice.billing_address || 'Same as above'}</div>
+          </div>
+
+          <!-- Project Details -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px;">
+            <div>
+              <div style="font-size: 14px; font-weight: 600; margin-bottom: 4px;">P.O. No.</div>
+              <div style="color: #6b7280; font-size: 14px;">${invoice.po_number || 'N/A'}</div>
+            </div>
+            <div>
+              <div style="font-size: 14px; font-weight: 600; margin-bottom: 4px;">Project</div>
+              <div style="color: #6b7280; font-size: 14px;">${invoice.estimate_title || invoice.job_title || job.title || 'Project'}</div>
+            </div>
+          </div>
+
+          <!-- Line Items Table -->
+          <div style="margin-bottom: 32px;">
+            <table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; margin-bottom: 16px;">
+              <thead>
+                <tr style="background: #1f2937; color: white;">
+                  <th style="border: 1px solid #d1d5db; padding: 12px 16px; text-align: left; font-size: 14px; font-weight: 600;">Qty</th>
+                  <th style="border: 1px solid #d1d5db; padding: 12px 16px; text-align: left; font-size: 14px; font-weight: 600;">Item</th>
+                  <th style="border: 1px solid #d1d5db; padding: 12px 16px; text-align: left; font-size: 14px; font-weight: 600;">Description</th>
+                  <th style="border: 1px solid #d1d5db; padding: 12px 16px; text-align: right; font-size: 14px; font-weight: 600;">Rate</th>
+                  <th style="border: 1px solid #d1d5db; padding: 12px 16px; text-align: right; font-size: 14px; font-weight: 600;">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${invoice.products?.map((product: any) => `
+                  <tr style="border-bottom: 1px solid #e5e7eb;">
+                    <td style="border: 1px solid #d1d5db; padding: 12px 16px; font-size: 14px; font-weight: 500;">${product.stock_quantity || 1}</td>
+                    <td style="border: 1px solid #d1d5db; padding: 12px 16px; font-weight: 600; font-size: 14px;">${product.product_name || 'Item'}</td>
+                    <td style="border: 1px solid #d1d5db; padding: 12px 16px; font-size: 13px; color: #6b7280; line-height: 1.4;">${product.description || ''}</td>
+                    <td style="border: 1px solid #d1d5db; padding: 12px 16px; text-align: right; font-size: 14px; font-weight: 500;">$${(product.estimated_price || 0).toFixed(2)}</td>
+                    <td style="border: 1px solid #d1d5db; padding: 12px 16px; text-align: right; font-weight: 600; font-size: 14px;">$${(product.total_cost || 0).toFixed(2)}</td>
+                  </tr>
+                `).join('') || ''}
+              </tbody>
+            </table>
+            
+            <!-- Subtotal -->
+            <div style="display: flex; justify-content: end; margin-top: 20px;">
+              <div style="text-align: right;">
+                <div style="font-weight: bold; font-size: 20px; color: #1f2937;">$${(invoice.total_amount || 0).toFixed(2)}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Notes Section -->
+          <div style="border-top: 2px solid #e5e7eb; padding-top: 20px; margin-bottom: 32px;">
+            <div style="background: #f3f4f6; padding: 16px; border-radius: 6px; text-align: center; border: 1px solid #e5e7eb;">
+              <div style="font-size: 14px; font-weight: 500; white-space: pre-line; color: #374151;">${invoice.notes || 'Final payment to complete project billing'}</div>
+            </div>
+          </div>
+
+          <!-- Disclaimer -->
+          <div style="font-size: 11px; color: #6b7280; margin-bottom: 32px; line-height: 1.5;">
+            <p style="margin: 0;">
+              JDP is not responsible for repair of lamps & landscaping, house owner utilities including cables, 
+              sprinkler systems, television or telephone cables, etc. that may be cut or damaged during installation. 
+              Price are subject to change prior to receipt of down payment.
+            </p>
+          </div>
+
+          <!-- Total and Contact -->
+          <div style="text-align: center; margin-bottom: 32px;">
+            <div style="font-size: 28px; font-weight: bold; margin-bottom: 20px; color: #1f2937;">Total $${(invoice.total_amount || 0).toFixed(2)}</div>
+            <div style="font-size: 14px; color: #6b7280; font-weight: 500;">
+              EMAIL: jen@jdpelectric.us 952-449-1088
+            </div>
+          </div>
+        </div>
+      `
+
+      tempElement.innerHTML = invoiceHtml
+      document.body.appendChild(tempElement)
+
+      // Generate PDF using the same logic as preview
+      const canvas = await html2canvas(tempElement, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
+      })
+
+      const imageData = canvas.toDataURL('image/png')
+
+      // Create PDF using jsPDF
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const imgWidth = 210
+      const pageHeight = 295
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      let heightLeft = imgHeight
+
+      let position = 0
+
+      pdf.addImage(imageData, 'PNG', 0, position, imgWidth, imgHeight)
+      heightLeft -= pageHeight
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight
+        pdf.addPage()
+        pdf.addImage(imageData, 'PNG', 0, position, imgWidth, imgHeight)
+        heightLeft -= pageHeight
+      }
+
+      // Create PDF blob and open in print dialog
+      const pdfBlob = pdf.output('blob')
+      const pdfUrl = URL.createObjectURL(pdfBlob)
+
+      // Open PDF in new window for printing
+      const printWindow = window.open(pdfUrl, '_blank')
+
+      if (printWindow) {
+        printWindow.onload = () => {
+          setTimeout(() => {
+            printWindow.print()
+          }, 1000)
+        }
+      }
+
+      // Clean up
+      document.body.removeChild(tempElement)
+      setTimeout(() => {
+        URL.revokeObjectURL(pdfUrl)
+      }, 10000)
+
+    } catch (err) {
+      console.error('Print error:', err)
+      toast.error('Failed to print invoice')
+    }
   }
 
   const handleDeleteInvoice = async (invoiceId: string) => {
@@ -1397,7 +1583,8 @@ console.log(suppliers,"supp")
       'Progressive Invoice': 'progressive_invoice',
       'Final Invoice': 'final_invoice'
     }
-    return mapping[uiType] || 'estimate'
+    // Return mapped value if exists, otherwise return the custom value as-is
+    return mapping[uiType] || uiType.toLowerCase().replace(/\s+/g, '_')
   }
 
   // Map API invoice type to UI format
@@ -1409,16 +1596,21 @@ console.log(suppliers,"supp")
       'progressive_invoice': 'Progressive Invoice',
       'final_invoice': 'Final Invoice'
     }
-    return mapping[apiType] || 'Estimate'
+    // Return mapped value if exists, otherwise convert custom value back to readable format
+    if (mapping[apiType]) {
+      return mapping[apiType]
+    }
+    // Convert custom API value back to readable format
+    return apiType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
   }
 
   // Fetch suppliers with search
   const fetchSuppliers = async (searchQuery: string = '') => {
     try {
-      const response = searchQuery 
+      const response = searchQuery
         ? await apiClient.searchSuppliersByQuery(searchQuery)
         : await apiClient.getAllSuppliers()
-      
+
       const suppliersData = response.data?.suppliers || response.data?.data || []
       setSuppliersList(suppliersData.map((s: any) => ({
         id: s.id,
@@ -1434,10 +1626,10 @@ console.log(suppliers,"supp")
   // Fetch products with search
   const fetchProducts = async (searchQuery: string = '') => {
     try {
-      const response = searchQuery 
+      const response = searchQuery
         ? await apiClient.searchProductsByQuery(searchQuery)
         : await apiClient.getAllProducts()
-      
+
       const productsData = response.data?.products || response.data?.data || []
       setProducts(productsData.map((p: any) => ({
         id: p.id,
@@ -1470,9 +1662,6 @@ console.log(suppliers,"supp")
       errors.poNumber = 'P.O. Number is required'
     }
 
-    if (!inlineInvoiceData.estimateNumber) {
-      errors.estimateNumber = 'Invoice/Estimate number is required'
-    }
 
     if (inlineInvoiceData.lineItems.length === 0 || !inlineInvoiceData.lineItems[0].item) {
       errors.lineItems = 'Please add at least one product item'
@@ -1486,14 +1675,13 @@ console.log(suppliers,"supp")
 
     setInvoiceValidationErrors({})
     setIsLoading(true)
-    try { 
-    const subtotal = calculateInvoiceSubtotal()
-    
+    try {
+      const subtotal = calculateInvoiceSubtotal()
+
       const customProducts = inlineInvoiceData.lineItems.map(item => {
         const productPayload: any = {
           product_name: item.item,
-          supplier_id: item.supplierId || selectedSupplierId || 1,
-          description: item.item.substring(0, 10),
+          description: item.description || '',
           jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
           stock_quantity: item.qty,
           unit: 'unit',
@@ -1503,12 +1691,12 @@ console.log(suppliers,"supp")
           estimated_price: item.estimatedPrice || 0,
           total_cost: item.total
         }
-        
+
         // Add product ID if editing existing product
         if (item.productId) {
           productPayload.id = item.productId
         }
-        
+
         return productPayload
       })
 
@@ -1520,7 +1708,8 @@ console.log(suppliers,"supp")
         service_type: 'service_based',
         email_address: job.email || 'customer@example.com',
         estimate_date: inlineInvoiceData.date,
-        billing_address_po_number: inlineInvoiceData.poNumber || '',
+        po_number: inlineInvoiceData.poNumber || '',
+        bill_to_address: inlineInvoiceData.billToAddress || '',
         status: 'draft',
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
         notes: inlineInvoiceData.notes || '',
@@ -1530,24 +1719,25 @@ console.log(suppliers,"supp")
       // Check if we're editing an existing invoice
       if (editingInvoiceId) {
         await apiClient.updateEstimate(Number(editingInvoiceId), payload as any)
-      toast.success('Invoice updated successfully!')
-    } else {
+        toast.success('Invoice updated successfully!')
+      } else {
         await apiClient.createEstimate(payload as any)
-      toast.success('Invoice saved as draft!')
-    }
-      
+        toast.success('Invoice saved as draft!')
+      }
+
       // Refresh estimates list
       await fetchEstimates()
-    
-    setShowInlineInvoiceForm(false)
-    setEditingInvoiceId(null)
-      
+
+      setShowInlineInvoiceForm(false)
+      setEditingInvoiceId(null)
+
       // Reset form
       setInlineInvoiceData({
         date: new Date().toISOString().split('T')[0],
         estimateNumber: '',
         customerName: job.customerName || '',
-        customerAddress: job.location || '',
+        customerAddress: job.address || '',
+        billToAddress: job.billToAddress || '',
         poNumber: '',
         project: job.title || '',
         lineItems: [{
@@ -1579,7 +1769,7 @@ console.log(suppliers,"supp")
     }
   }
 
-  const handlePreviewAndSend = async () => {
+  const handlePreviewAndSend = () => {
     // Validation
     const errors: Record<string, string> = {}
 
@@ -1591,9 +1781,6 @@ console.log(suppliers,"supp")
       errors.poNumber = 'P.O. Number is required'
     }
 
-    if (!inlineInvoiceData.estimateNumber) {
-      errors.estimateNumber = 'Invoice/Estimate number is required'
-    }
 
     if (inlineInvoiceData.lineItems.length === 0 || !inlineInvoiceData.lineItems[0].item) {
       errors.lineItems = 'Please add at least one product item'
@@ -1606,15 +1793,103 @@ console.log(suppliers,"supp")
     }
 
     setInvoiceValidationErrors({})
+    setShowPreviewDialog(true)
+  }
+
+  const handleSendFromPreview = async () => {
     setIsLoading(true)
     try {
-    const subtotal = calculateInvoiceSubtotal()
-      
+      // Generate PDF from invoice preview
+      const printElement = document.getElementById('invoice-preview-print')
+      if (!printElement) {
+        toast.error('Unable to generate invoice PDF')
+        return
+      }
+
+      const canvas = await html2canvas(printElement, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
+      })
+
+      const imageData = canvas.toDataURL('image/png')
+
+      // Create PDF using jsPDF
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const imgWidth = 210 // A4 width in mm
+      const pageHeight = 295 // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      let heightLeft = imgHeight
+
+      let position = 0
+
+      // Add image to PDF
+      pdf.addImage(imageData, 'PNG', 0, position, imgWidth, imgHeight)
+      heightLeft -= pageHeight
+
+      // Add new page if content is longer than one page
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight
+        pdf.addPage()
+        pdf.addImage(imageData, 'PNG', 0, position, imgWidth, imgHeight)
+        heightLeft -= pageHeight
+      }
+
+      // Generate PDF blob
+      const pdfBlob = pdf.output('blob')
+
+      // Create PDF filename
+      const fileName = `${inlineInvoiceData.invoiceType || 'Invoice'}_${inlineInvoiceData.estimateNumber || 'Draft'}_${new Date().toISOString().split('T')[0]}.pdf`
+
+      // Create mailto link with PDF attachment
+      const emailSubject = encodeURIComponent(`${inlineInvoiceData.invoiceType || 'Invoice'} - ${inlineInvoiceData.project || job.title}`)
+      const emailBody = encodeURIComponent(
+        `Dear ${inlineInvoiceData.customerName || 'Customer'},
+
+Please find attached your ${inlineInvoiceData.invoiceType || 'invoice'} for project: ${inlineInvoiceData.project || job.title}
+
+Invoice Details:
+- ${inlineInvoiceData.invoiceType || 'Invoice'} Number: ${inlineInvoiceData.estimateNumber || 'Draft'}
+- Project: ${inlineInvoiceData.project || job.title}
+- Total Amount: $${(calculateInvoiceSubtotal() as number).toFixed(2)}
+
+Please save the attached PDF as your invoice receipt.
+
+Thank you for your business!
+
+Best regards,
+JDP Team`
+      )
+
+      // Store PDF blob globally for attachment
+      ;(window as any).invoicePDFBlob = pdfBlob
+      ;(window as any).invoicePDFFileName = fileName
+
+      // Create download link for PDF (user can attach manually)
+      const downloadUrl = URL.createObjectURL(pdfBlob)
+      const downloadLink = document.createElement('a')
+      downloadLink.href = downloadUrl
+      downloadLink.download = fileName
+      document.body.appendChild(downloadLink)
+      downloadLink.click()
+      document.body.removeChild(downloadLink)
+      URL.revokeObjectURL(downloadUrl)
+
+      // Open email client with mailto link
+      const customerEmail = inlineInvoiceData.customerName?.replace(/\s+/g, '').toLowerCase() || 'customer'
+      const mailtoLink = `mailto:${customerEmail}@yopmail.com?subject=${emailSubject}&body=${emailBody}`
+      window.open(mailtoLink, '_blank')
+
+      toast.success('PDF downloaded and email opened! Please manually attach the downloaded PDF to your email.')
+
+      // Also save the invoice data to backend
+      const subtotal = calculateInvoiceSubtotal()
+
       const customProducts = inlineInvoiceData.lineItems.map(item => {
         const productPayload: any = {
           product_name: item.item,
-          supplier_id: item.supplierId || selectedSupplierId || 1,
-          description: item.item.substring(0, 10),
+          description: item.description || '',
           jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
           stock_quantity: item.qty,
           unit: 'unit',
@@ -1624,12 +1899,12 @@ console.log(suppliers,"supp")
           estimated_price: item.estimatedPrice || 0,
           total_cost: item.total
         }
-        
+
         // Add product ID if editing existing product
         if (item.productId) {
           productPayload.id = item.productId
         }
-        
+
         return productPayload
       })
 
@@ -1641,7 +1916,7 @@ console.log(suppliers,"supp")
         service_type: 'service_based',
         email_address: job.email || 'customer@example.com',
         estimate_date: inlineInvoiceData.date,
-        billing_address_po_number: inlineInvoiceData.poNumber || '',
+        po_number: inlineInvoiceData.poNumber || '',
         status: 'sent',
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
         notes: inlineInvoiceData.notes || '',
@@ -1651,32 +1926,33 @@ console.log(suppliers,"supp")
       // Check if we're editing an existing invoice
       if (editingInvoiceId) {
         await apiClient.updateEstimate(Number(editingInvoiceId), payload as any)
-        toast.success('Invoice updated and sent to customer!')
+        toast.success('Invoice updated and email opened!')
       } else {
         await apiClient.createEstimate(payload as any)
-      toast.success('Invoice sent to customer!')
-    }
-      
+        toast.success('Invoice created and email opened!')
+      }
+
       // Refresh estimates list
       await fetchEstimates()
-    
-    setShowInlineInvoiceForm(false)
-    setShowPreviewDialog(false)
-    setEditingInvoiceId(null)
+
+      setShowInlineInvoiceForm(false)
+      setShowPreviewDialog(false)
+      setEditingInvoiceId(null)
 
       // Reset form
-    setInlineInvoiceData({
+      setInlineInvoiceData({
         date: new Date().toISOString().split('T')[0],
         estimateNumber: '',
         customerName: job.customerName || '',
-        customerAddress: job.location || '',
-      poNumber: '',
+        customerAddress: job.address || '',
+        billToAddress: job.billToAddress || '',
+        poNumber: '',
         project: job.title || '',
-      lineItems: [{
-        id: Math.random().toString(36).substring(2, 9),
+        lineItems: [{
+          id: Math.random().toString(36).substring(2, 9),
           productId: null,
-        qty: 1,
-        item: '',
+          qty: 1,
+          item: '',
           description: '',
           rate: 0,
           estimatedPrice: 0,
@@ -1686,7 +1962,7 @@ console.log(suppliers,"supp")
           supplierId: 1
         }],
         notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
-      signatureText: 'ACCEPTED BY________________DATE_____',
+        signatureText: 'ACCEPTED BY________________DATE_____',
         invoiceType: 'Estimate',
         paymentPercentage: 0,
         estimateTotal: 0,
@@ -1701,54 +1977,119 @@ console.log(suppliers,"supp")
     }
   }
 
-  const handleSendFromPreview = handlePreviewAndSend
+  const handlePrintPreview = async () => {
+    try {
+      const printElement = document.getElementById('invoice-preview-print')
+      if (!printElement) {
+        toast.error('Unable to generate invoice for printing')
+        return
+      }
+
+      const canvas = await html2canvas(printElement, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
+      })
+
+      const imageData = canvas.toDataURL('image/png')
+
+      // Create PDF using jsPDF (same as send function)
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const imgWidth = 210 // A4 width in mm
+      const pageHeight = 295 // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      let heightLeft = imgHeight
+
+      let position = 0
+
+      // Add image to PDF
+      pdf.addImage(imageData, 'PNG', 0, position, imgWidth, imgHeight)
+      heightLeft -= pageHeight
+
+      // Add new page if content is longer than one page
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight
+        pdf.addPage()
+        pdf.addImage(imageData, 'PNG', 0, position, imgWidth, imgHeight)
+        heightLeft -= pageHeight
+      }
+
+      // Create PDF blob and open in print dialog
+      const pdfBlob = pdf.output('blob')
+      const pdfUrl = URL.createObjectURL(pdfBlob)
+
+      // Open PDF in new window for printing
+      const printWindow = window.open(pdfUrl, '_blank')
+
+      if (printWindow) {
+        printWindow.onload = () => {
+          setTimeout(() => {
+            printWindow.print()
+            // Don't close immediately, let user see the PDF
+            // printWindow.close()
+          }, 1000)
+        }
+      }
+
+      // Clean up URL after some time
+      setTimeout(() => {
+        URL.revokeObjectURL(pdfUrl)
+      }, 10000)
+
+    } catch (err) {
+      console.error('Print error:', err)
+      toast.error('Failed to print invoice')
+    }
+  }
 
   const handleEditInvoice = async (invoice: any) => {
     try {
       setIsLoading(true)
-      
+
       // Fetch full estimate details from API
       const response = await apiClient.getEstimateById(invoice.id)
       const estimateData = response?.data || response
-      
+
       console.log('Fetched estimate data:', estimateData)
-      
+
       // Map products to line items
       const lineItems = estimateData.products && estimateData.products.length > 0
         ? estimateData.products.map((product: any) => ({
-            id: Math.random().toString(36).substring(2, 9),
-            productId: product.id, // Store original product ID for updates
-            qty: product.stock_quantity || 1,
-            item: product.product_name || '',
-            description: product.description || '',
-            rate: product.unit_cost || 0,
-            estimatedPrice: product.estimated_price || product.unit_cost || 0,
-            total: (product.stock_quantity || 1) * (product.estimated_price || product.unit_cost || 0),
-            searchQuery: '',
-            showSearchResults: false,
-            supplierId: product.supplier_id || 1
-          }))
+          id: Math.random().toString(36).substring(2, 9),
+          productId: product.id, // Store original product ID for updates
+          qty: product.stock_quantity || 1,
+          item: product.product_name || '',
+          description: product.description || '',
+          rate: product.unit_cost || 0,
+          estimatedPrice: product.estimated_price || product.unit_cost || 0,
+          total: (product.stock_quantity || 1) * (product.estimated_price || product.unit_cost || 0),
+          searchQuery: '',
+          showSearchResults: false,
+          supplierId: product.supplier_id || 1
+        }))
         : [{
-            id: Math.random().toString(36).substring(2, 9),
-            productId: null,
-            qty: 1,
-            item: '',
-            description: '',
-            rate: 0,
-            estimatedPrice: 0,
-            total: 0,
-            searchQuery: '',
-            showSearchResults: false,
-            supplierId: 1
-          }]
-      
+          id: Math.random().toString(36).substring(2, 9),
+          productId: null,
+          qty: 1,
+          item: '',
+          description: '',
+          rate: 0,
+          estimatedPrice: 0,
+          total: 0,
+          searchQuery: '',
+          showSearchResults: false,
+          supplierId: 1
+        }]
+
       setInlineInvoiceData({
         date: estimateData.estimate_date || new Date().toISOString().split('T')[0],
         estimateNumber: estimateData.invoice_number || '',
-        customerName: estimateData.customer?.customer_name || job.customerName || '',
-        customerAddress: estimateData.customer?.address || job.location || '',
-        poNumber: estimateData.billing_address_po_number || '',
-        project: estimateData.estimate_title || job.title || '',
+        customerName: estimateData.customer?.customer_name || job.customer?.customer_name || job.customerName || '',
+        customerAddress: estimateData.customer?.address || job.customer?.address || job.address || '',
+        billToAddress: estimateData.bill_to_address || job.bill_to_address || '',
+        poNumber: estimateData.po_number || '',
+        project: estimateData.estimate_title || job.job_title || job.title || '',
         lineItems: lineItems,
         notes: estimateData.notes || 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
         signatureText: 'ACCEPTED BY________________DATE_____',
@@ -1757,9 +2098,9 @@ console.log(suppliers,"supp")
         estimateTotal: estimateData.total_amount || 0,
         paymentHistory: []
       })
-      
-    setEditingInvoiceId(invoice.id)
-    setShowInlineInvoiceForm(true)
+
+      setEditingInvoiceId(invoice.id)
+      setShowInlineInvoiceForm(true)
       toast.info('Loading invoice for editing...')
     } catch (error) {
       console.error('Error fetching invoice details:', error)
@@ -1783,14 +2124,14 @@ console.log(suppliers,"supp")
           </div>
 
           <div className="flex items-center gap-3">
-            <Button variant="outline" className="gap-2">
+            {/* <Button variant="outline" className="gap-2">
               <FileText className="h-4 w-4" />
               Generate Invoice
             </Button>
             <Button variant="outline" className="gap-2">
               <Send className="h-4 w-4" />
               Send Invoice
-            </Button>
+            </Button> */}
             <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => {
               setEditedJob({
                 ...job,
@@ -1804,10 +2145,6 @@ console.log(suppliers,"supp")
 
               <Edit className="h-4 w-4" />
               Edit Job
-            </Button>
-            <Button variant="outline" className="gap-2">
-              <Printer className="h-4 w-4" />
-              Print
             </Button>
           </div>
         </div>
@@ -1864,7 +2201,7 @@ console.log(suppliers,"supp")
                     </p>
                   )}
                   <p className="text-xs text-green-600">
-                    {isLoadingDashboard ?  "Loading" : dashboardMetrics?.totalMaterialUsed?.unit ?? "items"}
+                    {isLoadingDashboard ? "Loading" : dashboardMetrics?.totalMaterialUsed?.unit ?? "items"}
                   </p>
                 </div>
                 <Package className="h-8 w-8 text-green-600" />
@@ -2109,14 +2446,14 @@ console.log(suppliers,"supp")
                 </div>
 
                 <div>
-                  <Label className="flex items-center gap-2">
+                  <Label className="flex items-center gap-2 mb-2">
                     <UserCheck className="h-4 w-4 text-[#00A1FF]" />
                     Assigned Lead Labor
                   </Label>
 
                   {isEditing ? (
                     <AutoScrollMultiSelect
-                      selectedValues={editedJob.assignedLeadLabor?.map((labor: any) => labor.id.toString()) || []}
+                      selectedValues={editedJob.assignedLeadLabor?.map((labor: any) => labor.user?.full_name) || []}
                       onSelectionChange={(selectedIds, selectedItems) => {
                         const validSelectedItems = selectedItems.filter((labor: any) => labor !== undefined);
 
@@ -2151,14 +2488,14 @@ console.log(suppliers,"supp")
 
 
                 <div>
-                  <Label className="flex items-center gap-2">
+                  <Label className="flex items-center gap-2 mb-2">
                     <Users className="h-4 w-4 text-[#00A1FF]" />
                     Lead Labor
                   </Label>
 
                   {isEditing ? (
                     <AutoScrollMultiSelect
-                      selectedValues={editedJob.assignedLabor?.map((labor: any) => labor.id.toString()) || []}
+                      selectedValues={editedJob.assignedLabor?.map((labor: any) => labor.user?.full_name) || []}
                       onSelectionChange={(selectedIds, selectedItems) => {
                         const validSelectedItems = selectedItems.filter((labor: any) => labor !== undefined);
 
@@ -2178,19 +2515,19 @@ console.log(suppliers,"supp")
 
                   ) : (
                     <div className="flex flex-wrap gap-2 mt-2">
-  {(editedJob.assignedLabor || []).map((labor: any, index: number) => {
-    console.log("Rendering labor:", labor); 
+                      {(editedJob.assignedLabor || []).map((labor: any, index: number) => {
+                        console.log("Rendering labor:", labor);
 
-    return (
-      <span
-        key={labor.id || `labor-${index}`}
-        className="bg-orange-50 text-orange-700 text-sm px-2 py-1 rounded-md border border-orange-200"
-      >
-        {labor.user?.full_name || labor.labor_code}
-      </span>
-    );
-  })}
-</div>
+                        return (
+                          <span
+                            key={labor.id || `labor-${index}`}
+                            className="bg-orange-50 text-orange-700 text-sm px-2 py-1 rounded-md border border-orange-200"
+                          >
+                            {labor.user?.full_name || labor.labor_code}
+                          </span>
+                        );
+                      })}
+                    </div>
 
                   )}
 
@@ -2274,11 +2611,46 @@ console.log(suppliers,"supp")
                     <Receipt className="h-5 w-5" />
                     Transaction History
                   </CardTitle>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="border-primary/30 text-primary hover:bg-primary hover:text-white"
-                    onClick={() => setShowInlineInvoiceForm(!showInlineInvoiceForm)}
+                    onClick={() => {
+                      if (!showInlineInvoiceForm) {
+                        // Reset form and auto-fill when opening invoice form
+                        setInlineInvoiceData({
+                          date: new Date().toISOString().split('T')[0],
+                          estimateNumber: '',
+                          customerName: job.customerName || '',
+                          customerAddress: job.address || '',
+                          billToAddress: job.billToAddress || '',
+                          poNumber: '',
+                          project: job.title || '',
+                          lineItems: [{
+                            id: Math.random().toString(36).substring(2, 9),
+                            productId: null,
+                            qty: 1,
+                            item: '',
+                            description: '',
+                            rate: 0,
+                            estimatedPrice: 0,
+                            total: 0,
+                            searchQuery: '',
+                            showSearchResults: false,
+                            supplierId: 1
+                          }],
+                          notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
+                          signatureText: 'ACCEPTED BY________________DATE_____',
+                          invoiceType: 'Estimate',
+                          paymentPercentage: 0,
+                          estimateTotal: 0,
+                          paymentHistory: [] as any[]
+                        })
+                        setEditingInvoiceId(null)
+                        setInvoiceValidationErrors({})
+                      }
+                      setShowInlineInvoiceForm(!showInlineInvoiceForm)
+                    }}
                   >
                     <PlusCircle className="h-4 w-4 mr-2" />
                     {showInlineInvoiceForm ? 'Cancel' : 'Add Invoice'}
@@ -2299,30 +2671,31 @@ console.log(suppliers,"supp")
                       <div className="p-6 border-b border-gray-200 bg-gray-50">
                         <div className="flex items-center gap-4">
                           <Label className="text-primary font-semibold">Invoice Type:</Label>
-                          <Select 
-                            value={inlineInvoiceData.invoiceType} 
-                            onValueChange={(value: any) => setInlineInvoiceData(prev => ({ ...prev, invoiceType: value }))}
-                          >
-                            <SelectTrigger className="w-[250px] border-primary/30">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Estimate">Estimate</SelectItem>
-                              <SelectItem value="Downpayment Invoice">Downpayment Invoice</SelectItem>
-                              <SelectItem value="Rough Invoice">Rough Invoice</SelectItem>
-                              <SelectItem value="Progressive Invoice">Progressive Invoice</SelectItem>
-                              <SelectItem value="Final Invoice">Final Invoice</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="relative w-[250px]">
+                            <Input
+                              value={inlineInvoiceData.invoiceType}
+                              onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, invoiceType: e.target.value }))}
+                              placeholder="Select or type invoice type..."
+                              className="border-primary/30 focus:border-primary"
+                              list="invoice-types"
+                            />
+                            <datalist id="invoice-types">
+                              <option value="Estimate" />
+                              <option value="Downpayment Invoice" />
+                              <option value="Rough Invoice" />
+                              <option value="Progressive Invoice" />
+                              <option value="Final Invoice" />
+                            </datalist>
+                          </div>
                         </div>
                       </div>
 
                       <div className="p-8">
                         {/* Header */}
-                        <div className="flex justify-between items-start mb-8">
+                        <div className="flex justify-between items-end mb-8">
                           <div className="flex-shrink-0">
                             <Logo width={200} height={75} />
-                            <p className="text-sm font-semibold mt-2">952-449-1088</p>
+                            {/* <p className="text-sm font-semibold mt-2">952-449-1088</p> */}
                           </div>
 
                           <div className="text-right">
@@ -2334,27 +2707,39 @@ console.log(suppliers,"supp")
                                 onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, date: e.target.value }))}
                                 className="px-3 py-2 text-sm"
                               />
-                              <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">
-                                {inlineInvoiceData.invoiceType === 'Estimate' ? 'Estimate #' : 'Invoice #'}
-                              </Label>
-                              <div>
-                              <Input
-                                value={inlineInvoiceData.estimateNumber}
-                                  onChange={(e) => {
-                                    setInlineInvoiceData(prev => ({ ...prev, estimateNumber: e.target.value }))
-                                    setInvoiceValidationErrors(prev => ({ ...prev, estimateNumber: '' }))
-                                  }}
-                                  className={`px-3 py-2 text-sm ${invoiceValidationErrors.estimateNumber ? 'border-red-500' : ''}`}
-                                />
-                                {invoiceValidationErrors.estimateNumber && (
-                                  <p className="text-red-500 text-xs mt-1 px-2">{invoiceValidationErrors.estimateNumber}</p>
-                                )}
-                              </div>
+                              {/* Invoice Number - Only show when editing */}
+                              {editingInvoiceId && (
+                                <>
+                                  <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">
+                                    {inlineInvoiceData.invoiceType === 'Estimate' ? 'Estimate #' : 'Invoice #'}
+                                  </Label>
+                                  <div>
+                                    <Input
+                                      value={inlineInvoiceData.estimateNumber}
+                                      onChange={(e) => {
+                                        setInlineInvoiceData(prev => ({ ...prev, estimateNumber: e.target.value }))
+                                      }}
+                                      className="px-3 py-2 text-sm"
+                                      disabled={true}
+                                    />
+                                  </div>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
-
+                        <div className="mb-6">
+                          <Label className="block bg-gray-600 text-white px-3 py-2 mb-0 text-sm font-semibold">Bill To Address</Label>
+                          <Textarea
+                            value={inlineInvoiceData.billToAddress || ''}
+                            onChange={(e) => setInlineInvoiceData({ ...inlineInvoiceData, billToAddress: e.target.value })}
+                            className="mt-0 border-0 rounded-none"
+                            placeholder="Enter billing address (optional)"
+                            rows={3}
+                          />
+                        </div>
                         {/* Customer Information */}
+
                         <div className="mb-6">
                           <Label className="block bg-gray-600 text-white px-3 py-2 mb-0 text-sm font-semibold">Name / Address</Label>
                           <div className="border border-gray-300 p-4 min-h-[120px]">
@@ -2382,15 +2767,15 @@ console.log(suppliers,"supp")
                           </div>
                           <div className="grid grid-cols-2 gap-0">
                             <div>
-                            <Input
-                              value={inlineInvoiceData.poNumber}
+                              <Input
+                                value={inlineInvoiceData.poNumber}
                                 onChange={(e) => {
                                   setInlineInvoiceData(prev => ({ ...prev, poNumber: e.target.value }))
                                   setInvoiceValidationErrors(prev => ({ ...prev, poNumber: '' }))
                                 }}
                                 className={`px-3 py-2 text-sm rounded-none border-t-0 ${invoiceValidationErrors.poNumber ? 'border-red-500' : ''}`}
-                              placeholder="PO Number"
-                            />
+                                placeholder="PO Number"
+                              />
                               {invoiceValidationErrors.poNumber && (
                                 <p className="text-red-500 text-xs mt-1 px-2">{invoiceValidationErrors.poNumber}</p>
                               )}
@@ -2402,8 +2787,8 @@ console.log(suppliers,"supp")
                             />
                           </div>
                         </div>
-                      {/* Estimate Selection - Only show for payment invoices */}
-                      {/* {inlineInvoiceData.invoiceType !== 'Estimate' && (
+                        {/* Estimate Selection - Only show for payment invoices */}
+                        {/* {inlineInvoiceData.invoiceType !== 'Estimate' && (
                         <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                           <Label className="text-primary font-semibold mb-2 block">Select Estimate</Label>
                           <Select 
@@ -2435,114 +2820,51 @@ console.log(suppliers,"supp")
                         </div>
                       )} */}
 
-                      {/* Header Section */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label className="text-primary">Invoice Type</Label>
-                          <Select 
-                            value={inlineInvoiceData.invoiceType} 
-                            onValueChange={(value: any) => {
-                              // Set default payment percentage based on invoice type
-                              let defaultPercentage = 0.5
-                              if (value === 'Downpayment Invoice') defaultPercentage = 0.5
-                              else if (value === 'Rough Invoice') defaultPercentage = 0.3
-                              else if (value === 'Progressive Invoice') defaultPercentage = 0.15
-                              else if (value === 'Final Invoice') defaultPercentage = 0.05
-                              
-                              setInlineInvoiceData(prev => ({ 
-                                ...prev, 
-                                invoiceType: value,
-                                paymentPercentage: value !== 'Estimate' ? defaultPercentage : 0
-                              }))
-                            }}
-                          >
-                            <SelectTrigger className="border-primary/30 focus:border-primary">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Estimate">Estimate</SelectItem>
-                              <SelectItem value="Downpayment Invoice">Downpayment Invoice</SelectItem>
-                              <SelectItem value="Rough Invoice">Rough Invoice</SelectItem>
-                              <SelectItem value="Progressive Invoice">Progressive Invoice</SelectItem>
-                              <SelectItem value="Final Invoice">Final Invoice</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        {inlineInvoiceData.invoiceType !== 'Estimate' && (
-                          <div className="space-y-2">
-                            <Label className="text-primary">Payment %</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              max="100"
-                              value={(inlineInvoiceData.paymentPercentage || 0) * 100}
-                              onChange={(e) => setInlineInvoiceData(prev => ({ 
-                                ...prev, 
-                                paymentPercentage: parseFloat(e.target.value) / 100 
-                              }))}
-                              className="border-primary/30 focus:border-primary"
-                              placeholder="e.g., 50"
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              {inlineInvoiceData.invoiceType === 'Downpayment Invoice' && 'Default: 50%'}
-                              {inlineInvoiceData.invoiceType === 'Rough Invoice' && 'Default: 30%'}
-                              {inlineInvoiceData.invoiceType === 'Progressive Invoice' && 'Default: 15%'}
-                              {inlineInvoiceData.invoiceType === 'Final Invoice' && 'Remaining balance'}
-                            </p>
-                          </div>
-                        )}
-                        <div className="space-y-2">
-                          <Label className="text-primary">Date</Label>
-                          <Input
-                            value={inlineInvoiceData.date}
-                            onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, date: e.target.value }))}
-                            className="border-primary/30 focus:border-primary"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-primary">Invoice Number</Label>
-                          <Input
-                            value={inlineInvoiceData.estimateNumber}
-                            onChange={(e) => {
-                              setInlineInvoiceData(prev => ({ ...prev, estimateNumber: e.target.value }))
-                              setInvoiceValidationErrors(prev => ({ ...prev, estimateNumber: '' }))
-                            }}
-                            className={`border-primary/30 focus:border-primary ${invoiceValidationErrors.estimateNumber ? 'border-red-500' : ''}`}
-                          />
-                          {invoiceValidationErrors.estimateNumber && (
-                            <p className="text-red-500 text-xs mt-1">{invoiceValidationErrors.estimateNumber}</p>
-                          )}
-                        </div>
-                      </div>
+                        {/* Header Section */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-                      {/* Customer Information */}
-                      <div className="space-y-2 mt-3">
-                        <Label className="text-primary">Customer Name</Label>
-                        <Input
-                          value={inlineInvoiceData.customerName}
-                          onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customerName: e.target.value }))}
-                          className="border-primary/30 focus:border-primary"
-                        />
-                      </div>
-                      <div className="space-y-2 mt-3 mb-4">
-                        <Label className="text-primary">Customer Address</Label>
-                        <Textarea
-                          value={inlineInvoiceData.customerAddress}
-                          onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customerAddress: e.target.value }))}
-                          className="border-primary/30 focus:border-primary"
-                          rows={2}
-                        />
-                      </div> 
+                          {inlineInvoiceData.invoiceType !== 'Estimate' && (
+                            <div className="space-y-2">
+                              <Label className="text-primary">Payment %</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={(inlineInvoiceData.paymentPercentage || 0) * 100}
+                                onChange={(e) => setInlineInvoiceData(prev => ({
+                                  ...prev,
+                                  paymentPercentage: parseFloat(e.target.value) / 100
+                                }))}
+                                className="border-primary/30 focus:border-primary"
+                                placeholder="e.g., 50"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                {inlineInvoiceData.invoiceType === 'Downpayment Invoice' && 'Default: 50%'}
+                                {inlineInvoiceData.invoiceType === 'Rough Invoice' && 'Default: 30%'}
+                                {inlineInvoiceData.invoiceType === 'Progressive Invoice' && 'Default: 15%'}
+                                {inlineInvoiceData.invoiceType === 'Final Invoice' && 'Remaining balance'}
+                              </p>
+                            </div>
+                          )}
+                          <div className="space-y-2">
+                            <Label className="text-primary">Date</Label>
+                            <Input
+                              value={inlineInvoiceData.date}
+                              onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, date: e.target.value }))}
+                              className="border-primary/30 focus:border-primary"
+                            />
+                          </div>
+
+                        </div>
 
                         {/* Line Items Table */}
-                        <div className="mb-6 overflow-x-auto">
+                        <div className="mb-6 overflow-x-auto mt-4">
                           <table className="w-full border-collapse">
                             <thead>
                               <tr className="bg-gray-600 text-white">
                                 <th className="border border-gray-300 px-3 py-2 w-16 text-sm font-semibold">Qty</th>
                                 <th className="border border-gray-300 px-3 py-2 w-48 text-sm font-semibold">Item</th>
                                 <th className="border border-gray-300 px-3 py-2 text-sm font-semibold">Description</th>
-                                <th className="border border-gray-300 px-3 py-2 w-40 text-sm font-semibold">Supplier</th>
                                 <th className="border border-gray-300 px-3 py-2 w-28 text-sm font-semibold">Rate</th>
                                 <th className="border border-gray-300 px-3 py-2 w-32 text-sm font-semibold">Estimated Price</th>
                                 <th className="border border-gray-300 px-3 py-2 w-28 text-sm font-semibold">Total</th>
@@ -2585,7 +2907,7 @@ console.log(suppliers,"supp")
                                       <div className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1">
                                         {(() => {
                                           const filtered = getFilteredProducts(item.searchQuery || '')
-                                          
+
                                           // Trigger API search
                                           if (item.searchQuery && item.searchQuery.length > 2) {
                                             fetchProducts(item.searchQuery)
@@ -2644,27 +2966,7 @@ console.log(suppliers,"supp")
                                       rows={4}
                                     />
                                   </td>
-                                  <td className="border border-gray-300 p-1">
-                                    <Select
-                                      value={item.supplierId?.toString() || '1'}
-                                      onValueChange={(value) => updateInvoiceLineItem(item.id, 'supplierId', Number(value))}
-                                    >
-                                      <SelectTrigger className="border-0">
-                                        <SelectValue placeholder="Supplier" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {suppliersList.length > 0 ? (
-                                          suppliersList.map((supplier) => (
-                                            <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                                              {supplier.name}
-                                            </SelectItem>
-                                          ))
-                                        ) : (
-                                          <SelectItem value="1">Loading...</SelectItem>
-                                        )}
-                                      </SelectContent>
-                                    </Select>
-                                  </td>
+
                                   <td className="border border-gray-300 p-1">
                                     <Input
                                       type="number"
@@ -2705,7 +3007,7 @@ console.log(suppliers,"supp")
                               ))}
                               {/* Subtotal Row */}
                               <tr>
-                                <td colSpan={6} className="border border-gray-300 p-2"></td>
+                                <td colSpan={5} className="border border-gray-300 p-2"></td>
                                 <td className="border border-gray-300 p-2 text-right font-bold">
                                   ${calculateInvoiceSubtotal().toFixed(2)}
                                 </td>
@@ -2784,6 +3086,36 @@ console.log(suppliers,"supp")
                               setShowInlineInvoiceForm(false)
                               setEditingInvoiceId(null)
                               setInvoiceValidationErrors({})
+
+                              // Reset form data
+                              setInlineInvoiceData({
+                                date: new Date().toISOString().split('T')[0],
+                                estimateNumber: '',
+                                customerName: job.customerName || '',
+                                customerAddress: job.address || '',
+                                billToAddress: job.billToAddress || '',
+                                poNumber: '',
+                                project: job.title || '',
+                                lineItems: [{
+                                  id: Math.random().toString(36).substring(2, 9),
+                                  productId: null,
+                                  qty: 1,
+                                  item: '',
+                                  description: '',
+                                  rate: 0,
+                                  estimatedPrice: 0,
+                                  total: 0,
+                                  searchQuery: '',
+                                  showSearchResults: false,
+                                  supplierId: 1
+                                }],
+                                notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
+                                signatureText: 'ACCEPTED BY________________DATE_____',
+                                invoiceType: 'Estimate',
+                                paymentPercentage: 0,
+                                estimateTotal: 0,
+                                paymentHistory: [] as any[]
+                              })
                             }}
                             className="border-gray-300"
                           >
@@ -2830,75 +3162,75 @@ console.log(suppliers,"supp")
                     </div>
                   ) : (
                     estimates.map((invoice: any) => (
-                    <div key={invoice.id} className="p-4 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow bg-gradient-to-r from-white to-gray-50/30">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="w-14 h-14 bg-primary/10 rounded-lg flex items-center justify-center">
-                            <FileText className="h-7 w-7 text-primary" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-3 mb-1">
+                      <div key={invoice.id} className="p-4 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow bg-gradient-to-r from-white to-gray-50/30">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className="w-14 h-14 bg-primary/10 rounded-lg flex items-center justify-center">
+                              <FileText className="h-7 w-7 text-primary" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-3 mb-1">
                                 <h4 className="font-semibold text-foreground">{invoice.invoice_type || 'Estimate'}</h4>
                                 <Badge className={`${getInvoiceTypeColor(invoice.invoice_type)} text-xs font-medium`} variant="outline">
                                   {invoice.invoice_type || 'Estimate'}
-                              </Badge>
-                            </div>
+                                </Badge>
+                              </div>
                               <p className="text-sm text-muted-foreground mb-2">{invoice.description || invoice.estimate_title}</p>
-                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                              <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                 <span>#{invoice.invoice_number}</span>
                                 <span>Created: {formatDate(invoice.estimate_date || invoice.created_at)}</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
                               <p className="font-semibold text-lg text-foreground">{formatCurrency(invoice.total_amount || 0)}</p>
-                            <Badge className={getStatusBadgeColor(invoice.status)} variant="outline">
+                              <Badge className={getStatusBadgeColor(invoice.status)} variant="outline">
                                 {invoice.status || 'draft'}
-                            </Badge>
-                          </div>
-                          <div className="flex gap-2">
+                              </Badge>
+                            </div>
+                            <div className="flex gap-2">
                               {invoice.status === 'draft' && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditInvoice(invoice)}
+                                  className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-300"
+                                >
+                                  <Edit className="h-4 w-4 mr-1" />
+                                  Edit
+                                </Button>
+                              )}
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleEditInvoice(invoice)}
-                                className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-300"
+                                onClick={() => handleViewInvoice(invoice)}
+                                className="text-primary hover:text-primary hover:bg-primary/10 border-primary/30"
                               >
-                                <Edit className="h-4 w-4 mr-1" />
-                                Edit
+                                <Eye className="h-4 w-4 mr-1" />
+                                View
                               </Button>
-                            )}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleViewInvoice(invoice)}
-                              className="text-primary hover:text-primary hover:bg-primary/10 border-primary/30"
-                            >
-                              <Eye className="h-4 w-4 mr-1" />
-                              View
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handlePrintInvoice(invoice)}
-                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-300"
-                            >
-                              <Printer className="h-4 w-4 mr-1" />
-                              Print
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteInvoice(invoice.id)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handlePrintInvoice(invoice)}
+                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-300"
+                              >
+                                <Printer className="h-4 w-4 mr-1" />
+                                Print
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteInvoice(invoice.id)}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
                     ))
                   )}
                 </div>
@@ -2947,18 +3279,18 @@ console.log(suppliers,"supp")
                         <div className="flex items-center gap-4">
                           <div className="text-right">
                             <p className="font-semibold">
-                          {formatCurrency(
-                            (Number(material.stock_quantity ?? material.quantity ?? 0) || 0) *
-                            (Number(material.unit_cost ?? material.unitCost ?? material.price ?? 0) || 0)
-                          )}
-                        </p>
+                              {formatCurrency(
+                                (Number(material.stock_quantity ?? material.quantity ?? 0) || 0) *
+                                (Number(material.unit_cost ?? material.unitCost ?? material.price ?? 0) || 0)
+                              )}
+                            </p>
 
                             <p className="text-sm text-gray-600">{material.stock_quantity || material.quantity || 0} {material.unit}</p>
                           </div>
                           <Button variant="outline" size="sm" className="gap-1" onClick={() => {
-                                setProductToDelete(material);
-                                setShowDeleteProductDialog(true);
-                              }}>
+                            setProductToDelete(material);
+                            setShowDeleteProductDialog(true);
+                          }}>
                             <Trash2 className="h-3 w-3 text-red-600" />
                           </Button>
                         </div>
@@ -3150,29 +3482,7 @@ console.log(suppliers,"supp")
               </CardContent>
             </Card>
 
-            {/* Quick Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Quick Actions
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button className="w-full gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
-                  <FileText className="h-4 w-4" />
-                  Generate Invoice
-                </Button>
-                <Button variant="outline" className="w-full gap-2">
-                  <Send className="h-4 w-4" />
-                  Send to Customer
-                </Button>
-                <Button variant="outline" className="w-full gap-2" onClick={handlePrint}>
-                  <Printer className="h-4 w-4" />
-                  Print Report
-                </Button>
-              </CardContent>
-            </Card>
+
           </div>
         </div>
       </div>
@@ -3273,7 +3583,7 @@ console.log(suppliers,"supp")
                 <Label className="mb-2">SKU</Label>
                 <Input
                   value={materialFormData.sku}
-                   maxLength={15}
+                  maxLength={15}
                   onChange={(e) => setMaterialFormData({ ...materialFormData, sku: e.target.value })}
                 />
               </div>
@@ -3285,7 +3595,7 @@ console.log(suppliers,"supp")
                 <Input
                   type="number"
                   maxLength={10}
-                   value={materialFormData.quantity === 0 ? "" : materialFormData.quantity}
+                  value={materialFormData.quantity === 0 ? "" : materialFormData.quantity}
                   onChange={(e) => setMaterialFormData({ ...materialFormData, quantity: Number(e.target.value) })}
                 />
               </div>
@@ -3477,7 +3787,7 @@ console.log(suppliers,"supp")
                   type="number"
                   min="0"
                   step="0.5"
-                  value={timeLogFormData.hoursWorked === 0 ?"":timeLogFormData.hoursWorked}
+                  value={timeLogFormData.hoursWorked === 0 ? "" : timeLogFormData.hoursWorked}
                   onChange={(e) => setTimeLogFormData({ ...timeLogFormData, hoursWorked: Number(e.target.value) })}
                   placeholder="0"
                   disabled={timeLogModalMode === 'view'}
@@ -3492,7 +3802,7 @@ console.log(suppliers,"supp")
                   type="number"
                   min="0"
                   step="0.01"
-                  value={timeLogFormData.hourlyRate=== 0?"":timeLogFormData.hourlyRate}
+                  value={timeLogFormData.hourlyRate === 0 ? "" : timeLogFormData.hourlyRate}
                   onChange={(e) => setTimeLogFormData({ ...timeLogFormData, hourlyRate: Number(e.target.value) })}
                   placeholder="0.00"
                   disabled={timeLogModalMode === 'view'}
@@ -3537,125 +3847,304 @@ console.log(suppliers,"supp")
         </DialogContent>
       </Dialog>
       <Dialog open={showInvoiceModal} onOpenChange={setShowInvoiceModal}>
-          <DialogContent className="w-[500px] max-h-[80vh] overflow-y-auto">
+        <DialogContent className="w-[500px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-              <DialogTitle className="text-primary">Invoice Details</DialogTitle>
+            <DialogTitle className="text-primary">Invoice Details</DialogTitle>
             <DialogDescription>
               {selectedInvoice && `${selectedInvoice.invoice_type?.charAt(0).toUpperCase() + selectedInvoice.invoice_type?.slice(1).replace('_', ' ')} - ${selectedInvoice.invoice_number}`}
             </DialogDescription>
           </DialogHeader>
-            {selectedInvoice && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-gray-50 rounded-lg">
-                  <div>
-                    <Label className="text-primary">Invoice Information</Label>
-                    <div className="mt-2 space-y-2">
-                      <p><span className="font-medium">Type:</span> {selectedInvoice.invoice_type?.charAt(0).toUpperCase() + selectedInvoice.invoice_type?.slice(1).replace('_', ' ')}</p>
-                      <p><span className="font-medium">Number:</span> {selectedInvoice.invoice_number}</p>
-                      <p><span className="font-medium">Amount:</span> {formatCurrency(selectedInvoice.total_amount)}</p>
-                      <p><span className="font-medium">Status:</span> 
-                        <Badge className={`ml-2 ${getStatusBadgeColor(selectedInvoice.status)}`} variant="outline">
-                          {selectedInvoice.status}
-                        </Badge>
-                      </p>
-            </div>
-                  </div>
-                  <div>
-                    <Label className="text-primary">Dates</Label>
-                    <div className="mt-2 space-y-2">
-                      <p><span className="font-medium">Created:</span> {formatDate(selectedInvoice.created_at)}</p>
-                      {selectedInvoice.due_date && (
-                        <p><span className="font-medium">Due Date:</span> {formatDate(selectedInvoice.due_date)}</p>
-                      )}
-                    </div>
+          {selectedInvoice && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-gray-50 rounded-lg">
+                <div>
+                  <Label className="text-primary">Invoice Information</Label>
+                  <div className="mt-2 space-y-2">
+                    <p><span className="font-medium">Type:</span> {selectedInvoice.invoice_type?.charAt(0).toUpperCase() + selectedInvoice.invoice_type?.slice(1).replace('_', ' ')}</p>
+                    <p><span className="font-medium">Number:</span> {selectedInvoice.invoice_number}</p>
+                    <p><span className="font-medium">Amount:</span> {formatCurrency(selectedInvoice.total_amount)}</p>
+                    <p><span className="font-medium">Status:</span>
+                      <Badge className={`ml-2 ${getStatusBadgeColor(selectedInvoice.status)}`} variant="outline">
+                        {selectedInvoice.status}
+                      </Badge>
+                    </p>
                   </div>
                 </div>
                 <div>
-                  <Label className="text-primary">Description</Label>
-                  <p className="mt-2 p-4 bg-gray-50 rounded-lg">{selectedInvoice.description}</p>
+                  <Label className="text-primary">Dates</Label>
+                  <div className="mt-2 space-y-2">
+                    <p><span className="font-medium">Created:</span> {formatDate(selectedInvoice.created_at)}</p>
+                    {selectedInvoice.due_date && (
+                      <p><span className="font-medium">Due Date:</span> {formatDate(selectedInvoice.due_date)}</p>
+                    )}
+                  </div>
                 </div>
               </div>
-            )}
-            <DialogFooter>
-              <Button variant="outline" onClick={() => {
-                setShowInvoiceModal(false)
-                setSelectedInvoice(null)
-              }}>
+              <div>
+                <Label className="text-primary">Description</Label>
+                <p className="mt-2 p-4 bg-gray-50 rounded-lg">{selectedInvoice.notes}</p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowInvoiceModal(false)
+              setSelectedInvoice(null)
+            }}>
               Close
             </Button>
-              {selectedInvoice && (
-                <Button onClick={() => handlePrintInvoice(selectedInvoice)} className="bg-primary hover:bg-primary/90">
-                  <Printer className="h-4 w-4 mr-2" />
-                  Print Invoice
-            </Button>
-              )}
-            </DialogFooter>
+            {/* {selectedInvoice && (
+              <Button onClick={() => handlePrintInvoice(selectedInvoice)} className="bg-primary hover:bg-primary/90">
+                <Printer className="h-4 w-4 mr-2" />
+                Print Invoice
+              </Button>
+            )} */}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
-      
 
-    {selectedInvoiceId && (
-  <div
-    ref={printRef}
-    aria-hidden="true"
-    style={{
-      position: 'absolute',
-      left: '-10000px',
-      top: 0,
-      width: '22cm',
-      background: '#ffffff',
-      padding: '24px',
-      pointerEvents: 'none',
-    }}
-  >
-    <InvoiceTemplate invoiceId={selectedInvoiceId} />
-  </div>
-)}
+
+      {selectedInvoiceId && (
+        <div
+          ref={printRef}
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            left: '-10000px',
+            top: 0,
+            width: '22cm',
+            background: '#ffffff',
+            padding: '24px',
+            pointerEvents: 'none',
+          }}
+        >
+          <InvoiceTemplate invoiceId={selectedInvoiceId} />
+        </div>
+      )}
 
 
 
       <AlertDialog open={showDeleteProductDialog} onOpenChange={setShowDeleteProductDialog}>
-  <AlertDialogContent>
-    <AlertDialogHeader>
-      <AlertDialogTitle>Are you sure you want to delete this product?</AlertDialogTitle>
-      <AlertDialogDescription>
-        This action cannot be undone. This will permanently delete the product.
-      </AlertDialogDescription>
-    </AlertDialogHeader>
-    <AlertDialogFooter>
-      <AlertDialogCancel disabled={isDeleting}>No</AlertDialogCancel>
-      <AlertDialogAction
-        onClick={confirmDeleteProduct}
-        disabled={isDeleting}
-        className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
-      >
-        {isDeleting ? 'Deleting...' : 'Yes, delete'}
-      </AlertDialogAction>
-    </AlertDialogFooter>
-  </AlertDialogContent>
-</AlertDialog>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to delete this product?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the product.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>No</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteProduct}
+              disabled={isDeleting}
+              className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {isDeleting ? 'Deleting...' : 'Yes, delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
 
-<AlertDialog open={showDeleteEstimateDialog} onOpenChange={setShowDeleteEstimateDialog}>
-  <AlertDialogContent>
-    <AlertDialogHeader>
-      <AlertDialogTitle>Are you sure you want to delete this estimate?</AlertDialogTitle>
-      <AlertDialogDescription>
-        This action cannot be undone. This will permanently delete the estimate &quot;{estimateToDelete?.name || estimateToDelete?.id}&quot; from your records.
-      </AlertDialogDescription>
-    </AlertDialogHeader>
-    <AlertDialogFooter>
-      <AlertDialogCancel disabled={isDeleting}>No</AlertDialogCancel>
-      <AlertDialogAction
-        onClick={confirmDeleteEstimate}
-        disabled={isDeleting}
-        className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
-      >
-        {isDeleting ? 'Deleting...' : 'Yes, delete'}
-      </AlertDialogAction>
-    </AlertDialogFooter>
-  </AlertDialogContent>
-</AlertDialog>
+      <AlertDialog open={showDeleteEstimateDialog} onOpenChange={setShowDeleteEstimateDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to delete this estimate?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the estimate &quot;{estimateToDelete?.name || estimateToDelete?.id}&quot; from your records.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>No</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteEstimate}
+              disabled={isDeleting}
+              className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {isDeleting ? 'Deleting...' : 'Yes, delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Invoice Preview Modal */}
+      <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
+          <div className="bg-gray-100 p-6">
+            {/* Print-ready Invoice Design */}
+            <div id="invoice-preview-print" className="bg-white p-8 shadow-lg" style={{ width: '8.5in', margin: '0 auto' }}>
+              {/* Header */}
+              <div className="flex justify-between items-start mb-8">
+                <div>
+                  <Logo />
+                  {/* <p className="text-sm text-gray-600 mt-2">952-449-1088</p> */}
+                  {/* Invoice Number Display */}
+                  
+                </div>
+                <div className="text-right">
+                  <div className="bg-gray-800 text-white px-4 py-2 text-center mb-2">
+                    <div className="text-lg font-bold">{inlineInvoiceData.invoiceType?.toUpperCase() || 'ESTIMATE'}</div>
+                    <div className="text-sm">{new Date(inlineInvoiceData.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</div>
+                  </div>
+                  <div className="bg-gray-800 text-white px-4 py-2 text-center">
+                    <div className="text-lg font-bold">{inlineInvoiceData.invoiceType?.toUpperCase() || 'ESTIMATE'} #</div>
+                    <div className="text-sm">{inlineInvoiceData.estimateNumber}</div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-800 text-white p-3 mb-4">
+                <div className="text-sm font-bold">Bill TO</div>
+              </div>
+              {inlineInvoiceData.billToAddress && (
+                  <div className="text-gray-600 mt-2 font-medium"> {inlineInvoiceData.billToAddress}</div>
+                )}
+              {/* To Section */}
+              <div className="bg-gray-800 text-white p-3 mb-4 mt-4">
+                <div className="text-sm font-bold">TO</div>
+              </div>
+              <div className="mb-6">
+                <div className="font-semibold">{inlineInvoiceData.customerName}</div>
+                <div className="text-gray-600">{inlineInvoiceData.customerAddress}</div>
+               
+              </div>
+
+              {/* Project Details */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <div className="text-sm font-semibold">P.O. No.</div>
+                  <div className="text-gray-600">{inlineInvoiceData.poNumber}</div>
+                </div>
+                <div>
+                  <div className="text-sm font-semibold">Project</div>
+                  <div className="text-gray-600">{inlineInvoiceData.project}</div>
+                </div>
+              </div>
+
+              {/* Line Items Table */}
+              <div className="mb-6">
+                <table className="w-full border-collapse border border-gray-300">
+                  <thead>
+                    <tr className="bg-gray-800 text-white">
+                      <th className="border border-gray-300 px-3 py-2 text-left">Qty</th>
+                      <th className="border border-gray-300 px-3 py-2 text-left">Item</th>
+                      <th className="border border-gray-300 px-3 py-2 text-left">Description</th>
+                      <th className="border border-gray-300 px-3 py-2 text-right">Rate</th>
+                      <th className="border border-gray-300 px-3 py-2 text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inlineInvoiceData.lineItems.map((item, index) => (
+                      <tr key={item.id} className="hover:bg-gray-50">
+                        <td className="border border-gray-300 px-3 py-2">{item.qty}</td>
+                        <td className="border border-gray-300 px-3 py-2 font-medium">{item.item}</td>
+                        <td className="border border-gray-300 px-3 py-2 text-sm text-gray-600">{item.description}</td>
+                        <td className="border border-gray-300 px-3 py-2 text-right">${item.rate.toFixed(2)}</td>
+                        <td className="border border-gray-300 px-3 py-2 text-right font-medium">${item.total.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {/* Subtotal */}
+                <div className="flex justify-end mt-4">
+                  <div className="text-right">
+                    <div className="font-bold text-lg">${calculateInvoiceSubtotal().toFixed(2)}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes Section */}
+              <div className="border-t pt-4 mb-6">
+                <div className="bg-gray-100 p-3 rounded text-center">
+                  <div className="text-sm font-medium whitespace-pre-line">{inlineInvoiceData.notes || 'Final payment to complete project billing'}</div>
+                </div>
+              </div>
+
+              {/* Disclaimer */}
+              <div className="text-xs text-gray-600 mb-6">
+                <p className="mb-2">
+                  JDP is not responsible for repair of lamps & landscaping, house owner utilities including cables,
+                  sprinkler systems, television or telephone cables, etc. that may be cut or damaged during installation.
+                  Price are subject to change prior to receipt of down payment.
+                </p>
+              </div>
+
+              {/* Total and Contact */}
+              <div className="text-center mb-6">
+                <div className="text-2xl font-bold mb-4">Total ${calculateInvoiceSubtotal().toFixed(2)}</div>
+                <div className="text-sm text-gray-600">
+                  EMAIL: jen@jdpelectric.us 952-449-1088
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Modal Footer Buttons */}
+          <div className="flex justify-center gap-4 p-6 bg-gray-50 border-t">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowPreviewDialog(false)
+                // Reset form when closing preview
+                if (!editingInvoiceId) {
+                  setShowInlineInvoiceForm(false)
+                  setEditingInvoiceId(null)
+                  setInvoiceValidationErrors({})
+
+                  setInlineInvoiceData({
+                    date: new Date().toISOString().split('T')[0],
+                    estimateNumber: '',
+                    customerName: job.customerName || '',
+                    customerAddress: job.address || '',
+                    billToAddress: job.billToAddress || '',
+                    poNumber: '',
+                    project: job.title || '',
+                    lineItems: [{
+                      id: Math.random().toString(36).substring(2, 9),
+                      productId: null,
+                      qty: 1,
+                      item: '',
+                      description: '',
+                      rate: 0,
+                      estimatedPrice: 0,
+                      total: 0,
+                      searchQuery: '',
+                      showSearchResults: false,
+                      supplierId: 1
+                    }],
+                    notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
+                    signatureText: 'ACCEPTED BY________________DATE_____',
+                    invoiceType: 'Estimate',
+                    paymentPercentage: 0,
+                    estimateTotal: 0,
+                    paymentHistory: [] as any[]
+                  })
+                }
+              }}
+              className="flex items-center gap-2"
+            >
+              <X className="h-4 w-4" />
+              Close
+            </Button>
+            <Button
+              onClick={handlePrintPreview}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <Printer className="h-4 w-4" />
+              Print
+            </Button>
+            <Button
+              onClick={handleSendFromPreview}
+              disabled={isLoading}
+              className="bg-gray-800 hover:bg-gray-900 text-white flex items-center gap-2"
+            >
+              <Send className="h-4 w-4" />
+              {isLoading ? 'Sending...' : 'Send Invoice'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
 
     </div>
