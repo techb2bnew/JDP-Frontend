@@ -59,6 +59,7 @@ import { LoadingSpinner } from './common/LoadingSpinner'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog'
 import { motion } from 'framer-motion'
 import { Logo } from './common/Logo'
+import Image from 'next/image'
 
 // Sample data structure - replace with your actual data
 const sampleJobData = {
@@ -302,6 +303,21 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const [suppliersList, setSuppliersList] = useState<any[]>([])
   const [selectedSupplierId, setSelectedSupplierId] = useState<number>(1)
   const [invoiceValidationErrors, setInvoiceValidationErrors] = useState<Record<string, string>>({})
+  const [customInvoiceTypes, setCustomInvoiceTypes] = useState<string[]>([])
+  const [customerData, setCustomerData] = useState<any>(null)
+
+  // Clean duplicate custom types (case-insensitive)
+  const cleanCustomTypes = (types: string[]) => {
+    const seen = new Set<string>()
+    return types.filter(type => {
+      const lower = type.toLowerCase()
+      if (seen.has(lower)) {
+        return false
+      }
+      seen.add(lower)
+      return true
+    })
+  }
 
   // Debug: Log job data to see structure
   console.log('Job data:', job) 
@@ -313,6 +329,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     customerName: job.customerName || '',
     customerAddress: job.address || '',
     billToAddress: job.billToAddress || '',
+    billToAddressEnabled: true,
     poNumber: '',
     project: job.title || '',
     lineItems: [{
@@ -324,13 +341,15 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       rate: 0,
       estimatedPrice: 0,
       total: 0,
-      searchQuery: '',
-      showSearchResults: false,
-      supplierId: 1
+        searchQuery: '',
+        showSearchResults: false,
+        supplierId: 1,
+        isCustomProduct: false
     }],
     notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
     signatureText: 'ACCEPTED BY________________DATE_____',
     invoiceType: 'Estimate',
+    customInvoiceType: '',
     paymentPercentage: 0,
     estimateTotal: 0,
     paymentHistory: [] as any[]
@@ -1265,9 +1284,64 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         total: 0,
         searchQuery: '',
         showSearchResults: false,
-        supplierId: selectedSupplierId || 1
+        supplierId: selectedSupplierId || 1,
+        isCustomProduct: false
       }]
     }))
+  }
+
+  const addCustomLineItem = () => {
+    setInlineInvoiceData(prev => ({
+      ...prev,
+      lineItems: [...prev.lineItems, {
+        id: Math.random().toString(36).substring(2, 9),
+        productId: null,
+        qty: 1,
+        item: '',
+        description: '',
+        rate: 0,
+        estimatedPrice: 0,
+        total: 0,
+        searchQuery: '',
+        showSearchResults: false,
+        supplierId: selectedSupplierId || 1,
+        isCustomProduct: true
+      }]
+    }))
+  }
+
+  const addCustomInvoiceType = (customType: string) => {
+    if (customType) {
+      // Check for case-insensitive duplicates
+      const isDuplicate = customInvoiceTypes.some(existing => 
+        existing.toLowerCase() === customType.toLowerCase()
+      )
+      if (!isDuplicate) {
+        setCustomInvoiceTypes(prev => [...prev, customType])
+      }
+    }
+  }
+
+  // Fetch customer data
+  const fetchCustomerData = async (customerId: string) => {
+    try {
+      console.log('Fetching customer data for ID:', customerId)
+      const response = await apiClient.getCustomers(1, 100) // Get all customers
+      console.log('Customers response:', response)
+      const customers = response.data?.customers || response.data?.data || response.data || []
+      console.log('All customers:', customers)
+      const customer = customers.find((c: any) => c.id === Number(customerId))
+      console.log('Found customer:', customer)
+      if (customer) {
+        setCustomerData(customer)
+      } else {
+        console.log('Customer not found with ID:', customerId)
+        setCustomerData(null)
+      }
+    } catch (error) {
+      console.error('Error fetching customer data:', error)
+      setCustomerData(null)
+    }
   }
 
   const removeInvoiceLineItem = (itemId: string) => {
@@ -1286,12 +1360,23 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   }
 
   const selectProduct = (itemId: string, product: any) => {
+    // Check if product already exists in line items (by product ID, not name)
+    const isDuplicate = inlineInvoiceData.lineItems.some(item => 
+      item.id !== itemId && item.productId === product.id
+    )
+    
+    if (isDuplicate) {
+      toast.error('This product is already added to the invoice')
+      return
+    }
+
     setInlineInvoiceData(prev => ({
       ...prev,
       lineItems: prev.lineItems.map(item => {
         if (item.id === itemId) {
           return {
             ...item,
+            productId: product.id,
             item: product.name,
             description: product.description || '',
             rate: product.jdpPrice || 0,
@@ -1308,6 +1393,16 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   }
 
   const addCustomProduct = (itemId: string, productName: string) => {
+    // Check if custom product already exists in line items (by name for custom products)
+    const isDuplicate = inlineInvoiceData.lineItems.some(item => 
+      item.id !== itemId && item.productId === null && item.item.toLowerCase() === productName.toLowerCase()
+    )
+    
+    if (isDuplicate) {
+      toast.error('This custom product is already added to the invoice')
+      return
+    }
+
     setInlineInvoiceData(prev => ({
       ...prev,
       lineItems: prev.lineItems.map(item => {
@@ -1406,8 +1501,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           <!-- Header -->
           <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 32px;">
             <div>
-              <div style="font-size: 24px; font-weight: bold; color: #1e40af;">JDP</div>
-              <p style="font-size: 14px; color: #6b7280; margin: 8px 0;">952-449-1088</p>
+              <div > 
+                 <Image
+                src='/assets/logos/logo-jdp.png'
+                alt="logo"  
+              />
+              </div> 
               <!-- Invoice Number Display -->
               ${editingInvoiceId ? `
                 <div style="margin-top: 12px;">
@@ -1648,7 +1747,18 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   useEffect(() => {
     fetchProducts()
     fetchSuppliers()
-  }, [])
+    // Log job data to see customer email field
+    console.log('Job data:', job)
+    console.log('Job customer field:', job.customer)
+    console.log('Job customerName field:', job.customerName)
+    // Fetch customer data if customer ID is available
+    if (job.customer) {
+      console.log('Fetching customer data for customer ID:', job.customer)
+      fetchCustomerData(job.customer)
+    } else {
+      console.log('No customer ID found in job data')
+    }
+  }, [job.customer, job.id])
 
   const handleSaveInvoiceAsDraft = async () => {
     // Validation
@@ -1658,9 +1768,6 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       errors.project = 'Project field is required'
     }
 
-    if (!inlineInvoiceData.poNumber) {
-      errors.poNumber = 'P.O. Number is required'
-    }
 
 
     if (inlineInvoiceData.lineItems.length === 0 || !inlineInvoiceData.lineItems[0].item) {
@@ -1709,9 +1816,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         email_address: job.email || 'customer@example.com',
         estimate_date: inlineInvoiceData.date,
         po_number: inlineInvoiceData.poNumber || '',
-        bill_to_address: inlineInvoiceData.billToAddress || '',
+        ...(inlineInvoiceData.billToAddressEnabled && { bill_to_address: inlineInvoiceData.billToAddress || '' }),
         status: 'draft',
-        invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
+        invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType),
         notes: inlineInvoiceData.notes || '',
         custom_products: customProducts
       }
@@ -1738,6 +1845,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         customerName: job.customerName || '',
         customerAddress: job.address || '',
         billToAddress: job.billToAddress || '',
+        billToAddressEnabled: true,
         poNumber: '',
         project: job.title || '',
         lineItems: [{
@@ -1749,13 +1857,15 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           rate: 0,
           estimatedPrice: 0,
           total: 0,
-          searchQuery: '',
-          showSearchResults: false,
-          supplierId: 1
+        searchQuery: '',
+        showSearchResults: false,
+        supplierId: 1,
+        isCustomProduct: false
         }],
         notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
         signatureText: 'ACCEPTED BY________________DATE_____',
         invoiceType: 'Estimate',
+        customInvoiceType: '',
         paymentPercentage: 0,
         estimateTotal: 0,
         paymentHistory: []
@@ -1769,18 +1879,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     }
   }
 
-  const handlePreviewAndSend = () => {
+  const handlePreviewAndSend = async () => {
     // Validation
     const errors: Record<string, string> = {}
 
     if (!inlineInvoiceData.project) {
       errors.project = 'Project field is required'
     }
-
-    if (!inlineInvoiceData.poNumber) {
-      errors.poNumber = 'P.O. Number is required'
-    }
-
 
     if (inlineInvoiceData.lineItems.length === 0 || !inlineInvoiceData.lineItems[0].item) {
       errors.lineItems = 'Please add at least one product item'
@@ -1792,98 +1897,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       return
     }
 
-    setInvoiceValidationErrors({})
-    setShowPreviewDialog(true)
-  }
-
-  const handleSendFromPreview = async () => {
-    setIsLoading(true)
+    // First save as draft
     try {
-      // Generate PDF from invoice preview
-      const printElement = document.getElementById('invoice-preview-print')
-      if (!printElement) {
-        toast.error('Unable to generate invoice PDF')
-        return
-      }
-
-      const canvas = await html2canvas(printElement, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff'
-      })
-
-      const imageData = canvas.toDataURL('image/png')
-
-      // Create PDF using jsPDF
-      const pdf = new jsPDF('p', 'mm', 'a4')
-      const imgWidth = 210 // A4 width in mm
-      const pageHeight = 295 // A4 height in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
-      let heightLeft = imgHeight
-
-      let position = 0
-
-      // Add image to PDF
-      pdf.addImage(imageData, 'PNG', 0, position, imgWidth, imgHeight)
-      heightLeft -= pageHeight
-
-      // Add new page if content is longer than one page
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight
-        pdf.addPage()
-        pdf.addImage(imageData, 'PNG', 0, position, imgWidth, imgHeight)
-        heightLeft -= pageHeight
-      }
-
-      // Generate PDF blob
-      const pdfBlob = pdf.output('blob')
-
-      // Create PDF filename
-      const fileName = `${inlineInvoiceData.invoiceType || 'Invoice'}_${inlineInvoiceData.estimateNumber || 'Draft'}_${new Date().toISOString().split('T')[0]}.pdf`
-
-      // Create mailto link with PDF attachment
-      const emailSubject = encodeURIComponent(`${inlineInvoiceData.invoiceType || 'Invoice'} - ${inlineInvoiceData.project || job.title}`)
-      const emailBody = encodeURIComponent(
-        `Dear ${inlineInvoiceData.customerName || 'Customer'},
-
-Please find attached your ${inlineInvoiceData.invoiceType || 'invoice'} for project: ${inlineInvoiceData.project || job.title}
-
-Invoice Details:
-- ${inlineInvoiceData.invoiceType || 'Invoice'} Number: ${inlineInvoiceData.estimateNumber || 'Draft'}
-- Project: ${inlineInvoiceData.project || job.title}
-- Total Amount: $${(calculateInvoiceSubtotal() as number).toFixed(2)}
-
-Please save the attached PDF as your invoice receipt.
-
-Thank you for your business!
-
-Best regards,
-JDP Team`
-      )
-
-      // Store PDF blob globally for attachment
-      ;(window as any).invoicePDFBlob = pdfBlob
-      ;(window as any).invoicePDFFileName = fileName
-
-      // Create download link for PDF (user can attach manually)
-      const downloadUrl = URL.createObjectURL(pdfBlob)
-      const downloadLink = document.createElement('a')
-      downloadLink.href = downloadUrl
-      downloadLink.download = fileName
-      document.body.appendChild(downloadLink)
-      downloadLink.click()
-      document.body.removeChild(downloadLink)
-      URL.revokeObjectURL(downloadUrl)
-
-      // Open email client with mailto link
-      const customerEmail = inlineInvoiceData.customerName?.replace(/\s+/g, '').toLowerCase() || 'customer'
-      const mailtoLink = `mailto:${customerEmail}@yopmail.com?subject=${emailSubject}&body=${emailBody}`
-      window.open(mailtoLink, '_blank')
-
-      toast.success('PDF downloaded and email opened! Please manually attach the downloaded PDF to your email.')
-
-      // Also save the invoice data to backend
+      setIsLoading(true)
+      
       const subtotal = calculateInvoiceSubtotal()
 
       const customProducts = inlineInvoiceData.lineItems.map(item => {
@@ -1917,19 +1934,161 @@ JDP Team`
         email_address: job.email || 'customer@example.com',
         estimate_date: inlineInvoiceData.date,
         po_number: inlineInvoiceData.poNumber || '',
+        ...(inlineInvoiceData.billToAddressEnabled && { bill_to_address: inlineInvoiceData.billToAddress || '' }),
+        status: 'draft',
+        invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType),
+        notes: inlineInvoiceData.notes || '',
+        custom_products: customProducts
+      }
+      
+      if (editingInvoiceId) {
+        await apiClient.updateEstimate(Number(editingInvoiceId), payload as any)
+        toast.success('Invoice updated successfully!')
+      } else {
+        const response = await apiClient.createEstimate(payload as any)
+        setEditingInvoiceId(response.id)
+        toast.success('Invoice saved as draft!')
+      }
+      
+      // Clear validation errors
+      setInvoiceValidationErrors({})
+      
+      // Then open preview dialog
+      setShowPreviewDialog(true)
+      
+    } catch (error) {
+      console.error('Error saving invoice:', error)
+      toast.error('Failed to save invoice. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSendFromPreview = async () => {
+    setIsLoading(true)
+    try {
+      // Prepare API payload
+      const subtotal = calculateInvoiceSubtotal()
+      const total = subtotal // You can add tax calculation here if needed
+      
+      console.log('Creating payload with customerData:', customerData)
+      console.log('Job customerEmail field:', job.customerEmail)
+      const payload = {
+        estimateNumber: inlineInvoiceData.estimateNumber || 'Draft',
+        estimateDate: new Date(inlineInvoiceData.date).toLocaleDateString('en-US', { 
+          month: '2-digit', 
+          day: '2-digit', 
+          year: 'numeric' 
+        }),
+        customerName: inlineInvoiceData.customerName || 'Customer',
+        customerEmail: customerData?.email || job.customerEmail || 'customer@example.com',
+        customerAddress: inlineInvoiceData.customerAddress || '',
+        billToAddress: inlineInvoiceData.billToAddressEnabled ? inlineInvoiceData.billToAddress || '' : '',
+        poNumber: inlineInvoiceData.poNumber || '',
+        projectName: inlineInvoiceData.project || job.title || '',
+        items: inlineInvoiceData.lineItems.map(item => ({
+          quantity: item.qty.toString(),
+          item: item.item,
+          description: item.description || '',
+          rate: item.rate.toFixed(2),
+          amount: item.estimatedPrice.toFixed(2)
+        })),
+        subtotal: subtotal.toFixed(2),
+        total: total.toFixed(2),
+        notes: inlineInvoiceData.notes ? inlineInvoiceData.notes.split('\n').filter(note => note.trim()) : [],
+        email: 'jen@jdpelectric.us',
+        phone: '952-449-1088',
+        status: 'sent'
+      }
+
+      // Get auth token
+      const getAuthToken = (): string | null => {
+        if (typeof window !== "undefined") {
+          const savedAuth = localStorage.getItem("jdp_auth");
+          if (savedAuth) {
+            try {
+              const authData = JSON.parse(savedAuth);
+              if (authData.token && authData.expires > Date.now()) {
+                return authData.token;
+              }
+            } catch (error) {
+              console.error("Error parsing auth data:", error);
+            }
+          }
+        }
+        return null;
+      };
+
+      // Call API to send invoice
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+      const token = getAuthToken()
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      
+      const response = await fetch(`${apiUrl}/invoices/sendInvoiceToCustomer/${editingInvoiceId || estimates[0]?.id}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to send invoice')
+      }
+
+      toast.success('Invoice sent successfully to customer!')
+
+      // Also save the invoice data to backend
+      const customProducts = inlineInvoiceData.lineItems.map(item => {
+        const productPayload: any = {
+          product_name: item.item,
+          description: item.description || '',
+          jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          stock_quantity: item.qty,
+          unit: 'unit',
+          job_id: Number(jobId),
+          unit_cost: item.rate,
+          jdp_price: item.rate,
+          estimated_price: item.estimatedPrice || 0,
+          total_cost: item.total
+        }
+
+        // Add product ID if editing existing product
+        if (item.productId) {
+          productPayload.id = item.productId
+        }
+
+        return productPayload
+      })
+
+      const backendPayload = {
+        job_id: Number(jobId),
+        estimate_title: inlineInvoiceData.project || job.title,
+        customer_id: Number(job.customer) || 0,
+        priority: 'medium' as 'low' | 'medium' | 'high',
+        service_type: 'service_based',
+        email_address: job.email || 'customer@example.com',
+        estimate_date: inlineInvoiceData.date,
+        po_number: inlineInvoiceData.poNumber || '',
+        ...(inlineInvoiceData.billToAddressEnabled && { bill_to_address: inlineInvoiceData.billToAddress || '' }),
         status: 'sent',
-        invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
+        invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType),
         notes: inlineInvoiceData.notes || '',
         custom_products: customProducts
       }
 
       // Check if we're editing an existing invoice
       if (editingInvoiceId) {
-        await apiClient.updateEstimate(Number(editingInvoiceId), payload as any)
-        toast.success('Invoice updated and email opened!')
+        await apiClient.updateEstimate(Number(editingInvoiceId), backendPayload as any)
+        toast.success('Invoice updated and sent successfully!')
       } else {
-        await apiClient.createEstimate(payload as any)
-        toast.success('Invoice created and email opened!')
+        // Don't create new estimate when sending - it should already exist from preview step
+        toast.success('Invoice sent successfully!')
       }
 
       // Refresh estimates list
@@ -1946,6 +2105,7 @@ JDP Team`
         customerName: job.customerName || '',
         customerAddress: job.address || '',
         billToAddress: job.billToAddress || '',
+        billToAddressEnabled: true,
         poNumber: '',
         project: job.title || '',
         lineItems: [{
@@ -1957,13 +2117,15 @@ JDP Team`
           rate: 0,
           estimatedPrice: 0,
           total: 0,
-          searchQuery: '',
-          showSearchResults: false,
-          supplierId: 1
+        searchQuery: '',
+        showSearchResults: false,
+        supplierId: 1,
+        isCustomProduct: false
         }],
         notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
         signatureText: 'ACCEPTED BY________________DATE_____',
         invoiceType: 'Estimate',
+        customInvoiceType: '',
         paymentPercentage: 0,
         estimateTotal: 0,
         paymentHistory: []
@@ -2077,9 +2239,10 @@ JDP Team`
           rate: 0,
           estimatedPrice: 0,
           total: 0,
-          searchQuery: '',
-          showSearchResults: false,
-          supplierId: 1
+        searchQuery: '',
+        showSearchResults: false,
+        supplierId: 1,
+        isCustomProduct: false
         }]
 
       setInlineInvoiceData({
@@ -2088,12 +2251,31 @@ JDP Team`
         customerName: estimateData.customer?.customer_name || job.customer?.customer_name || job.customerName || '',
         customerAddress: estimateData.customer?.address || job.customer?.address || job.address || '',
         billToAddress: estimateData.bill_to_address || job.bill_to_address || '',
+        billToAddressEnabled: true,
         poNumber: estimateData.po_number || '',
         project: estimateData.estimate_title || job.job_title || job.title || '',
         lineItems: lineItems,
         notes: estimateData.notes || 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
         signatureText: 'ACCEPTED BY________________DATE_____',
-        invoiceType: mapInvoiceTypeToUI(estimateData.invoice_type) || 'Estimate',
+        invoiceType: (() => {
+          const mappedType = mapInvoiceTypeToUI(estimateData.invoice_type) || 'Estimate'
+          // Check if it's a custom type (not in standard mapping)
+          const standardTypes = ['Estimate', 'Downpayment Invoice', 'Rough Invoice', 'Progressive Invoice', 'Final Invoice']
+          if (!standardTypes.includes(mappedType)) {
+            // It's a custom type, add to custom types list and set as Custom
+            addCustomInvoiceType(mappedType)
+            return 'Custom'
+          }
+          return mappedType
+        })(),
+        customInvoiceType: (() => {
+          const mappedType = mapInvoiceTypeToUI(estimateData.invoice_type) || 'Estimate'
+          const standardTypes = ['Estimate', 'Downpayment Invoice', 'Rough Invoice', 'Progressive Invoice', 'Final Invoice']
+          if (!standardTypes.includes(mappedType)) {
+            return mappedType
+          }
+          return ''
+        })(),
         paymentPercentage: 0,
         estimateTotal: estimateData.total_amount || 0,
         paymentHistory: []
@@ -2261,10 +2443,10 @@ JDP Team`
 
 
         {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Job Details */}
-          <div className="lg:col-span-2 space-y-6">
+        <div className="flex justify-between gap-6">
+          {/* Left Column - Job Details */} 
             {/* Job Details Card */}
+            <div className='w-[70%]'>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
                 <CardTitle className="flex items-center gap-2">
@@ -2602,7 +2784,52 @@ JDP Team`
                 )}
               </CardFooter>
             </Card>
+            </div>
+                {/* Right Column - Project Summary */}
+                <div className='w-[25%]'> 
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  Project Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {projectSummary ? (
+                  <div className="space-y-4">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Job Estimate</span>
+                      <span className="font-medium">{formatCurrency(projectSummary.jobEstimate)}</span>
+                    </div>
 
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Products Cost</span>
+                      <span className="font-medium">{formatCurrency(projectSummary.materialsCost)}</span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Labor Cost</span>
+                      <span className="font-medium">{formatCurrency(projectSummary.laborCost)}</span>
+                    </div>
+
+                    <hr />
+
+                    <div className="flex justify-between">
+                      <span className="font-medium">Actual Project Cost</span>
+                      <span className="font-bold text-lg">{formatCurrency(projectSummary.actualProjectCost)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="flex items-center justify-center py-16"> <LoadingSpinner /></p>
+                )}
+              </CardContent>
+            </Card>
+
+
+          </div>
+          </div>
+           </div> 
             {/* Transaction History Section */}
             <Card className="bg-white shadow-sm border border-primary/10">
               <CardHeader className="bg-gradient-to-r from-primary/5 to-blue-50/50 border-b border-primary/10">
@@ -2624,6 +2851,7 @@ JDP Team`
                           customerName: job.customerName || '',
                           customerAddress: job.address || '',
                           billToAddress: job.billToAddress || '',
+                          billToAddressEnabled: true,
                           poNumber: '',
                           project: job.title || '',
                           lineItems: [{
@@ -2635,13 +2863,15 @@ JDP Team`
                             rate: 0,
                             estimatedPrice: 0,
                             total: 0,
-                            searchQuery: '',
-                            showSearchResults: false,
-                            supplierId: 1
+        searchQuery: '',
+        showSearchResults: false,
+        supplierId: 1,
+        isCustomProduct: false
                           }],
                           notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
                           signatureText: 'ACCEPTED BY________________DATE_____',
                           invoiceType: 'Estimate',
+                          customInvoiceType: '',
                           paymentPercentage: 0,
                           estimateTotal: 0,
                           paymentHistory: [] as any[]
@@ -2672,34 +2902,66 @@ JDP Team`
                         <div className="flex items-center gap-4">
                           <Label className="text-primary font-semibold">Invoice Type:</Label>
                           <div className="relative w-[250px]">
-                            <Input
+                            <Select
                               value={inlineInvoiceData.invoiceType}
-                              onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, invoiceType: e.target.value }))}
-                              placeholder="Select or type invoice type..."
-                              className="border-primary/30 focus:border-primary"
-                              list="invoice-types"
-                            />
-                            <datalist id="invoice-types">
-                              <option value="Estimate" />
-                              <option value="Downpayment Invoice" />
-                              <option value="Rough Invoice" />
-                              <option value="Progressive Invoice" />
-                              <option value="Final Invoice" />
-                            </datalist>
+                              onValueChange={(value) => setInlineInvoiceData(prev => ({ ...prev, invoiceType: value }))}
+                            >
+                              <SelectTrigger className="border-primary/30 focus:border-primary">
+                                <SelectValue placeholder="Select invoice type..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Estimate">Estimate</SelectItem>
+                                <SelectItem value="Downpayment Invoice">Downpayment Invoice</SelectItem>
+                                <SelectItem value="Rough Invoice">Rough Invoice</SelectItem>
+                                <SelectItem value="Progressive Invoice">Progressive Invoice</SelectItem>
+                                <SelectItem value="Final Invoice">Final Invoice</SelectItem>
+                                {customInvoiceTypes.length > 0 && (
+                                  <>
+                                    <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 border-b">Custom Types</div>
+                                    {cleanCustomTypes(customInvoiceTypes).map((customType, index) => (
+                                      <SelectItem key={index} value={customType}>{customType}</SelectItem>
+                                    ))}
+                                  </>
+                                )}
+                                <SelectItem value="Custom">+ Add Custom</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
+                          {inlineInvoiceData.invoiceType === 'Custom' && (
+                            <div className="relative w-[300px]">
+                              <Input
+                                value={inlineInvoiceData.customInvoiceType}
+                                onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customInvoiceType: e.target.value }))}
+                                onBlur={() => {
+                                  if (inlineInvoiceData.customInvoiceType) {
+                                    addCustomInvoiceType(inlineInvoiceData.customInvoiceType)
+                                  }
+                                }}
+                                placeholder="Enter custom invoice type name..."
+                                className="border-primary/30 focus:border-primary"
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
 
                       <div className="p-8">
                         {/* Header */}
                         <div className="flex justify-between items-end mb-8">
-                          <div className="flex-shrink-0">
-                            <Logo width={200} height={75} />
+                          <div className="flex-shrink-0"> 
+                            <Image
+                src='/assets/logos/logo-jdp.png'
+                alt="logo"
+                width={168}
+                height={63}
+                className='w-[140px] '
+
+              />
                             {/* <p className="text-sm font-semibold mt-2">952-449-1088</p> */}
                           </div>
 
                           <div className="text-right">
-                            <h1 className="text-2xl font-bold mb-4">{inlineInvoiceData.invoiceType}</h1>
+                            <h1 className="text-2xl font-bold mb-4">{inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType}</h1>
                             <div className="grid grid-cols-2 gap-2">
                               <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">Date</Label>
                               <Input
@@ -2729,14 +2991,73 @@ JDP Team`
                           </div>
                         </div>
                         <div className="mb-6">
-                          <Label className="block bg-gray-600 text-white px-3 py-2 mb-0 text-sm font-semibold">Bill To Address</Label>
-                          <Textarea
-                            value={inlineInvoiceData.billToAddress || ''}
-                            onChange={(e) => setInlineInvoiceData({ ...inlineInvoiceData, billToAddress: e.target.value })}
-                            className="mt-0 border-0 rounded-none"
-                            placeholder="Enter billing address (optional)"
-                            rows={3}
-                          />
+                          <div className="flex items-center justify-between bg-gray-600 text-white px-3 py-2 mb-0">
+                            <div className="flex items-center">
+                              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-6a1 1 0 00-1-1H9a1 1 0 00-1 1v6a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clipRule="evenodd" />
+                              </svg>
+                              <Label className="text-sm font-semibold">Bill To (Billing Address)</Label>
+                            </div>
+                            <div className="flex items-center">
+                              <button
+                                type="button"
+                                onClick={() => setInlineInvoiceData(prev => ({ ...prev, billToAddressEnabled: !prev.billToAddressEnabled }))}
+                                className={`mr-2 px-3 py-1 rounded text-xs font-medium transition-colors ${
+                                  inlineInvoiceData.billToAddressEnabled 
+                                    ? 'bg-red-100 text-red-700 hover:bg-red-200' 
+                                    : 'bg-green-100 text-green-700 hover:bg-green-200'
+                                }`}
+                              >
+                                {inlineInvoiceData.billToAddressEnabled ? (
+                                  <>
+                                    <svg className="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                    </svg>
+                                    Disable
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                                    </svg>
+                                    Enable
+                                  </>
+                                )}
+                              </button>
+                              <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                inlineInvoiceData.billToAddressEnabled ? 'bg-blue-600' : 'bg-gray-200'
+                              }`}>
+                                <input
+                                  type="checkbox"
+                                  checked={inlineInvoiceData.billToAddressEnabled}
+                                  onChange={() => setInlineInvoiceData(prev => ({ ...prev, billToAddressEnabled: !prev.billToAddressEnabled }))}
+                                  className="sr-only"
+                                />
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                  inlineInvoiceData.billToAddressEnabled ? 'translate-x-6' : 'translate-x-1'
+                                }`} />
+                              </div>
+                            </div>
+                          </div>
+                          {inlineInvoiceData.billToAddressEnabled && (
+                            <Textarea
+                              value={inlineInvoiceData.billToAddress || ''}
+                              onChange={(e) => setInlineInvoiceData({ ...inlineInvoiceData, billToAddress: e.target.value })}
+                              className="mt-0 border-0 rounded-none"
+                              placeholder="Enter billing address (defaults to customer/supplier address, can be edited)"
+                              rows={3}
+                            />
+                          )}
+                          {!inlineInvoiceData.billToAddressEnabled && (
+                            <div className="bg-gray-50 p-3 text-sm text-gray-600">
+                              <div className="flex items-center">
+                                <svg className="w-4 h-4 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                                This address defaults to the customer/supplier address but can be changed if billing address differs from job location
+                              </div>
+                            </div>
+                          )}
                         </div>
                         {/* Customer Information */}
 
@@ -2769,16 +3090,10 @@ JDP Team`
                             <div>
                               <Input
                                 value={inlineInvoiceData.poNumber}
-                                onChange={(e) => {
-                                  setInlineInvoiceData(prev => ({ ...prev, poNumber: e.target.value }))
-                                  setInvoiceValidationErrors(prev => ({ ...prev, poNumber: '' }))
-                                }}
-                                className={`px-3 py-2 text-sm rounded-none border-t-0 ${invoiceValidationErrors.poNumber ? 'border-red-500' : ''}`}
+                                onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, poNumber: e.target.value }))}
+                                className="px-3 py-2 text-sm rounded-none border-t-0"
                                 placeholder="PO Number"
                               />
-                              {invoiceValidationErrors.poNumber && (
-                                <p className="text-red-500 text-xs mt-1 px-2">{invoiceValidationErrors.poNumber}</p>
-                              )}
                             </div>
                             <Input
                               value={inlineInvoiceData.project}
@@ -2823,29 +3138,7 @@ JDP Team`
                         {/* Header Section */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-                          {inlineInvoiceData.invoiceType !== 'Estimate' && (
-                            <div className="space-y-2">
-                              <Label className="text-primary">Payment %</Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                max="100"
-                                value={(inlineInvoiceData.paymentPercentage || 0) * 100}
-                                onChange={(e) => setInlineInvoiceData(prev => ({
-                                  ...prev,
-                                  paymentPercentage: parseFloat(e.target.value) / 100
-                                }))}
-                                className="border-primary/30 focus:border-primary"
-                                placeholder="e.g., 50"
-                              />
-                              <p className="text-xs text-muted-foreground">
-                                {inlineInvoiceData.invoiceType === 'Downpayment Invoice' && 'Default: 50%'}
-                                {inlineInvoiceData.invoiceType === 'Rough Invoice' && 'Default: 30%'}
-                                {inlineInvoiceData.invoiceType === 'Progressive Invoice' && 'Default: 15%'}
-                                {inlineInvoiceData.invoiceType === 'Final Invoice' && 'Remaining balance'}
-                              </p>
-                            </div>
-                          )}
+                         
                           <div className="space-y-2">
                             <Label className="text-primary">Date</Label>
                             <Input
@@ -2884,34 +3177,43 @@ JDP Team`
                                     />
                                   </td>
                                   <td className="border border-gray-300 p-1 relative">
-                                    <div className="relative product-search-container">
+                                    {item.isCustomProduct ? (
                                       <Input
                                         value={item.item}
-                                        onChange={(e) => {
-                                          updateInvoiceLineItem(item.id, 'item', e.target.value)
-                                          updateInvoiceLineItem(item.id, 'searchQuery', e.target.value)
-                                          updateInvoiceLineItem(item.id, 'showSearchResults', true)
-                                        }}
-                                        onFocus={() => {
-                                          if (item.item) {
-                                            updateInvoiceLineItem(item.id, 'searchQuery', item.item)
-                                            updateInvoiceLineItem(item.id, 'showSearchResults', true)
-                                          }
-                                        }}
-                                        className="border-0 p-2 pr-8"
-                                        placeholder="Search or enter product name..."
+                                        onChange={(e) => updateInvoiceLineItem(item.id, 'item', e.target.value)}
+                                        className="border-0 p-2"
+                                        placeholder="Enter custom item name..."
                                       />
-                                      <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                    </div>
-                                    {item.showSearchResults && item.searchQuery && (
+                                    ) : (
+                                      <div className="relative product-search-container">
+                                        <Input
+                                          value={item.item}
+                                          onChange={(e) => {
+                                            const value = e.target.value
+                                            updateInvoiceLineItem(item.id, 'item', value)
+                                            updateInvoiceLineItem(item.id, 'searchQuery', value)
+                                            updateInvoiceLineItem(item.id, 'showSearchResults', true)
+                                            // Direct API call on input change
+                                            if (value && value.length > 2) {
+                                              fetchProducts(value)
+                                            }
+                                          }}
+                                          onFocus={() => {
+                                            if (item.item) {
+                                              updateInvoiceLineItem(item.id, 'searchQuery', item.item)
+                                              updateInvoiceLineItem(item.id, 'showSearchResults', true)
+                                            }
+                                          }}
+                                          className="border-0 p-2 pr-8"
+                                          placeholder="Search or enter product name..."
+                                        />
+                                        <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                      </div>
+                                    )}
+                                    {!item.isCustomProduct && item.showSearchResults && item.searchQuery && (
                                       <div className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1">
                                         {(() => {
                                           const filtered = getFilteredProducts(item.searchQuery || '')
-
-                                          // Trigger API search
-                                          if (item.searchQuery && item.searchQuery.length > 2) {
-                                            fetchProducts(item.searchQuery)
-                                          }
 
                                           return (
                                             <>
@@ -3016,15 +3318,25 @@ JDP Team`
                             </tbody>
                           </table>
 
-                          {/* Add Line Item Button */}
-                          <Button
-                            onClick={addInvoiceLineItem}
-                            variant="outline"
-                            className="mt-4 border-dashed border-2 border-primary text-primary hover:bg-primary/5"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Line Item
-                          </Button>
+                          {/* Add Buttons */}
+                          <div className="mt-4 flex gap-3">
+                            <Button
+                              onClick={addInvoiceLineItem}
+                              variant="outline"
+                              className="border-dashed border-2 border-primary text-primary hover:bg-primary/5"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add Line Item
+                            </Button>
+                            <Button
+                              onClick={addCustomLineItem}
+                              variant="outline"
+                              className="border-dashed border-2 border-green-500 text-green-600 hover:bg-green-50"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add Custom
+                            </Button>
+                          </div>
                           {invoiceValidationErrors.lineItems && (
                             <p className="text-red-500 text-xs mt-2">{invoiceValidationErrors.lineItems}</p>
                           )}
@@ -3094,6 +3406,7 @@ JDP Team`
                                 customerName: job.customerName || '',
                                 customerAddress: job.address || '',
                                 billToAddress: job.billToAddress || '',
+                                billToAddressEnabled: true,
                                 poNumber: '',
                                 project: job.title || '',
                                 lineItems: [{
@@ -3105,13 +3418,15 @@ JDP Team`
                                   rate: 0,
                                   estimatedPrice: 0,
                                   total: 0,
-                                  searchQuery: '',
-                                  showSearchResults: false,
-                                  supplierId: 1
+        searchQuery: '',
+        showSearchResults: false,
+        supplierId: 1,
+        isCustomProduct: false
                                 }],
                                 notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
                                 signatureText: 'ACCEPTED BY________________DATE_____',
                                 invoiceType: 'Estimate',
+                                customInvoiceType: '',
                                 paymentPercentage: 0,
                                 estimateTotal: 0,
                                 paymentHistory: [] as any[]
@@ -3440,51 +3755,7 @@ JDP Team`
                 </div>
               </CardContent>
             </Card>
-          </div>
-
-          {/* Right Column - Project Summary */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Project Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {projectSummary ? (
-                  <div className="space-y-4">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Job Estimate</span>
-                      <span className="font-medium">{formatCurrency(projectSummary.jobEstimate)}</span>
-                    </div>
-
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Products Cost</span>
-                      <span className="font-medium">{formatCurrency(projectSummary.materialsCost)}</span>
-                    </div>
-
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Labor Cost</span>
-                      <span className="font-medium">{formatCurrency(projectSummary.laborCost)}</span>
-                    </div>
-
-                    <hr />
-
-                    <div className="flex justify-between">
-                      <span className="font-medium">Actual Project Cost</span>
-                      <span className="font-bold text-lg">{formatCurrency(projectSummary.actualProjectCost)}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="flex items-center justify-center py-16"> <LoadingSpinner /></p>
-                )}
-              </CardContent>
-            </Card>
-
-
-          </div>
-        </div>
+         
       </div>
 
 
@@ -3976,28 +4247,40 @@ JDP Team`
               {/* Header */}
               <div className="flex justify-between items-start mb-8">
                 <div>
-                  <Logo />
+                  {/* <Logo /> */}
+                  <Image
+                src='/assets/logos/logo-jdp.png'
+                alt="logo"
+                width={168}
+                height={63}
+                className='w-[140px] '
+
+              />
                   {/* <p className="text-sm text-gray-600 mt-2">952-449-1088</p> */}
                   {/* Invoice Number Display */}
                   
                 </div>
                 <div className="text-right">
                   <div className="bg-gray-800 text-white px-4 py-2 text-center mb-2">
-                    <div className="text-lg font-bold">{inlineInvoiceData.invoiceType?.toUpperCase() || 'ESTIMATE'}</div>
+                    <div className="text-lg font-bold">{(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType)?.toUpperCase() || 'ESTIMATE'}</div>
                     <div className="text-sm">{new Date(inlineInvoiceData.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</div>
                   </div>
                   <div className="bg-gray-800 text-white px-4 py-2 text-center">
-                    <div className="text-lg font-bold">{inlineInvoiceData.invoiceType?.toUpperCase() || 'ESTIMATE'} #</div>
+                    <div className="text-lg font-bold">{(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType)?.toUpperCase() || 'ESTIMATE'} #</div>
                     <div className="text-sm">{inlineInvoiceData.estimateNumber}</div>
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-800 text-white p-3 mb-4">
-                <div className="text-sm font-bold">Bill TO</div>
-              </div>
-              {inlineInvoiceData.billToAddress && (
-                  <div className="text-gray-600 mt-2 font-medium"> {inlineInvoiceData.billToAddress}</div>
-                )}
+              {inlineInvoiceData.billToAddressEnabled && (
+                <>
+                  <div className="bg-gray-800 text-white p-3 mb-4">
+                    <div className="text-sm font-bold">Bill TO</div>
+                  </div>
+                  {inlineInvoiceData.billToAddress && (
+                    <div className="text-gray-600 mt-2 font-medium"> {inlineInvoiceData.billToAddress}</div>
+                  )}
+                </>
+              )}
               {/* To Section */}
               <div className="bg-gray-800 text-white p-3 mb-4 mt-4">
                 <div className="text-sm font-bold">TO</div>
@@ -4097,6 +4380,7 @@ JDP Team`
                     customerName: job.customerName || '',
                     customerAddress: job.address || '',
                     billToAddress: job.billToAddress || '',
+                    billToAddressEnabled: true,
                     poNumber: '',
                     project: job.title || '',
                     lineItems: [{
@@ -4108,13 +4392,15 @@ JDP Team`
                       rate: 0,
                       estimatedPrice: 0,
                       total: 0,
-                      searchQuery: '',
-                      showSearchResults: false,
-                      supplierId: 1
+        searchQuery: '',
+        showSearchResults: false,
+        supplierId: 1,
+        isCustomProduct: false
                     }],
                     notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
                     signatureText: 'ACCEPTED BY________________DATE_____',
                     invoiceType: 'Estimate',
+                    customInvoiceType: '',
                     paymentPercentage: 0,
                     estimateTotal: 0,
                     paymentHistory: [] as any[]

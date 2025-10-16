@@ -269,6 +269,7 @@ useEffect(() => {
       setLoading(true)
       // Fetch the latest job details from API
       const jobDetails = await apiClient.getJobById(jobId)
+      console.log('Job details from API:', jobDetails)
 
       // Update the jobs array with the fetched job details
       setJobs(prevJobs =>
