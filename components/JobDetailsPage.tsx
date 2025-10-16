@@ -305,6 +305,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const [invoiceValidationErrors, setInvoiceValidationErrors] = useState<Record<string, string>>({})
   const [customInvoiceTypes, setCustomInvoiceTypes] = useState<string[]>([])
   const [customerData, setCustomerData] = useState<any>(null)
+  const [contractorData, setContractorData] = useState<any>(null)
 
   // Clean duplicate custom types (case-insensitive)
   const cleanCustomTypes = (types: string[]) => {
@@ -320,7 +321,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   }
 
   // Debug: Log job data to see structure
-  console.log('Job data:', job) 
+  console.log('Job data:', job)
 
   // Inline Invoice Data State
   const [inlineInvoiceData, setInlineInvoiceData] = useState({
@@ -341,10 +342,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       rate: 0,
       estimatedPrice: 0,
       total: 0,
-        searchQuery: '',
-        showSearchResults: false,
-        supplierId: 1,
-        isCustomProduct: false
+      searchQuery: '',
+      showSearchResults: false,
+      supplierId: 1,
+      isCustomProduct: false
     }],
     notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
     signatureText: 'ACCEPTED BY________________DATE_____',
@@ -1313,7 +1314,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const addCustomInvoiceType = (customType: string) => {
     if (customType) {
       // Check for case-insensitive duplicates
-      const isDuplicate = customInvoiceTypes.some(existing => 
+      const isDuplicate = customInvoiceTypes.some(existing =>
         existing.toLowerCase() === customType.toLowerCase()
       )
       if (!isDuplicate) {
@@ -1324,42 +1325,60 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
   // Fetch customer data
   const fetchCustomerData = async (customerId: string) => {
-    try {
-      console.log('Fetching customer data for IDs:', customerId)
-      const response = await apiClient.getCustomers(1, 100) // Get all customers
-      console.log('Customers response:', response)
-      const customers = response.data?.customers || response.data?.data || response.data || []
-      console.log('All customers:', customers)
-      const customer = customers.find((c: any) => c.id === Number(customerId))
-      console.log('Found customer:', customer)
+    try { 
+      const response = await apiClient.getCustomers(1, 100) // Get all customers 
+      const customers = response.data?.customers || response.data?.data || response.data || [] 
+      const customer = customers.find((c: any) => c.id === Number(customerId)) 
       if (customer) {
-        setCustomerData(customer)
-        console.log('Fetching address:', customer.address || customer.customer_address)
-        console.log('Updating customerAddress to:', customer.address || customer.customer_address)
+        setCustomerData(customer) 
         // Update customer address in inline invoice data
-        const newAddress = customer.address || customer.customer_address || ''
-        console.log('Setting customerAddress:', newAddress)
-        console.log('Current inlineInvoiceData.customerAddress before update:', inlineInvoiceData.customerAddress)
+        const newAddress = customer.address || customer.customer_address || '' 
         
         // Force update with setTimeout to ensure state update
         setTimeout(() => {
-          setInlineInvoiceData(prev => {
-            console.log('setInlineInvoiceData prev.customerAddress:', prev.customerAddress)
+          setInlineInvoiceData(prev => { 
             const updated = {
               ...prev,
               customerAddress: newAddress
-            }
-            console.log('setInlineInvoiceData updated.customerAddress:', updated.customerAddress)
+            } 
             return updated
           })
         }, 100)
-      } else {
-        console.log('Customer not found with ID:', customerId)
+      } else { 
         setCustomerData(null)
       }
     } catch (error) {
       console.error('Error fetching customer data:', error)
       setCustomerData(null)
+    }
+  }
+
+  const fetchContractorData = async (contractorId: string) => {
+    try {
+      const response = await apiClient.getContractors(1, 100) // Get all contractors
+      const contractors = response.data?.contractors || response.data?.data || response.data || []
+      const contractor = contractors.find((c: any) => c.id === Number(contractorId))
+      if (contractor) {
+        setContractorData(contractor)
+        // Update contractor address in inline invoice data
+        const newAddress = contractor.address || contractor.contractor_address || ''
+        
+        // Force update with setTimeout to ensure state update
+        setTimeout(() => {
+          setInlineInvoiceData(prev => {
+            const updated = {
+              ...prev,
+              customerAddress: newAddress
+            }
+            return updated
+          })
+        }, 100)
+      } else {
+        setContractorData(null)
+      }
+    } catch (error) {
+      console.error('Error fetching contractor data:', error)
+      setContractorData(null)
     }
   }
 
@@ -1380,10 +1399,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
   const selectProduct = (itemId: string, product: any) => {
     // Check if product already exists in line items (by product ID, not name)
-    const isDuplicate = inlineInvoiceData.lineItems.some(item => 
+    const isDuplicate = inlineInvoiceData.lineItems.some(item =>
       item.id !== itemId && item.productId === product.id
     )
-    
+
     if (isDuplicate) {
       toast.error('This product is already added to the invoice')
       return
@@ -1413,10 +1432,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
   const addCustomProduct = (itemId: string, productName: string) => {
     // Check if custom product already exists in line items (by name for custom products)
-    const isDuplicate = inlineInvoiceData.lineItems.some(item => 
+    const isDuplicate = inlineInvoiceData.lineItems.some(item =>
       item.id !== itemId && item.productId === null && item.item.toLowerCase() === productName.toLowerCase()
     )
-    
+
     if (isDuplicate) {
       toast.error('This custom product is already added to the invoice')
       return
@@ -1513,18 +1532,17 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       tempElement.style.background = '#ffffff'
       tempElement.style.padding = '32px'
       tempElement.style.pointerEvents = 'none'
+      tempElement.style.fontFamily = 'Arial, sans-serif'
+      tempElement.style.lineHeight = '1.4'
+      tempElement.style.boxSizing = 'border-box'
 
-      // Generate invoice preview HTML
+      // Generate invoice preview HTML with better page break handling
       const invoiceHtml = `
-        <div style="font-family: Arial, sans-serif;">
+        <div style="font-family: Arial, sans-serif; page-break-inside: avoid;">
           <!-- Header -->
           <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 32px;">
             <div>
-              <div > 
-                 <Image
-                src='/assets/logos/logo-jdp.png'
-                alt="logo"  
-              />
+              <div style="width: 200px; height: 60px; background: url('/assets/logos/logo-jdp.png') no-repeat center center; background-size: contain;">
               </div> 
               <!-- Invoice Number Display -->
               ${editingInvoiceId ? `
@@ -1546,15 +1564,23 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               </div>
             </div>
           </div>
-
+ ${(invoice.bill_to_address || invoice.billing_address) ? ` 
+   <div style="background: #1f2937; color: white;  height: 36px;  margin-bottom: 8px;">
+            <div style="font-size: 14px; font-weight: bold; margin-left: 16px;">Bill To</div>
+          </div>
+  <div style="color: #6b7280; font-size: 14px; margin-top: 8px; font-weight: 500;">${invoice.bill_to_address || invoice.billing_address}
+  </div>` : ''}
           <!-- To Section -->
-          <div style="background: #1f2937; color: white; padding: 12px; margin-bottom: 16px;">
-            <div style="font-size: 14px; font-weight: bold;">TO</div>
+          <div style="background: #1f2937; color: white;  height: 36px;  margin-bottom: 8px; margin-top: 15px;">
+            <div style="font-size: 14px; font-weight: bold; margin-left: 16px;">To</div>
           </div>
           <div style="margin-bottom: 24px;">
-            <div style="font-weight: 600; font-size: 16px;">${invoice.customer_name || invoice.customer?.name || job.customerName || 'Customer'}</div>
-            <div style="color: #6b7280; font-size: 14px; margin-top: 4px;">${invoice.customer_address || invoice.customer?.address || job.location || 'Address'}</div>
-            ${(invoice.bill_to_address || invoice.billing_address) ? `<div style="color: #6b7280; font-size: 14px; margin-top: 8px; font-weight: 500;">Bill To: ${invoice.bill_to_address || invoice.billing_address}</div>` : ''}
+            <div style="font-weight: 600; font-size: 16px;">${job.type === 'contract-based' 
+              ? (contractorData?.name || contractorData?.contractor_name || invoice.customer_name || 'Contractor')
+              : (invoice.customer_name || invoice.customer?.name || job.customerName || 'Customer')
+            }</div>
+            <div style="color: #6b7280; font-size: 14px; margin-top: 4px;">${inlineInvoiceData.customerAddress || invoice.customer_address || invoice.customer?.address || job.location || 'Address'}</div>
+           
           </div>
 
           <!-- Project Details -->
@@ -1570,15 +1596,15 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           </div>
 
           <!-- Line Items Table -->
-          <div style="margin-bottom: 32px;">
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; margin-bottom: 16px;">
+          <div style="margin-bottom: 32px; page-break-inside: avoid;">
+            <table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; margin-bottom: 16px; page-break-inside: avoid;">
               <thead>
                 <tr style="background: #1f2937; color: white;">
-                  <th style="border: 1px solid #d1d5db; padding: 12px 16px; text-align: left; font-size: 14px; font-weight: 600;">Qty</th>
-                  <th style="border: 1px solid #d1d5db; padding: 12px 16px; text-align: left; font-size: 14px; font-weight: 600;">Item</th>
-                  <th style="border: 1px solid #d1d5db; padding: 12px 16px; text-align: left; font-size: 14px; font-weight: 600;">Description</th>
-                  <th style="border: 1px solid #d1d5db; padding: 12px 16px; text-align: right; font-size: 14px; font-weight: 600;">Rate</th>
-                  <th style="border: 1px solid #d1d5db; padding: 12px 16px; text-align: right; font-size: 14px; font-weight: 600;">Total</th>
+                  <th style="border: 1px solid #d1d5db;  padding-bottom:15px; padding-left:12px; text-align: left; font-size: 14px; font-weight: 600;">Qty</th>
+                  <th style="border: 1px solid #d1d5db;  padding-bottom:15px; padding-left:12px; text-align: left; font-size: 14px; font-weight: 600;">Item</th>
+                  <th style="border: 1px solid #d1d5db;  padding-bottom:15px; padding-left:12px; text-align: left; font-size: 14px; font-weight: 600;">Description</th>
+                  <th style="border: 1px solid #d1d5db;  padding-bottom:15px; padding-right:12px; text-align: right; font-size: 14px; font-weight: 600;">Rate</th>
+                  <th style="border: 1px solid #d1d5db;  padding-bottom:15px; padding-right:12px; text-align: right; font-size: 14px; font-weight: 600;">Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -1609,7 +1635,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
             </div>
           </div>
 
-          <!-- Disclaimer -->
+          <!-- Customer Acceptance Section -->
+          <div style="margin-bottom: 32px; page-break-inside: avoid;">
+          
+            <!-- Disclaimer -->
           <div style="font-size: 11px; color: #6b7280; margin-bottom: 32px; line-height: 1.5;">
             <p style="margin: 0;">
               JDP is not responsible for repair of lamps & landscaping, house owner utilities including cables, 
@@ -1625,34 +1654,82 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               EMAIL: jen@jdpelectric.us 952-449-1088
             </div>
           </div>
+
+            <!-- Top separator line -->
+            <div style="border-top: 1px solid #e5e7eb; margin-bottom: 24px;"></div>
+            
+            <!-- Customer Acceptance Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+              <div style="display: flex; flex-direction: column;">
+                <div style="font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 4px;">Customer Acceptance</div>
+                <div style="font-size: 14px; font-weight: 500; color: #374151;">Authorized Signature</div>
+              </div>
+              <div style="font-size: 14px; font-weight: 500; color: #374151;">Date</div>
+            </div>
+
+            <!-- Signature Fields -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+              <div style="display: flex; flex-direction: column; width: 60%;">
+                <div style="border-bottom: 1px solid #374151; height: 2px; margin-bottom: 8px;"></div>
+                <div style="font-size: 12px; color: #374151; text-align: center;">Signature</div>
+              </div>
+              <div style="display: flex; flex-direction: column; width: 30%;">
+                <div style="border-bottom: 1px solid #374151; height: 2px; margin-bottom: 8px;"></div>
+                <div style="font-size: 12px; color: #374151; text-align: center;">Date</div>
+              </div>
+            </div>
+            
+            <!-- Disclaimer Box -->
+            <div style="background: #e0f2fe; border: 1px solid #81d4fa; border-radius: 6px; padding: 16px; margin-top: 20px;">
+              <div style="font-size: 12px; color: #374151; line-height: 1.4;">
+                By signing above, you agree to the terms and pricing outlined in this estimate. This becomes a binding agreement upon signature.
+              </div>
+            </div>
+          </div>
+
+          
         </div>
       `
 
       tempElement.innerHTML = invoiceHtml
       document.body.appendChild(tempElement)
+      console.log('Temp element content length:', tempElement.innerHTML.length)
+      console.log('Temp element dimensions:', tempElement.offsetWidth, 'x', tempElement.offsetHeight)
 
       // Generate PDF using the same logic as preview
       const canvas = await html2canvas(tempElement, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        logging: false,
+        width: tempElement.scrollWidth,
+        height: tempElement.scrollHeight,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: tempElement.scrollWidth,
+        windowHeight: tempElement.scrollHeight
       })
 
       const imageData = canvas.toDataURL('image/png')
+      console.log('Canvas dimensions:', canvas.width, 'x', canvas.height)
+      console.log('Image data length:', imageData.length)
 
-      // Create PDF using jsPDF
+      // Create PDF using jsPDF - simple approach with footer space
       const pdf = new jsPDF('p', 'mm', 'a4')
-      const imgWidth = 210
-      const pageHeight = 295
+      const imgWidth = 210 // A4 width in mm
+      const footerSpace = 21 // 80px converted to mm (80px * 25.4mm/inch / 96dpi ≈ 21mm)
+      const pageHeight = 295 - footerSpace // A4 height minus footer space (274mm)
       const imgHeight = (canvas.height * imgWidth) / canvas.width
       let heightLeft = imgHeight
 
       let position = 0
 
+      // Add first page
       pdf.addImage(imageData, 'PNG', 0, position, imgWidth, imgHeight)
       heightLeft -= pageHeight
 
+      // Add additional pages if needed
       while (heightLeft >= 0) {
         position = heightLeft - imgHeight
         pdf.addPage()
@@ -1765,23 +1842,29 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
   useEffect(() => {
     fetchProducts()
-    fetchSuppliers() 
-    // Fetch customer data if customer ID is available
-    if (job.customer) {
+    fetchSuppliers()
+    
+    // Fetch data based on job type
+    if (job.type === 'contract-based' && job.contractor) {
+      // For contract-based jobs, fetch contractor data
+      console.log('Fetching contractor data for contractor ID:', job.contractor)
+      fetchContractorData(job.contractor)
+    } else if (job.type === 'service-based' && job.customer) {
+      // For service-based jobs, fetch customer data
       console.log('Fetching customer data for customer ID:', job.customer)
       fetchCustomerData(job.customer)
     } else {
-      console.log('No customer ID found in job data')
+      console.log('No customer/contractor ID found in job data')
     }
-  }, [job.customer, job.id])
+  }, [job.customer, job.contractor, job.type, job.id])
 
   // Debug: Log inlineInvoiceData changes
-  useEffect(() => { 
+  useEffect(() => {
   }, [inlineInvoiceData.customerAddress])
 
   // Update customer address when customerData changes
   useEffect(() => {
-    if (customerData?.address && customerData.address !== inlineInvoiceData.customerAddress) { 
+    if (customerData?.address && customerData.address !== inlineInvoiceData.customerAddress) {
       setInlineInvoiceData(prev => ({
         ...prev,
         customerAddress: customerData.address
@@ -1839,10 +1922,15 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       const payload = {
         job_id: Number(jobId),
         estimate_title: inlineInvoiceData.project || job.title,
-        customer_id: Number(job.customer) || 0,
+        ...(job.type === 'contract-based' 
+          ? { contractor_id: Number(job.contractor) || 0 }
+          : { customer_id: Number(job.customer) || 0 }
+        ),
         priority: 'medium' as 'low' | 'medium' | 'high',
-        service_type: 'service_based',
-        email_address: job.email || 'customer@example.com',
+        service_type: job.type === 'contract-based' ? 'contract_based' : 'service_based',
+        email_address: job.type === 'contract-based' 
+          ? (contractorData?.email || job.email || 'contractor@example.com')
+          : (customerData?.email || job.email || 'customer@example.com'),
         estimate_date: inlineInvoiceData.date,
         po_number: inlineInvoiceData.poNumber || '',
         ...(inlineInvoiceData.billToAddressEnabled && { bill_to_address: inlineInvoiceData.billToAddress || '' }),
@@ -1886,10 +1974,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           rate: 0,
           estimatedPrice: 0,
           total: 0,
-        searchQuery: '',
-        showSearchResults: false,
-        supplierId: 1,
-        isCustomProduct: false
+          searchQuery: '',
+          showSearchResults: false,
+          supplierId: 1,
+          isCustomProduct: false
         }],
         notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
         signatureText: 'ACCEPTED BY________________DATE_____',
@@ -1929,7 +2017,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     // First save as draft
     try {
       setIsLoading(true)
-      
+
       const subtotal = calculateInvoiceSubtotal()
 
       const customProducts = inlineInvoiceData.lineItems.map(item => {
@@ -1957,10 +2045,15 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       const payload = {
         job_id: Number(jobId),
         estimate_title: inlineInvoiceData.project || job.title,
-        customer_id: Number(job.customer) || 0,
+        ...(job.type === 'contract-based' 
+          ? { contractor_id: Number(job.contractor) || 0 }
+          : { customer_id: Number(job.customer) || 0 }
+        ),
         priority: 'medium' as 'low' | 'medium' | 'high',
-        service_type: 'service_based',
-        email_address: job.email || 'customer@example.com',
+        service_type: job.type === 'contract-based' ? 'contract_based' : 'service_based',
+        email_address: job.type === 'contract-based' 
+          ? (contractorData?.email || job.email || 'contractor@example.com')
+          : (customerData?.email || job.email || 'customer@example.com'),
         estimate_date: inlineInvoiceData.date,
         po_number: inlineInvoiceData.poNumber || '',
         ...(inlineInvoiceData.billToAddressEnabled && { bill_to_address: inlineInvoiceData.billToAddress || '' }),
@@ -1969,22 +2062,21 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         notes: inlineInvoiceData.notes || '',
         custom_products: customProducts
       }
-      
+
       if (editingInvoiceId) {
         await apiClient.updateEstimate(Number(editingInvoiceId), payload as any)
         toast.success('Invoice updated successfully!')
       } else {
         const response = await apiClient.createEstimate(payload as any)
         setEditingInvoiceId(response.id)
-        toast.success('Invoice saved as draft!')
       }
-      
+
       // Clear validation errors
       setInvoiceValidationErrors({})
-      
+
       // Then open preview dialog
       setShowPreviewDialog(true)
-      
+
     } catch (error) {
       console.error('Error saving invoice:', error)
       toast.error('Failed to save invoice. Please try again.')
@@ -1999,13 +2091,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       // Prepare API payload
       const subtotal = calculateInvoiceSubtotal()
       const total = subtotal // You can add tax calculation here if needed
-       
+
       const payload = {
         estimateNumber: inlineInvoiceData.estimateNumber || 'Draft',
-        estimateDate: new Date(inlineInvoiceData.date).toLocaleDateString('en-US', { 
-          month: '2-digit', 
-          day: '2-digit', 
-          year: 'numeric' 
+        estimateDate: new Date(inlineInvoiceData.date).toLocaleDateString('en-US', {
+          month: '2-digit',
+          day: '2-digit',
+          year: 'numeric'
         }),
         customerName: inlineInvoiceData.customerName || 'Customer',
         customerEmail: customerData?.email || job.customerEmail || 'customer@example.com',
@@ -2049,15 +2141,15 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       // Call API to send invoice
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
       const token = getAuthToken()
-      
+
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       }
-      
+
       if (token) {
         headers['Authorization'] = `Bearer ${token}`
       }
-      
+
       const response = await fetch(`${apiUrl}/invoices/sendInvoiceToCustomer/${editingInvoiceId || estimates[0]?.id}`, {
         method: 'POST',
         headers,
@@ -2096,10 +2188,15 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       const backendPayload = {
         job_id: Number(jobId),
         estimate_title: inlineInvoiceData.project || job.title,
-        customer_id: Number(job.customer) || 0,
+        ...(job.type === 'contract-based' 
+          ? { contractor_id: Number(job.contractor) || 0 }
+          : { customer_id: Number(job.customer) || 0 }
+        ),
         priority: 'medium' as 'low' | 'medium' | 'high',
-        service_type: 'service_based',
-        email_address: job.email || 'customer@example.com',
+        service_type: job.type === 'contract-based' ? 'contract_based' : 'service_based',
+        email_address: job.type === 'contract-based' 
+          ? (contractorData?.email || job.email || 'contractor@example.com')
+          : (customerData?.email || job.email || 'customer@example.com'),
         estimate_date: inlineInvoiceData.date,
         po_number: inlineInvoiceData.poNumber || '',
         ...(inlineInvoiceData.billToAddressEnabled && { bill_to_address: inlineInvoiceData.billToAddress || '' }),
@@ -2144,10 +2241,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           rate: 0,
           estimatedPrice: 0,
           total: 0,
-        searchQuery: '',
-        showSearchResults: false,
-        supplierId: 1,
-        isCustomProduct: false
+          searchQuery: '',
+          showSearchResults: false,
+          supplierId: 1,
+          isCustomProduct: false
         }],
         notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
         signatureText: 'ACCEPTED BY________________DATE_____',
@@ -2266,10 +2363,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           rate: 0,
           estimatedPrice: 0,
           total: 0,
-        searchQuery: '',
-        showSearchResults: false,
-        supplierId: 1,
-        isCustomProduct: false
+          searchQuery: '',
+          showSearchResults: false,
+          supplierId: 1,
+          isCustomProduct: false
         }]
 
       setInlineInvoiceData({
@@ -2311,7 +2408,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       setEditingInvoiceId(invoice.id)
       setShowInlineInvoiceForm(true)
       toast.info('Loading invoice for editing...')
-    } catch (error) { 
+    } catch (error) {
       toast.error('Failed to load invoice details')
     } finally {
       setIsLoading(false)
@@ -2470,9 +2567,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
         {/* Main Content */}
         <div className="flex justify-between gap-6">
-          {/* Left Column - Job Details */} 
-            {/* Job Details Card */}
-            <div className='w-[70%]'>
+          {/* Left Column - Job Details */}
+          {/* Job Details Card */}
+          <div className='w-[70%]'>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
                 <CardTitle className="flex items-center gap-2">
@@ -2810,329 +2907,331 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                 )}
               </CardFooter>
             </Card>
+          </div>
+          {/* Right Column - Project Summary */}
+          <div className='w-[25%]'>
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" />
+                    Project Summary
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {projectSummary ? (
+                    <div className="space-y-4">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Job Estimate</span>
+                        <span className="font-medium">{formatCurrency(projectSummary.jobEstimate)}</span>
+                      </div>
+
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Products Cost</span>
+                        <span className="font-medium">{formatCurrency(projectSummary.materialsCost)}</span>
+                      </div>
+
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Labor Cost</span>
+                        <span className="font-medium">{formatCurrency(projectSummary.laborCost)}</span>
+                      </div>
+
+                      <hr />
+
+                      <div className="flex justify-between">
+                        <span className="font-medium">Actual Project Cost</span>
+                        <span className="font-bold text-lg">{formatCurrency(projectSummary.actualProjectCost)}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="flex items-center justify-center py-16"> <LoadingSpinner /></p>
+                  )}
+                </CardContent>
+              </Card>
+
+
             </div>
-                {/* Right Column - Project Summary */}
-                <div className='w-[25%]'> 
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Project Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {projectSummary ? (
-                  <div className="space-y-4">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Job Estimate</span>
-                      <span className="font-medium">{formatCurrency(projectSummary.jobEstimate)}</span>
-                    </div>
-
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Products Cost</span>
-                      <span className="font-medium">{formatCurrency(projectSummary.materialsCost)}</span>
-                    </div>
-
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Labor Cost</span>
-                      <span className="font-medium">{formatCurrency(projectSummary.laborCost)}</span>
-                    </div>
-
-                    <hr />
-
-                    <div className="flex justify-between">
-                      <span className="font-medium">Actual Project Cost</span>
-                      <span className="font-bold text-lg">{formatCurrency(projectSummary.actualProjectCost)}</span>
+          </div>
+        </div>
+        {/* Transaction History Section */}
+        <Card className="bg-white shadow-sm border border-primary/10">
+          <CardHeader className="bg-gradient-to-r from-primary/5 to-blue-50/50 border-b border-primary/10">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-primary flex items-center gap-2">
+                <Receipt className="h-5 w-5" />
+                Transaction History
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-primary/30 text-primary hover:bg-primary hover:text-white"
+                onClick={() => {
+                  if (!showInlineInvoiceForm) {
+                    // Reset form and auto-fill when opening invoice form
+                    setInlineInvoiceData({
+                      date: new Date().toISOString().split('T')[0],
+                      estimateNumber: '',
+                      customerName: job.customerName || '',
+                      customerAddress: job.address || '',
+                      billToAddress: job.billToAddress || '',
+                      billToAddressEnabled: true,
+                      poNumber: '',
+                      project: job.title || '',
+                      lineItems: [{
+                        id: Math.random().toString(36).substring(2, 9),
+                        productId: null,
+                        qty: 1,
+                        item: '',
+                        description: '',
+                        rate: 0,
+                        estimatedPrice: 0,
+                        total: 0,
+                        searchQuery: '',
+                        showSearchResults: false,
+                        supplierId: 1,
+                        isCustomProduct: false
+                      }],
+                      notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
+                      signatureText: 'ACCEPTED BY________________DATE_____',
+                      invoiceType: 'Estimate',
+                      customInvoiceType: '',
+                      paymentPercentage: 0,
+                      estimateTotal: 0,
+                      paymentHistory: [] as any[]
+                    })
+                    setEditingInvoiceId(null)
+                    setInvoiceValidationErrors({})
+                  }
+                  setShowInlineInvoiceForm(!showInlineInvoiceForm)
+                }}
+              >
+                <PlusCircle className="h-4 w-4 mr-2" />
+                {showInlineInvoiceForm ? 'Cancel' : 'Add Invoice'}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            {/* Inline Invoice Form - Matches AddInvoiceForm.tsx exactly */}
+            {showInlineInvoiceForm && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+                className="mb-6"
+              >
+                <Card className="bg-white shadow-lg border-2 border-primary/20">
+                  {/* Invoice Type Selector */}
+                  <div className="p-6 border-b border-gray-200 bg-gray-50">
+                    <div className="flex items-center gap-4">
+                      <Label className="text-primary font-semibold">Invoice Type:</Label>
+                      <div className="relative w-[250px]">
+                        <Select
+                          value={inlineInvoiceData.invoiceType}
+                          onValueChange={(value) => setInlineInvoiceData(prev => ({ ...prev, invoiceType: value }))}
+                        >
+                          <SelectTrigger className="border-primary/30 focus:border-primary">
+                            <SelectValue placeholder="Select invoice type..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Estimate">Estimate</SelectItem>
+                            <SelectItem value="Downpayment Invoice">Downpayment Invoice</SelectItem>
+                            <SelectItem value="Rough Invoice">Rough Invoice</SelectItem>
+                            <SelectItem value="Progressive Invoice">Progressive Invoice</SelectItem>
+                            <SelectItem value="Final Invoice">Final Invoice</SelectItem>
+                            {customInvoiceTypes.length > 0 && (
+                              <>
+                                <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 border-b">Custom Types</div>
+                                {cleanCustomTypes(customInvoiceTypes).map((customType, index) => (
+                                  <SelectItem key={index} value={customType}>{customType}</SelectItem>
+                                ))}
+                              </>
+                            )}
+                            <SelectItem value="Custom">+ Add Custom</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {inlineInvoiceData.invoiceType === 'Custom' && (
+                        <div className="relative w-[300px]">
+                          <Input
+                            value={inlineInvoiceData.customInvoiceType}
+                            onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customInvoiceType: e.target.value }))}
+                            onBlur={() => {
+                              if (inlineInvoiceData.customInvoiceType) {
+                                addCustomInvoiceType(inlineInvoiceData.customInvoiceType)
+                              }
+                            }}
+                            placeholder="Enter custom invoice type name..."
+                            className="border-primary/30 focus:border-primary"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
-                ) : (
-                  <p className="flex items-center justify-center py-16"> <LoadingSpinner /></p>
-                )}
-              </CardContent>
-            </Card>
 
+                  <div className="p-8">
+                    {/* Header */}
+                    <div className="flex justify-between items-end mb-8">
+                      <div className="flex-shrink-0">
+                        <Image
+                          src='/assets/logos/logo-jdp.png'
+                          alt="logo"
+                          width={168}
+                          height={63}
+                          className='w-[140px] '
 
-          </div>
-          </div>
-           </div> 
-            {/* Transaction History Section */}
-            <Card className="bg-white shadow-sm border border-primary/10">
-              <CardHeader className="bg-gradient-to-r from-primary/5 to-blue-50/50 border-b border-primary/10">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-primary flex items-center gap-2">
-                    <Receipt className="h-5 w-5" />
-                    Transaction History
-                  </CardTitle>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-primary/30 text-primary hover:bg-primary hover:text-white"
-                    onClick={() => {
-                      if (!showInlineInvoiceForm) {
-                        // Reset form and auto-fill when opening invoice form
-                        setInlineInvoiceData({
-                          date: new Date().toISOString().split('T')[0],
-                          estimateNumber: '',
-                          customerName: job.customerName || '',
-                          customerAddress: job.address || '',
-                          billToAddress: job.billToAddress || '',
-                          billToAddressEnabled: true,
-                          poNumber: '',
-                          project: job.title || '',
-                          lineItems: [{
-                            id: Math.random().toString(36).substring(2, 9),
-                            productId: null,
-                            qty: 1,
-                            item: '',
-                            description: '',
-                            rate: 0,
-                            estimatedPrice: 0,
-                            total: 0,
-        searchQuery: '',
-        showSearchResults: false,
-        supplierId: 1,
-        isCustomProduct: false
-                          }],
-                          notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
-                          signatureText: 'ACCEPTED BY________________DATE_____',
-                          invoiceType: 'Estimate',
-                          customInvoiceType: '',
-                          paymentPercentage: 0,
-                          estimateTotal: 0,
-                          paymentHistory: [] as any[]
-                        })
-                        setEditingInvoiceId(null)
-                        setInvoiceValidationErrors({})
-                      }
-                      setShowInlineInvoiceForm(!showInlineInvoiceForm)
-                    }}
-                  >
-                    <PlusCircle className="h-4 w-4 mr-2" />
-                    {showInlineInvoiceForm ? 'Cancel' : 'Add Invoice'}
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="p-6">
-                {/* Inline Invoice Form - Matches AddInvoiceForm.tsx exactly */}
-                {showInlineInvoiceForm && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4 }}
-                    className="mb-6"
-                  >
-                    <Card className="bg-white shadow-lg border-2 border-primary/20">
-                      {/* Invoice Type Selector */}
-                      <div className="p-6 border-b border-gray-200 bg-gray-50">
-                        <div className="flex items-center gap-4">
-                          <Label className="text-primary font-semibold">Invoice Type:</Label>
-                          <div className="relative w-[250px]">
-                            <Select
-                              value={inlineInvoiceData.invoiceType}
-                              onValueChange={(value) => setInlineInvoiceData(prev => ({ ...prev, invoiceType: value }))}
-                            >
-                              <SelectTrigger className="border-primary/30 focus:border-primary">
-                                <SelectValue placeholder="Select invoice type..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Estimate">Estimate</SelectItem>
-                                <SelectItem value="Downpayment Invoice">Downpayment Invoice</SelectItem>
-                                <SelectItem value="Rough Invoice">Rough Invoice</SelectItem>
-                                <SelectItem value="Progressive Invoice">Progressive Invoice</SelectItem>
-                                <SelectItem value="Final Invoice">Final Invoice</SelectItem>
-                                {customInvoiceTypes.length > 0 && (
-                                  <>
-                                    <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 border-b">Custom Types</div>
-                                    {cleanCustomTypes(customInvoiceTypes).map((customType, index) => (
-                                      <SelectItem key={index} value={customType}>{customType}</SelectItem>
-                                    ))}
-                                  </>
-                                )}
-                                <SelectItem value="Custom">+ Add Custom</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          {inlineInvoiceData.invoiceType === 'Custom' && (
-                            <div className="relative w-[300px]">
-                              <Input
-                                value={inlineInvoiceData.customInvoiceType}
-                                onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customInvoiceType: e.target.value }))}
-                                onBlur={() => {
-                                  if (inlineInvoiceData.customInvoiceType) {
-                                    addCustomInvoiceType(inlineInvoiceData.customInvoiceType)
-                                  }
-                                }}
-                                placeholder="Enter custom invoice type name..."
-                                className="border-primary/30 focus:border-primary"
-                              />
-                            </div>
+                        />
+                        {/* <p className="text-sm font-semibold mt-2">952-449-1088</p> */}
+                      </div>
+
+                      <div className="text-right">
+                        <h1 className="text-2xl font-bold mb-4">{inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType}</h1>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">Date</Label>
+                          <Input
+                            value={inlineInvoiceData.date}
+                            onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, date: e.target.value }))}
+                            className="px-3 py-2 text-sm"
+                          />
+                          {/* Invoice Number - Only show when editing */}
+                          {editingInvoiceId && (
+                            <>
+                              <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">
+                                {inlineInvoiceData.invoiceType === 'Estimate' ? 'Estimate #' : 'Invoice #'}
+                              </Label>
+                              <div>
+                                <Input
+                                  value={inlineInvoiceData.estimateNumber}
+                                  onChange={(e) => {
+                                    setInlineInvoiceData(prev => ({ ...prev, estimateNumber: e.target.value }))
+                                  }}
+                                  className="px-3 py-2 text-sm"
+                                  disabled={true}
+                                />
+                              </div>
+                            </>
                           )}
                         </div>
                       </div>
-
-                      <div className="p-8">
-                        {/* Header */}
-                        <div className="flex justify-between items-end mb-8">
-                          <div className="flex-shrink-0"> 
-                            <Image
-                src='/assets/logos/logo-jdp.png'
-                alt="logo"
-                width={168}
-                height={63}
-                className='w-[140px] '
-
-              />
-                            {/* <p className="text-sm font-semibold mt-2">952-449-1088</p> */}
-                          </div>
-
-                          <div className="text-right">
-                            <h1 className="text-2xl font-bold mb-4">{inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType}</h1>
-                            <div className="grid grid-cols-2 gap-2">
-                              <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">Date</Label>
-                              <Input
-                                value={inlineInvoiceData.date}
-                                onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, date: e.target.value }))}
-                                className="px-3 py-2 text-sm"
-                              />
-                              {/* Invoice Number - Only show when editing */}
-                              {editingInvoiceId && (
-                                <>
-                                  <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">
-                                    {inlineInvoiceData.invoiceType === 'Estimate' ? 'Estimate #' : 'Invoice #'}
-                                  </Label>
-                                  <div>
-                                    <Input
-                                      value={inlineInvoiceData.estimateNumber}
-                                      onChange={(e) => {
-                                        setInlineInvoiceData(prev => ({ ...prev, estimateNumber: e.target.value }))
-                                      }}
-                                      className="px-3 py-2 text-sm"
-                                      disabled={true}
-                                    />
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          </div>
+                    </div>
+                    <div className="mb-6">
+                      <div className="flex items-center justify-between bg-gray-600 text-white px-3 py-2 mb-0">
+                        <div className="flex items-center">
+                          <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-6a1 1 0 00-1-1H9a1 1 0 00-1 1v6a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clipRule="evenodd" />
+                          </svg>
+                          <Label className="text-sm font-semibold">Bill To (Billing Address)</Label>
                         </div>
-                        <div className="mb-6">
-                          <div className="flex items-center justify-between bg-gray-600 text-white px-3 py-2 mb-0">
-                            <div className="flex items-center">
-                              <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-6a1 1 0 00-1-1H9a1 1 0 00-1 1v6a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clipRule="evenodd" />
-                              </svg>
-                              <Label className="text-sm font-semibold">Bill To (Billing Address)</Label>
-                            </div>
-                            <div className="flex items-center">
-                              <button
-                                type="button"
-                                onClick={() => setInlineInvoiceData(prev => ({ ...prev, billToAddressEnabled: !prev.billToAddressEnabled }))}
-                                className={`mr-2 px-3 py-1 rounded text-xs font-medium transition-colors ${
-                                  inlineInvoiceData.billToAddressEnabled 
-                                    ? 'bg-red-100 text-red-700 hover:bg-red-200' 
-                                    : 'bg-green-100 text-green-700 hover:bg-green-200'
-                                }`}
-                              >
-                                {inlineInvoiceData.billToAddressEnabled ? (
-                                  <>
-                                    <svg className="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                    </svg>
-                                    Disable
-                                  </>
-                                ) : (
-                                  <>
-                                    <svg className="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                                    </svg>
-                                    Enable
-                                  </>
-                                )}
-                              </button>
-                              <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                                inlineInvoiceData.billToAddressEnabled ? 'bg-blue-600' : 'bg-gray-200'
-                              }`}>
-                                <input
-                                  type="checkbox"
-                                  checked={inlineInvoiceData.billToAddressEnabled}
-                                  onChange={() => setInlineInvoiceData(prev => ({ ...prev, billToAddressEnabled: !prev.billToAddressEnabled }))}
-                                  className="sr-only"
-                                />
-                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                  inlineInvoiceData.billToAddressEnabled ? 'translate-x-6' : 'translate-x-1'
-                                }`} />
-                              </div>
-                            </div>
-                          </div>
-                          {inlineInvoiceData.billToAddressEnabled && (
-                            <Textarea
-                              value={inlineInvoiceData.billToAddress || ''}
-                              onChange={(e) => setInlineInvoiceData({ ...inlineInvoiceData, billToAddress: e.target.value })}
-                              className="mt-0 border-0 rounded-none"
-                              placeholder="Enter billing address (defaults to customer/supplier address, can be edited)"
-                              rows={3}
-                            />
-                          )}
-                          {!inlineInvoiceData.billToAddressEnabled && (
-                            <div className="bg-gray-50 p-3 text-sm text-gray-600">
-                              <div className="flex items-center">
-                                <svg className="w-4 h-4 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        <div className="flex items-center">
+                          <button
+                            type="button"
+                            onClick={() => setInlineInvoiceData(prev => ({ ...prev, billToAddressEnabled: !prev.billToAddressEnabled }))}
+                            className={`mr-2 px-3 py-1 rounded text-xs font-medium transition-colors ${inlineInvoiceData.billToAddressEnabled
+                                ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                                : 'bg-green-100 text-green-700 hover:bg-green-200'
+                              }`}
+                          >
+                            {inlineInvoiceData.billToAddressEnabled ? (
+                              <>
+                                <svg className="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                                 </svg>
-                                This address defaults to the customer/supplier address but can be changed if billing address differs from job location
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        {/* Customer Information */}
-
-                        <div className="mb-6">
-                          <Label className="block bg-gray-600 text-white px-3 py-2 mb-0 text-sm font-semibold">Name / Address</Label>
-                          <div className="border border-gray-300 p-4 min-h-[120px]">
-                            <Input
-                              value={inlineInvoiceData.customerName}
-                              onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customerName: e.target.value }))}
-                              className="mb-2 border-0 p-0 focus-visible:ring-0"
-                              placeholder="Customer Name"
+                                Disable
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                                </svg>
+                                Enable
+                              </>
+                            )}
+                          </button>
+                          <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${inlineInvoiceData.billToAddressEnabled ? 'bg-blue-600' : 'bg-gray-200'
+                            }`}>
+                            <input
+                              type="checkbox"
+                              checked={inlineInvoiceData.billToAddressEnabled}
+                              onChange={() => setInlineInvoiceData(prev => ({ ...prev, billToAddressEnabled: !prev.billToAddressEnabled }))}
+                              className="sr-only"
                             />
-                            <Textarea
-                              key={`customer-address-${inlineInvoiceData.customerAddress}`}
-                              value={inlineInvoiceData.customerAddress}
-                              onChange={(e) => { 
-                                setInlineInvoiceData(prev => ({ ...prev, customerAddress: e.target.value }))
-                              }}
-                              className="border-0 p-0 resize-none focus-visible:ring-0"
-                              rows={3}
-                              placeholder="Customer Address"
-                            /> 
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${inlineInvoiceData.billToAddressEnabled ? 'translate-x-6' : 'translate-x-1'
+                              }`} />
                           </div>
                         </div>
+                      </div>
+                      {inlineInvoiceData.billToAddressEnabled && (
+                        <Textarea
+                          value={inlineInvoiceData.billToAddress || ''}
+                          onChange={(e) => setInlineInvoiceData({ ...inlineInvoiceData, billToAddress: e.target.value })}
+                          className="mt-0 border-0 rounded-none"
+                          placeholder="Enter billing address (defaults to customer/supplier address, can be edited)"
+                          rows={3}
+                        />
+                      )}
+                      {!inlineInvoiceData.billToAddressEnabled && (
+                        <div className="bg-gray-50 p-3 text-sm text-gray-600">
+                          <div className="flex items-center">
+                            <svg className="w-4 h-4 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            This address defaults to the customer/supplier address but can be changed if billing address differs from job location
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {/* Customer Information */}
 
-                        {/* PO and Project */}
-                        <div className="mb-6">
-                          <div className="grid grid-cols-2 gap-0">
-                            <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">P.O. No.</Label>
-                            <Label className="bg-gray-600 text-white px-3 py-2 text-center text-sm font-semibold">Project</Label>
-                          </div>
-                          <div className="grid grid-cols-2 gap-0">
-                            <div>
-                              <Input
-                                value={inlineInvoiceData.poNumber}
-                                onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, poNumber: e.target.value }))}
-                                className="px-3 py-2 text-sm rounded-none border-t-0"
-                                placeholder="PO Number"
-                              />
-                            </div>
-                            <Input
-                              value={inlineInvoiceData.project}
-                              onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, project: e.target.value }))}
-                              className="px-3 py-2 text-sm rounded-none border-t-0"
-                            />
-                          </div>
+                    <div className="mb-6">
+                      <Label className="block bg-gray-600 text-white px-3 py-2 mb-0 text-sm font-semibold">
+                        {job.type === 'contract-based' ? 'Contractor Name / Address' : 'Customer Name / Address'}
+                      </Label>
+                      <div className="border border-gray-300 p-4 min-h-[120px]">
+                        <Input
+                          value={job.type === 'contract-based' 
+                            ? (contractorData?.name || contractorData?.contractor_name || inlineInvoiceData.customerName)
+                            : (customerData?.name || customerData?.customer_name || inlineInvoiceData.customerName)
+                          }
+                          onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customerName: e.target.value }))}
+                          className="mb-2 border-0 p-0 focus-visible:ring-0"
+                          placeholder={job.type === 'contract-based' ? 'Contractor Name' : 'Customer Name'}
+                        />
+                        <Textarea
+                          key={`customer-address-${inlineInvoiceData.customerAddress}`}
+                          value={inlineInvoiceData.customerAddress}
+                          onChange={(e) => {
+                            setInlineInvoiceData(prev => ({ ...prev, customerAddress: e.target.value }))
+                          }}
+                          className="border-0 p-0 resize-none focus-visible:ring-0"
+                          rows={3}
+                          placeholder={job.type === 'contract-based' ? 'Contractor Address' : 'Customer Address'}
+                        />
+                      </div>
+                    </div>
+
+                    {/* PO and Project */}
+                    <div className="mb-6">
+                      <div className="grid grid-cols-2 gap-0">
+                        <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">P.O. No.</Label>
+                        <Label className="bg-gray-600 text-white px-3 py-2 text-center text-sm font-semibold">Project</Label>
+                      </div>
+                      <div className="grid grid-cols-2 gap-0">
+                        <div>
+                          <Input
+                            value={inlineInvoiceData.poNumber}
+                            onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, poNumber: e.target.value }))}
+                            className="px-3 py-2 text-sm rounded-none border-t-0"
+                            placeholder="PO Number"
+                          />
                         </div>
-                        {/* Estimate Selection - Only show for payment invoices */}
-                        {/* {inlineInvoiceData.invoiceType !== 'Estimate' && (
+                        <Input
+                          value={inlineInvoiceData.project}
+                          onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, project: e.target.value }))}
+                          className="px-3 py-2 text-sm rounded-none border-t-0"
+                        />
+                      </div>
+                    </div>
+                    {/* Estimate Selection - Only show for payment invoices */}
+                    {/* {inlineInvoiceData.invoiceType !== 'Estimate' && (
                         <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                           <Label className="text-primary font-semibold mb-2 block">Select Estimate</Label>
                           <Select 
@@ -3164,8 +3263,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                         </div>
                       )} */}
 
-                        {/* Header Section */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Header Section */}
+                    {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                          
                           <div className="space-y-2">
@@ -3177,614 +3276,643 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                             />
                           </div>
 
-                        </div>
-
-                        {/* Line Items Table */}
-                        <div className="mb-6 overflow-x-auto mt-4">
-                          <table className="w-full border-collapse">
-                            <thead>
-                              <tr className="bg-gray-600 text-white">
-                                <th className="border border-gray-300 px-3 py-2 w-16 text-sm font-semibold">Qty</th>
-                                <th className="border border-gray-300 px-3 py-2 w-48 text-sm font-semibold">Item</th>
-                                <th className="border border-gray-300 px-3 py-2 text-sm font-semibold">Description</th>
-                                <th className="border border-gray-300 px-3 py-2 w-28 text-sm font-semibold">Rate</th>
-                                <th className="border border-gray-300 px-3 py-2 w-32 text-sm font-semibold">Estimated Price</th>
-                                <th className="border border-gray-300 px-3 py-2 w-28 text-sm font-semibold">Total</th>
-                                <th className="border border-gray-300 px-3 py-2 w-16"></th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {inlineInvoiceData.lineItems.map((item) => (
-                                <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                                  <td className="border border-gray-300 p-1">
-                                    <Input
-                                      type="number"
-                                      value={item.qty}
-                                      onChange={(e) => updateInvoiceLineItem(item.id, 'qty', parseFloat(e.target.value) || 0)}
-                                      className="text-center border-0 p-2"
-                                      min="0"
-                                    />
-                                  </td>
-                                  <td className="border border-gray-300 p-1 relative">
-                                    {item.isCustomProduct ? (
-                                      <Input
-                                        value={item.item}
-                                        onChange={(e) => updateInvoiceLineItem(item.id, 'item', e.target.value)}
-                                        className="border-0 p-2"
-                                        placeholder="Enter custom item name..."
-                                      />
-                                    ) : (
-                                      <div className="relative product-search-container">
-                                        <Input
-                                          value={item.item}
-                                          onChange={(e) => {
-                                            const value = e.target.value
-                                            updateInvoiceLineItem(item.id, 'item', value)
-                                            updateInvoiceLineItem(item.id, 'searchQuery', value)
-                                            updateInvoiceLineItem(item.id, 'showSearchResults', true)
-                                            // Direct API call on input change
-                                            if (value && value.length > 2) {
-                                              fetchProducts(value)
-                                            }
-                                          }}
-                                          onFocus={() => {
-                                            if (item.item) {
-                                              updateInvoiceLineItem(item.id, 'searchQuery', item.item)
-                                              updateInvoiceLineItem(item.id, 'showSearchResults', true)
-                                            }
-                                          }}
-                                          className="border-0 p-2 pr-8"
-                                          placeholder="Search or enter product name..."
-                                        />
-                                        <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                      </div>
-                                    )}
-                                    {!item.isCustomProduct && item.showSearchResults && item.searchQuery && (
-                                      <div className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1">
-                                        {(() => {
-                                          const filtered = getFilteredProducts(item.searchQuery || '')
-
-                                          return (
-                                            <>
-                                              {filtered.length > 0 ? (
-                                                filtered.map(product => (
-                                                  <div
-                                                    key={product.id}
-                                                    onMouseDown={(e) => {
-                                                      e.preventDefault()
-                                                      selectProduct(item.id, product)
-                                                    }}
-                                                    className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100 transition-colors"
-                                                  >
-                                                    <div className="font-medium text-sm mb-1">{product.name}</div>
-                                                    <div className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
-                                                      {product.description}
-                                                    </div>
-                                                    <div className="text-xs text-primary mt-2">
-                                                      {product.jdpSKU} • ${product.jdpPrice.toFixed(2)}
-                                                      {product.estimatedPrice && product.estimatedPrice > 0 && ` • Est: $${product.estimatedPrice.toFixed(2)}`}
-                                                    </div>
-                                                  </div>
-                                                ))
-                                              ) : (
-                                                <div className="p-3">
-                                                  <div className="text-sm text-muted-foreground mb-2">No products found</div>
-                                                  <Button
-                                                    size="sm"
-                                                    onMouseDown={(e) => {
-                                                      e.preventDefault()
-                                                      addCustomProduct(item.id, item.searchQuery || '')
-                                                    }}
-                                                    className="w-full bg-primary hover:bg-primary/90"
-                                                  >
-                                                    <Plus className="h-3 w-3 mr-1" />
-                                                    Add "{item.searchQuery}"
-                                                  </Button>
-                                                </div>
-                                              )}
-                                            </>
-                                          )
-                                        })()}
-                                      </div>
-                                    )}
-                                  </td>
-                                  <td className="border border-gray-300 p-1">
-                                    <Textarea
-                                      value={item.description}
-                                      onChange={(e) => updateInvoiceLineItem(item.id, 'description', e.target.value)}
-                                      className="border-0 p-2 min-h-[80px] resize-none leading-relaxed"
-                                      placeholder="Enter product description (up to 4 lines)"
-                                      rows={4}
-                                    />
-                                  </td>
-
-                                  <td className="border border-gray-300 p-1">
-                                    <Input
-                                      type="number"
-                                      value={item.rate}
-                                      onChange={(e) => updateInvoiceLineItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
-                                      className="text-right border-0 p-2"
-                                      min="0"
-                                      step="0.01"
-                                    />
-                                  </td>
-                                  <td className="border border-gray-300 p-1">
-                                    <Input
-                                      type="number"
-                                      value={item.estimatedPrice || ""}
-                                      onChange={(e) => updateInvoiceLineItem(item.id, 'estimatedPrice', parseFloat(e.target.value) || 0)}
-                                      className="text-right border-0 p-2"
-                                      min="0"
-                                      step="0.01"
-                                      placeholder="0.00"
-                                    />
-                                  </td>
-                                  <td className="border border-gray-300 p-2 text-right">
-                                    ${item.total.toFixed(2)}
-                                  </td>
-                                  <td className="border border-gray-300 p-1 text-center">
-                                    {inlineInvoiceData.lineItems.length > 1 && (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => removeInvoiceLineItem(item.id)}
-                                        className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
-                              {/* Subtotal Row */}
-                              <tr>
-                                <td colSpan={5} className="border border-gray-300 p-2"></td>
-                                <td className="border border-gray-300 p-2 text-right font-bold">
-                                  ${calculateInvoiceSubtotal().toFixed(2)}
-                                </td>
-                                <td className="border border-gray-300 p-1"></td>
-                              </tr>
-                            </tbody>
-                          </table>
-
-                          {/* Add Buttons */}
-                          <div className="mt-4 flex gap-3">
-                            <Button
-                              onClick={addInvoiceLineItem}
-                              variant="outline"
-                              className="border-dashed border-2 border-primary text-primary hover:bg-primary/5"
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Add Line Item
-                            </Button>
-                            <Button
-                              onClick={addCustomLineItem}
-                              variant="outline"
-                              className="border-dashed border-2 border-green-500 text-green-600 hover:bg-green-50"
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Add Custom
-                            </Button>
-                          </div>
-                          {invoiceValidationErrors.lineItems && (
-                            <p className="text-red-500 text-xs mt-2">{invoiceValidationErrors.lineItems}</p>
-                          )}
-                        </div>
-
-                        {/* Notes Section */}
-                        <div className="mb-6 overflow-x-auto">
-                          <table className="w-full border-collapse">
-                            <tbody>
-                              <tr>
-                                <td className="border border-gray-300 p-3 bg-white text-sm" style={{ minHeight: '120px' }}>
-                                  <Textarea
-                                    value={inlineInvoiceData.notes}
-                                    onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, notes: e.target.value }))}
-                                    className="w-full min-h-[100px] border-0 p-0 focus-visible:ring-0 resize-none"
-                                    placeholder="NOTES&#10;JDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE"
-                                  />
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-
-                        {/* Footer disclaimer and Total */}
-                        <div className="mb-6">
-                          <div className="border border-gray-300 p-3 text-xs text-center bg-white">
-                            <p>
-                              JDP is not responsible for repair of lamps & landscaping, house owner utilities including
-                              cables, sprinkler systems, television or telephone cables, etc. that may be cut or damaged
-                              during installation. Price are subject to change prior to receipt of down payment.
-                            </p>
-                          </div>
-                          <div className="flex justify-end mt-4">
-                            <div className="text-right">
-                              <div className="flex items-center gap-4">
-                                <span className="text-xl font-bold">Total</span>
-                                <span className="text-2xl font-bold">
-                                  ${calculateInvoiceSubtotal().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Company Footer */}
-                        {/* <div className="text-center text-xs">
-                          <p className="text-blue-600 font-semibold">
-                            1432 Oakpointe Drive Waconia, MN 55387 <span className="text-blue-700">paul@jdpelectric.us</span>
-                          </p>
                         </div> */}
-                      </div>
 
-                      {/* Action Buttons */}
-                      <div className="border-t bg-gray-50 px-8 py-6">
-                        <div className="flex items-center justify-between">
+                    {/* Line Items Table */}
+                    <div className="mb-6 overflow-x-auto mt-4">
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr className="bg-gray-600 text-white">
+                            <th className="border border-gray-300 px-3 py-2 w-16 text-sm font-semibold">Qty</th>
+                            <th className="border border-gray-300 px-3 py-2 w-48 text-sm font-semibold">Item</th>
+                            <th className="border border-gray-300 px-3 py-2 text-sm font-semibold">Description</th>
+                            <th className="border border-gray-300 px-3 py-2 w-28 text-sm font-semibold">Rate</th>
+                            <th className="border border-gray-300 px-3 py-2 w-32 text-sm font-semibold">Estimated Price</th>
+                            <th className="border border-gray-300 px-3 py-2 w-28 text-sm font-semibold">Total</th>
+                            <th className="border border-gray-300 px-3 py-2 w-16"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {inlineInvoiceData.lineItems.map((item) => (
+                            <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                              <td className="border border-gray-300 p-1">
+                                <Input
+                                  type="number"
+                                  value={item.qty}
+                                  onChange={(e) => updateInvoiceLineItem(item.id, 'qty', parseFloat(e.target.value) || 0)}
+                                  className="text-center border-0 p-2"
+                                  min="0"
+                                />
+                              </td>
+                              <td className="border border-gray-300 p-1 relative">
+                                {item.isCustomProduct ? (
+                                  <Input
+                                    value={item.item}
+                                    onChange={(e) => updateInvoiceLineItem(item.id, 'item', e.target.value)}
+                                    className="border-0 p-2"
+                                    placeholder="Enter custom item name..."
+                                  />
+                                ) : (
+                                  <div className="relative product-search-container">
+                                    <Input
+                                      value={item.item}
+                                      onChange={(e) => {
+                                        const value = e.target.value
+                                        updateInvoiceLineItem(item.id, 'item', value)
+                                        updateInvoiceLineItem(item.id, 'searchQuery', value)
+                                        updateInvoiceLineItem(item.id, 'showSearchResults', true)
+                                        // Direct API call on input change
+                                        if (value && value.length > 2) {
+                                          fetchProducts(value)
+                                        }
+                                      }}
+                                      onFocus={() => {
+                                        if (item.item) {
+                                          updateInvoiceLineItem(item.id, 'searchQuery', item.item)
+                                          updateInvoiceLineItem(item.id, 'showSearchResults', true)
+                                        }
+                                      }}
+                                      className="border-0 p-2 pr-8"
+                                      placeholder="Search or enter product name..."
+                                    />
+                                    <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                  </div>
+                                )}
+                                {!item.isCustomProduct && item.showSearchResults && item.searchQuery && (
+                                  <div className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1">
+                                    {(() => {
+                                      const filtered = getFilteredProducts(item.searchQuery || '')
+
+                                      return (
+                                        <>
+                                          {filtered.length > 0 ? (
+                                            filtered.map(product => (
+                                              <div
+                                                key={product.id}
+                                                onMouseDown={(e) => {
+                                                  e.preventDefault()
+                                                  selectProduct(item.id, product)
+                                                }}
+                                                className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100 transition-colors"
+                                              >
+                                                <div className="font-medium text-sm mb-1">{product.name}</div>
+                                                <div className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
+                                                  {product.description}
+                                                </div>
+                                                <div className="text-xs text-primary mt-2">
+                                                  {product.jdpSKU} • ${product.jdpPrice.toFixed(2)}
+                                                  {product.estimatedPrice && product.estimatedPrice > 0 && ` • Est: $${product.estimatedPrice.toFixed(2)}`}
+                                                </div>
+                                              </div>
+                                            ))
+                                          ) : (
+                                            <div className="p-3">
+                                              <div className="text-sm text-muted-foreground mb-2">No products found</div>
+                                              <Button
+                                                size="sm"
+                                                onMouseDown={(e) => {
+                                                  e.preventDefault()
+                                                  addCustomProduct(item.id, item.searchQuery || '')
+                                                }}
+                                                className="w-full bg-primary hover:bg-primary/90"
+                                              >
+                                                <Plus className="h-3 w-3 mr-1" />
+                                                Add "{item.searchQuery}"
+                                              </Button>
+                                            </div>
+                                          )}
+                                        </>
+                                      )
+                                    })()}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="border border-gray-300 p-1">
+                                <Textarea
+                                  value={item.description}
+                                  onChange={(e) => updateInvoiceLineItem(item.id, 'description', e.target.value)}
+                                  className="border-0 p-2 min-h-[80px] resize-none leading-relaxed"
+                                  placeholder="Enter product description (up to 4 lines)"
+                                  rows={4}
+                                />
+                              </td>
+
+                              <td className="border border-gray-300 p-1">
+                                <Input
+                                  type="number"
+                                  value={item.rate}
+                                  onChange={(e) => updateInvoiceLineItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
+                                  className="text-right border-0 p-2"
+                                  min="0"
+                                  step="0.01"
+                                />
+                              </td>
+                              <td className="border border-gray-300 p-1">
+                                <Input
+                                  type="number"
+                                  value={item.estimatedPrice || ""}
+                                  onChange={(e) => updateInvoiceLineItem(item.id, 'estimatedPrice', parseFloat(e.target.value) || 0)}
+                                  className="text-right border-0 p-2"
+                                  min="0"
+                                  step="0.01"
+                                  placeholder="0.00"
+                                />
+                              </td>
+                              <td className="border border-gray-300 p-2 text-right">
+                                ${item.total.toFixed(2)}
+                              </td>
+                              <td className="border border-gray-300 p-1 text-center">
+                                {inlineInvoiceData.lineItems.length > 1 && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeInvoiceLineItem(item.id)}
+                                    className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                          {/* Subtotal Row */}
+                          <tr>
+                            <td colSpan={5} className="border border-gray-300 p-2"></td>
+                            <td className="border border-gray-300 p-2 text-right font-bold">
+                              ${calculateInvoiceSubtotal().toFixed(2)}
+                            </td>
+                            <td className="border border-gray-300 p-1"></td>
+                          </tr>
+                        </tbody>
+                      </table>
+
+                      {/* Add Buttons */}
+                      <div className="mt-4 flex gap-3">
+                        <Button
+                          onClick={addInvoiceLineItem}
+                          variant="outline"
+                          className="border-dashed border-2 border-primary text-primary hover:bg-primary/5"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Line Item
+                        </Button>
+                        <Button
+                          onClick={addCustomLineItem}
+                          variant="outline"
+                          className="border-dashed border-2 border-green-500 text-green-600 hover:bg-green-50"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Custom
+                        </Button>
+                      </div>
+                      {invoiceValidationErrors.lineItems && (
+                        <p className="text-red-500 text-xs mt-2">{invoiceValidationErrors.lineItems}</p>
+                      )}
+                    </div>
+
+                    {/* Notes Section */}
+                    <div className="mb-6 overflow-x-auto">
+                      <table className="w-full border-collapse">
+                        <tbody>
+                          <tr>
+                            <td className="border border-gray-300 p-3 bg-white text-sm" style={{ minHeight: '120px' }}>
+                              <Textarea
+                                value={inlineInvoiceData.notes}
+                                onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, notes: e.target.value }))}
+                                className="w-full min-h-[100px] border-0 p-0 focus-visible:ring-0 resize-none"
+                                placeholder="NOTES&#10;JDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE"
+                              />
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Footer disclaimer and Total */}
+                    <div className="mb-6">
+                      <div className="border border-gray-300 p-3 text-xs text-center bg-white">
+                        <p>
+                          JDP is not responsible for repair of lamps & landscaping, house owner utilities including
+                          cables, sprinkler systems, television or telephone cables, etc. that may be cut or damaged
+                          during installation. Price are subject to change prior to receipt of down payment.
+                        </p>
+                      </div>
+                      <div className="flex justify-end mt-4">
+                        <div className="text-right">
+                          <div className="flex items-center gap-4">
+                            <span className="text-xl font-bold">Total</span>
+                            <span className="text-2xl font-bold">
+                              ${calculateInvoiceSubtotal().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="secnacher">
+                      {/* Customer Acceptance Section */}
+                      <div className="mt-8">
+                        {/* Top separator line */}
+                        <div className="border-t border-gray-300 mb-6"></div>
+
+                        {/* Customer Acceptance Header */}
+                        <div className="flex justify-between items-center mb-5">
+                          <div className="flex flex-col">
+                            <div className="text-sm font-medium text-gray-700 mb-1">Customer Acceptance</div>
+                            <div className="text-sm font-medium text-gray-700">Authorized Signature</div>
+                          </div>
+                          <div className="text-sm font-medium text-gray-700">Date</div>
+                        </div>
+
+                        {/* Signature Fields */}
+                        <div className="flex justify-between items-center mb-5">
+                          <div className="flex flex-col w-3/5">
+                            <div className="border-b border-gray-800 h-0.5 mb-2"></div>
+                            <div className="text-xs text-gray-700 text-center">Signature</div>
+                          </div>
+                          <div className="flex flex-col w-1/3">
+                            <div className="border-b border-gray-800 h-0.5 mb-2"></div>
+                            <div className="text-xs text-gray-700 text-center">Date</div>
+                          </div>
+                        </div>
+
+                        {/* Disclaimer Box */}
+                        <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mt-5">
+                          <div className="text-xs text-gray-700 leading-relaxed">
+                            By signing above, you agree to the terms and pricing outlined in this estimate. This becomes a binding agreement upon signature.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="border-t bg-gray-50 px-8 py-6">
+                    <div className="flex items-center justify-between">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setShowInlineInvoiceForm(false)
+                          setEditingInvoiceId(null)
+                          setInvoiceValidationErrors({})
+
+                          // Reset form data
+                          setInlineInvoiceData({
+                            date: new Date().toISOString().split('T')[0],
+                            estimateNumber: '',
+                            customerName: job.customerName || '',
+                            customerAddress: job.address || '',
+                            billToAddress: job.billToAddress || '',
+                            billToAddressEnabled: true,
+                            poNumber: '',
+                            project: job.title || '',
+                            lineItems: [{
+                              id: Math.random().toString(36).substring(2, 9),
+                              productId: null,
+                              qty: 1,
+                              item: '',
+                              description: '',
+                              rate: 0,
+                              estimatedPrice: 0,
+                              total: 0,
+                              searchQuery: '',
+                              showSearchResults: false,
+                              supplierId: 1,
+                              isCustomProduct: false
+                            }],
+                            notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
+                            signatureText: 'ACCEPTED BY________________DATE_____',
+                            invoiceType: 'Estimate',
+                            customInvoiceType: '',
+                            paymentPercentage: 0,
+                            estimateTotal: 0,
+                            paymentHistory: [] as any[]
+                          })
+                        }}
+                        className="border-gray-300"
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Cancel
+                      </Button>
+                      <div className="flex gap-3">
+                        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                          <Button
+                            onClick={handleSaveInvoiceAsDraft}
+                            variant="outline"
+                            size="lg"
+                            className="border-primary text-primary hover:bg-primary/5"
+                          >
+                            <FileText className="h-5 w-5 mr-2" />
+                            Save as Draft
+                          </Button>
+                        </motion.div>
+
+                        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                          <Button
+                            onClick={handlePreviewAndSend}
+                            size="lg"
+                            className="bg-primary hover:bg-primary/90 text-white"
+                          >
+                            <Eye className="h-5 w-5 mr-2" />
+                            Preview & Send to Customer
+                          </Button>
+                        </motion.div>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              </motion.div>
+            )}
+
+            <div className="space-y-4">
+              {isLoadingEstimates ? (
+                <div className="flex justify-center py-8"><LoadingSpinner /></div>
+              ) : estimates.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Receipt className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p>No invoices found for this job</p>
+                </div>
+              ) : (
+                estimates.map((invoice: any) => (
+                  <div key={invoice.id} className="p-4 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow bg-gradient-to-r from-white to-gray-50/30">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 bg-primary/10 rounded-lg flex items-center justify-center">
+                          <FileText className="h-7 w-7 text-primary" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-3 mb-1">
+                            <h4 className="font-semibold text-foreground">{invoice.invoice_type || 'Estimate'}</h4>
+                            <Badge className={`${getInvoiceTypeColor(invoice.invoice_type)} text-xs font-medium`} variant="outline">
+                              {invoice.invoice_type || 'Estimate'}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">{invoice.description || invoice.estimate_title}</p>
+                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                            <span>#{invoice.invoice_number}</span>
+                            <span>Created: {formatDate(invoice.estimate_date || invoice.created_at)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <p className="font-semibold text-lg text-foreground">{formatCurrency(invoice.total_amount || 0)}</p>
+                          <Badge className={getStatusBadgeColor(invoice.status)} variant="outline">
+                            {invoice.status || 'draft'}
+                          </Badge>
+                        </div>
+                        <div className="flex gap-2">
+                          {invoice.status === 'draft' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditInvoice(invoice)}
+                              className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-300"
+                            >
+                              <Edit className="h-4 w-4 mr-1" />
+                              Edit
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
-                            onClick={() => {
-                              setShowInlineInvoiceForm(false)
-                              setEditingInvoiceId(null)
-                              setInvoiceValidationErrors({})
-
-                              // Reset form data
-                              setInlineInvoiceData({
-                                date: new Date().toISOString().split('T')[0],
-                                estimateNumber: '',
-                                customerName: job.customerName || '',
-                                customerAddress: job.address || '',
-                                billToAddress: job.billToAddress || '',
-                                billToAddressEnabled: true,
-                                poNumber: '',
-                                project: job.title || '',
-                                lineItems: [{
-                                  id: Math.random().toString(36).substring(2, 9),
-                                  productId: null,
-                                  qty: 1,
-                                  item: '',
-                                  description: '',
-                                  rate: 0,
-                                  estimatedPrice: 0,
-                                  total: 0,
-        searchQuery: '',
-        showSearchResults: false,
-        supplierId: 1,
-        isCustomProduct: false
-                                }],
-                                notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
-                                signatureText: 'ACCEPTED BY________________DATE_____',
-                                invoiceType: 'Estimate',
-                                customInvoiceType: '',
-                                paymentPercentage: 0,
-                                estimateTotal: 0,
-                                paymentHistory: [] as any[]
-                              })
-                            }}
-                            className="border-gray-300"
+                            size="sm"
+                            onClick={() => handleViewInvoice(invoice)}
+                            className="text-primary hover:text-primary hover:bg-primary/10 border-primary/30"
                           >
-                            <X className="h-4 w-4 mr-2" />
-                            Cancel
+                            <Eye className="h-4 w-4 mr-1" />
+                            View
                           </Button>
-                          <div className="flex gap-3">
-                            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                              <Button
-                                onClick={handleSaveInvoiceAsDraft}
-                                variant="outline"
-                                size="lg"
-                                className="border-primary text-primary hover:bg-primary/5"
-                              >
-                                <FileText className="h-5 w-5 mr-2" />
-                                Save as Draft
-                              </Button>
-                            </motion.div>
-
-                            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                              <Button
-                                onClick={handlePreviewAndSend}
-                                size="lg"
-                                className="bg-primary hover:bg-primary/90 text-white"
-                              >
-                                <Eye className="h-5 w-5 mr-2" />
-                                Preview & Send to Customer
-                              </Button>
-                            </motion.div>
-                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePrintInvoice(invoice)}
+                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-300"
+                          >
+                            <Printer className="h-4 w-4 mr-1" />
+                            Print
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteInvoice(invoice.id)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
-                    </Card>
-                  </motion.div>
-                )}
-
-                <div className="space-y-4">
-                  {isLoadingEstimates ? (
-                    <div className="flex justify-center py-8"><LoadingSpinner /></div>
-                  ) : estimates.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <Receipt className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                      <p>No invoices found for this job</p>
                     </div>
-                  ) : (
-                    estimates.map((invoice: any) => (
-                      <div key={invoice.id} className="p-4 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow bg-gradient-to-r from-white to-gray-50/30">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 bg-primary/10 rounded-lg flex items-center justify-center">
-                              <FileText className="h-7 w-7 text-primary" />
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-3 mb-1">
-                                <h4 className="font-semibold text-foreground">{invoice.invoice_type || 'Estimate'}</h4>
-                                <Badge className={`${getInvoiceTypeColor(invoice.invoice_type)} text-xs font-medium`} variant="outline">
-                                  {invoice.invoice_type || 'Estimate'}
-                                </Badge>
-                              </div>
-                              <p className="text-sm text-muted-foreground mb-2">{invoice.description || invoice.estimate_title}</p>
-                              <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                <span>#{invoice.invoice_number}</span>
-                                <span>Created: {formatDate(invoice.estimate_date || invoice.created_at)}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="text-right">
-                              <p className="font-semibold text-lg text-foreground">{formatCurrency(invoice.total_amount || 0)}</p>
-                              <Badge className={getStatusBadgeColor(invoice.status)} variant="outline">
-                                {invoice.status || 'draft'}
-                              </Badge>
-                            </div>
-                            <div className="flex gap-2">
-                              {invoice.status === 'draft' && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleEditInvoice(invoice)}
-                                  className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-300"
-                                >
-                                  <Edit className="h-4 w-4 mr-1" />
-                                  Edit
-                                </Button>
-                              )}
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleViewInvoice(invoice)}
-                                className="text-primary hover:text-primary hover:bg-primary/10 border-primary/30"
-                              >
-                                <Eye className="h-4 w-4 mr-1" />
-                                View
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handlePrintInvoice(invoice)}
-                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-300"
-                              >
-                                <Printer className="h-4 w-4 mr-1" />
-                                Print
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteInvoice(invoice.id)}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+
+
+        {/* Material Usage */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Product Usage
+            </CardTitle>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-600">
+                Total Cost: <span className="font-semibold">{formatCurrency(totalMaterialCost)}</span>
+              </span>
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowAddMaterialModal(true)}>
+                <Plus className="h-4 w-4" />
+                Add Product
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoadingMaterials ? (
+              <p className="flex items-center justify-center py-16"> <LoadingSpinner /></p>
+            ) : materials.length === 0 ? (
+              <p className="text-sm text-gray-500">No materials found.</p>
+            ) : (
+              <div className="space-y-4">
+                {materials.map((material: any, index: number) => (
+                  <div key={material.id ?? material.sku ?? index} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                    <div className="flex items-center gap-4">
+                      <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
+                        <Package className="h-5 w-5 text-blue-700" />
+                      </div>
+                      <div>
+                        <h4 className="font-medium">{material.product_name || material.name}</h4>
+                        <p className="text-xs text-gray-600">
+                          {material.supplier?.company_name || material.supplier} • SKU: {material.supplier_sku || material.jdp_sku} • {material.unit}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className="font-semibold">
+                          {formatCurrency(
+                            (Number(material.stock_quantity ?? material.quantity ?? 0) || 0) *
+                            (Number(material.unit_cost ?? material.unitCost ?? material.price ?? 0) || 0)
+                          )}
+                        </p>
+
+                        <p className="text-sm text-gray-600">{material.stock_quantity || material.quantity || 0} {material.unit}</p>
+                      </div>
+                      <Button variant="outline" size="sm" className="gap-1" onClick={() => {
+                        setProductToDelete(material);
+                        setShowDeleteProductDialog(true);
+                      }}>
+                        <Trash2 className="h-3 w-3 text-red-600" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+
+        </Card>
+
+        {/* Labour & Time Logs */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Labour & Time Logs
+            </CardTitle>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-600">
+                Total Cost: <span className="font-semibold">{formatCurrency(totalLaborCost)}</span>
+              </span>
+              <Button variant="outline" size="sm" className="gap-2" onClick={handleCreateTimeLog}>
+                <Plus className="h-4 w-4" />
+                Add Time Log
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Show assigned labor data */}
+              {job.assignedLaborDetails && job.assignedLaborDetails.length > 0 && (
+                <>
+                  {job.assignedLaborDetails.map((labor: any, index: number) => (
+                    <div key={`assigned-${labor.id}`} className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
+                      <div className="flex items-center gap-4">
+                        <div className="h-10 w-10 bg-green-200 rounded-lg flex items-center justify-center">
+                          <Users className="h-5 w-5 text-green-700" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium">{labor.user?.full_name || labor.labor_code}</h4>
+                          <p className="text-xs text-gray-600">
+                            {labor.trade} • {labor.experience} • {labor.availability}
+                          </p>
+                          <p className="text-xs text-gray-500">Code: {labor.labor_code}</p>
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-
-
-            {/* Material Usage */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  Product Usage
-                </CardTitle>
-                <div className="flex items-center gap-4">
-                  <span className="text-sm text-gray-600">
-                    Total Cost: <span className="font-semibold">{formatCurrency(totalMaterialCost)}</span>
-                  </span>
-                  <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowAddMaterialModal(true)}>
-                    <Plus className="h-4 w-4" />
-                    Add Product
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {isLoadingMaterials ? (
-                  <p className="flex items-center justify-center py-16"> <LoadingSpinner /></p>
-                ) : materials.length === 0 ? (
-                  <p className="text-sm text-gray-500">No materials found.</p>
-                ) : (
-                  <div className="space-y-4">
-                    {materials.map((material: any, index: number) => (
-                      <div key={material.id ?? material.sku ?? index} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                        <div className="flex items-center gap-4">
-                          <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
-                            <Package className="h-5 w-5 text-blue-700" />
-                          </div>
-                          <div>
-                            <h4 className="font-medium">{material.product_name || material.name}</h4>
-                            <p className="text-xs text-gray-600">
-                              {material.supplier?.company_name || material.supplier} • SKU: {material.supplier_sku || material.jdp_sku} • {material.unit}
-                            </p>
-                          </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="font-semibold">${labor.hourly_rate || 0}/hr</p>
+                          <p className="text-sm text-gray-600">
+                            {labor.hours_worked || 0} hrs worked
+                          </p>
                         </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <p className="font-semibold">
-                              {formatCurrency(
-                                (Number(material.stock_quantity ?? material.quantity ?? 0) || 0) *
-                                (Number(material.unit_cost ?? material.unitCost ?? material.price ?? 0) || 0)
-                              )}
-                            </p>
-
-                            <p className="text-sm text-gray-600">{material.stock_quantity || material.quantity || 0} {material.unit}</p>
-                          </div>
-                          <Button variant="outline" size="sm" className="gap-1" onClick={() => {
-                            setProductToDelete(material);
-                            setShowDeleteProductDialog(true);
-                          }}>
-                            <Trash2 className="h-3 w-3 text-red-600" />
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Assigned
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1"
+                            onClick={() => handleViewTimeLog(labor)}
+                          >
+                            <Eye className="h-3 w-3" />
+                            View
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1"
+                            onClick={() => handleEditTimeLog(labor)}
+                          >
+                            <Edit className="h-3 w-3" />
+                            Edit
                           </Button>
                         </div>
                       </div>
-                    ))}
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* Show custom labor data */}
+              {job.customLabor && job.customLabor.length > 0 && (
+                <>
+                  {job.customLabor.map((labor: any, index: number) => (
+                    <div key={`custom-${labor.id}`} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                      <div className="flex items-center gap-4">
+                        <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
+                          <Users className="h-5 w-5 text-blue-700" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium">{labor.user?.full_name || labor.labor_code}</h4>
+                          <p className="text-xs text-gray-600">
+                            {labor.trade || 'Custom Labor'} • {labor.experience || 'N/A'} • {labor.availability || 'Available'}
+                          </p>
+                          <p className="text-xs text-gray-500">Code: {labor.labor_code}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="font-semibold">${labor.hourly_rate || 0}/hr</p>
+                          <p className="text-sm text-gray-600">
+                            {labor.hours_worked || 0} hrs worked
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            Custom
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1"
+                            onClick={() => handleViewTimeLog(labor)}
+                          >
+                            <Eye className="h-3 w-3" />
+                            View
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1"
+                            onClick={() => handleEditTimeLog(labor)}
+                          >
+                            <Edit className="h-3 w-3" />
+                            Edit
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* Show message if no labor at all */}
+              {(!job.assignedLaborDetails || job.assignedLaborDetails.length === 0) &&
+                (!job.customLabor || job.customLabor.length === 0) && (
+                  <div className="text-center py-8 text-gray-500">
+                    <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                    <p>No labor assigned to this job</p>
                   </div>
                 )}
-              </CardContent>
-
-            </Card>
-
-            {/* Labour & Time Logs */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Labour & Time Logs
-                </CardTitle>
-                <div className="flex items-center gap-4">
-                  <span className="text-sm text-gray-600">
-                    Total Cost: <span className="font-semibold">{formatCurrency(totalLaborCost)}</span>
-                  </span>
-                  <Button variant="outline" size="sm" className="gap-2" onClick={handleCreateTimeLog}>
-                    <Plus className="h-4 w-4" />
-                    Add Time Log
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Show assigned labor data */}
-                  {job.assignedLaborDetails && job.assignedLaborDetails.length > 0 && (
-                    <>
-                      {job.assignedLaborDetails.map((labor: any, index: number) => (
-                        <div key={`assigned-${labor.id}`} className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
-                          <div className="flex items-center gap-4">
-                            <div className="h-10 w-10 bg-green-200 rounded-lg flex items-center justify-center">
-                              <Users className="h-5 w-5 text-green-700" />
-                            </div>
-                            <div>
-                              <h4 className="font-medium">{labor.user?.full_name || labor.labor_code}</h4>
-                              <p className="text-xs text-gray-600">
-                                {labor.trade} • {labor.experience} • {labor.availability}
-                              </p>
-                              <p className="text-xs text-gray-500">Code: {labor.labor_code}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="text-right">
-                              <p className="font-semibold">${labor.hourly_rate || 0}/hr</p>
-                              <p className="text-sm text-gray-600">
-                                {labor.hours_worked || 0} hrs worked
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                Assigned
-                              </span>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1"
-                                onClick={() => handleViewTimeLog(labor)}
-                              >
-                                <Eye className="h-3 w-3" />
-                                View
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1"
-                                onClick={() => handleEditTimeLog(labor)}
-                              >
-                                <Edit className="h-3 w-3" />
-                                Edit
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </>
-                  )}
-
-                  {/* Show custom labor data */}
-                  {job.customLabor && job.customLabor.length > 0 && (
-                    <>
-                      {job.customLabor.map((labor: any, index: number) => (
-                        <div key={`custom-${labor.id}`} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                          <div className="flex items-center gap-4">
-                            <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
-                              <Users className="h-5 w-5 text-blue-700" />
-                            </div>
-                            <div>
-                              <h4 className="font-medium">{labor.user?.full_name || labor.labor_code}</h4>
-                              <p className="text-xs text-gray-600">
-                                {labor.trade || 'Custom Labor'} • {labor.experience || 'N/A'} • {labor.availability || 'Available'}
-                              </p>
-                              <p className="text-xs text-gray-500">Code: {labor.labor_code}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="text-right">
-                              <p className="font-semibold">${labor.hourly_rate || 0}/hr</p>
-                              <p className="text-sm text-gray-600">
-                                {labor.hours_worked || 0} hrs worked
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                Custom
-                              </span>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1"
-                                onClick={() => handleViewTimeLog(labor)}
-                              >
-                                <Eye className="h-3 w-3" />
-                                View
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1"
-                                onClick={() => handleEditTimeLog(labor)}
-                              >
-                                <Edit className="h-3 w-3" />
-                                Edit
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </>
-                  )}
-
-                  {/* Show message if no labor at all */}
-                  {(!job.assignedLaborDetails || job.assignedLaborDetails.length === 0) &&
-                    (!job.customLabor || job.customLabor.length === 0) && (
-                      <div className="text-center py-8 text-gray-500">
-                        <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                        <p>No labor assigned to this job</p>
-                      </div>
-                    )}
 
 
-                </div>
-              </CardContent>
-            </Card>
-         
+            </div>
+          </CardContent>
+        </Card>
+
       </div>
 
 
@@ -4278,16 +4406,16 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                 <div>
                   {/* <Logo /> */}
                   <Image
-                src='/assets/logos/logo-jdp.png'
-                alt="logo"
-                width={168}
-                height={63}
-                className='w-[140px] '
+                    src='/assets/logos/logo-jdp.png'
+                    alt="logo"
+                    width={168}
+                    height={63}
+                    className='w-[140px] '
 
-              />
+                  />
                   {/* <p className="text-sm text-gray-600 mt-2">952-449-1088</p> */}
                   {/* Invoice Number Display */}
-                  
+
                 </div>
                 <div className="text-right">
                   <div className="bg-gray-800 text-white px-4 py-2 text-center mb-2">
@@ -4317,7 +4445,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               <div className="mb-6">
                 <div className="font-semibold">{inlineInvoiceData.customerName}</div>
                 <div className="text-gray-600">{inlineInvoiceData.customerAddress}</div>
-               
+
               </div>
 
               {/* Project Details */}
@@ -4388,6 +4516,41 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                   EMAIL: jen@jdpelectric.us 952-449-1088
                 </div>
               </div>
+              <div className="secnacher">
+                {/* Customer Acceptance Section */}
+                <div className="mt-8">
+                  {/* Top separator line */}
+                  <div className="border-t border-gray-300 mb-6"></div>
+
+                  {/* Customer Acceptance Header */}
+                  <div className="flex justify-between items-center mb-5">
+                    <div className="flex flex-col">
+                      <div className="text-sm font-medium text-gray-700 mb-1">Customer Acceptance</div>
+                      <div className="text-sm font-medium text-gray-700">Authorized Signature</div>
+                    </div>
+                    <div className="text-sm font-medium text-gray-700">Date</div>
+                  </div>
+
+                  {/* Signature Fields */}
+                  <div className="flex justify-between items-center mb-5">
+                    <div className="flex flex-col w-3/5">
+                      <div className="border-b border-gray-800 h-0.5 mb-2"></div>
+                      <div className="text-xs text-gray-700 text-center">Signature</div>
+                    </div>
+                    <div className="flex flex-col w-1/3">
+                      <div className="border-b border-gray-800 h-0.5 mb-2"></div>
+                      <div className="text-xs text-gray-700 text-center">Date</div>
+                    </div>
+                  </div>
+
+                  {/* Disclaimer Box */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mt-5">
+                    <div className="text-xs text-gray-700 leading-relaxed">
+                      By signing above, you agree to the terms and pricing outlined in this estimate. This becomes a binding agreement upon signature.
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -4421,10 +4584,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                       rate: 0,
                       estimatedPrice: 0,
                       total: 0,
-        searchQuery: '',
-        showSearchResults: false,
-        supplierId: 1,
-        isCustomProduct: false
+                      searchQuery: '',
+                      showSearchResults: false,
+                      supplierId: 1,
+                      isCustomProduct: false
                     }],
                     notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
                     signatureText: 'ACCEPTED BY________________DATE_____',
