@@ -327,7 +327,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     date: new Date().toISOString().split('T')[0],
     estimateNumber: '',
     customerName: job.customerName || '',
-    customerAddress: job.address || '',
+    customerAddress: '', // Initialize as empty, will be set by fetchCustomerData
     billToAddress: job.billToAddress || '',
     billToAddressEnabled: true,
     poNumber: '',
@@ -1325,7 +1325,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   // Fetch customer data
   const fetchCustomerData = async (customerId: string) => {
     try {
-      console.log('Fetching customer data for ID:', customerId)
+      console.log('Fetching customer data for IDs:', customerId)
       const response = await apiClient.getCustomers(1, 100) // Get all customers
       console.log('Customers response:', response)
       const customers = response.data?.customers || response.data?.data || response.data || []
@@ -1334,6 +1334,25 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       console.log('Found customer:', customer)
       if (customer) {
         setCustomerData(customer)
+        console.log('Fetching address:', customer.address || customer.customer_address)
+        console.log('Updating customerAddress to:', customer.address || customer.customer_address)
+        // Update customer address in inline invoice data
+        const newAddress = customer.address || customer.customer_address || ''
+        console.log('Setting customerAddress:', newAddress)
+        console.log('Current inlineInvoiceData.customerAddress before update:', inlineInvoiceData.customerAddress)
+        
+        // Force update with setTimeout to ensure state update
+        setTimeout(() => {
+          setInlineInvoiceData(prev => {
+            console.log('setInlineInvoiceData prev.customerAddress:', prev.customerAddress)
+            const updated = {
+              ...prev,
+              customerAddress: newAddress
+            }
+            console.log('setInlineInvoiceData updated.customerAddress:', updated.customerAddress)
+            return updated
+          })
+        }, 100)
       } else {
         console.log('Customer not found with ID:', customerId)
         setCustomerData(null)
@@ -1535,7 +1554,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           <div style="margin-bottom: 24px;">
             <div style="font-weight: 600; font-size: 16px;">${invoice.customer_name || invoice.customer?.name || job.customerName || 'Customer'}</div>
             <div style="color: #6b7280; font-size: 14px; margin-top: 4px;">${invoice.customer_address || invoice.customer?.address || job.location || 'Address'}</div>
-            <div style="color: #6b7280; font-size: 14px; margin-top: 8px; font-weight: 500;">Bill To: ${invoice.bill_to_address || invoice.billing_address || 'Same as above'}</div>
+            ${(invoice.bill_to_address || invoice.billing_address) ? `<div style="color: #6b7280; font-size: 14px; margin-top: 8px; font-weight: 500;">Bill To: ${invoice.bill_to_address || invoice.billing_address}</div>` : ''}
           </div>
 
           <!-- Project Details -->
@@ -1746,11 +1765,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
   useEffect(() => {
     fetchProducts()
-    fetchSuppliers()
-    // Log job data to see customer email field
-    console.log('Job data:', job)
-    console.log('Job customer field:', job.customer)
-    console.log('Job customerName field:', job.customerName)
+    fetchSuppliers() 
     // Fetch customer data if customer ID is available
     if (job.customer) {
       console.log('Fetching customer data for customer ID:', job.customer)
@@ -1759,6 +1774,20 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       console.log('No customer ID found in job data')
     }
   }, [job.customer, job.id])
+
+  // Debug: Log inlineInvoiceData changes
+  useEffect(() => { 
+  }, [inlineInvoiceData.customerAddress])
+
+  // Update customer address when customerData changes
+  useEffect(() => {
+    if (customerData?.address && customerData.address !== inlineInvoiceData.customerAddress) { 
+      setInlineInvoiceData(prev => ({
+        ...prev,
+        customerAddress: customerData.address
+      }))
+    }
+  }, [customerData?.address])
 
   const handleSaveInvoiceAsDraft = async () => {
     // Validation
@@ -1970,9 +1999,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       // Prepare API payload
       const subtotal = calculateInvoiceSubtotal()
       const total = subtotal // You can add tax calculation here if needed
-      
-      console.log('Creating payload with customerData:', customerData)
-      console.log('Job customerEmail field:', job.customerEmail)
+       
       const payload = {
         estimateNumber: inlineInvoiceData.estimateNumber || 'Draft',
         estimateDate: new Date(inlineInvoiceData.date).toLocaleDateString('en-US', { 
@@ -2284,8 +2311,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       setEditingInvoiceId(invoice.id)
       setShowInlineInvoiceForm(true)
       toast.info('Loading invoice for editing...')
-    } catch (error) {
-      console.error('Error fetching invoice details:', error)
+    } catch (error) { 
       toast.error('Failed to load invoice details')
     } finally {
       setIsLoading(false)
@@ -3071,12 +3097,15 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                               placeholder="Customer Name"
                             />
                             <Textarea
+                              key={`customer-address-${inlineInvoiceData.customerAddress}`}
                               value={inlineInvoiceData.customerAddress}
-                              onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customerAddress: e.target.value }))}
+                              onChange={(e) => { 
+                                setInlineInvoiceData(prev => ({ ...prev, customerAddress: e.target.value }))
+                              }}
                               className="border-0 p-0 resize-none focus-visible:ring-0"
                               rows={3}
                               placeholder="Customer Address"
-                            />
+                            /> 
                           </div>
                         </div>
 

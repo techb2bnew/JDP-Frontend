@@ -1862,6 +1862,7 @@ getTimesheetDashboardStats: async () => {
           company_name: customer.company_name,
           email: customer.email,
           phone: customer.phone,
+          address: customer.address,
         };
         return transformedCustomer;
       }),
