@@ -860,6 +860,30 @@ getAllProducts: async () => {
 
     return response.json();
   },
+  // Get Estimates by Job ID
+  getEstimatesByJob: async (jobId: string, page = 1, limit = 10) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const response = await fetch(`${apiBaseUrl}/estimates/getEstimatesByJob/${jobId}?page=${page}&limit=${limit}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to fetch estimates by job");
+    }
+
+    return response.json();
+  },
 
   // Get All Timesheets
   getAllTimesheets: async () => {

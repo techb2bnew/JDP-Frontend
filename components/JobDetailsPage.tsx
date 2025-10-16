@@ -252,6 +252,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   }[]>([]);
   const dispatch = useDispatch();
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingDraft, setIsLoadingDraft] = useState(false);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [estimates, setEstimates] = useState<Invoice[]>([]);
   const [refreshInvoices, setRefreshInvoices] = useState(false);
@@ -729,11 +731,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const fetchEstimates = async () => {
     setIsLoadingEstimates(true);
     try {
-      const response = await apiClient.getAllEstimates();
-      const filtered = response.data.estimates.filter(
-        (item: any) => Number(item.job_id) === Number(jobId)
-      );
-      setEstimates(filtered);
+      const response = await apiClient.getEstimatesByJob(jobId, 1, 10);
+      setEstimates(response.data.estimates || []);
     } catch (error) {
       console.error('Failed to fetch estimates:', error);
     } finally {
@@ -1893,7 +1892,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     }
 
     setInvoiceValidationErrors({})
-    setIsLoading(true)
+    setIsLoadingDraft(true)
     try {
       const subtotal = calculateInvoiceSubtotal()
 
@@ -1951,7 +1950,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
       // Refresh estimates list
       await fetchEstimates()
-
+      try {
+        const res = await apiClient.getJobDashboard(jobId);
+        setDashboardMetrics(res.data.dashboardMetrics);
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      }
       setShowInlineInvoiceForm(false)
       setEditingInvoiceId(null)
 
@@ -1992,7 +1996,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       console.error('Error saving invoice:', error)
       toast.error('Failed to save invoice')
     } finally {
-      setIsLoading(false)
+      setIsLoadingDraft(false)
     }
   }
 
@@ -2016,7 +2020,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
     // First save as draft
     try {
-      setIsLoading(true)
+      setIsLoadingPreview(true)
 
       const subtotal = calculateInvoiceSubtotal()
 
@@ -2065,7 +2069,6 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
       if (editingInvoiceId) {
         await apiClient.updateEstimate(Number(editingInvoiceId), payload as any)
-        toast.success('Invoice updated successfully!')
       } else {
         const response = await apiClient.createEstimate(payload as any)
         setEditingInvoiceId(response.id)
@@ -2074,6 +2077,20 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       // Clear validation errors
       setInvoiceValidationErrors({})
 
+      // Show single success message
+      toast.success('Invoice saved successfully!')
+
+      // Refresh estimates to update count
+      await fetchEstimates()
+      
+      // Refresh dashboard data
+      try {
+        const res = await apiClient.getJobDashboard(jobId);
+        setDashboardMetrics(res.data.dashboardMetrics);
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      }
+      
       // Then open preview dialog
       setShowPreviewDialog(true)
 
@@ -2081,7 +2098,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       console.error('Error saving invoice:', error)
       toast.error('Failed to save invoice. Please try again.')
     } finally {
-      setIsLoading(false)
+      setIsLoadingPreview(false)
     }
   }
 
@@ -2099,9 +2116,18 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           day: '2-digit',
           year: 'numeric'
         }),
-        customerName: inlineInvoiceData.customerName || 'Customer',
-        customerEmail: customerData?.email || job.customerEmail || 'customer@example.com',
-        customerAddress: inlineInvoiceData.customerAddress || '',
+        ...(job.type === 'contract-based' 
+          ? {
+            customerName: inlineInvoiceData.customerName || 'Contractor',
+            customerEmail: contractorData?.email || job.email || 'contractor@example.com',
+            customerAddress: inlineInvoiceData.customerAddress || ''
+            }
+          : {
+              customerName: inlineInvoiceData.customerName || 'Customer',
+              customerEmail: customerData?.email || job.customerEmail || 'customer@example.com',
+              customerAddress: inlineInvoiceData.customerAddress || ''
+            }
+        ),
         billToAddress: inlineInvoiceData.billToAddressEnabled ? inlineInvoiceData.billToAddress || '' : '',
         poNumber: inlineInvoiceData.poNumber || '',
         projectName: inlineInvoiceData.project || job.title || '',
@@ -2217,7 +2243,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
       // Refresh estimates list
       await fetchEstimates()
-
+      try {
+        const res = await apiClient.getJobDashboard(jobId);
+        setDashboardMetrics(res.data.dashboardMetrics);
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      }
       setShowInlineInvoiceForm(false)
       setShowPreviewDialog(false)
       setEditingInvoiceId(null)
@@ -3145,18 +3176,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                                 Enable
                               </>
                             )}
-                          </button>
-                          <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${inlineInvoiceData.billToAddressEnabled ? 'bg-blue-600' : 'bg-gray-200'
-                            }`}>
-                            <input
-                              type="checkbox"
-                              checked={inlineInvoiceData.billToAddressEnabled}
-                              onChange={() => setInlineInvoiceData(prev => ({ ...prev, billToAddressEnabled: !prev.billToAddressEnabled }))}
-                              className="sr-only"
-                            />
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${inlineInvoiceData.billToAddressEnabled ? 'translate-x-6' : 'translate-x-1'
-                              }`} />
-                          </div>
+                          </button> 
                         </div>
                       </div>
                       {inlineInvoiceData.billToAddressEnabled && (
@@ -3194,6 +3214,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                           onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customerName: e.target.value }))}
                           className="mb-2 border-0 p-0 focus-visible:ring-0"
                           placeholder={job.type === 'contract-based' ? 'Contractor Name' : 'Customer Name'}
+                          readOnly
                         />
                         <Textarea
                           key={`customer-address-${inlineInvoiceData.customerAddress}`}
@@ -3204,6 +3225,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                           className="border-0 p-0 resize-none focus-visible:ring-0"
                           rows={3}
                           placeholder={job.type === 'contract-based' ? 'Contractor Address' : 'Customer Address'}
+                          readOnly
                         />
                       </div>
                     </div>
@@ -3390,33 +3412,48 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                               <td className="border border-gray-300 p-1">
                                 <Textarea
                                   value={item.description}
-                                  onChange={(e) => updateInvoiceLineItem(item.id, 'description', e.target.value)}
+                                  onChange={(e) => {
+                                    const value = e.target.value
+                                    const words = value.trim().split(/\s+/).filter(word => word.length > 0)
+                                    if (words.length <= 200) {
+                                      updateInvoiceLineItem(item.id, 'description', value)
+                                    }
+                                  }}
                                   className="border-0 p-2 min-h-[80px] resize-none leading-relaxed"
-                                  placeholder="Enter product description (up to 4 lines)"
+                                  placeholder="Enter product description (max 200 words)"
                                   rows={4}
                                 />
+                                <div className="text-xs text-gray-500 mt-1 text-right">
+                                  {item.description ? item.description.trim().split(/\s+/).filter(word => word.length > 0).length : 0}/200 words
+                                </div>
                               </td>
 
                               <td className="border border-gray-300 p-1">
-                                <Input
-                                  type="number"
-                                  value={item.rate}
-                                  onChange={(e) => updateInvoiceLineItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
-                                  className="text-right border-0 p-2"
-                                  min="0"
-                                  step="0.01"
-                                />
+                                <div className="relative">
+                                  <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                                  <Input
+                                    type="number"
+                                    value={item.rate}
+                                    onChange={(e) => updateInvoiceLineItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
+                                    className="text-right border-0 p-2 pl-6"
+                                    min="0"
+                                    step="0.01"
+                                  />
+                                </div>
                               </td>
                               <td className="border border-gray-300 p-1">
-                                <Input
-                                  type="number"
-                                  value={item.estimatedPrice || ""}
-                                  onChange={(e) => updateInvoiceLineItem(item.id, 'estimatedPrice', parseFloat(e.target.value) || 0)}
-                                  className="text-right border-0 p-2"
-                                  min="0"
-                                  step="0.01"
-                                  placeholder="0.00"
-                                />
+                                <div className="relative">
+                                  <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                                  <Input
+                                    type="number"
+                                    value={item.estimatedPrice || ""}
+                                    onChange={(e) => updateInvoiceLineItem(item.id, 'estimatedPrice', parseFloat(e.target.value) || 0)}
+                                    className="text-right border-0 p-2 pl-6"
+                                    min="0"
+                                    step="0.01"
+                                    placeholder="0.00"
+                                  />
+                                </div>
                               </td>
                               <td className="border border-gray-300 p-2 text-right">
                                 ${item.total.toFixed(2)}
@@ -3478,10 +3515,19 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                             <td className="border border-gray-300 p-3 bg-white text-sm" style={{ minHeight: '120px' }}>
                               <Textarea
                                 value={inlineInvoiceData.notes}
-                                onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, notes: e.target.value }))}
+                                onChange={(e) => {
+                                  const value = e.target.value
+                                  const words = value.trim().split(/\s+/).filter(word => word.length > 0)
+                                  if (words.length <= 200) {
+                                    setInlineInvoiceData(prev => ({ ...prev, notes: value }))
+                                  }
+                                }}
                                 className="w-full min-h-[100px] border-0 p-0 focus-visible:ring-0 resize-none"
                                 placeholder="NOTES&#10;JDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE"
                               />
+                              <div className="text-xs text-gray-500 mt-1 text-right">
+                                {inlineInvoiceData.notes ? inlineInvoiceData.notes.trim().split(/\s+/).filter(word => word.length > 0).length : 0}/200 words
+                              </div>
                             </td>
                           </tr>
                         </tbody>
@@ -3507,6 +3553,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                           </div>
                         </div>
                       </div>
+                      <div className='text-center text-sm text-blue-500 font-bold'>
+                        <p>1432 Oakpointe Drive Waconia, MN 55387 paul@jdpelectric.us</p>
+                    </div>
                     </div>
                     <div className="secnacher">
                       {/* Customer Acceptance Section */}
@@ -3601,9 +3650,19 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                             variant="outline"
                             size="lg"
                             className="border-primary text-primary hover:bg-primary/5"
+                            disabled={isLoadingDraft}
                           >
-                            <FileText className="h-5 w-5 mr-2" />
-                            Save as Draft
+                            {isLoadingDraft ? (
+                              <>
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mr-2"></div>
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <FileText className="h-5 w-5 mr-2" />
+                                Save as Draft
+                              </>
+                            )}
                           </Button>
                         </motion.div>
 
@@ -3612,9 +3671,19 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                             onClick={handlePreviewAndSend}
                             size="lg"
                             className="bg-primary hover:bg-primary/90 text-white"
+                            disabled={isLoadingPreview}
                           >
-                            <Eye className="h-5 w-5 mr-2" />
-                            Preview & Send to Customer
+                            {isLoadingPreview ? (
+                              <>
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                                Loading...
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="h-5 w-5 mr-2" />
+                                Preview & Send to Customer
+                              </>
+                            )}
                           </Button>
                         </motion.div>
                       </div>
