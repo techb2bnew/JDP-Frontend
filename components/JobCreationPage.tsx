@@ -107,16 +107,13 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     estimatedHours: 0,
     estimatedCost: 0,
     assignedLeadLabor: [] as string[],
-    assignedLabor: [] as string[],
-    
-    // Step 4: Review
+    assignedLabor: [] as string[]
   })
 
   const steps = [
     { id: 1, title: 'Job Type', icon: FileText },
     { id: 2, title: 'Job Details', icon: User },
-    { id: 3, title: 'Resources', icon: Users },
-    { id: 4, title: 'Review', icon: Check }
+    { id: 3, title: 'Review', icon: Check }
   ]
 
   const generateJobId = () => {
@@ -195,59 +192,6 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     return Object.keys(errors).length === 0
   }
 
-  const validateStep3 = (): boolean => {
-    const errors: Record<string, string> = {}
-
-    if (!formData.dueDate) {
-      errors.dueDate = 'Due date is required'
-    } else {
-      // Validate due date is not in the past
-      const today = new Date()
-      const dueDate = new Date(formData.dueDate)
-      today.setHours(0, 0, 0, 0) // Reset time to start of day for comparison
-      
-      if (dueDate < today) {
-        errors.dueDate = 'Due date cannot be in the past'
-      }
-      
-      // Validate due date is not too far in the future (optional business rule)
-      const maxFutureDate = new Date()
-      maxFutureDate.setFullYear(maxFutureDate.getFullYear() + 2) // 2 years from now
-      
-      if (dueDate > maxFutureDate) {
-        errors.dueDate = 'Due date cannot be more than 2 years in the future'
-      }
-    }
-
-    // Validate lead labor and labor assignment
-    if (formData.assignedLabor.length === 0 && formData.assignedLeadLabor.length === 0) {
-      errors.assignedLabor = 'Please assign at least one lead labor or labor'
-    } else {
-      // Additional validation: recommend having at least one lead labor for supervision
-      if (formData.assignedLeadLabor.length === 0 && formData.assignedLabor.length > 0) {
-        errors.assignedLeadLabor = 'It is recommended to assign at least one lead labor for supervision'
-      }
-    }
-
-    // Validate estimated hours if provided
-    if (formData.estimatedHours !== undefined && formData.estimatedHours < 0) {
-      errors.estimatedHours = 'Estimated hours cannot be negative'
-    }
-    if (formData.estimatedHours !== undefined && formData.estimatedHours > 1000) {
-      errors.estimatedHours = 'Estimated hours seems too high. Please verify the value.'
-    }
-
-    // Validate estimated cost if provided
-    if (formData.estimatedCost !== undefined && formData.estimatedCost < 0) {
-      errors.estimatedCost = 'Estimated cost cannot be negative'
-    }
-    if (formData.estimatedCost !== undefined && formData.estimatedCost > 1000000) {
-      errors.estimatedCost = 'Estimated cost seems too high. Please verify the value.'
-    }
-
-    setValidationErrors(errors)
-    return Object.keys(errors).length === 0
-  }
 
   const handleSameAsAddressChange = (checked: boolean) => {
     if (checked) {
@@ -287,14 +231,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
       }
     }
     
-    if (currentStep === 3) {
-      if (!validateStep3()) {
-        toast.error('Please fix the validation errors before proceeding')
-        return
-      }
-    }
-    
-    setCurrentStep(prev => Math.min(prev + 1, 4))
+    setCurrentStep(prev => Math.min(prev + 1, 3))
   }
 
   const handlePrevious = () => {
@@ -536,11 +473,10 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
   )
 
   const renderStep2 = () => (
-    <Card className="bg-white shadow-md border-0">
-      <CardHeader>
-        <CardTitle>Job Details</CardTitle>
-      </CardHeader>
+    <Card className=" border-0"> 
       <CardContent className="space-y-6">
+        <div className="bg-white shadow-lg p-3"> 
+          <h3 className="font-bold text-[#2b2b2b] mb-4 text-lg">Job Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <Label htmlFor="title">Job Title *</Label>
@@ -608,7 +544,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
           )}
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 mt-3">
           <Label htmlFor="description">Description *</Label>
           <Textarea
             id="description"
@@ -626,26 +562,55 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             <p className="text-red-500 text-sm">{validationErrors.description}</p>
           )}
         </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-3">
+          <div className="space-y-2">
+            <Label htmlFor="dueDate">Due Date *</Label>
+            <Input
+              id="dueDate"
+              type="date"
+              value={formData.dueDate}
+              min={new Date().toISOString().split('T')[0]} // Prevent selecting past dates
+              onChange={(e) => {
+                setFormData({...formData, dueDate: e.target.value})
+                clearValidationError('dueDate')
+              }}
+              className={validationErrors.dueDate ? 'border-red-500' : ''}
+              required
+            />
+            {validationErrors.dueDate && (
+              <p className="text-red-500 text-sm">{validationErrors.dueDate}</p>
+            )}
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="priority">Priority</Label>
-          <Select value={formData.priority} onValueChange={(value: 'low' | 'medium' | 'high') => setFormData({...formData, priority: value})}>
-            <SelectTrigger className="md:w-1/2">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="low">Low Priority</SelectItem>
-              <SelectItem value="medium">Medium Priority</SelectItem>
-              <SelectItem value="high">High Priority</SelectItem>
-            </SelectContent>
-          </Select>
+          
+
+          <div className="space-y-2">
+            <Label htmlFor="estimatedCost">Estimated Cost ($)</Label>
+            <Input
+              id="estimatedCost"
+              type="number"
+              min="0"
+              step="0.01"
+              value={formData.estimatedCost || ''}
+              onChange={(e) => {
+                setFormData({...formData, estimatedCost: Number(e.target.value)})
+                clearValidationError('estimatedCost')
+              }}
+              placeholder="0.00"
+              className={validationErrors.estimatedCost ? 'border-red-500' : ''}
+            />
+            {validationErrors.estimatedCost && (
+              <p className="text-red-500 text-sm">{validationErrors.estimatedCost}</p>
+            )}
+          </div>
         </div>
+          </div> 
 
         {/* Enhanced Location Section */}
-        <div className="space-y-4">
+        <div className="space-y-4 bg-white shadow-lg p-3">
           <div className="flex items-center gap-2 mb-4">
-            <MapPin className="h-5 w-5 text-[#00A1FF]" />
-            <h3 className="font-medium text-[#2b2b2b]">Location Information</h3>
+            <MapPin className="h-5 w-5 text-[#00A1FF]" /> 
+            <h3 className="font-bold text-[#2b2b2b]  text-lg">Location Information</h3>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -739,10 +704,10 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
         </div>
 
         {/* Bill To Section */}
-        <div className="space-y-4">
+        <div className="space-y-4 bg-white shadow-lg p-3">
           <div className="flex items-center gap-2 mb-4">
             <Building className="h-5 w-5 text-[#00A1FF]" />
-            <h3 className="font-medium text-[#2b2b2b]">Bill To Information</h3>
+            <h3 className="font-bold text-[#2b2b2b]  text-lg">Bill To Information</h3>
           </div>
 
           <div className="flex items-center space-x-2 mb-4">
@@ -823,143 +788,9 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     </Card>
   )
 
+
+
   const renderStep3 = () => (
-    <Card className="bg-white shadow-md border-0">
-      <CardHeader>
-        <CardTitle>Resources & Scheduling</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="space-y-2">
-            <Label htmlFor="dueDate">Due Date *</Label>
-            <Input
-              id="dueDate"
-              type="date"
-              value={formData.dueDate}
-              min={new Date().toISOString().split('T')[0]} // Prevent selecting past dates
-              onChange={(e) => {
-                setFormData({...formData, dueDate: e.target.value})
-                clearValidationError('dueDate')
-              }}
-              className={validationErrors.dueDate ? 'border-red-500' : ''}
-              required
-            />
-            {validationErrors.dueDate && (
-              <p className="text-red-500 text-sm">{validationErrors.dueDate}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="estimatedHours">Estimated Hours</Label>
-            <Input
-              id="estimatedHours"
-              type="number"
-              min="0"
-              value={formData.estimatedHours || ''}
-              onChange={(e) => {
-                setFormData({...formData, estimatedHours: Number(e.target.value)})
-                clearValidationError('estimatedHours')
-              }}
-              placeholder="0"
-              className={validationErrors.estimatedHours ? 'border-red-500' : ''}
-            />
-            {validationErrors.estimatedHours && (
-              <p className="text-red-500 text-sm">{validationErrors.estimatedHours}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="estimatedCost">Estimated Cost ($)</Label>
-            <Input
-              id="estimatedCost"
-              type="number"
-              min="0"
-              step="0.01"
-              value={formData.estimatedCost || ''}
-              onChange={(e) => {
-                setFormData({...formData, estimatedCost: Number(e.target.value)})
-                clearValidationError('estimatedCost')
-              }}
-              placeholder="0.00"
-              className={validationErrors.estimatedCost ? 'border-red-500' : ''}
-            />
-            {validationErrors.estimatedCost && (
-              <p className="text-red-500 text-sm">{validationErrors.estimatedCost}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Contractor selection for service-based jobs (optional) */}
-        {formData.type === 'service-based' && (
-          <div className="space-y-2">
-            <Label htmlFor="serviceContractor">Contractor (Optional)</Label>
-            <AutoScrollSelect
-              value={formData.contractor || ''}
-              onValueChange={(value, item) => {
-                const contractorName = item?.name || item?.contractor_name || item?.company_name || ''
-                setFormData({...formData, contractor: value, contractorName: contractorName})
-                setSelectedContractorName(contractorName)
-              }}
-              placeholder="Select contractor (optional)"
-              fetchData={apiClient.getContractors}
-              displayField="name"
-              valueField="id"
-            />
-          </div>
-        )}
-
-        {/* Assigned Lead Labor Section */}
-        <div>
-          <Label className="flex items-center gap-2">
-            <UserCheck className="h-4 w-4 text-[#00A1FF]" />
-            Assigned Lead Labor
-          </Label>
-          <p className="text-sm text-gray-600 mb-3">Select lead labor to assign to this job</p>
-          <AutoScrollMultiSelect
-            selectedValues={formData.assignedLeadLabor}
-            onSelectionChange={(selectedIds, selectedItems) => {
-              handleLeadLaborChange(selectedIds, selectedItems)
-              clearValidationError('assignedLabor')
-              clearValidationError('assignedLeadLabor')
-            }}
-            placeholder="Select lead labor"
-            fetchData={apiClient.getLeadLabor}
-            displayField="name"
-            valueField="id"
-          />
-          {validationErrors.assignedLeadLabor && (
-            <p className="text-red-500 text-sm mt-2">{validationErrors.assignedLeadLabor}</p>
-          )}
-        </div>
-
-        {/* Assigned Labor Section */}
-        <div>
-          <Label className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-[#00A1FF]" />
-            Assigned Labor
-          </Label>
-          <p className="text-sm text-gray-600 mb-3">Select labor to assign to this job</p>
-          <AutoScrollMultiSelect
-            selectedValues={formData.assignedLabor}
-            onSelectionChange={(selectedIds, selectedItems) => {
-              handleLaborChange(selectedIds, selectedItems)
-              clearValidationError('assignedLabor')
-            }}
-            placeholder="Select labor"
-            fetchData={apiClient.getLabor}
-            displayField="name"
-            valueField="id"
-          />
-          {validationErrors.assignedLabor && (
-            <p className="text-red-500 text-sm mt-2">{validationErrors.assignedLabor}</p>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  )
-
-
-  const renderStep4 = () => (
     <Card className="bg-white shadow-md border-0">
       <CardHeader>
         <CardTitle>Review Job Details</CardTitle>
@@ -995,17 +826,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                       {formData.contractorName || selectedContractorName || `Contractor ID: ${formData.contractor}`}
                     </span>
                   </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Priority:</span>
-                  <Badge className={
-                    formData.priority === 'high' ? 'bg-red-50 text-red-600 border-red-200' :
-                    formData.priority === 'medium' ? 'bg-yellow-50 text-yellow-600 border-yellow-200' :
-                    'bg-green-50 text-green-600 border-green-200'
-                  }>
-                    {formData.priority.charAt(0).toUpperCase() + formData.priority.slice(1)} Priority
-                  </Badge>
-                </div>
+                )} 
               </div>
             </div>
 
@@ -1152,7 +973,6 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
         {currentStep === 1 && renderStep1()}
         {currentStep === 2 && renderStep2()}
         {currentStep === 3 && renderStep3()}
-        {currentStep === 4 && renderStep4()}
       </div>
 
       {/* Navigation */}
@@ -1167,7 +987,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
           Previous
         </Button>
 
-        {currentStep < 4 ? (
+        {currentStep < 3 ? (
           <Button
             onClick={handleNext}
             className="bg-primary text-white hover:bg-[#0090e6] gap-2"

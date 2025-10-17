@@ -1260,8 +1260,19 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       lineItems: prev.lineItems.map(item => {
         if (item.id === itemId) {
           const updated = { ...item, [field]: value }
-          if (field === 'qty' || field === 'estimatedPrice') {
-            updated.total = (updated.qty || 0) * (updated.estimatedPrice || 0)
+          
+          // Update total calculation based on the logic:
+          // If both rate and estimatedPrice are provided, use estimatedPrice
+          // If only rate is provided, use rate
+          if (field === 'qty' || field === 'rate' || field === 'estimatedPrice') {
+            const qty = updated.qty || 0
+            const rate = updated.rate || 0
+            const estimatedPrice = updated.estimatedPrice || 0
+            
+            // If estimatedPrice is provided and greater than 0, use it
+            // Otherwise, use rate
+            const priceToUse = estimatedPrice > 0 ? estimatedPrice : rate
+            updated.total = qty * priceToUse
           }
           return updated
         }
@@ -1539,58 +1550,63 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       const invoiceHtml = `
         <div style="font-family: Arial, sans-serif; page-break-inside: avoid;">
           <!-- Header -->
-          <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 32px;">
+          <div style="display: flex; justify-content: space-between;   ">
             <div>
               <div style="width: 200px; height: 60px; background: url('/assets/logos/logo-jdp.png') no-repeat center center; background-size: contain;">
               </div> 
-              <!-- Invoice Number Display -->
-              ${editingInvoiceId ? `
-                <div style="margin-top: 12px;">
-                  <div style="font-size: 14px; font-weight: 600; color: #374151;">
-                    ${invoice.invoice_type || 'Invoice'} #: ${invoice.invoice_number}
-                  </div>
-                </div>
-              ` : ''}
+              <div style="margin-top: 8px; font-size: 14px; color: #6b7280;">952-449-1088</div>
+              
             </div>
-            <div style="text-align: right;">
-              <div style="background: #1f2937; color: white; padding: 16px; text-align: center; margin-bottom: 8px;">
-                <div style="font-size: 18px; font-weight: bold;">${invoice.invoice_type?.toUpperCase() || 'INVOICE'}</div>
-                <div style="font-size: 14px;">${new Date(invoice.created_at).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</div>
+            <div style="display: flex;  ">
+              <div style="background: #1f2937; color: white; padding: 16px; text-align: center; border: 2px solid #1f2937; width:150px;">
+                <div style="font-size: 16px; font-weight: bold;">ESTIMATE</div>
               </div>
-              <div style="background: #1f2937; color: white; padding: 16px; text-align: center;">
-                <div style="font-size: 18px; font-weight: bold;">${invoice.invoice_type?.toUpperCase() || 'INVOICE'} #</div>
-                <div style="font-size: 14px;">${invoice.invoice_number}</div>
+              <div style="background: white; color: #374151; padding: 16px; text-align: center; border: 2px solid #e5e7eb; width:150px;">
+                <div style="font-size: 16px; font-weight: bold;">${new Date(inlineInvoiceData.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</div>
+              </div>
+            </div>
+          </div>
+          <div style="display: flex; justify-content: flex-end; margin-bottom: 24px;">
+            <div style="display: flex;">
+              <div style="background: #1f2937; color: white; padding: 16px; text-align: center; border: 2px solid #1f2937; width:150px;">
+                <div style="font-size: 16px; font-weight: bold;">ESTIMATE #</div>
+              </div>
+              <div style="background: white; color: #374151; padding: 16px; text-align: center; border: 2px solid #e5e7eb; width:150px;">
+                <div style="font-size: 16px; font-weight: bold;">${invoice.invoice_number || 'INV-2025-029'}</div>
               </div>
             </div>
           </div>
  ${(invoice.bill_to_address || invoice.billing_address) ? ` 
-   <div style="background: #1f2937; color: white;  height: 36px;  margin-bottom: 8px;">
+   <div style="background: #1f2937; color: white; height: 36px; display: flex; align-items: center; margin-bottom: 8px;">
             <div style="font-size: 14px; font-weight: bold; margin-left: 16px;">Bill To</div>
           </div>
-  <div style="color: #6b7280; font-size: 14px; margin-top: 8px; font-weight: 500;">${invoice.bill_to_address || invoice.billing_address}
+  <div style="background: white; border: 2px solid #e5e7eb; padding: 12px; color: #374151; font-size: 14px; margin-bottom: 16px;">${invoice.bill_to_address || invoice.billing_address}
   </div>` : ''}
           <!-- To Section -->
-          <div style="background: #1f2937; color: white;  height: 36px;  margin-bottom: 8px; margin-top: 15px;">
+          <div style="background: #1f2937; color: white; height: 36px; display: flex; align-items: center; margin-bottom: 8px; ${(invoice.bill_to_address || invoice.billing_address) ? '' : 'margin-top: 15px;'}">
             <div style="font-size: 14px; font-weight: bold; margin-left: 16px;">To</div>
           </div>
-          <div style="margin-bottom: 24px;">
-            <div style="font-weight: 600; font-size: 16px;">${job.type === 'contract-based' 
+          <div style="background: white; border: 2px solid #e5e7eb; padding: 12px; margin-bottom: 24px;">
+            <div style="font-weight: 600; font-size: 16px; color: #374151;">${job.type === 'contract-based' 
               ? (contractorData?.name || contractorData?.contractor_name || invoice.customer_name || 'Contractor')
               : (invoice.customer_name || invoice.customer?.name || job.customerName || 'Customer')
             }</div>
             <div style="color: #6b7280; font-size: 14px; margin-top: 4px;">${inlineInvoiceData.customerAddress || invoice.customer_address || invoice.customer?.address || job.location || 'Address'}</div>
-           
           </div>
 
           <!-- Project Details -->
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px;">
             <div>
-              <div style="font-size: 14px; font-weight: 600; margin-bottom: 4px;">P.O. No.</div>
-              <div style="color: #6b7280; font-size: 14px;">${invoice.po_number || 'N/A'}</div>
+              <div style="background: #1f2937; color: white; height: 36px; display: flex; align-items: center; margin-bottom: 8px;">
+                <div style="font-size: 14px; font-weight: bold; margin-left: 16px;">P.O. No.</div>
+              </div>
+              <div style="background: white; border: 2px solid #e5e7eb; padding: 12px; color: #374151; font-size: 14px;">${invoice.po_number || 'DFRG-678'}</div>
             </div>
             <div>
-              <div style="font-size: 14px; font-weight: 600; margin-bottom: 4px;">Project</div>
-              <div style="color: #6b7280; font-size: 14px;">${invoice.estimate_title || invoice.job_title || job.title || 'Project'}</div>
+              <div style="background: #1f2937; color: white; height: 36px; display: flex; align-items: center; margin-bottom: 8px;">
+                <div style="font-size: 14px; font-weight: bold; margin-left: 16px;">Project</div>
+              </div>
+              <div style="background: white; border: 2px solid #e5e7eb; padding: 12px; color: #374151; font-size: 14px;">${invoice.estimate_title || invoice.job_title || job.title || 'tech-gb-job'}</div>
             </div>
           </div>
 
@@ -1649,7 +1665,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           <!-- Total and Contact -->
           <div style="text-align: center; margin-bottom: 32px;">
             <div style="font-size: 28px; font-weight: bold; margin-bottom: 20px; color: #1f2937;">Total $${(invoice.total_amount || 0).toFixed(2)}</div>
-            <div style="font-size: 14px; color: #6b7280; font-weight: 500;">
+            <div style="font-size: 14px; color: blue; font-weight: 500;">
               EMAIL: jen@jdpelectric.us 952-449-1088
             </div>
           </div>
@@ -1879,10 +1895,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       errors.project = 'Project field is required'
     }
 
+    // Filter out empty line items and check if we have at least one valid item
+    const validLineItems = inlineInvoiceData.lineItems.filter(item => 
+      item.item && item.item.trim() !== '' && item.rate > 0
+    )
 
-
-    if (inlineInvoiceData.lineItems.length === 0 || !inlineInvoiceData.lineItems[0].item) {
-      errors.lineItems = 'Please add at least one product item'
+    if (validLineItems.length === 0) {
+      errors.lineItems = 'Please add at least one product item with name and rate'
     }
 
     if (Object.keys(errors).length > 0) {
@@ -1896,7 +1915,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     try {
       const subtotal = calculateInvoiceSubtotal()
 
-      const customProducts = inlineInvoiceData.lineItems.map(item => {
+      // Only map valid line items to custom products
+      const customProducts = validLineItems.map(item => {
         const productPayload: any = {
           product_name: item.item,
           description: item.description || '',
@@ -2008,8 +2028,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       errors.project = 'Project field is required'
     }
 
-    if (inlineInvoiceData.lineItems.length === 0 || !inlineInvoiceData.lineItems[0].item) {
-      errors.lineItems = 'Please add at least one product item'
+    // Filter out empty line items and check if we have at least one valid item
+    const validLineItems = inlineInvoiceData.lineItems.filter(item => 
+      item.item && item.item.trim() !== '' && item.rate > 0
+    )
+
+    if (validLineItems.length === 0) {
+      errors.lineItems = 'Please add at least one product item with name and rate'
     }
 
     if (Object.keys(errors).length > 0) {
@@ -2024,7 +2049,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
       const subtotal = calculateInvoiceSubtotal()
 
-      const customProducts = inlineInvoiceData.lineItems.map(item => {
+      // Only map valid line items to custom products
+      const customProducts = validLineItems.map(item => {
         const productPayload: any = {
           product_name: item.item,
           description: item.description || '',
@@ -4482,28 +4508,28 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                     className='w-[140px] '
 
                   />
-                  {/* <p className="text-sm text-gray-600 mt-2">952-449-1088</p> */}
+                  <p className="text-sm text-gray-600 mt-2">952-449-1088</p>
                   {/* Invoice Number Display */}
 
                 </div>
                 <div className="text-right">
-                  <div className="bg-gray-800 text-white px-4 py-2 text-center mb-2">
-                    <div className="text-lg font-bold">{(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType)?.toUpperCase() || 'ESTIMATE'}</div>
-                    <div className="text-sm">{new Date(inlineInvoiceData.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</div>
+                  <div className="text-center flex justify-center items-center">
+                    <div className="text-lg font-bold bg-gray-800 text-white p-[14px] w-[200px]">{(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType)?.toUpperCase() || 'ESTIMATE'}</div>
+                    <div className="text-sm border border-gray-800 p-[17px] w-[200px]">{new Date(inlineInvoiceData.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</div>
                   </div>
-                  <div className="bg-gray-800 text-white px-4 py-2 text-center">
-                    <div className="text-lg font-bold">{(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType)?.toUpperCase() || 'ESTIMATE'} #</div>
-                    <div className="text-sm">{inlineInvoiceData.estimateNumber}</div>
+                  <div className="text-center mb-2 flex justify-center items-center">
+                    <div className="text-lg font-bold bg-gray-800 text-white p-[14px] w-[200px]">{(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType)?.toUpperCase() || 'ESTIMATE'} #</div>
+                    <div className="text-sm border border-gray-800 p-[17px] w-[200px]">{inlineInvoiceData.estimateNumber}</div>
                   </div>
                 </div>
               </div>
               {inlineInvoiceData.billToAddressEnabled && (
                 <>
                   <div className="bg-gray-800 text-white p-3 mb-4">
-                    <div className="text-sm font-bold">Bill TO</div>
+                    <div className="text-sm font-bold ">Bill TO</div>
                   </div>
                   {inlineInvoiceData.billToAddress && (
-                    <div className="text-gray-600 mt-2 font-medium"> {inlineInvoiceData.billToAddress}</div>
+                    <div className="text-gray-600 mt-2 font-medium border border-gray-800 p-3"> {inlineInvoiceData.billToAddress}</div>
                   )}
                 </>
               )}
@@ -4511,7 +4537,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               <div className="bg-gray-800 text-white p-3 mb-4 mt-4">
                 <div className="text-sm font-bold">TO</div>
               </div>
-              <div className="mb-6">
+              <div className="mb-6 border border-gray-800 p-3">
                 <div className="font-semibold">{inlineInvoiceData.customerName}</div>
                 <div className="text-gray-600">{inlineInvoiceData.customerAddress}</div>
 
@@ -4520,12 +4546,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               {/* Project Details */}
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div>
-                  <div className="text-sm font-semibold">P.O. No.</div>
-                  <div className="text-gray-600">{inlineInvoiceData.poNumber}</div>
+                  <div className="text-sm font-semibold border border-gray-800 p-3">P.O. No.</div>
+                  <div className="text-gray-600 border border-gray-800 p-3">{inlineInvoiceData.poNumber}</div>
                 </div>
                 <div>
-                  <div className="text-sm font-semibold">Project</div>
-                  <div className="text-gray-600">{inlineInvoiceData.project}</div>
+                  <div className="bg-gray-800 text-white text-sm font-semibold border border-gray-800 p-3">Project</div>
+                  <div className="text-gray-600 border border-gray-800 p-3">{inlineInvoiceData.project}</div>
                 </div>
               </div>
 
@@ -4581,7 +4607,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               {/* Total and Contact */}
               <div className="text-center mb-6">
                 <div className="text-2xl font-bold mb-4">Total ${calculateInvoiceSubtotal().toFixed(2)}</div>
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-blue-600">
                   EMAIL: jen@jdpelectric.us 952-449-1088
                 </div>
               </div>
