@@ -334,6 +334,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     billToAddressEnabled: true,
     poNumber: '',
     project: job.title || '',
+    rep: '',
+    dueDate: '',
+    paymentCredits: '',
+    balanceDue: '',
     lineItems: [{
       id: Math.random().toString(36).substring(2, 9),
       productId: null,
@@ -1596,6 +1600,24 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
             </div>
           </div>
 
+          <!-- Rep and Due Date Table -->
+          <div style="margin-bottom: 24px;">
+            <table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db;">
+              <thead>
+                <tr style="background: #f3f4f6;">
+                  <th style="border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; font-size: 14px; font-weight: 600; color: #374151;">Rep</th>
+                  <th style="border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; font-size: 14px; font-weight: 600; color: #374151;">Due Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="border: 1px solid #d1d5db; padding: 8px 12px; font-size: 14px; color: #374151;">${inlineInvoiceData.rep || 'JDP'}</td>
+                  <td style="border: 1px solid #d1d5db; padding: 8px 12px; font-size: 14px; color: #374151;">${inlineInvoiceData.dueDate ? new Date(inlineInvoiceData.dueDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : '10/17/2025'}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
           <!-- Line Items Table -->
           <div style="margin-bottom: 32px; page-break-inside: avoid;">
             <table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; margin-bottom: 16px; page-break-inside: avoid;">
@@ -1625,6 +1647,20 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
             <div style="display: flex; justify-content: end; margin-top: 20px;">
               <div style="text-align: right;">
                 <div style="font-weight: bold; font-size: 20px; color: #1f2937;">$${(invoice.total_amount || 0).toFixed(2)}</div>
+              </div>
+            </div>
+            
+            <!-- Payment/Credits and Balance Due -->
+            <div style="display: flex; justify-content: end; margin-top: 16px;">
+              <div style="text-align: right; min-width: 200px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                  <span style="font-size: 14px; color: #374151;">Payments / Credits:</span>
+                  <span style="font-size: 14px; color: #374151;">$${parseFloat(inlineInvoiceData.paymentCredits || '0').toFixed(2)}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; background: #f3f4f6; padding: 8px 12px; border-radius: 4px;">
+                  <span style="font-weight: bold; font-size: 14px; color: #374151;">Balance Due:</span>
+                  <span style="font-weight: bold; font-size: 14px; color: #374151;">$${parseFloat(inlineInvoiceData.balanceDue || (invoice.total_amount || 0).toString()).toFixed(2)}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -1932,6 +1968,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           : (customerData?.email || job.customer?.email || job.email || 'customer@example.com'),
         estimate_date: inlineInvoiceData.date,
         po_number: inlineInvoiceData.poNumber || '',
+        rep: inlineInvoiceData.rep || '',
+        due_date: inlineInvoiceData.dueDate || '',
+        payment_credits: inlineInvoiceData.paymentCredits || '',
+        balance_due: inlineInvoiceData.balanceDue || '',
         ...(inlineInvoiceData.billToAddressEnabled && { bill_to_address: inlineInvoiceData.billToAddress || '' }),
         status: 'draft',
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType),
@@ -1969,6 +2009,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         billToAddressEnabled: true,
         poNumber: '',
         project: job.title || '',
+        rep: '',
+                      dueDate: '',
+                      paymentCredits: '',
+                      balanceDue: '',
         lineItems: [{
           id: Math.random().toString(36).substring(2, 9),
           productId: null,
@@ -2066,6 +2110,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           : (customerData?.email || job.customer?.email || job.email || 'customer@example.com'),
         estimate_date: inlineInvoiceData.date,
         po_number: inlineInvoiceData.poNumber || '',
+        rep: inlineInvoiceData.rep || '',
+        due_date: inlineInvoiceData.dueDate || '',
+        payment_credits: inlineInvoiceData.paymentCredits || '',
+        balance_due: inlineInvoiceData.balanceDue || '',
         ...(inlineInvoiceData.billToAddressEnabled && { bill_to_address: inlineInvoiceData.billToAddress || '' }),
         status: 'draft',
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType),
@@ -2231,6 +2279,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           : (customerData?.email || job.customer?.email || job.email || 'customer@example.com'),
         estimate_date: inlineInvoiceData.date,
         po_number: inlineInvoiceData.poNumber || '',
+        rep: inlineInvoiceData.rep || '',
+        due_date: inlineInvoiceData.dueDate || '',
+        payment_credits: inlineInvoiceData.paymentCredits || '',
+        balance_due: inlineInvoiceData.balanceDue || '',
         ...(inlineInvoiceData.billToAddressEnabled && { bill_to_address: inlineInvoiceData.billToAddress || '' }),
         status: 'sent',
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType),
@@ -2241,7 +2293,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       // Check if we're editing an existing invoice
       if (editingInvoiceId) {
         await apiClient.updateEstimate(Number(editingInvoiceId), backendPayload as any)
-        toast.success('Invoice updated and sent successfully!')
+        // toast.success('Invoice updated and sent successfully!')
       } else {
         // Don't create new estimate when sending - it should already exist from preview step
         // toast.success('Invoice sent successfully!')
@@ -2269,6 +2321,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         billToAddressEnabled: true,
         poNumber: '',
         project: job.title || '',
+        rep: '',
+                      dueDate: '',
+                      paymentCredits: '',
+                      balanceDue: '',
         lineItems: [{
           id: Math.random().toString(36).substring(2, 9),
           productId: null,
@@ -2411,6 +2467,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         customerName: estimateData.customer?.customer_name || job.customer?.customer_name || job.customerName || '',
         customerAddress: estimateData.customer?.address || job.customer?.address || job.address || '',
         billToAddress: estimateData.bill_to_address || job.bill_to_address || '',
+        rep: estimateData.rep || '',
+        dueDate: estimateData.due_date || '',
+        paymentCredits: estimateData.payment_credits || '',
+        balanceDue: estimateData.balance_due || '',
         billToAddressEnabled: true,
         poNumber: estimateData.po_number || '',
         project: estimateData.estimate_title || job.job_title || job.title || '',
@@ -3008,6 +3068,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                       billToAddressEnabled: true,
                       poNumber: '',
                       project: job.title || '',
+                      rep: '',
+                      dueDate: '',
+                      paymentCredits: '',
+                      balanceDue: '',
                       lineItems: [{
                         id: Math.random().toString(36).substring(2, 9),
                         productId: null,
@@ -3232,11 +3296,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
                     {/* PO and Project */}
                     <div className="mb-6">
-                      <div className="grid grid-cols-2 gap-0">
+                      <div className="grid grid-cols-3 gap-0">
                         <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">P.O. No.</Label>
                         <Label className="bg-gray-600 text-white px-3 py-2 text-center text-sm font-semibold">Project</Label>
+                        <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">Rep</Label>
                       </div>
-                      <div className="grid grid-cols-2 gap-0">
+                      <div className="grid grid-cols-3 gap-0">
                         <div>
                           <Input
                             value={inlineInvoiceData.poNumber}
@@ -3249,6 +3314,42 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                           value={inlineInvoiceData.project}
                           onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, project: e.target.value }))}
                           className="px-3 py-2 text-sm rounded-none border-t-0"
+                        />
+                        <Input
+                          value={inlineInvoiceData.rep}
+                          onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, rep: e.target.value }))}
+                          className="px-3 py-2 text-sm rounded-none border-t-0"
+                          placeholder="Rep"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mb-6">
+                      <div className="grid grid-cols-3 gap-0">
+                        <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">Due Date</Label>
+                        <Label className="bg-gray-600 text-white px-3 py-2 text-center text-sm font-semibold">Payment / Credits</Label>
+                        <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">Balance Due</Label>
+                      </div>
+                      <div className="grid grid-cols-3 gap-0">
+                        <div>
+                          <Input
+                            type="date"
+                            value={inlineInvoiceData.dueDate}
+                            onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, dueDate: e.target.value }))}
+                            className="px-3 py-2 text-sm rounded-none border-t-0"
+                          />
+                        </div>
+                        <Input
+                          value={inlineInvoiceData.paymentCredits}
+                          onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, paymentCredits: e.target.value }))}
+                          className="px-3 py-2 text-sm rounded-none border-t-0"
+                          placeholder="Payment / Credits"
+                        />
+                        <Input
+                          value={inlineInvoiceData.balanceDue}
+                          onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, balanceDue: e.target.value }))}
+                          className="px-3 py-2 text-sm rounded-none border-t-0"
+                          placeholder="Balance Due"
                         />
                       </div>
                     </div>
@@ -3615,6 +3716,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                             billToAddressEnabled: true,
                             poNumber: '',
                             project: job.title || '',
+                            rep: '',
+                            dueDate: '',
+                            paymentCredits: '',
+                            balanceDue: '',
                             lineItems: [{
                               id: Math.random().toString(36).substring(2, 9),
                               productId: null,
@@ -4644,6 +4749,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                     billToAddressEnabled: true,
                     poNumber: '',
                     project: job.title || '',
+                    rep: '',
+                      dueDate: '',
+                      paymentCredits: '',
+                      balanceDue: '',
                     lineItems: [{
                       id: Math.random().toString(36).substring(2, 9),
                       productId: null,
