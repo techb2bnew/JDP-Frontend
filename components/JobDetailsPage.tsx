@@ -226,8 +226,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       0
     );
 
-
-  console.log(job?.assignedLaborDetails, "deeeee")
+ 
 
   job.estimatedCost || 0
   const totalHours = timeLogs.reduce((sum, log) => sum + log.hoursWorked, 0)
@@ -406,11 +405,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         //       : job.status
         //   : 'unknown',
       };
+ 
 
-      console.log('Updating job with payload:', updatePayload);
-
-      const response = await apiClient.updateJob(jobId, updatePayload);
-      console.log('Job updated successfully:', response);
+      const response = await apiClient.updateJob(jobId, updatePayload); 
 
       const updatedJobs = jobs.map((j: any) =>
         j.id === jobId ? { ...j, ...editedJob } : j
@@ -425,13 +422,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     }
   };
 
-
-  console.log(invoice, "invs")
+ 
   const currentInvoice = selectedInvoiceId == null
     ? undefined
     : estimates.find(inv => Number(inv.id) === selectedInvoiceId);
 
-  console.log(currentInvoice, "current")
+ 
 
 
   const handleCancel = () => {
@@ -573,12 +569,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     }
   };
 
-  const handleEditTimeLog = async (labor: any) => {
-    console.log('Edit button clicked, labor:', labor);
+  const handleEditTimeLog = async (labor: any) => { 
     try {
       // Fetch detailed labor data from API
-      const laborDetails = await apiClient.getLaborById(labor.id);
-      console.log('Fetched labor details for edit:', laborDetails);
+      const laborDetails = await apiClient.getLaborById(labor.id); 
 
       // Check if this is assigned labor or custom labor
       const isAssignedLabor = job.assignedLaborDetails && job.assignedLaborDetails.some((al: any) => al.id === labor.id);
@@ -779,8 +773,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
       const printWindow = window.open('', '_blank');
       if (!printWindow) return;
-
-      console.log(currentInvoice, "number")
+ 
 
       printWindow.document.write(`
       <html>
@@ -1038,14 +1031,11 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   };
 
   const refreshJobData = async () => {
-    try {
-      console.log('Refreshing job data...');
-      const updatedJobData = await apiClient.getJobById(jobId);
-      console.log('Updated job data:', updatedJobData);
+    try { 
+      const updatedJobData = await apiClient.getJobById(jobId); 
       const updatedJobs = jobs.map((j: any) => j.id === jobId ? updatedJobData : j);
       setJobs(updatedJobs);
-
-      console.log('Job data refreshed successfully');
+ 
     } catch (error) {
       console.error('Error refreshing job data:', error);
       toast.error('Failed to refresh job data');
@@ -1102,8 +1092,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
 
 
-
-  console.log(suppliers, "supp")
+ 
   useEffect(() => {
     const fetchSuppliers = async () => {
       try {
@@ -1146,8 +1135,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     const fetchDashboard = async () => {
       try {
         setIsLoadingDashboard(true);
-        const res = await apiClient.getJobDashboard(jobId);
-        console.log(res, 'dashres')
+        const res = await apiClient.getJobDashboard(jobId); 
         setDashboardMetrics(res.data.dashboardMetrics);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -1528,9 +1516,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
   const handlePrintInvoice = async (invoice: any) => {
     try {
-      // Debug: Log invoice data to see structure
-      console.log('Invoice data for printing:', invoice)
-      console.log('Products data:', invoice.products)
+      // Debug: Log invoice data to see structure 
 
       // Create a temporary invoice preview element with invoice data
       const tempElement = document.createElement('div')
@@ -1707,9 +1693,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       `
 
       tempElement.innerHTML = invoiceHtml
-      document.body.appendChild(tempElement)
-      console.log('Temp element content length:', tempElement.innerHTML.length)
-      console.log('Temp element dimensions:', tempElement.offsetWidth, 'x', tempElement.offsetHeight)
+      document.body.appendChild(tempElement) 
 
       // Generate PDF using the same logic as preview
       const canvas = await html2canvas(tempElement, {
@@ -1726,9 +1710,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         windowHeight: tempElement.scrollHeight
       })
 
-      const imageData = canvas.toDataURL('image/png')
-      console.log('Canvas dimensions:', canvas.width, 'x', canvas.height)
-      console.log('Image data length:', imageData.length)
+      const imageData = canvas.toDataURL('image/png') 
 
       // Create PDF using jsPDF - simple approach with footer space
       const pdf = new jsPDF('p', 'mm', 'a4')
@@ -1861,12 +1843,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     
     // Fetch data based on job type
     if (job.type === 'contract-based' && job.contractor) {
-      // For contract-based jobs, fetch contractor data
-      console.log('Fetching contractor data for contractor ID:', job.contractor)
+      // For contract-based jobs, fetch contractor data 
       fetchContractorData(job.contractor)
     } else if (job.type === 'service-based' && job.customer) {
-      // For service-based jobs, fetch customer data
-      console.log('Fetching customer data for customer ID:', job.customer)
+      // For service-based jobs, fetch customer data 
       fetchCustomerData(job.customer)
     } else {
       console.log('No customer/contractor ID found in job data')
@@ -1943,13 +1923,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         estimate_title: inlineInvoiceData.project || job.title,
         ...(job.type === 'contract-based' 
           ? { contractor_id: Number(job.contractor) || 0 }
-          : { customer_id: Number(job.customer) || 0 }
+          : { customer_id: Number(job.customer?.id || job.customer) || 0 }
         ),
         priority: 'medium' as 'low' | 'medium' | 'high',
         service_type: job.type === 'contract-based' ? 'contract_based' : 'service_based',
         email_address: job.type === 'contract-based' 
           ? (contractorData?.email || job.email || 'contractor@example.com')
-          : (customerData?.email || job.email || 'customer@example.com'),
+          : (customerData?.email || job.customer?.email || job.email || 'customer@example.com'),
         estimate_date: inlineInvoiceData.date,
         po_number: inlineInvoiceData.poNumber || '',
         ...(inlineInvoiceData.billToAddressEnabled && { bill_to_address: inlineInvoiceData.billToAddress || '' }),
@@ -2077,13 +2057,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         estimate_title: inlineInvoiceData.project || job.title,
         ...(job.type === 'contract-based' 
           ? { contractor_id: Number(job.contractor) || 0 }
-          : { customer_id: Number(job.customer) || 0 }
+          : { customer_id: Number(job.customer?.id || job.customer) || 0 }
         ),
         priority: 'medium' as 'low' | 'medium' | 'high',
         service_type: job.type === 'contract-based' ? 'contract_based' : 'service_based',
         email_address: job.type === 'contract-based' 
           ? (contractorData?.email || job.email || 'contractor@example.com')
-          : (customerData?.email || job.email || 'customer@example.com'),
+          : (customerData?.email || job.customer?.email || job.email || 'customer@example.com'),
         estimate_date: inlineInvoiceData.date,
         po_number: inlineInvoiceData.poNumber || '',
         ...(inlineInvoiceData.billToAddressEnabled && { bill_to_address: inlineInvoiceData.billToAddress || '' }),
@@ -2150,7 +2130,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
             }
           : {
               customerName: inlineInvoiceData.customerName || 'Customer',
-              customerEmail: customerData?.email || job.customerEmail || 'customer@example.com',
+              customerEmail: customerData?.email || job.customer?.email || job.customerEmail || 'customer@example.com',
               customerAddress: inlineInvoiceData.customerAddress || ''
             }
         ),
@@ -2242,13 +2222,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         estimate_title: inlineInvoiceData.project || job.title,
         ...(job.type === 'contract-based' 
           ? { contractor_id: Number(job.contractor) || 0 }
-          : { customer_id: Number(job.customer) || 0 }
+          : { customer_id: Number(job.customer?.id || job.customer) || 0 }
         ),
         priority: 'medium' as 'low' | 'medium' | 'high',
         service_type: job.type === 'contract-based' ? 'contract_based' : 'service_based',
         email_address: job.type === 'contract-based' 
           ? (contractorData?.email || job.email || 'contractor@example.com')
-          : (customerData?.email || job.email || 'customer@example.com'),
+          : (customerData?.email || job.customer?.email || job.email || 'customer@example.com'),
         estimate_date: inlineInvoiceData.date,
         po_number: inlineInvoiceData.poNumber || '',
         ...(inlineInvoiceData.billToAddressEnabled && { bill_to_address: inlineInvoiceData.billToAddress || '' }),
@@ -2264,7 +2244,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         toast.success('Invoice updated and sent successfully!')
       } else {
         // Don't create new estimate when sending - it should already exist from preview step
-        toast.success('Invoice sent successfully!')
+        // toast.success('Invoice sent successfully!')
       }
 
       // Refresh estimates list
@@ -2393,8 +2373,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       // Fetch full estimate details from API
       const response = await apiClient.getEstimateById(invoice.id)
       const estimateData = response?.data || response
-
-      console.log('Fetched estimate data:', estimateData)
+ 
 
       // Map products to line items
       const lineItems = estimateData.products && estimateData.products.length > 0
@@ -2823,9 +2802,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                           ...prev,
                           assignedLeadLabor: validSelectedItems,
                         }));
-
-                        console.log('Selected Lead Labor IDs:', selectedIds);
-                        console.log('Selected Lead Labor Items:', validSelectedItems);
+ 
                       }}
                       placeholder="Select lead labor"
                       fetchData={apiClient.getLeadLabor}
@@ -2865,9 +2842,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                           ...prev,
                           assignedLabor: validSelectedItems,
                         }));
-
-                        console.log('Selected Lead Labor IDs:', selectedIds);
-                        console.log('Selected Lead Labor Items:', validSelectedItems);
+ 
                       }}
                       placeholder="Select lead labor"
                       fetchData={apiClient.getLabor}
@@ -2877,8 +2852,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
                   ) : (
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {(editedJob.assignedLabor || []).map((labor: any, index: number) => {
-                        console.log("Rendering labor:", labor);
+                      {(editedJob.assignedLabor || []).map((labor: any, index: number) => { 
 
                         return (
                           <span

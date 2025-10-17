@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { JobDetailsPage } from './JobDetailsPage'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
@@ -53,20 +55,68 @@ import {
   Plus
 } from 'lucide-react'
 
+interface Job {
+  id: number
+  job_title: string
+  job_type: string
+  customer_id: number | null
+  contractor_id: number
+  description: string
+  priority: string
+  address: string
+  city_zip: string
+  phone: string | null
+  email: string | null
+  bill_to_address: string | null
+  bill_to_city_zip: string | null
+  bill_to_phone: string | null
+  bill_to_email: string | null
+  same_as_address: boolean
+  due_date: string
+  estimated_hours: number
+  estimated_cost: number
+  assigned_lead_labor_ids: string | null
+  assigned_labor_ids: string | null
+  assigned_material_ids: string | null
+  status: string
+  created_by: number
+  system_ip: string | null
+  created_at: string
+  updated_at: string
+  created_from: string
+  total_work_time: string
+  work_activity: number
+  start_timer: string | null
+  end_timer: string | null
+  pause_timer: any[]
+  labor_timesheets: any[]
+  customer: any
+  isMainJob: boolean
+  isSubJob: boolean
+  parentJobId: number | null
+  parentAddress: string | null
+  subJobs: Job[]
+  progress: number
+  totalSubJobs: number
+  totalJobs: number
+  completedSubJobs: number
+  completedJobs: number
+  totalEstimatedCost: number
+  totalEstimatedHours: number
+}
+
 interface Contractor {
-  id: string
-  name: string
+  id: number
+  contractor_name: string
+  company_name: string
   email: string
   phone: string
-  address: string
-  status: 'active' | 'inactive'
-  totalJobs: number
-  completedJobs: number
-  ongoingJobs: number
-  pendingJobs: number
-  totalRevenue: number
-  rating: number
-  joinDate: string
+  status: string
+  created_at: string
+  jobs: Job[]
+  total_jobs: number
+  active_jobs: number
+  completed_jobs: number
 }
 
 interface OrderItem {
@@ -138,75 +188,11 @@ interface SubJob {
   invoices: SubJobInvoice[]
 }
 
-interface Job {
-  id: string
-  title: string
-  contractorId: string
-  status: 'complete' | 'ongoing' | 'pending'
-  customer: string
-  location: string
-  startDate: string
-  dueDate: string
-  estimatedCost: number
-  actualCost?: number
-  estimatedHours: number
-  actualHours?: number
-  progress: number
-  priority: 'high' | 'medium' | 'low'
-  invoiceStatus: 'paid' | 'partial-paid' | 'pending' | 'overdue'
-  approvalStatus: 'approved' | 'pending' | 'rejected'
-  subJobs?: SubJob[]
-}
 
-const contractorsData: Contractor[] = [
-  {
-    id: 'CONT-001',
-    name: 'John Carter',
-    email: 'john@gmail.com',
-    phone: '+1 415‑555‑0132',
-    address: '1160 N Willow Dr Near Res.',
-    status: 'active',
-    totalJobs: 15,
-    completedJobs: 12,
-    ongoingJobs: 2,
-    pendingJobs: 1,
-    totalRevenue: 45000,
-    rating: 4.8,
-    joinDate: '2024-01-15'
-  },
-  {
-    id: 'CONT-002',
-    name: 'Sarah Johnson',
-    email: 'sarah@contracting.com',
-    phone: '+1 415‑555‑0133',
-    address: '2805 Maplewood Cir E palladino',
-    status: 'active',
-    totalJobs: 8,
-    completedJobs: 7,
-    ongoingJobs: 1,
-    pendingJobs: 0,
-    totalRevenue: 32000,
-    rating: 4.6,
-    joinDate: '2024-03-20'
-  },
-  {
-    id: 'CONT-003',
-    name: 'Mike Wilson',
-    email: 'mike@electrical.com',
-    phone: '+1 415‑555‑0134',
-    address: '6149 CR 13 Batzer Res.',
-    status: 'active',
-    totalJobs: 22,
-    completedJobs: 18,
-    ongoingJobs: 3,
-    pendingJobs: 1,
-    totalRevenue: 68000,
-    rating: 4.9,
-    joinDate: '2023-11-10'
-  }
-]
+// Sample data removed - using API data instead
 
-const jobsData: Job[] = [
+// Sample jobs data removed - using API data instead
+const jobsData: any[] = [
   {
     id: 'PH209_US_JDP',
     title: '1160 N Willow Dr Near Res.',
@@ -796,8 +782,8 @@ const InvoiceTemplate = ({ subJob, job, contractor }: { subJob: SubJob, job: Job
         <div>
           <h3 className="font-semibold mb-2">Bill To:</h3>
           <div className="text-sm">
-            <p className="font-medium">{job.customer}</p>
-            <p>{job.location}</p>
+            <p className="font-medium">{job.customer?.customer_name || job.customer?.company_name || 'N/A'}</p>
+            <p>{job.address}</p>
           </div>
         </div>
         <div>
@@ -805,7 +791,7 @@ const InvoiceTemplate = ({ subJob, job, contractor }: { subJob: SubJob, job: Job
           <div className="text-sm">
             <p><span className="font-medium">Job ID:</span> {job.id}</p>
             <p><span className="font-medium">Sub-Job:</span> {subJob.title}</p>
-            <p><span className="font-medium">Contractor:</span> {contractor.name}</p>
+            <p><span className="font-medium">Contractor:</span> {contractor.contractor_name}</p>
             <p><span className="font-medium">Completion Date:</span> {subJob.completedDate ? formatDate(subJob.completedDate) : 'In Progress'}</p>
           </div>
         </div>
@@ -906,6 +892,7 @@ const InvoiceTemplate = ({ subJob, job, contractor }: { subJob: SubJob, job: Job
 }
 
 export function ContractorListingPage() {
+  const router = useRouter()
   const [selectedContractor, setSelectedContractor] = useState<string | null>(null)
   const [selectedJob, setSelectedJob] = useState<string | null>(null)
   const [selectedSubJob, setSelectedSubJob] = useState<string | null>(null)
@@ -957,12 +944,12 @@ export function ContractorListingPage() {
     try {
       setIsLoadingContractors(true)
       
-      const response = await globalApiCall(`${apiBaseUrl}/contractor/getContractors?page=${currentPage}&limit=${itemsPerPage}`, {
+      const response = await globalApiCall(`${apiBaseUrl}/contractor/getContractors?include_jobs=true&page=${currentPage}&limit=${itemsPerPage}`, {
         method: 'GET'
       })
 
       const responseData = await response.json()
-      console.log('Contractors API Response:', responseData)
+      console.log('Contractors with Jobs API Response:', responseData)
 
       if (responseData.success && responseData.data) {
         setContractors(responseData.data.contractors || [])
@@ -1670,8 +1657,8 @@ export function ContractorListingPage() {
           <div class="bill-to">
             <div class="section-title">Bill To:</div>
             <div class="section-content">
-              <div>${job.customer}</div>
-              <div>${job.location}</div>
+              <div>${job.customer?.customer_name || job.customer?.company_name || 'N/A'}</div>
+              <div>${job.address}</div>
             </div>
           </div>
           <div class="job-details">
@@ -1679,7 +1666,7 @@ export function ContractorListingPage() {
             <div class="section-content">
               <div>Job ID: ${job.id}</div>
               <div>Sub-Job: ${subJob.title}</div>
-              <div>Contractor: ${contractor.name}</div>
+              <div>Contractor: ${contractor.contractor_name}</div>
               <div>Completion: ${subJob.completedDate ? formatDate(subJob.completedDate) : 'In Progress'}</div>
             </div>
           </div>
@@ -1828,7 +1815,7 @@ export function ContractorListingPage() {
       pdf.text('Bill To:', 20, yPosition)
       yPosition += 8
       pdf.setFontSize(10)
-      pdf.text(selectedJobData.customer, 20, yPosition)
+      pdf.text(selectedJobData.customer?.customer_name || selectedJobData.customer?.company_name || 'N/A', 20, yPosition)
       yPosition += 5
       pdf.text(selectedJobData.location, 20, yPosition)
       
@@ -1977,7 +1964,7 @@ export function ContractorListingPage() {
       
       // Generate filename
       const invoiceNumber = invoiceSubJob.invoices[0]?.invoiceNumber || `INV-${invoiceSubJob.id}`
-      const filename = `${invoiceNumber}_${selectedJobData.customer.replace(/\s+/g, '_')}.pdf`
+      const filename = `${invoiceNumber}_${(selectedJobData.customer?.customer_name || selectedJobData.customer?.company_name || 'Customer').replace(/\s+/g, '_')}.pdf`
       
       // Download the PDF
       pdf.save(filename)
@@ -2084,15 +2071,16 @@ export function ContractorListingPage() {
     }
   }
 
-  const selectedContractorData = selectedContractor ? contractorsData.find(c => c.id === selectedContractor) : null
-  const selectedJobData = selectedJob ? jobsData.find(j => j.id === selectedJob) : null
-
+  const selectedContractorData = selectedContractor ? contractors.find(c => c.id.toString() === selectedContractor) : null
+  const selectedJobData = selectedJob ? selectedContractorData?.jobs.find((j: Job) => j.id.toString() === selectedJob) : null
+  console.log(selectedJobData, 'selectedJobData')
+  console.log(selectedContractorData, 'selectedContractorData')
   const SubJobDetails = ({ subJob }: { subJob: SubJob }) => {
-    const isExpanded = expandedSubJobs.has(subJob.id)
+    const isExpanded = expandedSubJobs.has(subJob.id.toString())
     
     return (
       <Card className="mt-4 border-l-4 border-l-primary bg-gradient-to-r from-primary/5 to-transparent">
-        <Collapsible open={isExpanded} onOpenChange={() => toggleSubJob(subJob.id)}>
+        <Collapsible open={isExpanded} onOpenChange={() => toggleSubJob(subJob.id.toString())}>
           <CollapsibleTrigger asChild>
             <CardHeader className="cursor-pointer hover:bg-primary/5 transition-colors">
               <div className="flex items-center justify-between">
@@ -2113,7 +2101,7 @@ export function ContractorListingPage() {
                 </div>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                   <span>{subJob.progress}% Complete</span>
-                  <span>{subJob.actualHours || 0}h / {subJob.estimatedHours}h</span>
+                  <span>0h / {subJob.estimatedHours}h</span>
                 </div>
               </div>
               <div className="flex items-center gap-4 mt-2">
@@ -2145,7 +2133,7 @@ export function ContractorListingPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {subJob.orders.length > 0 ? (
+                  {subJob.orders && subJob.orders.length > 0 ? (
                     <div className="overflow-hidden">
                       <Table>
                         <TableHeader>
@@ -2224,7 +2212,7 @@ export function ContractorListingPage() {
                   <CardContent className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Actual Hours:</span>
-                      <span className="font-medium">{subJob.actualHours || 0}h</span>
+                      <span className="font-medium">0h</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Actual Cost:</span>
@@ -2278,7 +2266,7 @@ export function ContractorListingPage() {
                     <div>
                       <span className="text-sm text-muted-foreground">Staff Assigned:</span>
                       <div className="flex flex-wrap gap-1 mt-1">
-                        {subJob.staffAssigned.map((staff, index) => (
+                        {subJob.staffAssigned && subJob.staffAssigned.map((staff, index) => (
                           <Badge key={index} variant="outline" className="text-xs">
                             {staff}
                           </Badge>
@@ -2335,7 +2323,7 @@ export function ContractorListingPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {subJob.transactions.length > 0 ? (
+                  {subJob.transactions && subJob.transactions.length > 0 ? (
                     <div className="overflow-hidden">
                       <Table>
                         <TableHeader>
@@ -2379,7 +2367,7 @@ export function ContractorListingPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {subJob.timesheets.length > 0 ? (
+                  {subJob.timesheets && subJob.timesheets.length > 0 ? (
                     <div className="overflow-hidden">
                       <Table>
                         <TableHeader>
@@ -2454,7 +2442,7 @@ export function ContractorListingPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {subJob.invoices.length > 0 ? (
+                  {subJob.invoices && subJob.invoices.length > 0 ? (
                     <div className="space-y-3">
                       {subJob.invoices.map((invoice) => (
                         <div key={invoice.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -2539,16 +2527,16 @@ export function ContractorListingPage() {
         {/* Contractor Listings */}
         <ScrollArea className="flex-1 bg-white">
           <div className="p-2">
-            {contractorsData.map((contractor) => {
-              const contractorJobs = jobsData.filter(job => job.contractorId === contractor.id)
-              const isExpanded = expandedContractors.has(contractor.id)
-              const isSelected = selectedContractor === contractor.id && !selectedJob
+            {contractors.map((contractor) => {
+              const contractorJobs = contractor.jobs || []
+              const isExpanded = expandedContractors.has(contractor.id.toString())
+              const isSelected = selectedContractor === contractor.id.toString() && !selectedJob
 
               return (
                 <div key={contractor.id} className="mb-2">
                   <Collapsible
                     open={isExpanded}
-                    onOpenChange={() => toggleContractor(contractor.id)}
+                    onOpenChange={() => toggleContractor(contractor.id.toString())}
                   >
                     <CollapsibleTrigger asChild>
                       <Button
@@ -2556,7 +2544,7 @@ export function ContractorListingPage() {
                         className={`w-full justify-start p-3 text-left h-auto hover:bg-primary/5 ${
                           isSelected ? 'bg-primary/10 shadow-sm border border-primary/20' : ''
                         }`}
-                        onClick={() => selectContractor(contractor.id)}
+                        onClick={() => selectContractor(contractor.id.toString())}
                       >
                         <div className="flex items-center justify-between w-full">
                           <div className="flex items-center gap-3">
@@ -2569,8 +2557,8 @@ export function ContractorListingPage() {
                               <User className="h-4 w-4 text-primary" />
                             </div>
                             <div>
-                              <div className="font-medium text-gray-900">{contractor.name}</div>
-                              <div className="text-xs text-gray-500">{contractor.totalJobs} jobs</div>
+                              <div className="font-medium text-gray-900">{contractor.contractor_name}</div>
+                              <div className="text-xs text-gray-500">{contractor.total_jobs} jobs</div>
                             </div>
                           </div>
                         </div>
@@ -2578,10 +2566,10 @@ export function ContractorListingPage() {
                     </CollapsibleTrigger>
 
                     <CollapsibleContent className="ml-6 mt-1">
-                      {contractorJobs.map((job) => {
+                      {contractorJobs.map((job: Job) => {
                         const hasSubJobs = job.subJobs && job.subJobs.length > 0
-                        const isJobExpanded = expandedJobs.has(job.id)
-                        const isJobSelected = selectedJob === job.id && !selectedSubJob
+                        const isJobExpanded = expandedJobs.has(job.id.toString())
+                        const isJobSelected = selectedJob === job.id.toString() && !selectedSubJob
 
                         return (
                           <div key={job.id} className="mb-1">
@@ -2590,7 +2578,7 @@ export function ContractorListingPage() {
                               <div className="flex-1">
                                 <Collapsible
                                   open={isJobExpanded}
-                                  onOpenChange={() => toggleJob(job.id)}
+                                  onOpenChange={() => toggleJob(job.id.toString())}
                                 >
                                   <CollapsibleTrigger asChild>
                                     <Button
@@ -2598,7 +2586,7 @@ export function ContractorListingPage() {
                                       className={`w-full justify-start p-2 text-left h-auto text-sm hover:bg-primary/5 ${
                                         isJobSelected ? 'bg-primary/10 shadow-sm border border-primary/20' : ''
                                       }`}
-                                      onClick={() => selectJob(job.id, contractor.id)}
+                                      onClick={() => selectJob(job.id.toString(), contractor.id.toString())}
                                     >
                                       <div className="flex items-center justify-between w-full">
                                         <div className="flex items-center gap-2">
@@ -2612,7 +2600,7 @@ export function ContractorListingPage() {
                                           {getStatusIcon(job.status)}
                                           <div className="flex-1 min-w-0">
                                             <div className="text-xs font-medium text-gray-800 truncate">
-                                              {job.title}
+                                              {job.job_title}
                                             </div>
                                             <div className="text-xs text-gray-500">
                                               {job.status} • {job.progress}%
@@ -2626,7 +2614,7 @@ export function ContractorListingPage() {
                                   {hasSubJobs && (
                                     <CollapsibleContent className="ml-4 mt-1">
                                       {job.subJobs?.map((subJob) => {
-                                        const isSubJobSelected = selectedSubJob === subJob.id
+                                        const isSubJobSelected = selectedSubJob === subJob.id.toString()
 
                                         return (
                                           <div key={subJob.id} className="flex items-start mb-1">
@@ -2636,16 +2624,16 @@ export function ContractorListingPage() {
                                               className={`flex-1 justify-start p-1.5 text-left h-auto text-xs hover:bg-primary/5 ${
                                                 isSubJobSelected ? 'bg-primary/10 shadow-sm border border-primary/20' : ''
                                               }`}
-                                              onClick={() => selectSubJob(subJob.id, job.id, contractor.id)}
+                                              onClick={() => selectSubJob(subJob.id.toString(), job.id.toString(), contractor.id.toString())}
                                             >
                                               <div className="flex items-center gap-2 w-full">
                                                 {getStatusIcon(subJob.status)}
                                                 <div className="flex-1 min-w-0">
                                                   <div className="text-xs text-gray-700 truncate">
-                                                    {subJob.title}
+                                                    {subJob.job_title}
                                                   </div>
                                                   <div className="text-xs text-gray-500">
-                                                    {subJob.progress}% • {subJob.actualHours || 0}h
+                                                    {subJob.progress}% • 0h
                                                   </div>
                                                 </div>
                                               </div>
@@ -2685,16 +2673,14 @@ export function ContractorListingPage() {
         </div>
 
         {/* Contractor Listing Table */}
-        <div className="p-6 space-y-6">
-          {/* Header */}
-          <div className="flex items-center justify-between">
+        {/* <div className="p-6 space-y-6">
+           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-medium text-gray-900">Contractors</h2>
               <p className="text-sm text-gray-600 mt-1">Manage your contractors and their information</p>
             </div>
           </div>
-
-          {/* Filters and Search */}
+ 
           
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="flex-1">
@@ -2727,8 +2713,7 @@ export function ContractorListingPage() {
                   </Button>
                 </div>
               </div>  
-
-          {/* Contractors Table */}
+ 
           <Card>
             <CardContent className="p-0">
               {isLoadingContractors ? (
@@ -2763,7 +2748,7 @@ export function ContractorListingPage() {
                             <TableCell>{contractor.email}</TableCell>
                             <TableCell>{contractor.phone}</TableCell>
                             <TableCell className="max-w-xs truncate">
-                              {contractor.address || '-'}
+                              -
                             </TableCell>
                             <TableCell>
                               <Badge 
@@ -2821,8 +2806,7 @@ export function ContractorListingPage() {
               )}
             </CardContent>
           </Card>
-
-          {/* Pagination Controls */}
+ 
           {totalContractors > itemsPerPage && (
             <div className="flex items-center justify-between px-4 py-3 border-t">
               <div className="text-sm text-muted-foreground">
@@ -2851,7 +2835,7 @@ export function ContractorListingPage() {
               </div>
             </div>
           )}
-        </div>
+        </div> */}
 
         {selectedJobData && selectedContractorData ? (
           <div className="p-6 space-y-6">
@@ -2901,28 +2885,28 @@ export function ContractorListingPage() {
                 </div>
                 <div className="space-y-4">
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Customer</p>
-                    <p className="font-medium">{selectedJobData.customer}</p>
+                    <p className="text-sm text-gray-600 mb-1">Job Title</p>
+                    <p className="font-medium">{selectedJobData.job_title || 'N/A'}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Location</p>
-                    <p className="font-medium">{selectedJobData.location}</p>
+                    <p className="text-sm text-gray-600 mb-1">Address</p>
+                    <p className="font-medium">{selectedJobData.address}</p>
                   </div>
                 </div>
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Start Date</p>
-                    <p className="font-medium">{formatDate(selectedJobData.startDate)}</p>
+                    <p className="font-medium">{formatDate(selectedJobData.created_at)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Due Date</p>
-                    <p className="font-medium">{formatDate(selectedJobData.dueDate)}</p>
+                    <p className="font-medium">{formatDate(selectedJobData.due_date)}</p>
                   </div>
                 </div>
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Estimated Cost</p>
-                    <p className="font-medium text-primary">{formatCurrency(selectedJobData.estimatedCost)}</p>
+                    <p className="font-medium text-primary">{formatCurrency(selectedJobData.estimated_cost)}</p>
                   </div>
                   {selectedJobData.actualCost && (
                     <div>
@@ -2944,11 +2928,48 @@ export function ContractorListingPage() {
                   </Badge>
                 </div>
                 
-                {selectedJobData.subJobs.map((subJob) => (
-                  <SubJobDetails key={subJob.id} subJob={subJob} />
-                ))}
+                {selectedJobData.subJobs.map((subJob: Job) => {
+                  // Ensure the subJob has the customer data properly structured
+                  const jobWithCustomerData = {
+                    ...subJob,
+                    // CRITICAL: Ensure ID matches what we pass to JobDetailsPage
+                    id: subJob.id.toString(),
+                    // Map customer data to the format JobDetailsPage expects
+                    customer: subJob.customer?.id?.toString() || subJob.customer_id?.toString(),
+                    customerName: subJob.customer?.customer_name || subJob.customer?.company_name,
+                    customerEmail: subJob.customer?.email,
+                    contractor: subJob.contractor_id?.toString(),
+                    // Map other fields that JobDetailsPage might expect
+                    title: subJob.job_title,
+                    type: subJob.job_type === 'contract_based' ? 'contract-based' : 'service-based',
+                    location: subJob.address,
+                    address: subJob.address,
+                    cityZip: subJob.city_zip,
+                    estimatedCost: subJob.estimated_cost,
+                    estimatedHours: subJob.estimated_hours,
+                    startDate: subJob.created_at,
+                    dueDate: subJob.due_date,
+                    priority: subJob.priority,
+                    status: subJob.status,
+                    progress: subJob.progress || 0
+                  }
+                  
+                  const allJobs = [jobWithCustomerData]
+                  console.log(jobWithCustomerData, 'jobWithCustomerData==>>')
+                  
+                  return (
+                    <JobDetailsPage 
+                      key={subJob.id} 
+                      jobId={subJob.id.toString()} 
+                      onBack={() => setSelectedSubJob(null)}
+                      jobs={allJobs} 
+                      setJobs={() => {}}
+                    />
+                  )
+                })}
               </div>
             )}
+
           </div>
         ) : (
           <div className="flex items-center justify-center h-full">
