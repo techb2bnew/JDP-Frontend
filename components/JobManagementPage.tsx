@@ -806,7 +806,7 @@ useEffect(() => {
                   </div>
                 </div>
 
-                {job.assignedLaborDetails && job.assignedLaborDetails.length > 0 && (
+                {/* {job.assignedLaborDetails && job.assignedLaborDetails.length > 0 && (
                   <div>
                     <p className="text-sm text-gray-600 mb-2">Assigned Labor:</p>
                     <div className="flex flex-wrap gap-1">
@@ -817,9 +817,9 @@ useEffect(() => {
                       ))}
                     </div>
                   </div>
-                )}
+                )} */}
 
-                {job.assignedLeadLaborDetails && job.assignedLeadLaborDetails.length > 0 && (
+                {/* {job.assignedLeadLaborDetails && job.assignedLeadLaborDetails.length > 0 && (
                   <div>
                     <p className="text-sm text-gray-600 mb-2">Lead Labor:</p>
                     <div className="flex flex-wrap gap-1">
@@ -830,7 +830,7 @@ useEffect(() => {
                       ))}
                     </div>
                   </div>
-                )}
+                )} */}
               </CardContent>
             </Card>
           ))}
