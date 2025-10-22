@@ -2479,4 +2479,96 @@ getTimesheetDashboardStats: async () => {
       await clearAuthData();
     }
   },
+
+  // Configuration
+  getFullConfiguration: async () => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const response = await fetch(
+      `${apiBaseUrl}/configuration/getFullConfiguration`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to fetch configuration");
+    }
+
+    return response.json();
+  },
+
+  createOrUpdateConfiguration: async (configurationData: {
+    hourly_rates: Array<{
+      id?: number;
+      description: string;
+      max_hours: number | null;
+      rate: number;
+    }>;
+    markup_percentage: number;
+  }) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const response = await fetch(
+      `${apiBaseUrl}/configuration/createOrUpdateConfiguration`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(configurationData),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to save configuration");
+    }
+
+    return response.json();
+  },
+
+  removeHourlyRates: async (rateIds: number[]) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const response = await fetch(
+      `${apiBaseUrl}/configuration/removeHourlyRates`,
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ rate_ids: rateIds }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to remove hourly rates");
+    }
+
+    return response.json();
+  },
 };

@@ -7,6 +7,8 @@ import { ChevronDown, X } from 'lucide-react'
 
 interface AutoScrollMultiSelectProps {
   selectedValues: any[];
+  // New: pass the full selected objects so we can render labels immediately
+  selectedObjects?: any[];
   onSelectionChange: (selectedIds: string[], selectedItems: any[]) => void;
   placeholder: string;
   fetchData: (page: number, limit: number) => Promise<{
@@ -21,6 +23,7 @@ interface AutoScrollMultiSelectProps {
 
 export function AutoScrollMultiSelect({
   selectedValues,
+  selectedObjects,
   onSelectionChange,
   placeholder,
   fetchData,
@@ -74,12 +77,24 @@ export function AutoScrollMultiSelect({
     }
   }, [isOpen, items.length, loadData]);
 
+  // Seed selected items from fetched list and from provided selectedObjects
   useEffect(() => {
-    const matchedItems = items.filter(item =>
+    const matchedFromItems = items.filter(item =>
       selectedValues.includes(item[valueField]?.toString())
     );
-    setSelectedItems(matchedItems);
-  }, [items, selectedValues, valueField]);
+    // Merge with provided objects (if any)
+    const mappedFromObjects = (selectedObjects || [])
+      .filter(obj => obj && obj[valueField] !== undefined)
+      .map(obj => obj);
+
+    // Deduplicate by valueField
+    const byId = new Map<string, any>();
+    [...mappedFromObjects, ...matchedFromItems].forEach(it => {
+      const key = it[valueField]?.toString();
+      if (key) byId.set(key, it);
+    });
+    setSelectedItems(Array.from(byId.values()));
+  }, [items, selectedValues, selectedObjects, valueField]);
 
   const handleItemToggle = (item: any) => {
     const itemId = item[valueField]?.toString();
@@ -111,7 +126,18 @@ export function AutoScrollMultiSelect({
 
   const getSelectedItemName = (itemId: string) => {
     const item = selectedItems.find(item => item[valueField]?.toString() === itemId);
-    return item?.[displayField] || itemId;
+    // Try common fallbacks if displayField is missing
+    if (item) {
+      return (
+        item[displayField] ||
+        item.name ||
+        item.users?.full_name ||
+        item.full_name ||
+        item.label ||
+        itemId
+      );
+    }
+    return itemId;
   };
 
   return (

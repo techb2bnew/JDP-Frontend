@@ -2875,6 +2875,10 @@ export function ContractorListingPage() {
                     <p className="text-sm text-gray-600 mb-1">Status</p>
                     {getStatusBadge(selectedJobData.status)}
                   </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Estimated Cost</p>
+                    <p className="font-medium text-primary">{formatCurrency(selectedJobData.estimated_cost)}</p>
+                  </div>
                   {/* <div>
                     <p className="text-sm text-gray-600 mb-1">Progress</p>
                     <div className="flex items-center gap-2">
@@ -2898,15 +2902,12 @@ export function ContractorListingPage() {
                     <p className="text-sm text-gray-600 mb-1">Start Date</p>
                     <p className="font-medium">{formatDate(selectedJobData.created_at)}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Due Date</p>
-                    <p className="font-medium">{formatDate(selectedJobData.due_date)}</p>
-                  </div>
+               
                 </div>
                 <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Estimated Cost</p>
-                    <p className="font-medium text-primary">{formatCurrency(selectedJobData.estimated_cost)}</p>
+                <div>
+                    <p className="text-sm text-gray-600 mb-1">Due Date</p>
+                    <p className="font-medium">{formatDate(selectedJobData.due_date)}</p>
                   </div>
                   {selectedJobData.actualCost && (
                     <div>

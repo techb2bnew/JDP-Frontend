@@ -1,13 +1,16 @@
 'use client'
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Info, Clock, TrendingUp, Table, Settings, CheckCircle, RefreshCw, Save, PlusCircle } from 'lucide-react';
+import { Info, Clock, TrendingUp, Table, Settings, CheckCircle, RefreshCw, Save, PlusCircle, X } from 'lucide-react';
+import { apiClient } from '../utils/api';
+import { toast } from 'sonner';
 
  
 interface RateTier {
+  id?: number;
   description: string;
   maxHours: number | string;
   rate: number | string;
@@ -19,12 +22,15 @@ interface MarkupExample {
 }
 
 export function ConfigurationPage() { 
-  const [tiers, setTiers] = useState<RateTier[]>([
-    { description: 'Up to 3 hours', maxHours: 3, rate: 165 },
-    { description: 'More than 3 hours', maxHours: '', rate: 135 },
-  ]);
+  // Original tiers state
+  const originalTiers: RateTier[] = [];
+
+  const [tiers, setTiers] = useState<RateTier[]>(originalTiers);
+  const [originalLoadedTiers, setOriginalLoadedTiers] = useState<RateTier[]>([]);
+  const [originalLoadedMarkup, setOriginalLoadedMarkup] = useState<number>(25);
  
   const [markupPercentage, setMarkupPercentage] = useState<number>(25);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   
   const markupExamples: MarkupExample[] = [
@@ -37,10 +43,115 @@ export function ConfigurationPage() {
   const calculateMarkupPrice = (basePrice: number): number => {
     return basePrice * (1 + markupPercentage / 100);
   };
+
+  // Load configuration data on component mount
+  useEffect(() => {
+    const loadConfiguration = async () => {
+      try {
+        setIsLoading(true);
+        const response = await apiClient.getFullConfiguration();
+        
+        if (response.success && response.data) {
+          // Transform API data to match our component format
+          const loadedTiers = response.data.hourly_rates.map((rate: any) => ({
+            id: rate.id,
+            description: rate.description,
+            maxHours: rate.max_hours || '',
+            rate: rate.rate
+          }));
+
+          setTiers(loadedTiers);
+          setMarkupPercentage(response.data.markup_percentage);
+          
+          // Store original loaded data for reset functionality
+          setOriginalLoadedTiers(loadedTiers);
+          setOriginalLoadedMarkup(response.data.markup_percentage);
+          
+          console.log('Configuration loaded:', response.data);
+        }
+      } catch (error) {
+        console.error('Error loading configuration:', error);
+        toast.error('Failed to load configuration data');
+        // Keep default values if loading fails
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadConfiguration();
+  }, []);
  
   const handleAddTier = () => {
     setTiers([...tiers, { description: '', maxHours: '', rate: '' }]);
   };
+
+  const handleRemoveTier = async (index: number) => {
+    if (tiers.length > 1) { // Prevent removing the last tier
+      const tierToRemove = tiers[index];
+      
+      // If the tier has an ID (loaded from API), call delete API
+      if (tierToRemove.id) {
+        try {
+          await apiClient.removeHourlyRates([tierToRemove.id]);
+          toast.success('Tier removed successfully!');
+        } catch (error) {
+          console.error('Error removing tier:', error);
+          toast.error('Failed to remove tier');
+          return; // Don't remove from UI if API call fails
+        }
+      }
+      
+      // Remove from UI state
+      setTiers(tiers.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleTierChange = (index: number, field: keyof RateTier, value: string | number) => {
+    setTiers(tiers.map((tier, i) => 
+      i === index ? { ...tier, [field]: value } : tier
+    ));
+  };
+
+  const handleReset = () => {
+    setTiers([...originalLoadedTiers]);
+    setMarkupPercentage(originalLoadedMarkup);
+  };
+
+  const handleSave = async () => {
+    try {
+      // Transform tiers data to match API format
+      const hourlyRates = tiers.map((tier, index) => ({
+        id: index + 1, // You might want to use actual IDs from your data
+        description: tier.description,
+        max_hours: tier.maxHours === '' ? null : Number(tier.maxHours),
+        rate: Number(tier.rate)
+      }));
+
+      const configurationData = {
+        hourly_rates: hourlyRates,
+        markup_percentage: markupPercentage
+      };
+ 
+
+      const response = await apiClient.createOrUpdateConfiguration(configurationData);
+      
+      toast.success('Configuration saved successfully!'); 
+    } catch (error) {
+      console.error('Error saving configuration:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to save configuration');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading configuration...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="  min-h-screen">
@@ -51,10 +162,10 @@ export function ConfigurationPage() {
             <p className="text-gray-500 mt-1">Configure system-wide settings for pricing and rates</p>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline" className="flex items-center gap-2">
+            <Button variant="outline" className="flex items-center gap-2" onClick={handleReset}>
               <RefreshCw className="w-4 h-4" /> Reset
             </Button>
-            <Button className="flex items-center gap-2 bg-primary hover:bg-blue-700">
+            <Button className="flex items-center gap-2 bg-primary text-white hover:bg-[#0090e6]" onClick={handleSave}>
               <Save className="w-4 h-4" /> Save Changes
             </Button>
           </div>
@@ -80,16 +191,40 @@ export function ConfigurationPage() {
               <CardContent className="space-y-6">
                 {tiers.map((tier, index) => (
                   <div key={index} className="p-5 border rounded-lg bg-gray-50 space-y-4">
-                    <h3 className="font-semibold text-gray-600">Tier {index + 1}</h3>
+                    <div className="flex justify-between items-center">
+                      <h3 className="font-semibold text-gray-600">Tier {index + 1}</h3>
+                      {tiers.length > 1 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRemoveTier(index)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                        >
+                          <X className="w-4 h-4 mr-1" />
+                          Remove
+                        </Button>
+                      )}
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label htmlFor={`desc-${index}`} className="block text-sm font-medium text-gray-600 mb-1">Description</label>
-                        <Input id={`desc-${index}`} value={tier.description} placeholder="e.g., Up to 3 hours" />
+                        <Input 
+                          id={`desc-${index}`} 
+                          value={tier.description} 
+                          onChange={(e) => handleTierChange(index, 'description', e.target.value)}
+                          placeholder="e.g., Up to 3 hours" 
+                        />
                       </div>
                       {index === 0 && (
                         <div>
                           <label htmlFor={`max-hours-${index}`} className="block text-sm font-medium text-gray-600 mb-1">Maximum Hours</label>
-                          <Input id={`max-hours-${index}`} type="number" value={tier.maxHours} placeholder="e.g., 3" />
+                          <Input 
+                            id={`max-hours-${index}`} 
+                            type="number" 
+                            value={tier.maxHours} 
+                            onChange={(e) => handleTierChange(index, 'maxHours', e.target.value)}
+                            placeholder="e.g., 3" 
+                          />
                         </div>
                       )}
                     </div>
@@ -97,7 +232,14 @@ export function ConfigurationPage() {
                       <label htmlFor={`rate-${index}`} className="block text-sm font-medium text-gray-600 mb-1">Hourly Rate</label>
                       <div className="relative">
                         <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
-                        <Input id={`rate-${index}`} type="number" value={tier.rate} className="pl-7" placeholder="e.g., 165" />
+                        <Input 
+                          id={`rate-${index}`} 
+                          type="number" 
+                          value={tier.rate} 
+                          onChange={(e) => handleTierChange(index, 'rate', e.target.value)}
+                          className="pl-7" 
+                          placeholder="e.g., 165" 
+                        />
                       </div>
                     </div>
                     <div className="bg-white p-3 rounded-md text-sm text-gray-600 border">

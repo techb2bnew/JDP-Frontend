@@ -205,14 +205,14 @@ export function Header({
               View Jobs
             </Link>
               )}
-              {hasPermission('jobs', 'create') && (
+              {/* {hasPermission('jobs', 'create') && (
             <Button
               className="bg-primary text-white hover:bg-[#0090e6] gap-2 text-[#fff]"
             >
               <Plus className="h-4 w-4" />
               Create New Estimate
             </Button>
-              )}
+              )} */}
 
             {/* Theme Toggle */}
             {/* <Tooltip>

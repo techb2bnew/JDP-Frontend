@@ -23,6 +23,7 @@ export interface Product {
   jdpSku?: string
   jdp_price?: number
   markup_amount?: number
+  markup_percentage?: number
   createdDate: string
   lastUpdated: string
   minStockLevel?: number

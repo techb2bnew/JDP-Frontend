@@ -242,6 +242,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const [showAddInvoiceModal, setShowAddInvoiceModal] = useState(false);
   const [showAddMaterialModal, setShowAddMaterialModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [suppliers, setSuppliers] = useState<{
     id: number;
     company_name: string;
@@ -277,6 +278,54 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     laborCost: number;
     actualProjectCost: number;
   } | null>(null);
+
+  // Function to parse labor IDs and fetch labor data
+  const parseLaborIds = async (laborIdsString: string, isLeadLabor: boolean = false) => {
+    if (!laborIdsString) return [];
+    
+    try {
+      const laborIds = JSON.parse(laborIdsString);
+      if (!Array.isArray(laborIds)) return [];
+      
+      const laborData = [];
+      for (const id of laborIds) {
+        try {
+          if (isLeadLabor) {
+            // For lead labor, we'll fetch all and filter by ID since getLeadLaborById doesn't exist
+            const response = await apiClient.getLeadLabor(1, 100); // Get a large number to find the specific ID
+            const leadLabor = response.data.find((item: any) => item.id.toString() === id.toString());
+            if (leadLabor) {
+              laborData.push({
+                id: leadLabor.id,
+                name: leadLabor.name || leadLabor.users?.full_name,
+                user: { full_name: leadLabor.name || leadLabor.users?.full_name }
+              });
+            }
+          } else {
+            console.log('Fetching labor by ID:', id);
+            const response = await apiClient.getLaborById(id.toString());
+            console.log('Labor API response:', response);
+            if (response) {
+              laborData.push({
+                id: response.id,
+                name: response.users?.full_name || response.name || response.labor_code,
+                user: response.users,
+                labor_code: response.labor_code
+              });
+            }
+          }
+        } catch (error) {
+          console.error(`Error fetching ${isLeadLabor ? 'lead labor' : 'labor'} with ID ${id}:`, error);
+        }
+      }
+      console.log('Final labor data:', laborData);
+      return laborData;
+    } catch (error) {
+      console.error('Error parsing labor IDs:', error);
+      return [];
+    }
+  };
+
   const [editedJob, setEditedJob] = useState({
     title: job.title,
     type: job.type,
@@ -289,6 +338,37 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     assignedLabor: job.assignedLaborDetails || [],
     assignedLeadLabor: job.assignedLeadLaborDetails || [],
   });
+
+  // Load labor data when component mounts
+  useEffect(() => {
+    const loadLaborData = async () => {
+      try {
+        // Parse and load lead labor data
+        if (job.assigned_lead_labor_ids) {
+          const leadLaborData = await parseLaborIds(job.assigned_lead_labor_ids, true);
+          setEditedJob(prev => ({
+            ...prev,
+            assignedLeadLabor: leadLaborData
+          }));
+        }
+
+        // Parse and load regular labor data
+        if (job.assigned_labor_ids) {
+          console.log('Loading regular labor data:', job.assigned_labor_ids);
+          const laborData = await parseLaborIds(job.assigned_labor_ids, false);
+          console.log('Parsed labor data:', laborData);
+          setEditedJob(prev => ({
+            ...prev,
+            assignedLabor: laborData
+          }));
+        }
+      } catch (error) {
+        console.error('Error loading labor data:', error);
+      }
+    };
+
+    loadLaborData();
+  }, [job.assigned_lead_labor_ids, job.assigned_labor_ids]);
 
   // Form states
   const [showAddInvoiceDialog, setShowAddInvoiceDialog] = useState(false)
@@ -364,6 +444,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const allowedStatuses = ['draft', 'active', 'in_progress', 'completed', 'cancelled', 'on_hold'];
 
   const handleSave = async () => {
+    setIsSaving(true);
     try {
       const status = allowedStatuses.includes(editedJob.status)
         ? editedJob.status
@@ -413,16 +494,47 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
       const response = await apiClient.updateJob(jobId, updatePayload); 
 
+      // Update the job data with the new labor assignments
+      const updatedJob = {
+        ...job,
+        ...editedJob,
+        assigned_labor_ids: updatePayload.assigned_labor_ids,
+        assigned_lead_labor_ids: updatePayload.assigned_lead_labor_ids
+      };
+
       const updatedJobs = jobs.map((j: any) =>
-        j.id === jobId ? { ...j, ...editedJob } : j
+        j.id === jobId ? updatedJob : j
       );
       setJobs(updatedJobs);
+
+      // Refresh the labor data immediately after save
+      try {
+        if (updatePayload.assigned_lead_labor_ids) {
+          const leadLaborData = await parseLaborIds(updatePayload.assigned_lead_labor_ids, true);
+          setEditedJob(prev => ({
+            ...prev,
+            assignedLeadLabor: leadLaborData
+          }));
+        }
+
+        if (updatePayload.assigned_labor_ids) {
+          const laborData = await parseLaborIds(updatePayload.assigned_labor_ids, false);
+          setEditedJob(prev => ({
+            ...prev,
+            assignedLabor: laborData
+          }));
+        }
+      } catch (error) {
+        console.error('Error refreshing labor data after save:', error);
+      }
 
       setIsEditing(false);
       toast.success('Job updated successfully!');
     } catch (error) {
       console.error('Error updating job:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to update job');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -434,7 +546,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
  
 
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
+    // Reset base fields
     setEditedJob({
       title: job.title,
       type: job.type,
@@ -447,6 +560,22 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       assignedLabor: job.assignedLaborDetails || [],
       assignedLeadLabor: job.assignedLeadLaborDetails || [],
     });
+
+    // If detailed arrays are missing, hydrate from stored ID strings
+    try {
+      if ((!job.assignedLeadLaborDetails || job.assignedLeadLaborDetails.length === 0) && job.assigned_lead_labor_ids) {
+        const leadLaborData = await parseLaborIds(job.assigned_lead_labor_ids, true);
+        setEditedJob(prev => ({ ...prev, assignedLeadLabor: leadLaborData }));
+      }
+      if ((!job.assignedLaborDetails || job.assignedLaborDetails.length === 0) && job.assigned_labor_ids) {
+        const laborData = await parseLaborIds(job.assigned_labor_ids, false);
+        setEditedJob(prev => ({ ...prev, assignedLabor: laborData }));
+      }
+    } catch (e) {
+      // swallow errors here, view will just show what we have
+      console.error('Failed to hydrate labor data on cancel', e);
+    }
+
     setIsEditing(false);
   };
 
@@ -2854,8 +2983,20 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
                   {isEditing ? (
                     <AutoScrollMultiSelect
-                      selectedValues={editedJob.assignedLeadLabor?.map((labor: any) => labor.user?.full_name) || []}
+                      selectedValues={(() => {
+                        const values = editedJob.assignedLeadLabor?.map((labor: any) => {
+                          // Handle different data structures
+                          if (typeof labor === 'string') return labor;
+                          if (labor.id) return labor.id.toString();
+                          if (labor.user?.id) return labor.user.id.toString();
+                          return labor.toString();
+                        }) || [];
+                        console.log('Lead Labor selectedValues:', values, 'Original data:', editedJob.assignedLeadLabor);
+                        return values;
+                      })()}
+                      selectedObjects={editedJob.assignedLeadLabor}
                       onSelectionChange={(selectedIds, selectedItems) => {
+                        console.log('Lead Labor selection changed:', { selectedIds, selectedItems });
                         const validSelectedItems = selectedItems.filter((labor: any) => labor !== undefined);
 
                         setEditedJob((prev) => ({
@@ -2894,8 +3035,20 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
                   {isEditing ? (
                     <AutoScrollMultiSelect
-                      selectedValues={editedJob.assignedLabor?.map((labor: any) => labor.user?.full_name) || []}
+                      selectedValues={(() => {
+                        const values = editedJob.assignedLabor?.map((labor: any) => {
+                          // Handle different data structures
+                          if (typeof labor === 'string') return labor;
+                          if (labor.id) return labor.id.toString();
+                          if (labor.user?.id) return labor.user.id.toString();
+                          return labor.toString();
+                        }) || [];
+                        console.log('Labor selectedValues:', values, 'Original data:', editedJob.assignedLabor);
+                        return values;
+                      })()}
+                      selectedObjects={editedJob.assignedLabor}
                       onSelectionChange={(selectedIds, selectedItems) => {
+                        console.log('Labor selection changed:', { selectedIds, selectedItems });
                         const validSelectedItems = selectedItems.filter((labor: any) => labor !== undefined);
 
                         setEditedJob((prev) => ({
@@ -2904,7 +3057,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                         }));
  
                       }}
-                      placeholder="Select lead labor"
+                      placeholder="Select labor"
                       fetchData={apiClient.getLabor}
                       displayField="name"
                       valueField="id"
@@ -2919,7 +3072,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                             key={labor.id || `labor-${index}`}
                             className="bg-orange-50 text-orange-700 text-sm px-2 py-1 rounded-md border border-orange-200"
                           >
-                            {labor.user?.full_name || labor.labor_code}
+                            {labor.name || labor.user?.full_name || labor.labor_code}
                           </span>
                         );
                       })}
@@ -2990,9 +3143,23 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                       <X className="h-4 w-4" />
                       Cancel
                     </Button>
-                    <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleSave}>
-                      <Check className="h-4 w-4" />
-                      Save
+                    <Button 
+                      size="sm" 
+                      className="bg-primary text-primary-foreground hover:bg-primary/90" 
+                      onClick={handleSave}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? (
+                        <>
+                          <LoadingSpinner />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="h-4 w-4" />
+                          Save
+                        </>
+                      )}
                     </Button>
                   </div>
                 )}

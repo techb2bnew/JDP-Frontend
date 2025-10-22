@@ -133,6 +133,7 @@ export function ProductsPage() {
   const [categories, setCategories] = useState<string[]>(['Electrical', 'Construction Materials', 'Tools', 'Plumbing', 'Hardware']);
   const [units, setUnits] = useState<string[]>(['piece', 'roll', 'box', 'pack', 'kg', 'meter', 'liter', 'set']);
   const [estimatedPrices, setEstimatedPrices] = useState({});
+  const [configurationData, setConfigurationData] = useState<any>(null);
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
 
   const [formData, setFormData] = useState<ProductFormData>({
@@ -182,13 +183,35 @@ export function ProductsPage() {
       jdpPrice,
       profitMargin: parseFloat(profitMargin.toFixed(1))
     }));
-  }, [formData.supplierCostPrice, formData.markupPercentage]);
+  }, [formData.unit_cost, formData.markupPercentage]);
+
+  // Force calculations when form data is loaded from API
+  useEffect(() => {
+    if (formData.unit_cost > 0 && formData.markupPercentage > 0) {
+      const markupAmount = formData.unit_cost * (formData.markupPercentage / 100);
+      const jdpPrice = formData.unit_cost + markupAmount;
+      const profitMargin = (markupAmount / jdpPrice) * 100;
+
+      // Only update if values are different to avoid infinite loops
+      if (Math.abs(formData.markupAmount - markupAmount) > 0.01 || 
+          Math.abs(formData.jdpPrice - jdpPrice) > 0.01 || 
+          Math.abs(formData.profitMargin - profitMargin) > 0.01) {
+        setFormData(prev => ({
+          ...prev,
+          markupAmount,
+          jdpPrice,
+          profitMargin: parseFloat(profitMargin.toFixed(1))
+        }));
+      }
+    }
+  }, [formData.unit_cost, formData.markupPercentage, formData.markupAmount, formData.jdpPrice, formData.profitMargin]);
 
   // Fetch suppliers and products data on component mount
   useEffect(() => {
     fetchSuppliersData(1, 100); // Fetch first 100 suppliers
     fetchProductsData(currentPage, itemsPerPage); // Fetch products for current page
     fetchProductStats(); // Fetch product statistics
+    loadConfiguration(); // Load configuration data
   }, [currentPage, itemsPerPage]);
 
 
@@ -207,6 +230,7 @@ const fetchBySearch = async () => {
       jdp_price: apiProduct.jdp_price || 0,
       stock: apiProduct.stock_quantity || 0,
       markup_amount: apiProduct.markup_amount || 0,
+      markup_percentage: apiProduct.markup_percentage || 0,
       status: apiProduct.status || 'active',
       jdpSku: apiProduct.jdp_sku || '', 
       branches: apiProduct.branches || [],
@@ -274,6 +298,7 @@ useEffect(() => {
   jdp_price: apiProduct.jdp_price || 0,
   stock: apiProduct.stock_quantity || 0,
   markup_amount: apiProduct.markup_amount || 0,
+  markup_percentage: apiProduct.markup_percentage || 0,
   status: apiProduct.status || 'active',
   jdpSku: apiProduct.jdp_sku || '', 
   branches: apiProduct.branches || [],
@@ -396,7 +421,7 @@ useEffect(() => {
         supplierSku: '',
         jdpSku: '',
         supplierCostPrice: 0,
-        markupPercentage: 0,
+        markupPercentage: configurationData?.markup_percentage || 0,
         markupAmount: 0,
         jdpPrice: 0,
         profitMargin: 0,
@@ -618,7 +643,7 @@ useEffect(() => {
       supplierSku: '',
       jdpSku: '',
       supplierCostPrice: 0,
-      markupPercentage: 0,
+      markupPercentage: configurationData?.markup_percentage || 0,
       markupAmount: 0,
       jdpPrice: 0,
       profitMargin: 0,
@@ -632,6 +657,11 @@ useEffect(() => {
     setSelectedProduct(null)
     setCurrentAction('add')
     setValidationErrors({})
+  }
+
+  const handleModalClose = () => {
+    setShowProductModal(false);
+    resetForm();
   }
 
  const handleExport = () => {
@@ -788,6 +818,7 @@ useEffect(() => {
           jdp_price: apiProduct.jdp_price || 0,
           stock: apiProduct.stock_quantity || 0,
           markup_amount: apiProduct.markup_amount || 0,
+          markup_percentage: apiProduct.markup_percentage || 0,
           status: apiProduct.status || 'active',
           jdpSku: apiProduct.jdp_sku || '', 
           branches: [], // Will be populated if branch data is available in API
@@ -866,7 +897,7 @@ useEffect(() => {
           unit: apiProduct.unit || 'piece',
           branchIds: [], 
           status: apiProduct.status || 'draft' ,
-          unit_cost:apiProduct.unicost || 0,
+          unit_cost:apiProduct.unit_cost || 0,
           estimated_price:apiProduct.estimated_price|| 0
         };
 
@@ -940,6 +971,29 @@ useEffect(() => {
       }
     } finally {
       setIsLoadingStats(false);
+    }
+  };
+
+  const loadConfiguration = async () => {
+    try {
+      const response = await apiClient.getFullConfiguration();
+      
+      if (response.success && response.data) {
+        setConfigurationData(response.data);
+        
+        // Set the markup percentage from configuration to form data
+        if (response.data.markup_percentage) {
+          setFormData(prev => ({
+            ...prev,
+            markupPercentage: response.data.markup_percentage
+          }));
+        }
+        
+        console.log('Configuration loaded in Products page:', response.data.markup_percentage);
+      }
+    } catch (error) {
+      console.error('Error loading configuration in Products page:', error);
+      // Don't show error toast, just log it
     }
   };
   
@@ -1229,7 +1283,7 @@ useEffect(() => {
                     <TableCell className="font-medium">{formatCurrency(product.unit_cost)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <span>{product.markup_amount}</span>
+                        <span>{(product as any).markup_percentage}%</span>
                         
                       </div>
                     </TableCell>
@@ -1314,7 +1368,7 @@ useEffect(() => {
       </Card>
 
       {/* Product Modal (Add/Edit/View) */}
-      <Dialog open={showProductModal} onOpenChange={setShowProductModal}>
+      <Dialog open={showProductModal} onOpenChange={handleModalClose} key={selectedProduct?.id || 'new'}>
         <DialogContent className="max-w-2xl   max-h-[90vh] overflow-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1659,6 +1713,11 @@ useEffect(() => {
                       <Label htmlFor="markupPercentage" className="flex items-center gap-1">
                         {/* <PercentIcon className="h-4 w-4 text-blue-500" /> */}
                         Markup Percentage *
+                        {configurationData?.markup_percentage && formData.markupPercentage === configurationData.markup_percentage && (
+                          <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                            From Config
+                          </span>
+                        )}
                       </Label>
                       <div className="relative mt-2">
                         <span className="absolute right-3 top-1/2 transform -translate-y-1/2">%</span>
@@ -1679,6 +1738,11 @@ useEffect(() => {
                       </div>
                       {validationErrors.markupPercentage && (
                         <p className="text-red-500 text-sm mt-1">{validationErrors.markupPercentage}</p>
+                      )}
+                      {configurationData?.markup_percentage && formData.markupPercentage === configurationData.markup_percentage && (
+                        <p className="text-green-600 text-xs mt-1">
+                          ✓ Loaded from Configuration ({configurationData.markup_percentage}%)
+                        </p>
                       )}
                     </div>
                      <div>
@@ -1859,7 +1923,7 @@ useEffect(() => {
               </div>
             ) : (
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setShowProductModal(false)}>
+                <Button variant="outline" onClick={handleModalClose}>
                   <X className="h-4 w-4 mr-2" />
                   Cancel
                 </Button>
