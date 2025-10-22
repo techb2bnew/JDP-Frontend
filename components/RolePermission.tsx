@@ -210,7 +210,8 @@ export default function RolePermission() {
     'notification',
     'inventory_price',
     'bluesheet',
-    'role_permission'
+    'role_permission',
+    'configuration'
   ];
 
   const actions = ['view', 'create', 'edit', 'delete'];

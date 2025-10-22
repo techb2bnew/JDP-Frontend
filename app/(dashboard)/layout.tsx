@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAppDispatch } from '../../redux/hooks'
 import { logout } from '../../redux/slices/authSlice'
-import { clearAuthData } from '../../utils/auth'
+import { clearAuthData, checkAuthStatus } from '../../utils/auth'
 import { Sidebar } from '../../components/layout/Sidebar'
 import { Header } from '../../components/layout/Header'
 
@@ -21,7 +21,7 @@ export default function DashboardLayout({
   const dispatch = useAppDispatch()
 
   useEffect(() => {
-    const checkAuth = () => {
+    const checkAuth = async () => {
       // Ensure we're in browser environment
       if (typeof window === 'undefined') {
         console.log('⚠️ Not in browser environment, skipping auth check');
@@ -37,112 +37,38 @@ export default function DashboardLayout({
       }
       
       try {
-        const authData = typeof window !== 'undefined' ? localStorage.getItem('jdp_auth') : null
-        // console.log('Auth data from localStorage:', authData);
+        const authResult = await checkAuthStatus();
         
-        // If we're on dashboard and no auth data, redirect to login
-        if (pathname === '/dashboard' && !authData) {
-          // console.log('On dashboard but no auth data, redirecting to login');
-          setIsLoading(false)
-          setTimeout(() => {
-            router.push('/')
-          }, 100)
-          return
-        }
-        
-        if (authData) {
-          const parsed = JSON.parse(authData)
-          // console.log('Parsed auth data:', parsed);
-          
-          // Check if all required fields exist and token is not expired
-          if (parsed.user && parsed.token && parsed.expires && parsed.expires > Date.now()) {
-            // console.log('✅ Valid authentication found');
-            setIsAuthenticated(true)
-            setIsLoading(false)
-            return
-          } else {
-            // console.log('❌ Invalid or expired authentication data');
-            // console.log('User:', parsed.user);
-            // console.log('Token:', parsed.token ? 'Present' : 'Missing');
-            // console.log('Expires:', parsed.expires);
-            // console.log('Current time:', Date.now());
-            // console.log('Is expired:', parsed.expires ? parsed.expires <= Date.now() : 'No expiry');
-            
-            // Clear invalid data
-            if (typeof window !== 'undefined') {
-              localStorage.removeItem('jdp_auth')
-            }
-          }
+        if (authResult.isAuthenticated) {
+          console.log('✅ User is authenticated');
+          setIsAuthenticated(true);
+          setIsLoading(false);
         } else {
-          // console.log('❌ No authentication data found');
-          // console.log('localStorage keys:', typeof window !== 'undefined' ? Object.keys(localStorage) : 'Not available');
+          console.log('❌ User is not authenticated');
+          setIsAuthenticated(false);
+          setIsLoading(false);
           
-          // Clear all cookies when no auth data found
-          if (typeof window !== 'undefined') {
-            // console.log('Clearing all cookies...');
-            // Clear auth-related cookies
-            document.cookie = 'auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-            document.cookie = 'jdp_auth=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-            document.cookie = 'redirect-url=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-            
-            // Clear all cookies with auth-related names
-            const cookies = document.cookie.split(';');
-            cookies.forEach(cookie => {
-              const eqPos = cookie.indexOf('=');
-              const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
-              if (name && (name.includes('auth') || name.includes('token') || name.includes('session'))) {
-                document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-                document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname};`;
-                document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${window.location.hostname};`;
-              }
-            });
-            
-            console.log('Cookies cleared. Current cookies:', document.cookie);
+          if (authResult.shouldRedirect) {
+            console.log('Redirecting to login page...');
+            router.push('/');
           }
         }
         
-        // If no valid auth data, redirect to login
-        console.log('Redirecting to login page...');
-        setIsLoading(false)
-        
-        // Only redirect if we're not already on login page and not on dashboard
-        if (pathname !== '/' && pathname !== '/dashboard') {
-          console.log('Redirecting to login page from:', pathname);
-          setTimeout(() => {
-            router.push('/')
-          }, 100)
-        } else {
-          console.log('Already on login page or dashboard, no redirect needed');
-        }
       } catch (error) {
-        console.error('Error during authentication check:', error)
+        console.error('Error during authentication check:', error);
         // Clear corrupted data
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('jdp_auth')
-        }
-        setIsLoading(false)
-        
-        // Only redirect if we're not already on login page and not on dashboard
-        if (pathname !== '/' && pathname !== '/dashboard') {
-          console.log('Redirecting to login page from error:', pathname);
-          setTimeout(() => {
-            router.push('/')
-          }, 100)
-        } else {
-          console.log('Already on login page or dashboard, no redirect needed from error');
-        }
+        await clearAuthData();
+        setIsLoading(false);
+        router.push('/');
       }
     }
 
     // Add a small delay to ensure localStorage is available
-    const timer = setTimeout(checkAuth, 100)
-    setAuthCheckTimeout(timer)
-    
-    // Remove timeout mechanism as it's causing unwanted redirects
-    // The authentication check will handle redirects properly
+    const timer = setTimeout(checkAuth, 100);
+    setAuthCheckTimeout(timer);
     
     return () => {
-      clearTimeout(timer)
+      clearTimeout(timer);
     }
   }, [router, pathname])
 

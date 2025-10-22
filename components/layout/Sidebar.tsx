@@ -134,16 +134,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       description: "Manage and view system alerts and messages",
       module: "notification",
       requiredActions: ["view", "create", "edit", "delete"]
-    },
-    {
-      id: "configuration",
-      name: "Configuration",
-      icon: Settings,
-      href: "/configuration",
-      description: "Configure system-wide settings for pricing and rates",
-      module: "settings",
-      requiredActions: ["view", "create", "edit", "delete"]
-    },
+    }, 
     {
       id: "role",
       name: "Role & Permission",
@@ -152,7 +143,16 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       description: "Role & Permission",
       module: "role_permission",
       requiredActions: ["view", "create", "edit", "delete"]
-    }
+    },
+    {
+      id: "configuration",
+      name: "Configuration",
+      icon: Settings,
+      href: "/configuration",
+      description: "Configure system-wide settings for pricing and rates",
+      module: "configuration",
+      requiredActions: ["view", "create", "edit", "delete"]
+    },
   ]
 
   // Filter navigation items based on permissions
