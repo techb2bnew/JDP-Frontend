@@ -2673,7 +2673,7 @@ export function ContractorListingPage() {
         </div>
 
         {/* Contractor Listing Table */}
-        {/* <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6">
            <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-medium text-gray-900">Contractors</h2>
@@ -2835,7 +2835,7 @@ export function ContractorListingPage() {
               </div>
             </div>
           )}
-        </div> */}
+        </div>
 
         {selectedJobData && selectedContractorData ? (
           <div className="p-6 space-y-6">
@@ -2875,13 +2875,13 @@ export function ContractorListingPage() {
                     <p className="text-sm text-gray-600 mb-1">Status</p>
                     {getStatusBadge(selectedJobData.status)}
                   </div>
-                  <div>
+                  {/* <div>
                     <p className="text-sm text-gray-600 mb-1">Progress</p>
                     <div className="flex items-center gap-2">
                       <Progress value={selectedJobData.progress} className="flex-1" />
                       <span className="text-sm font-medium text-primary">{selectedJobData.progress}%</span>
                     </div>
-                  </div>
+                  </div> */}
                 </div>
                 <div className="space-y-4">
                   <div>
