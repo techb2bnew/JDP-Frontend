@@ -18,6 +18,7 @@ import { apiClient } from '@/utils/api'
 import { useDispatch } from 'react-redux'
 import { motion } from 'framer-motion'
 import { Logo } from '../common/Logo'
+import Image from 'next/image'
 // import { formatCurrency, formatDate } from '../../utils/invoiceUtils'
 
 interface NewInvoiceDialogProps {
@@ -27,8 +28,8 @@ interface NewInvoiceDialogProps {
   jobs: any[];
   jobId?: number;
 onInvoiceSaved?: (invoice: any) => void;
-  
-  
+  isViewMode?: boolean;
+  viewInvoiceData?: any;
 }
 
 
@@ -82,7 +83,7 @@ export interface CreateEstimatePayload {
     jdp_sku: string;
     stock_quantity: number;
     unit: string;
-    job_id:number;
+    job_id: number;
     is_custom: boolean;
     unit_cost: number;
   }[];
@@ -90,7 +91,7 @@ export interface CreateEstimatePayload {
 
 interface ProductFormData {
   id: number;
-  product_name:string;
+  product_name: string;
   name: string;          
   sku: string;           
   jdpSku: string;
@@ -105,10 +106,12 @@ interface ProductFormData {
 
 
 
-export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onInvoiceSaved }: NewInvoiceDialogProps) => {
+export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onInvoiceSaved, isViewMode = false, viewInvoiceData }: NewInvoiceDialogProps) => {
   console.log('trsting jobs', jobs);
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [savingDraft, setSavingDraft] = useState(false)
+  const [sendingInvoice, setSendingInvoice] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [localJobs, setLocalJobs] = useState<any[]>(jobs || []);
   const [suppliers, setSuppliers] = useState<{
@@ -160,11 +163,18 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
     estimateNumber: '',
     customerName: '',
     customerAddress: '',
+    billToAddress: '',
+    billToAddressEnabled: true,
     poNumber: '',
     project: '',
     jobId: jobId || '',
+    rep: '',
+    dueDate: '',
+    paymentCredits: 0,
+    balanceDue: '',
     lineItems: [{
       id: Math.random().toString(36).substring(2, 9),
+      productId: null,
       qty: 1,
       item: '',
       description: '',
@@ -173,11 +183,13 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
       total: 0,
       searchQuery: '',
       showSearchResults: false,
-      supplierId: 1
+      supplierId: 1,
+      isCustomProduct: false
     }],
     notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
     signatureText: 'ACCEPTED BY________________DATE_____',
     invoiceType: 'Estimate',
+    customInvoiceType: '',
     paymentPercentage: 0,
     estimateTotal: 0,
     paymentHistory: [] as any[]
@@ -196,6 +208,107 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
     }
   }, [currentJob, jobId])
 
+  // Populate data from viewInvoiceData when in view mode
+  useEffect(() => {
+    if (isViewMode && viewInvoiceData) {
+      console.log('Setting customer data:', {
+        customer_name: viewInvoiceData?.contractor?.contractor_name,
+        address: viewInvoiceData?.contractor?.address
+      });
+
+      const customerName = viewInvoiceData?.contractor?.contractor_name ?? viewInvoiceData?.customer?.customer_name;
+      const customerAddress = viewInvoiceData?.contractor?.address ??viewInvoiceData?.customer?.address;
+      const project = viewInvoiceData?.estimate_title || 'No project name';
+
+      console.log('Processed customer data:', { customerName, customerAddress, project });
+
+      // Force update with multiple approaches
+      const updateData = () => {
+        console.log('Updating inlineInvoiceData with:', { customerName, customerAddress, project });
+
+        setInlineInvoiceData(prev => {
+          const newData = {
+            ...prev,
+            date: viewInvoiceData.estimate_date || new Date().toISOString().split('T')[0],
+            estimateNumber: viewInvoiceData.invoice_number || '',
+            customerName: customerName,
+            customerAddress: customerAddress,
+            billToAddress: viewInvoiceData.bill_to_address || '',
+            billToAddressEnabled: !!viewInvoiceData.bill_to_address,
+            poNumber: viewInvoiceData.po_number || '',
+            project: project,
+            jobId: viewInvoiceData.job_id || '',
+            rep: viewInvoiceData.rep || '',
+            dueDate: viewInvoiceData.due_date || '',
+            paymentCredits: viewInvoiceData.payment_credits || 0,
+            balanceDue: viewInvoiceData.balance_due || '',
+            notes: viewInvoiceData.notes || 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
+            invoiceType: viewInvoiceData.invoice_type === 'estimate' ? 'Estimate' :
+              viewInvoiceData.invoice_type === 'down_payment' ? 'Downpayment Invoice' :
+                viewInvoiceData.invoice_type === 'proposal_invoice' ? 'Rough Invoice' :
+                  viewInvoiceData.invoice_type === 'progressive_invoice' ? 'Progressive Invoice' :
+                    viewInvoiceData.invoice_type === 'final_invoice' ? 'Final Invoice' : 'Estimate',
+            lineItems: viewInvoiceData.products?.map((product: any, index: number) => ({
+              id: `item-${index}`,
+              productId: product.id,
+              qty: product.stock_quantity || 1,
+              item: product.product_name || '',
+              description: product.description,
+              rate: product.jdp_price || product.unit_cost || 0,
+              estimatedPrice: product.estimated_price || 0,
+              total: product.total_cost || 0,
+              searchQuery: '',
+              showSearchResults: false,
+              supplierId: product.supplier_id || 1,
+              isCustomProduct: true
+            })) || [{
+              id: Math.random().toString(36).substring(2, 9),
+              productId: null,
+              qty: 1,
+              item: '',
+              description: '',
+              rate: 0,
+              estimatedPrice: 0,
+              total: 0,
+              searchQuery: '',
+              showSearchResults: false,
+              supplierId: 1,
+              isCustomProduct: false
+            }]
+          };
+
+          console.log('New data being set:', newData);
+          return newData;
+        });
+
+        // Set selected job for proper display
+        if (viewInvoiceData.job) {
+          setSelectedJob(viewInvoiceData.job)
+        }
+      };
+
+      // Try multiple approaches
+      updateData();
+
+      // Force update after a delay
+      setTimeout(() => {
+        console.log('Force updating after timeout...');
+        updateData();
+      }, 100);
+
+      // Another force update
+      setTimeout(() => {
+        console.log('Second force update...');
+        setInlineInvoiceData(prev => ({
+          ...prev,
+          customerName: customerName,
+          customerAddress: customerAddress,
+          project: project
+        }));
+      }, 200);
+    }
+  }, [isViewMode, viewInvoiceData])
+
 
 
 
@@ -212,14 +325,108 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
     return inlineInvoiceData.lineItems.reduce((sum, item) => sum + item.total, 0)
   }
 
+  // Send invoice to customer function
+  const sendInvoiceToCustomer = async (invoiceId: number) => {
+    try {
+      const currentJob = jobsList.find((j: any) => j.id === inlineInvoiceData.jobId)
+      if (!currentJob) {
+        throw new Error('Job not found')
+      }
+
+      // Get token properly
+      const getAuthToken = (): string | null => {
+        if (typeof window !== "undefined") {
+          const savedAuth = localStorage.getItem("jdp_auth");
+          if (savedAuth) {
+            try {
+              const authData = JSON.parse(savedAuth);
+              if (authData.token && authData.expires > Date.now()) {
+                return authData.token;
+              }
+            } catch (error) {
+              console.error("Error parsing auth data:", error);
+            }
+          }
+        }
+        return null;
+      };
+
+      const token = getAuthToken()
+      if (!token) {
+        throw new Error('No authentication token found')
+      }
+
+      const payload = {
+        estimateNumber: inlineInvoiceData.estimateNumber || 'Draft',
+        estimateDate: new Date(inlineInvoiceData.date).toLocaleDateString('en-US', {
+          month: '2-digit',
+          day: '2-digit',
+          year: 'numeric'
+        }),
+        customerName: inlineInvoiceData.customerName || 'Customer',
+        customerEmail: currentJob.email || 'customer@example.com',
+        customerAddress: inlineInvoiceData.customerAddress || '',
+        billToAddress: inlineInvoiceData.billToAddressEnabled ? inlineInvoiceData.billToAddress || '' : '',
+        poNumber: inlineInvoiceData.poNumber || '',
+        project: inlineInvoiceData.project || '',
+        rep: inlineInvoiceData.rep || '',
+        dueDate: inlineInvoiceData.dueDate || '',
+        paymentCredits: inlineInvoiceData.paymentCredits || 0,
+        balanceDue: inlineInvoiceData.balanceDue || '',
+        lineItems: inlineInvoiceData.lineItems.map(item => ({
+          qty: item.qty,
+          item: item.item,
+          description: item.description,
+          rate: item.rate,
+          total: item.total
+        })),
+        notes: inlineInvoiceData.notes || '',
+        signatureText: inlineInvoiceData.signatureText || '',
+        invoiceType: inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType,
+        subtotal: calculateInvoiceSubtotal(),
+        total: calculateInvoiceSubtotal()
+      }
+
+      console.log('Sending invoice to customer with ID:', invoiceId)
+      console.log('Payload:', payload)
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/invoices/sendInvoiceToCustomer/${invoiceId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      })
+
+      console.log('Response status:', response.status)
+      console.log('Response:', response)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Error response:', errorText)
+        throw new Error(`Failed to send invoice to customer: ${response.status}`)
+      }
+
+      toast.success('Invoice sent successfully to customer!')
+    } catch (error) {
+      console.error('Error sending invoice to customer:', error)
+      toast.error(`Failed to send invoice to customer: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
   const updateInvoiceLineItem = (itemId: string, field: string, value: any) => {
     setInlineInvoiceData(prev => ({
       ...prev,
       lineItems: prev.lineItems.map(item => {
         if (item.id === itemId) {
           const updated = { ...item, [field]: value }
-          if (field === 'qty' || field === 'estimatedPrice') {
-            updated.total = (updated.qty || 0) * (updated.estimatedPrice || 0)
+          if (field === 'qty' || field === 'estimatedPrice' || field === 'rate') {
+            // Use estimated price if available, otherwise use rate
+            const priceToUse = updated.estimatedPrice && updated.estimatedPrice > 0
+              ? updated.estimatedPrice
+              : updated.rate
+            updated.total = (updated.qty || 0) * priceToUse
           }
           return updated
         }
@@ -233,6 +440,7 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
       ...prev,
       lineItems: [...prev.lineItems, {
         id: Math.random().toString(36).substring(2, 9),
+        productId: null,
         qty: 1,
         item: '',
         description: '',
@@ -241,7 +449,8 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
         total: 0,
         searchQuery: '',
         showSearchResults: false,
-        supplierId: selectedSupplierId || 1
+        supplierId: selectedSupplierId || 1,
+        isCustomProduct: false
       }]
     }))
   }
@@ -266,13 +475,18 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
       ...prev,
       lineItems: prev.lineItems.map(item => {
         if (item.id === itemId) {
+          const rate = product.jdpPrice || 0
+          const estimatedPrice = product.estimatedPrice || 0
+          // Use estimated price if available, otherwise use rate
+          const priceToUse = estimatedPrice > 0 ? estimatedPrice : rate
+
           return {
             ...item,
             item: product.name,
             description: product.description || '',
-            rate: product.jdpPrice || 0,
-            estimatedPrice: product.estimatedPrice || product.jdpPrice || 0,
-            total: (item.qty || 1) * (product.estimatedPrice || product.jdpPrice || 0),
+            rate: rate,
+            estimatedPrice: estimatedPrice,
+            total: (item.qty || 1) * priceToUse,
             showSearchResults: false,
             searchQuery: '',
             supplierId: product.supplierId || selectedSupplierId || 1
@@ -291,12 +505,33 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
           return {
             ...item,
             item: productName,
+            isCustomProduct: true,
             showSearchResults: false,
             searchQuery: ''
           }
         }
         return item
       })
+    }))
+  }
+
+  const addCustomLineItem = () => {
+    setInlineInvoiceData(prev => ({
+      ...prev,
+      lineItems: [...prev.lineItems, {
+        id: Math.random().toString(36).substring(2, 9),
+        productId: null,
+        qty: 1,
+        item: '',
+        description: '',
+        rate: 0,
+        estimatedPrice: 0,
+        total: 0,
+        searchQuery: '',
+        showSearchResults: false,
+        supplierId: selectedSupplierId || 1,
+        isCustomProduct: true
+      }]
     }))
   }
 
@@ -379,11 +614,14 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
       setInlineInvoiceData(prev => ({
         ...prev,
         jobId: job.id,
-        customerName: job.customerName || '',
-        customerAddress: job.location || job.address || '',
+        customerName: job.type === 'contract-based' ? (job.contractorName || job.contractor?.name || '') : (job.customerName || ''),
+        customerAddress: job.type === 'contract-based' ? (job.contractorAddress || job.contractor?.address || job.location || job.address || '') : (job.location || job.address || ''),
+        billToAddress: job.billToAddress || '',
         project: job.title || ''
       }))
     }
+    console.log(selectedJob, 'selectedJob');
+    console.log(inlineInvoiceData, 'setInlineInvoiceData');
   }
 
   const handleSaveInvoiceAsDraft = async () => {
@@ -398,13 +636,7 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
       errors.project = 'Project field is required'
     }
 
-    if (!inlineInvoiceData.poNumber) {
-      errors.poNumber = 'P.O. Number is required'
-    }
 
-    if (!inlineInvoiceData.estimateNumber) {
-      errors.estimateNumber = 'Invoice/Estimate number is required'
-    }
 
     if (inlineInvoiceData.lineItems.length === 0 || !inlineInvoiceData.lineItems[0].item) {
       errors.lineItems = 'Please add at least one product item'
@@ -417,12 +649,13 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
     }
 
     setValidationErrors({})
-    setLoading(true)
+    setSavingDraft(true)
     try {
       const subtotal = calculateInvoiceSubtotal()
       
       const customProducts = inlineInvoiceData.lineItems.map(item => ({
         product_name: item.item,
+        description: item.description || '',
         supplier_id: item.supplierId || selectedSupplierId || 1,
         supplier_sku: item.item.substring(0, 10),
         jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
@@ -438,12 +671,21 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
       const payload = {
         job_id: Number(inlineInvoiceData.jobId),
         estimate_title: inlineInvoiceData.project || currentJob?.title,
-        customer_id: Number(currentJob?.customer) || 0,
+        ...(currentJob?.type === 'contract-based'
+          ? { contractor_id: Number(currentJob?.contractor) || 0 }
+          : { customer_id: Number(currentJob?.customer) || 0 }
+        ),
         priority: 'medium' as 'low' | 'medium' | 'high',
-        service_type: 'service_based',
+        service_type: currentJob?.type === 'contract-based' ? 'contract_based' : 'service_based',
         email_address: currentJob?.email || 'customer@example.com',
         estimate_date: inlineInvoiceData.date,
-        billing_address_po_number: inlineInvoiceData.poNumber || '',
+        po_number: inlineInvoiceData.poNumber || '',
+        rep: inlineInvoiceData.rep || '',
+        due_date: inlineInvoiceData.dueDate || '',
+        payment_credits: inlineInvoiceData.paymentCredits || 0,
+        balance_due: inlineInvoiceData.balanceDue || '',
+        bill_to_address: inlineInvoiceData.billToAddressEnabled ? inlineInvoiceData.billToAddress || '' : '',
+        notes: inlineInvoiceData.notes || '',
         status: 'draft',
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
         custom_products: customProducts
@@ -465,11 +707,18 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
         estimateNumber: '',
         customerName: '',
         customerAddress: '',
+        billToAddress: '',
+        billToAddressEnabled: true,
         poNumber: '',
         project: '',
         jobId: jobId || '',
+        rep: '',
+        dueDate: '',
+        paymentCredits: 0,
+        balanceDue: '',
         lineItems: [{
           id: Math.random().toString(36).substring(2, 9),
+          productId: null,
           qty: 1,
           item: '',
           description: '',
@@ -478,11 +727,13 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
           total: 0,
           searchQuery: '',
           showSearchResults: false,
-          supplierId: 1
+          supplierId: 1,
+          isCustomProduct: false
         }],
         notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
         signatureText: 'ACCEPTED BY________________DATE_____',
         invoiceType: 'Estimate',
+        customInvoiceType: '',
         paymentPercentage: 0,
         estimateTotal: 0,
         paymentHistory: []
@@ -493,7 +744,7 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
       console.error('Error saving invoice:', error)
       toast.error('Failed to save invoice')
     } finally {
-      setLoading(false)
+      setSavingDraft(false)
     }
   }
 
@@ -509,13 +760,7 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
       errors.project = 'Project field is required'
     }
 
-    if (!inlineInvoiceData.poNumber) {
-      errors.poNumber = 'P.O. Number is required'
-    }
 
-    if (!inlineInvoiceData.estimateNumber) {
-      errors.estimateNumber = 'Invoice/Estimate number is required'
-    }
 
     if (inlineInvoiceData.lineItems.length === 0 || !inlineInvoiceData.lineItems[0].item) {
       errors.lineItems = 'Please add at least one product item'
@@ -528,12 +773,13 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
     }
 
     setValidationErrors({})
-    setLoading(true)
+    setSendingInvoice(true)
     try {
       const subtotal = calculateInvoiceSubtotal()
       
       const customProducts = inlineInvoiceData.lineItems.map(item => ({
         product_name: item.item,
+        description: item.description || '',
         supplier_id: item.supplierId || selectedSupplierId || 1,
         supplier_sku: item.item.substring(0, 10),
         jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
@@ -549,19 +795,31 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
       const payload = {
         job_id: Number(inlineInvoiceData.jobId),
         estimate_title: inlineInvoiceData.project || currentJob?.title,
-        customer_id: Number(currentJob?.customer) || 0,
+        ...(currentJob?.type === 'contract-based'
+          ? { contractor_id: Number(currentJob?.contractor) || 0 }
+          : { customer_id: Number(currentJob?.customer) || 0 }
+        ),
         priority: 'medium' as 'low' | 'medium' | 'high',
-        service_type: 'service_based',
+        service_type: currentJob?.type === 'contract-based' ? 'contract_based' : 'service_based',
         email_address: currentJob?.email || 'customer@example.com',
         estimate_date: inlineInvoiceData.date,
-        billing_address_po_number: inlineInvoiceData.poNumber || '',
+        po_number: inlineInvoiceData.poNumber || '',
+        rep: inlineInvoiceData.rep || '',
+        due_date: inlineInvoiceData.dueDate || '',
+        payment_credits: inlineInvoiceData.paymentCredits || 0,
+        balance_due: inlineInvoiceData.balanceDue || '',
+        bill_to_address: inlineInvoiceData.billToAddressEnabled ? inlineInvoiceData.billToAddress || '' : '',
+        notes: inlineInvoiceData.notes || '',
         status: 'sent',
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
         custom_products: customProducts
       }
 
-      await apiClient.createEstimate(payload as any)
-      toast.success('Invoice sent to customer!')
+      const response = await apiClient.createEstimate(payload as any)
+      toast.success('Invoice created successfully!')
+
+      // Send invoice to customer using estimate ID
+      await sendInvoiceToCustomer(response.data.id)
       
       // Refresh the estimates list
       if (onInvoiceSaved) {
@@ -576,11 +834,18 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
         estimateNumber: '',
         customerName: '',
         customerAddress: '',
+        billToAddress: '',
+        billToAddressEnabled: true,
         poNumber: '',
         project: '',
         jobId: jobId || '',
+        rep: '',
+        dueDate: '',
+        paymentCredits: 0,
+        balanceDue: '',
         lineItems: [{
           id: Math.random().toString(36).substring(2, 9),
+          productId: null,
           qty: 1,
           item: '',
           description: '',
@@ -589,11 +854,13 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
           total: 0,
           searchQuery: '',
           showSearchResults: false,
-          supplierId: 1
+          supplierId: 1,
+          isCustomProduct: false
         }],
         notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
         signatureText: 'ACCEPTED BY________________DATE_____',
         invoiceType: 'Estimate',
+        customInvoiceType: '',
         paymentPercentage: 0,
         estimateTotal: 0,
         paymentHistory: []
@@ -604,7 +871,7 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
       console.error('Error sending invoice:', error)
       toast.error('Failed to send invoice')
     } finally {
-      setLoading(false)
+      setSendingInvoice(false)
     }
   }
 
@@ -621,7 +888,7 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
       unitPrice: 0,
       total_cost: 0,
       supplierId: 1,
-      productId:0,
+      productId: 0,
     }
     setNewInvoice((prev) => ({
       ...prev,
@@ -893,7 +1160,7 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
   }, [])
 
 
-  console.log(suppliers,"supp")
+  console.log(suppliers, "supp")
     useEffect(() => {
       const fetchSuppliers = async () => {
         try {
@@ -931,25 +1198,32 @@ useEffect(() => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+      <DialogContent key={viewInvoiceData?.id || 'new-invoice'} className="max-w-4xl max-h-[90vh] overflow-auto">
         <DialogHeader>
           <DialogTitle>Create New Invoice</DialogTitle>
           <DialogDescription>
-            Step {currentStep} of 6: Create a comprehensive invoice for your project
+            Create a comprehensive invoice for your project
           </DialogDescription>
         </DialogHeader>
 
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="mb-6"
+        >
         <Card className="bg-white shadow-lg border-2 border-primary/20">
                       {/* Invoice Type Selector */}
                       <div className="p-6 border-b border-gray-200 bg-gray-50">
                         <div className="flex items-center gap-4">
                           <Label className="text-primary font-semibold">Invoice Type:</Label>
+                <div className="relative w-[250px]">
                           <Select 
                             value={inlineInvoiceData.invoiceType} 
-                            onValueChange={(value: any) => setInlineInvoiceData(prev => ({ ...prev, invoiceType: value }))}
+                    onValueChange={(value) => setInlineInvoiceData(prev => ({ ...prev, invoiceType: value }))}
                           >
-                            <SelectTrigger className="w-[250px] border-primary/30">
-                              <SelectValue />
+                    <SelectTrigger className="border-primary/30 focus:border-primary">
+                      <SelectValue placeholder="Select invoice type..." />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="Estimate">Estimate</SelectItem>
@@ -957,47 +1231,64 @@ useEffect(() => {
                               <SelectItem value="Rough Invoice">Rough Invoice</SelectItem>
                               <SelectItem value="Progressive Invoice">Progressive Invoice</SelectItem>
                               <SelectItem value="Final Invoice">Final Invoice</SelectItem>
+                      <SelectItem value="Custom">+ Add Custom</SelectItem>
                             </SelectContent>
                           </Select>
+                </div>
+                {inlineInvoiceData.invoiceType === 'Custom' && (
+                  <div className="relative w-[300px]">
+                    <Input
+                      value={inlineInvoiceData.customInvoiceType}
+                      onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customInvoiceType: e.target.value }))}
+                      placeholder="Enter custom invoice type name..."
+                      className="border-primary/30 focus:border-primary"
+                    />
+                  </div>
+                )}
                         </div>
                       </div>
 
                       <div className="p-8">
                         {/* Header */}
-                        <div className="flex justify-between items-start mb-8">
+              <div className="flex justify-between items-end mb-8">
                           <div className="flex-shrink-0">
-                            <Logo width={200} height={75} /> 
+                  <Image
+                    src='/assets/logos/logo-jdp.png'
+                    alt="logo"
+                    width={168}
+                    height={63}
+                    className='w-[140px] '
+                  />
                           </div>
 
                           <div className="text-right">
-                            <h1 className="text-2xl font-bold mb-4">{inlineInvoiceData.invoiceType}</h1>
-                            <div className="grid grid-cols-2 gap-2">
+                  <h1 className="text-2xl font-bold mb-4">{inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType}</h1>
+                            <div className="grid grid-cols-2">
                               <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">Date</Label>
                               <Input
                                 value={inlineInvoiceData.date}
                                 onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, date: e.target.value }))}
                                 className="px-3 py-2 text-sm"
+                      readOnly={isViewMode}
                               />
+                  </div>
+                  {/* Show Estimate Number only in view mode */}
+                  {isViewMode && (
+                    <div className="grid grid-cols-2">
                               <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">
                                 {inlineInvoiceData.invoiceType === 'Estimate' ? 'Estimate #' : 'Invoice #'}
                               </Label>
                               <div>
                                 <Input
-                                  value={inlineInvoiceData.estimateNumber}
-                                  onChange={(e) => {
-                                    setInlineInvoiceData(prev => ({ ...prev, estimateNumber: e.target.value }))
-                                    setValidationErrors(prev => ({ ...prev, estimateNumber: '' }))
-                                  }}
-                                  className={`px-3 py-2 text-sm ${validationErrors.estimateNumber ? 'border-red-500' : ''}`}
-                                />
-                                {validationErrors.estimateNumber && (
-                                  <p className="text-red-500 text-xs mt-1">{validationErrors.estimateNumber}</p>
-                                )}
-                              </div>
-                            </div>
+                          value={inlineInvoiceData.estimateNumber || viewInvoiceData?.invoice_number || ''}
+                          className="px-3 py-2 text-sm"
+                          disabled={true}
+                        />
+                      </div>
+                    </div>
+                  )}
                           </div>
                         </div>
- 
 
                         {/* Job Selection */}
                         <div className="mb-6">
@@ -1006,11 +1297,14 @@ useEffect(() => {
                             <Select 
                               value={inlineInvoiceData.jobId?.toString() || ''} 
                               onValueChange={(value) => {
+                      if (!isViewMode) {
                                 handleJobSelection(value)
                                 setValidationErrors(prev => ({ ...prev, jobId: '' }))
+                      }
                               }}
+                    disabled={isViewMode}
                             >
-                              <SelectTrigger className={`border-primary/30 focus:border-primary bg-white ${validationErrors.jobId ? 'border-red-500' : ''}`}>
+                    <SelectTrigger className={`border-primary/30 focus:border-primary bg-white ${validationErrors.jobId ? 'border-red-500' : ''} ${isViewMode ? 'opacity-50' : ''}`}>
                                 <SelectValue placeholder="Select a job..." />
                               </SelectTrigger>
                               <SelectContent>
@@ -1031,201 +1325,162 @@ useEffect(() => {
                           </div>
                         </div>
 
+              {/* Bill To Section */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between bg-gray-600 text-white px-3 py-2 mb-0">
+                  <div className="flex items-center">
+                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-6a1 1 0 00-1-1H9a1 1 0 00-1 1v6a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clipRule="evenodd" />
+                    </svg>
+                    <Label className="text-sm font-semibold">Bill To (Billing Address)</Label>
+                  </div>
+                  <div className="flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => setInlineInvoiceData(prev => ({ ...prev, billToAddressEnabled: !prev.billToAddressEnabled }))}
+                      className={`mr-2 px-3 py-1 rounded text-xs font-medium transition-colors ${inlineInvoiceData.billToAddressEnabled
+                        ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                        : 'bg-green-100 text-green-700 hover:bg-green-200'
+                        }`}
+                    >
+                      {inlineInvoiceData.billToAddressEnabled ? (
+                        <>
+                          <svg className="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                          Disable
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                          </svg>
+                          Enable
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+                {inlineInvoiceData.billToAddressEnabled && (
+                  <Textarea
+                    value={inlineInvoiceData.billToAddress || ''}
+                    onChange={(e) => setInlineInvoiceData({ ...inlineInvoiceData, billToAddress: e.target.value })}
+                    className="mt-0 border-0 rounded-none"
+                    placeholder="Enter billing address (defaults to customer/supplier address, can be edited)"
+                    rows={3}
+                    readOnly={isViewMode}
+                  />
+                )}
+                {!inlineInvoiceData.billToAddressEnabled && (
+                  <div className="bg-gray-50 p-3 text-sm text-gray-600">
+                    <div className="flex items-center">
+                      <svg className="w-4 h-4 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      This address defaults to the customer/supplier address but can be changed if billing address differs from job location
+                    </div>
+                  </div>
+                )}
+              </div>
+
                         {/* Customer Information */}
                         <div className="mb-6">
-                          <Label className="block bg-gray-600 text-white px-3 py-2 mb-0 text-sm font-semibold">Name / Address</Label>
+                <Label className="block bg-gray-600 text-white px-3 py-2 mb-0 text-sm font-semibold">Customer Name / Address</Label>
                           <div className="border border-gray-300 p-4 min-h-[120px]">
+
                             <Input
-                              value={inlineInvoiceData.customerName}
+                    value={selectedJob?.type === 'contract-based' ? (selectedJob?.contractorName || selectedJob?.contractor?.name || inlineInvoiceData.customerName) : inlineInvoiceData.customerName}
                               onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customerName: e.target.value }))}
                               className="mb-2 border-0 p-0 focus-visible:ring-0"
-                              placeholder="Customer Name"
+                    placeholder={selectedJob?.type === 'contract-based' ? 'Contractor Name' : 'Customer Name'}
                               readOnly
                             />
-                            <Textarea
-                              value={inlineInvoiceData.customerAddress}
-                              onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customerAddress: e.target.value }))}
-                              className="border-0 p-0 resize-none focus-visible:ring-0"
-                              rows={3}
-                              placeholder="Customer Address"
-                              readOnly
-                            />
+                  <Textarea
+                    value={selectedJob?.type === 'contract-based' ? (selectedJob?.contractorAddress || selectedJob?.contractor?.address || inlineInvoiceData.customerAddress) : inlineInvoiceData.customerAddress}
+                    onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customerAddress: e.target.value }))}
+                    className="border-0 p-0 resize-none focus-visible:ring-0"
+                    rows={3}
+                    placeholder={selectedJob?.type === 'contract-based' ? 'Contractor Address' : 'Customer Address'}
+                    readOnly
+                  />
                           </div>
                         </div>
 
                         {/* PO and Project */}
-                        {/* <div className="mb-6">
-                          <div className="grid grid-cols-2 gap-0">
+              <div className="mb-6">
+                <div className="grid grid-cols-3 gap-0">
                             <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">P.O. No.</Label>
+                  <Label className="bg-gray-600 text-white px-3 py-2 text-center text-sm font-semibold">Project</Label>
+                  <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">Rep</Label>
                            </div>
-                          <div className="grid grid-cols-2 gap-0">
+                <div className="grid grid-cols-3 gap-0">
                             <div>
                               <Input
                                 value={inlineInvoiceData.poNumber}
-                                onChange={(e) => {
-                                  setInlineInvoiceData(prev => ({ ...prev, poNumber: e.target.value }))
-                                  setValidationErrors(prev => ({ ...prev, poNumber: '' }))
-                                }}
-                                className={`px-3 py-2 text-sm rounded-none border-t-0 ${validationErrors.poNumber ? 'border-red-500' : ''}`}
+                      onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, poNumber: e.target.value }))}
+                      className="px-3 py-2 text-sm rounded-none border-t-0"
                                 placeholder="PO Number"
+                      readOnly={isViewMode}
                               />
-                              {validationErrors.poNumber && (
-                                <p className="text-red-500 text-xs mt-1 px-2">{validationErrors.poNumber}</p>
-                              )}
                             </div>
-                            <div>
                               <Input
-                                value={inlineInvoiceData.project}
-                                onChange={(e) => {
-                                  setInlineInvoiceData(prev => ({ ...prev, project: e.target.value }))
-                                  setValidationErrors(prev => ({ ...prev, project: '' }))
-                                }}
-                                className={`px-3 py-2 text-sm rounded-none border-t-0 ${validationErrors.project ? 'border-red-500' : ''}`}
-                                readOnly
-                              />
-                              {validationErrors.project && (
-                                <p className="text-red-500 text-xs mt-1 px-2">{validationErrors.project}</p>
-                              )}
+                    value={inlineInvoiceData.project || ''}
+                    onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, project: e.target.value }))}
+                    className="px-3 py-2 text-sm rounded-none border-t-0"
+                    placeholder="Project"
+                    readOnly={isViewMode}
+                  />
+                  <Input
+                    value={inlineInvoiceData.rep}
+                    onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, rep: e.target.value }))}
+                    className="px-3 py-2 text-sm rounded-none border-t-0"
+                    placeholder="Rep"
+                    readOnly={isViewMode}
+                  />
                             </div>
                           </div>
-                        </div> */}
-                      {/* Estimate Selection - Only show for payment invoices */}
-                      {/* {inlineInvoiceData.invoiceType !== 'Estimate' && (
-                        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                          <Label className="text-primary font-semibold mb-2 block">Select Estimate</Label>
-                          <Select 
-                            value={selectedEstimateId || ''} 
-                            onValueChange={(value) => handleEstimateSelection(value)}
-                          >
-                            <SelectTrigger className="border-primary/30 focus:border-primary bg-white">
-                              <SelectValue placeholder="Select an estimate to link..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {getAvailableEstimates().map((estimate: any) => (
-                                <SelectItem key={estimate.id} value={estimate.id}>
-                                  {estimate.invoice_number} - {estimate.estimate_title} (${(estimate.total_amount || 0).toLocaleString()})
-                                </SelectItem>
-                              ))}
-                              {getAvailableEstimates().length === 0 && (
-                                <SelectItem value="none" disabled>No estimates available</SelectItem>
-                              )}
-                            </SelectContent>
-                          </Select>
-                          {selectedEstimateId && (
-                            <p className="text-sm text-muted-foreground mt-2">
-                              Estimate Total: ${inlineInvoiceData.estimateTotal?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                              {inlineInvoiceData.paymentHistory && inlineInvoiceData.paymentHistory.length > 0 && (
-                                <> • Previous Payments: ${inlineInvoiceData.paymentHistory.reduce((sum, p) => sum + p.amount, 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</>
-                              )}
-                            </p>
-                          )}
-                        </div>
-                      )} */}
 
-                      {/* Header Section */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label className="text-primary">Invoice Type</Label>
-                          <Select 
-                            value={inlineInvoiceData.invoiceType} 
-                            onValueChange={(value: any) => {
-                              // Set default payment percentage based on invoice type
-                              let defaultPercentage = 0.5
-                              if (value === 'Downpayment Invoice') defaultPercentage = 0.5
-                              else if (value === 'Rough Invoice') defaultPercentage = 0.3
-                              else if (value === 'Progressive Invoice') defaultPercentage = 0.15
-                              else if (value === 'Final Invoice') defaultPercentage = 0.05
-                              
-                              setInlineInvoiceData(prev => ({ 
-                                ...prev, 
-                                invoiceType: value,
-                                paymentPercentage: value !== 'Estimate' ? defaultPercentage : 0
-                              }))
-                            }}
-                          >
-                            <SelectTrigger className="border-primary/30 focus:border-primary">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Estimate">Estimate</SelectItem>
-                              <SelectItem value="Downpayment Invoice">Downpayment Invoice</SelectItem>
-                              <SelectItem value="Rough Invoice">Rough Invoice</SelectItem>
-                              <SelectItem value="Progressive Invoice">Progressive Invoice</SelectItem>
-                              <SelectItem value="Final Invoice">Final Invoice</SelectItem>
-                            </SelectContent>
-                          </Select>
+              <div className="mb-6">
+                <div className="grid grid-cols-3 gap-0">
+                  <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">Due Date</Label>
+                  <Label className="bg-gray-600 text-white px-3 py-2 text-center text-sm font-semibold">Payment / Credits</Label>
+                  <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">Balance Due</Label>
                         </div>
-                        {inlineInvoiceData.invoiceType !== 'Estimate' && (
-                          <div className="space-y-2">
-                            <Label className="text-primary">Payment %</Label>
+                <div className="grid grid-cols-3 gap-0">
+                  <div>
                             <Input
-                              type="number"
-                              min="0"
-                              max="100"
-                              value={(inlineInvoiceData.paymentPercentage || 0) * 100}
-                              onChange={(e) => setInlineInvoiceData(prev => ({ 
-                                ...prev, 
-                                paymentPercentage: parseFloat(e.target.value) / 100 
-                              }))}
-                              className="border-primary/30 focus:border-primary"
-                              placeholder="e.g., 50"
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              {inlineInvoiceData.invoiceType === 'Downpayment Invoice' && 'Default: 50%'}
-                              {inlineInvoiceData.invoiceType === 'Rough Invoice' && 'Default: 30%'}
-                              {inlineInvoiceData.invoiceType === 'Progressive Invoice' && 'Default: 15%'}
-                              {inlineInvoiceData.invoiceType === 'Final Invoice' && 'Remaining balance'}
-                            </p>
+                      type="date"
+                      value={inlineInvoiceData.dueDate}
+                      onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, dueDate: e.target.value }))}
+                      className="px-3 py-2 text-sm rounded-none border-t-0"
+                      readOnly={isViewMode}
+                    />
                           </div>
-                        )}
-                        <div className="space-y-2">
-                          <Label className="text-primary">Date</Label>
                           <Input
-                            value={inlineInvoiceData.date}
-                            onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, date: e.target.value }))}
-                            className="border-primary/30 focus:border-primary"
+                    value={inlineInvoiceData.paymentCredits}
+                    onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, paymentCredits: parseFloat(e.target.value) || 0 }))}
+                    className="px-3 py-2 text-sm rounded-none border-t-0"
+                    placeholder="Payment / Credits"
+                    readOnly={isViewMode}
+                  />
+                          <Input
+                    value={inlineInvoiceData.balanceDue}
+                    onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, balanceDue: e.target.value }))}
+                    className="px-3 py-2 text-sm rounded-none border-t-0"
+                    placeholder="Balance Due"
+                    readOnly={isViewMode}
                           />
                         </div>
-                        <div className="space-y-2">
-                          <Label className="text-primary">Invoice Number</Label>
-                          <Input
-                            value={inlineInvoiceData.estimateNumber}
-                            onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, estimateNumber: e.target.value }))}
-                            className="border-primary/30 focus:border-primary"
-                          />
-                        </div>
-                        <div className="space-y-2 mb-3">
-                          <Label className="text-primary">P.O. Number</Label>
-                          <Input
-                            value={inlineInvoiceData.poNumber}
-                            onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, poNumber: e.target.value }))}
-                            className="border-primary/30 focus:border-primary"
-                            placeholder="P.O. Number"
-                          />
-                          
-                        </div>
-                      </div>
-
-                      {/* Customer Information */}
-                      
-                      <div className="space-y-2">
-                        <Label className="text-primary">Project</Label>
-                        <Input
-                          value={inlineInvoiceData.project}
-                          onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, project: e.target.value }))}
-                          className="border-primary/30 focus:border-primary"
-                        />
                       </div>
 
                         {/* Line Items Table */}
-                        <div className="mb-6 overflow-x-auto">
+              <div className="mb-6 overflow-x-auto mt-4">
                           <table className="w-full border-collapse">
                             <thead>
                               <tr className="bg-gray-600 text-white">
                                 <th className="border border-gray-300 px-3 py-2 w-16 text-sm font-semibold">Qty</th>
                                 <th className="border border-gray-300 px-3 py-2 w-48 text-sm font-semibold">Item</th>
                                 <th className="border border-gray-300 px-3 py-2 text-sm font-semibold">Description</th>
-                                <th className="border border-gray-300 px-3 py-2 w-40 text-sm font-semibold">Supplier</th>
                                 <th className="border border-gray-300 px-3 py-2 w-28 text-sm font-semibold">Rate</th>
                                 <th className="border border-gray-300 px-3 py-2 w-32 text-sm font-semibold">Estimated Price</th>
                                 <th className="border border-gray-300 px-3 py-2 w-28 text-sm font-semibold">Total</th>
@@ -1242,16 +1497,31 @@ useEffect(() => {
                                       onChange={(e) => updateInvoiceLineItem(item.id, 'qty', parseFloat(e.target.value) || 0)}
                                       className="text-center border-0 p-2"
                                       min="0"
+                            readOnly={isViewMode}
                                     />
                                   </td>
                                   <td className="border border-gray-300 p-1 relative">
+                          {item.isCustomProduct ? (
+                            <Input
+                              value={item.item}
+                              onChange={(e) => updateInvoiceLineItem(item.id, 'item', e.target.value)}
+                              className="border-0 p-2"
+                              placeholder="Enter custom item name..."
+                              readOnly={isViewMode}
+                            />
+                          ) : (
                                     <div className="relative product-search-container">
                                       <Input
                                         value={item.item}
                                         onChange={(e) => {
-                                          updateInvoiceLineItem(item.id, 'item', e.target.value)
-                                          updateInvoiceLineItem(item.id, 'searchQuery', e.target.value)
+                                  const value = e.target.value
+                                  updateInvoiceLineItem(item.id, 'item', value)
+                                  updateInvoiceLineItem(item.id, 'searchQuery', value)
                                           updateInvoiceLineItem(item.id, 'showSearchResults', true)
+                                  // Direct API call on input change
+                                  if (value && value.length > 2) {
+                                    fetchProductsList(value)
+                                  }
                                         }}
                                         onFocus={() => {
                                           if (item.item) {
@@ -1261,18 +1531,15 @@ useEffect(() => {
                                         }}
                                         className="border-0 p-2 pr-8"
                                         placeholder="Search or enter product name..."
+                                readOnly={isViewMode}
                                       />
                                       <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                     </div>
-                                    {item.showSearchResults && item.searchQuery && (
+                          )}
+                          {!item.isCustomProduct && item.showSearchResults && item.searchQuery && (
                                       <div className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1">
                                         {(() => {
                                           const filtered = getFilteredProducts(item.searchQuery || '')
-                                          
-                                          // Trigger API search
-                                          if (item.searchQuery && item.searchQuery.length > 2) {
-                                            fetchProductsList(item.searchQuery)
-                                          }
 
                                           return (
                                             <>
@@ -1321,53 +1588,51 @@ useEffect(() => {
                                   <td className="border border-gray-300 p-1">
                                     <Textarea
                                       value={item.description}
-                                      onChange={(e) => updateInvoiceLineItem(item.id, 'description', e.target.value)}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              const words = value.trim().split(/\s+/).filter(word => word.length > 0)
+                              if (words.length <= 200) {
+                                updateInvoiceLineItem(item.id, 'description', value)
+                              }
+                            }}
                                       className="border-0 p-2 min-h-[80px] resize-none leading-relaxed"
-                                      placeholder="Enter product description (up to 4 lines)"
+                            placeholder="Enter product description (max 200 words)"
                                       rows={4}
+                            readOnly={isViewMode}
                                     />
+                          <div className="text-xs text-gray-500 mt-1 text-right">
+                            {item.description ? item.description.trim().split(/\s+/).filter(word => word.length > 0).length : 0}/200 words
+                          </div>
                                   </td>
+
                                   <td className="border border-gray-300 p-1">
-                                    <Select
-                                      value={item.supplierId?.toString() || '1'}
-                                      onValueChange={(value) => updateInvoiceLineItem(item.id, 'supplierId', Number(value))}
-                                    >
-                                      <SelectTrigger className="border-0">
-                                        <SelectValue placeholder="Supplier" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {suppliersList.length > 0 ? (
-                                          suppliersList.map((supplier) => (
-                                            <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                                              {supplier.name}
-                                            </SelectItem>
-                                          ))
-                                        ) : (
-                                          <SelectItem value="1">Loading...</SelectItem>
-                                        )}
-                                      </SelectContent>
-                                    </Select>
-                                  </td>
-                                  <td className="border border-gray-300 p-1">
+                          <div className="relative">
+                            <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
                                     <Input
                                       type="number"
                                       value={item.rate}
                                       onChange={(e) => updateInvoiceLineItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
-                                      className="text-right border-0 p-2"
+                              className="text-right border-0 p-2 pl-6"
                                       min="0"
                                       step="0.01"
+                              readOnly={isViewMode}
                                     />
+                          </div>
                                   </td>
                                   <td className="border border-gray-300 p-1">
+                          <div className="relative">
+                            <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
                                     <Input
                                       type="number"
                                       value={item.estimatedPrice || ""}
                                       onChange={(e) => updateInvoiceLineItem(item.id, 'estimatedPrice', parseFloat(e.target.value) || 0)}
-                                      className="text-right border-0 p-2"
+                              className="text-right border-0 p-2 pl-6"
                                       min="0"
                                       step="0.01"
                                       placeholder="0.00"
+                              readOnly={isViewMode}
                                     />
+                          </div>
                                   </td>
                                   <td className="border border-gray-300 p-2 text-right">
                                     ${item.total.toFixed(2)}
@@ -1388,7 +1653,7 @@ useEffect(() => {
                               ))}
                               {/* Subtotal Row */}
                               <tr>
-                                <td colSpan={6} className="border border-gray-300 p-2"></td>
+                      <td colSpan={5} className="border border-gray-300 p-2"></td>
                                 <td className="border border-gray-300 p-2 text-right font-bold">
                                   ${calculateInvoiceSubtotal().toFixed(2)}
                                 </td>
@@ -1397,15 +1662,25 @@ useEffect(() => {
                             </tbody>
                           </table>
 
-                          {/* Add Line Item Button */}
+                {/* Add Buttons */}
+                <div className="mt-4 flex gap-3">
                           <Button
                             onClick={addInvoiceLineItem}
                             variant="outline"
-                            className="mt-4 border-dashed border-2 border-primary text-primary hover:bg-primary/5"
+                    className="border-dashed border-2 border-primary text-primary hover:bg-primary/5"
                           >
                             <Plus className="h-4 w-4 mr-2" />
                             Add Line Item
                           </Button>
+                  <Button
+                    onClick={addCustomLineItem}
+                    variant="outline"
+                    className="border-dashed border-2 border-green-500 text-green-600 hover:bg-green-50"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Custom
+                  </Button>
+                </div>
                           {validationErrors.lineItems && (
                             <p className="text-red-500 text-xs mt-2">{validationErrors.lineItems}</p>
                           )}
@@ -1419,10 +1694,20 @@ useEffect(() => {
                                 <td className="border border-gray-300 p-3 bg-white text-sm" style={{ minHeight: '120px' }}>
                                   <Textarea
                                     value={inlineInvoiceData.notes}
-                                    onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, notes: e.target.value }))}
+                          onChange={(e) => {
+                            const value = e.target.value
+                            const words = value.trim().split(/\s+/).filter(word => word.length > 0)
+                            if (words.length <= 200) {
+                              setInlineInvoiceData(prev => ({ ...prev, notes: value }))
+                            }
+                          }}
                                     className="w-full min-h-[100px] border-0 p-0 focus-visible:ring-0 resize-none"
                                     placeholder="NOTES&#10;JDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE"
+                          readOnly={isViewMode}
                                   />
+                        <div className="text-xs text-gray-500 mt-1 text-right">
+                          {inlineInvoiceData.notes ? inlineInvoiceData.notes.trim().split(/\s+/).filter(word => word.length > 0).length : 0}/200 words
+                        </div>
                                 </td>
                               </tr>
                             </tbody>
@@ -1448,17 +1733,50 @@ useEffect(() => {
                               </div>
                             </div>
                           </div>
+                <div className='text-center text-sm text-blue-500 font-bold'>
+                  <p>1432 Oakpointe Drive Waconia, MN 55387 paul@jdpelectric.us</p>
                         </div>
+              </div>
+              <div className="secnacher">
+                {/* Customer Acceptance Section */}
+                <div className="mt-8">
+                  {/* Top separator line */}
+                  <div className="border-t border-gray-300 mb-6"></div>
 
-                        {/* Company Footer */}
-                        {/* <div className="text-center text-xs">
-                          <p className="text-blue-600 font-semibold">
-                            1432 Oakpointe Drive Waconia, MN 55387 <span className="text-blue-700">paul@jdpelectric.us</span>
-                          </p>
-                        </div> */}
+                  {/* Customer Acceptance Header */}
+                  <div className="flex justify-between items-center mb-5">
+                    <div className="flex flex-col">
+                      <div className="text-sm font-medium text-gray-700 mb-1">Customer Acceptance</div>
+                      <div className="text-sm font-medium text-gray-700">Authorized Signature</div>
+                    </div>
+                    <div className="text-sm font-medium text-gray-700">Date</div>
+                  </div>
+
+                  {/* Signature Fields */}
+                  <div className="flex justify-between items-center mb-5">
+                    <div className="flex flex-col w-3/5">
+                      <div className="border-b border-gray-800 h-0.5 mb-2"></div>
+                      <div className="text-xs text-gray-700 text-center">Signature</div>
+                    </div>
+                    <div className="flex flex-col w-1/3">
+                      <div className="border-b border-gray-800 h-0.5 mb-2"></div>
+                      <div className="text-xs text-gray-700 text-center">Date</div>
+                    </div>
+                  </div>
+
+                  {/* Disclaimer Box */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mt-5">
+                    <div className="text-xs text-gray-700 leading-relaxed">
+                      By signing above, you agree to the terms and pricing outlined in this estimate. This becomes a binding agreement upon signature.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
                       </div>
 
                       {/* Action Buttons */}
+            {!isViewMode && (
                       <div className="border-t bg-gray-50 px-8 py-6">
                         <div className="flex items-center justify-between">
                           <Button
@@ -1479,9 +1797,10 @@ useEffect(() => {
                                 variant="outline"
                                 size="lg"
                                 className="border-primary text-primary hover:bg-primary/5"
+                        disabled={savingDraft || sendingInvoice}
                               >
                                 <FileText className="h-5 w-5 mr-2" />
-                                Save as Draft
+                        {savingDraft ? 'Saving...' : 'Save as Draft'}
                               </Button>
                             </motion.div>
 
@@ -1490,15 +1809,102 @@ useEffect(() => {
                                 onClick={handlePreviewAndSend}
                                 size="lg"
                                 className="bg-primary hover:bg-primary/90 text-white"
+                        disabled={savingDraft || sendingInvoice}
                               >
                                 <Eye className="h-5 w-5 mr-2" />
-                                Preview & Send to Customer
+                        {sendingInvoice ? 'Sending...' : 'Preview & Send to Customer'}
                               </Button>
                             </motion.div>
                           </div>
                         </div>
                       </div>
+            )}
+
+            {/* View Mode - Only Close Button */}
+            {isViewMode && (
+              <div className="border-t bg-gray-50 px-8 py-6">
+                <div className="flex justify-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => onOpenChange(false)}
+                    className="border-gray-300"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
                     </Card>
+        </motion.div>
+        {/* <div className="mb-6">
+                          <div className="grid grid-cols-2 gap-0">
+                            <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">P.O. No.</Label>
+                           </div>
+                          <div className="grid grid-cols-2 gap-0">
+                            <div>
+                              <Input
+                                value={inlineInvoiceData.poNumber}
+                                onChange={(e) => {
+                                  setInlineInvoiceData(prev => ({ ...prev, poNumber: e.target.value }))
+                                  setValidationErrors(prev => ({ ...prev, poNumber: '' }))
+                                }}
+                                className={`px-3 py-2 text-sm rounded-none border-t-0 ${validationErrors.poNumber ? 'border-red-500' : ''}`}
+                                placeholder="PO Number"
+                              />
+                              {validationErrors.poNumber && (
+                                <p className="text-red-500 text-xs mt-1 px-2">{validationErrors.poNumber}</p>
+                              )}
+                            </div>
+                            <div>
+                              <Input
+                                value={inlineInvoiceData.project}
+                                onChange={(e) => {
+                                  setInlineInvoiceData(prev => ({ ...prev, project: e.target.value }))
+                                  setValidationErrors(prev => ({ ...prev, project: '' }))
+                                }}
+                                className={`px-3 py-2 text-sm rounded-none border-t-0 ${validationErrors.project ? 'border-red-500' : ''}`}
+                                readOnly
+                              />
+                              {validationErrors.project && (
+                                <p className="text-red-500 text-xs mt-1 px-2">{validationErrors.project}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div> */}
+        {/* Estimate Selection - Only show for payment invoices */}
+        {/* {inlineInvoiceData.invoiceType !== 'Estimate' && (
+                        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                          <Label className="text-primary font-semibold mb-2 block">Select Estimate</Label>
+                          <Select 
+                            value={selectedEstimateId || ''} 
+                            onValueChange={(value) => handleEstimateSelection(value)}
+                          >
+                            <SelectTrigger className="border-primary/30 focus:border-primary bg-white">
+                              <SelectValue placeholder="Select an estimate to link..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {getAvailableEstimates().map((estimate: any) => (
+                                <SelectItem key={estimate.id} value={estimate.id}>
+                                  {estimate.invoice_number} - {estimate.estimate_title} (${(estimate.total_amount || 0).toLocaleString()})
+                                </SelectItem>
+                              ))}
+                              {getAvailableEstimates().length === 0 && (
+                                <SelectItem value="none" disabled>No estimates available</SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                          {selectedEstimateId && (
+                            <p className="text-sm text-muted-foreground mt-2">
+                              Estimate Total: ${inlineInvoiceData.estimateTotal?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                              {inlineInvoiceData.paymentHistory && inlineInvoiceData.paymentHistory.length > 0 && (
+                                <> • Previous Payments: ${inlineInvoiceData.paymentHistory.reduce((sum, p) => sum + p.amount, 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</>
+                              )}
+                            </p>
+                          )}
+                        </div>
+                      )} */}
+
 
       </DialogContent>
     </Dialog>

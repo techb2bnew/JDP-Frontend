@@ -519,12 +519,14 @@ useEffect(() => {
         jdp_sku: formData.jdpSku,
         supplier_cost_price: formData.supplierCostPrice,
         markup_percentage: formData.markupPercentage,
+        markup_amount: formData.markupAmount,
+        jdp_price: formData.jdpPrice,
         stock_quantity: formData.stockQuantity,
         unit: formData.unit,
         status: formData.status,
         system_ip: systemIP,
-        unit_cost:formData.unit_cost,
-      estimated_price:formData.estimated_price
+        unit_cost: formData.unit_cost,
+        estimated_price: formData.estimated_price
       };
 
       let response;
@@ -807,6 +809,7 @@ useEffect(() => {
 
       const responseData = await response.json();
       console.log('Products API Response:', responseData);
+      console.log('Pagination Data:', responseData.data.pagination);
 
       if (responseData.success && responseData.data) {
         // Transform API response to match component's expected format
@@ -837,6 +840,7 @@ useEffect(() => {
 
         setProducts(transformedProducts);
         setTotalProducts(responseData.data.pagination?.totalItems || transformedProducts.length);
+        setTotalPages(responseData.data.pagination?.totalPages || 1);
         
         // Extract unique categories from products
         const uniqueCategories = Array.from(new Set(transformedProducts.map((product:any) => product.category).filter(Boolean))) as string[];
@@ -1338,9 +1342,10 @@ useEffect(() => {
 {totalPages > 0 && (
   <div className="flex items-center justify-between px-4 py-3 border-t">
     <div className="text-sm text-muted-foreground">
-      {/* Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalProducts)} of {totalProducts} products */}
+      Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalProducts)} of {totalProducts} products
     </div>
     <div className="flex items-center gap-2">
+    
       <Button
         variant="outline"
         size="sm"
@@ -1350,13 +1355,13 @@ useEffect(() => {
         Previous
       </Button>
       <span className="text-sm">
-        Page {currentPage} of {Math.ceil(totalPages / itemsPerPage)}
+        Page {currentPage} of {totalPages}
       </span>
       <Button
         variant="outline"
         size="sm"
         onClick={() => setCurrentPage(prev => prev + 1)}
-        disabled={currentPage >= Math.ceil(totalPages / itemsPerPage) || isLoadingProducts}
+        disabled={currentPage >= totalPages || isLoadingProducts}
       >
         Next
       </Button>

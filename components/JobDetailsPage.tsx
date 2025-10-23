@@ -226,7 +226,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       0
     );
 
- 
+
 
   job.estimatedCost || 0
   const totalHours = timeLogs.reduce((sum, log) => sum + log.hoursWorked, 0)
@@ -271,7 +271,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const [estimateToDelete, setEstimateToDelete] = useState<any | null>(null);
   const [printInvoiceId, setPrintInvoiceId] = useState<number | null>(null);
   const [showPrintMount, setShowPrintMount] = useState(false);
-
+  const [totalEstimates, setTotalEstimates] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
   const [projectSummary, setProjectSummary] = useState<{
     jobEstimate: number;
     materialsCost: number;
@@ -282,11 +284,11 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   // Function to parse labor IDs and fetch labor data
   const parseLaborIds = async (laborIdsString: string, isLeadLabor: boolean = false) => {
     if (!laborIdsString) return [];
-    
+
     try {
       const laborIds = JSON.parse(laborIdsString);
       if (!Array.isArray(laborIds)) return [];
-      
+
       const laborData = [];
       for (const id of laborIds) {
         try {
@@ -387,7 +389,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const [customInvoiceTypes, setCustomInvoiceTypes] = useState<string[]>([])
   const [customerData, setCustomerData] = useState<any>(null)
   const [contractorData, setContractorData] = useState<any>(null)
-
+  const [InvoioiceNumber, setInvoioiceNumber] = useState('')
   // Clean duplicate custom types (case-insensitive)
   const cleanCustomTypes = (types: string[]) => {
     const seen = new Set<string>()
@@ -416,7 +418,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     project: job.title || '',
     rep: '',
     dueDate: '',
-    paymentCredits: '',
+    paymentCredits: 0,
     balanceDue: '',
     lineItems: [{
       id: Math.random().toString(36).substring(2, 9),
@@ -490,9 +492,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         //       : job.status
         //   : 'unknown',
       };
- 
 
-      const response = await apiClient.updateJob(jobId, updatePayload); 
+
+      const response = await apiClient.updateJob(jobId, updatePayload);
 
       // Update the job data with the new labor assignments
       const updatedJob = {
@@ -538,12 +540,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     }
   };
 
- 
+
   const currentInvoice = selectedInvoiceId == null
     ? undefined
     : estimates.find(inv => Number(inv.id) === selectedInvoiceId);
 
- 
+
 
 
   const handleCancel = async () => {
@@ -702,10 +704,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     }
   };
 
-  const handleEditTimeLog = async (labor: any) => { 
+  const handleEditTimeLog = async (labor: any) => {
     try {
       // Fetch detailed labor data from API
-      const laborDetails = await apiClient.getLaborById(labor.id); 
+      const laborDetails = await apiClient.getLaborById(labor.id);
 
       // Check if this is assigned labor or custom labor
       const isAssignedLabor = job.assignedLaborDetails && job.assignedLaborDetails.some((al: any) => al.id === labor.id);
@@ -860,6 +862,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     try {
       const response = await apiClient.getEstimatesByJob(jobId, 1, 10);
       setEstimates(response.data.estimates || []);
+      setTotalEstimates(response.data.total || 0);
+      setInvoioiceNumber(response.data.estimates[0]?.invoice_number || '')
     } catch (error) {
       console.error('Failed to fetch estimates:', error);
     } finally {
@@ -906,7 +910,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
       const printWindow = window.open('', '_blank');
       if (!printWindow) return;
- 
+
 
       printWindow.document.write(`
       <html>
@@ -1164,11 +1168,11 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   };
 
   const refreshJobData = async () => {
-    try { 
-      const updatedJobData = await apiClient.getJobById(jobId); 
+    try {
+      const updatedJobData = await apiClient.getJobById(jobId);
       const updatedJobs = jobs.map((j: any) => j.id === jobId ? updatedJobData : j);
       setJobs(updatedJobs);
- 
+
     } catch (error) {
       console.error('Error refreshing job data:', error);
       toast.error('Failed to refresh job data');
@@ -1225,7 +1229,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
 
 
- 
+
   useEffect(() => {
     const fetchSuppliers = async () => {
       try {
@@ -1268,7 +1272,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     const fetchDashboard = async () => {
       try {
         setIsLoadingDashboard(true);
-        const res = await apiClient.getJobDashboard(jobId); 
+        const res = await apiClient.getJobDashboard(jobId);
         setDashboardMetrics(res.data.dashboardMetrics);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -1381,7 +1385,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       lineItems: prev.lineItems.map(item => {
         if (item.id === itemId) {
           const updated = { ...item, [field]: value }
-          
+
           // Update total calculation based on the logic:
           // If both rate and estimatedPrice are provided, use estimatedPrice
           // If only rate is provided, use rate
@@ -1389,7 +1393,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
             const qty = updated.qty || 0
             const rate = updated.rate || 0
             const estimatedPrice = updated.estimatedPrice || 0
-            
+
             // If estimatedPrice is provided and greater than 0, use it
             // Otherwise, use rate
             const priceToUse = estimatedPrice > 0 ? estimatedPrice : rate
@@ -1456,26 +1460,26 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
   // Fetch customer data
   const fetchCustomerData = async (customerId: string) => {
-    try { 
+    try {
       const response = await apiClient.getCustomers(1, 100) // Get all customers 
-      const customers = response.data?.customers || response.data?.data || response.data || [] 
-      const customer = customers.find((c: any) => c.id === Number(customerId)) 
+      const customers = response.data?.customers || response.data?.data || response.data || []
+      const customer = customers.find((c: any) => c.id === Number(customerId))
       if (customer) {
-        setCustomerData(customer) 
+        setCustomerData(customer)
         // Update customer address in inline invoice data
-        const newAddress = customer.address || customer.customer_address || '' 
-        
+        const newAddress = customer.address || customer.customer_address || ''
+
         // Force update with setTimeout to ensure state update
         setTimeout(() => {
-          setInlineInvoiceData(prev => { 
+          setInlineInvoiceData(prev => {
             const updated = {
               ...prev,
               customerAddress: newAddress
-            } 
+            }
             return updated
           })
         }, 100)
-      } else { 
+      } else {
         setCustomerData(null)
       }
     } catch (error) {
@@ -1491,9 +1495,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       const contractor = contractors.find((c: any) => c.id === Number(contractorId))
       if (contractor) {
         setContractorData(contractor)
+        console.log(contractor, 'contractor')
         // Update contractor address in inline invoice data
         const newAddress = contractor.address || contractor.contractor_address || ''
-        
+        console.log(newAddress, 'newAddress')
         // Force update with setTimeout to ensure state update
         setTimeout(() => {
           setInlineInvoiceData(prev => {
@@ -1649,218 +1654,215 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
   const handlePrintInvoice = async (invoice: any) => {
     try {
-      // Debug: Log invoice data to see structure 
+      // Temp container (same)
+      const tempElement = document.createElement('div');
+      tempElement.id = 'temp-invoice-preview';
+      tempElement.style.position = 'absolute';
+      tempElement.style.left = '-10000px';
+      tempElement.style.top = '0';
+      tempElement.style.width = '8.5in';
+      tempElement.style.background = '#ffffff';
+      tempElement.style.padding = '32px';
+      tempElement.style.pointerEvents = 'none';
+      tempElement.style.fontFamily = 'Arial, sans-serif';
+      tempElement.style.lineHeight = '1.4';
+      tempElement.style.boxSizing = 'border-box';
 
-      // Create a temporary invoice preview element with invoice data
-      const tempElement = document.createElement('div')
-      tempElement.id = 'temp-invoice-preview'
-      tempElement.style.position = 'absolute'
-      tempElement.style.left = '-10000px'
-      tempElement.style.top = '0'
-      tempElement.style.width = '8.5in'
-      tempElement.style.background = '#ffffff'
-      tempElement.style.padding = '32px'
-      tempElement.style.pointerEvents = 'none'
-      tempElement.style.fontFamily = 'Arial, sans-serif'
-      tempElement.style.lineHeight = '1.4'
-      tempElement.style.boxSizing = 'border-box'
-
-      // Generate invoice preview HTML with better page break handling
+      // === YOUR SAME HTML (unchanged) ===
       const invoiceHtml = `
-        <div style="font-family: Arial, sans-serif; page-break-inside: avoid;">
-          <!-- Header -->
-          <div style="display: flex; justify-content: space-between;   ">
+      <div style="font-family: Arial, sans-serif; page-break-inside: avoid;">
+        <!-- Header (wrapped) -->
+        <div id="print-header">
+          <div style="display:flex;justify-content:space-between">
             <div>
-              <div style="width: 200px; height: 60px; background: url('/assets/logos/logo-jdp.png') no-repeat center center; background-size: contain;">
-              </div> 
-              <div style="margin-top: 8px; font-size: 14px; color: #6b7280;">952-449-1088</div>
-              
+              <div style="width:200px;height:60px;background:url('/assets/logos/logo-jdp.png') no-repeat center center;background-size:contain;"></div>
+              <div style="margin-top:8px;font-size:14px;color:#6b7280;">952-449-1088</div>
             </div>
-            <div style="display: flex;  ">
-              <div style="background: #1f2937; color: white; padding: 16px; text-align: center; border: 2px solid #1f2937; width:150px;">
-                <div style="font-size: 16px; font-weight: bold;">ESTIMATE</div>
+            <div style="display:flex;">
+              <div style="background:#1f2937;color:#fff;padding:16px;text-align:center;border:2px solid #1f2937;width:150px;">
+                <div style="font-size:16px;font-weight:bold;">ESTIMATE</div>
               </div>
-              <div style="background: white; color: #374151; padding: 16px; text-align: center; border: 2px solid #e5e7eb; width:150px;">
-                <div style="font-size: 16px; font-weight: bold;">${new Date(inlineInvoiceData.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</div>
+              <div style="background:#fff;color:#374151;padding:16px;text-align:center;border:2px solid #e5e7eb;width:150px;">
+                <div style="font-size:16px;font-weight:bold;">${new Date(inlineInvoiceData.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</div>
               </div>
             </div>
           </div>
-          <div style="display: flex; justify-content: flex-end; margin-bottom: 24px;">
-            <div style="display: flex;">
-              <div style="background: #1f2937; color: white; padding: 16px; text-align: center; border: 2px solid #1f2937; width:150px;">
-                <div style="font-size: 16px; font-weight: bold;">ESTIMATE #</div>
+ 
+          <div style="display:flex;justify-content:flex-end;margin-bottom:24px;">
+            <div style="display:flex;">
+              <div style="background:#1f2937;color:#fff;padding:16px;text-align:center;border:2px solid #1f2937;width:150px;">
+                <div style="font-size:16px;font-weight:bold;">ESTIMATE #</div>
               </div>
-              <div style="background: white; color: #374151; padding: 16px; text-align: center; border: 2px solid #e5e7eb; width:150px;">
-                <div style="font-size: 16px; font-weight: bold;">${invoice.invoice_number || 'INV-2025-029'}</div>
+              <div style="background:#fff;color:#374151;padding:16px;text-align:center;border:2px solid #e5e7eb;width:150px;">
+                <div style="font-size:16px;font-weight:bold;">${InvoioiceNumber || 'INV-2025-029'}</div>
               </div>
             </div>
           </div>
- ${(invoice.bill_to_address || invoice.billing_address) ? ` 
-   <div style="background: #1f2937; color: white; height: 36px; display: flex; align-items: center; margin-bottom: 8px;">
-            <div style="font-size: 14px; font-weight: bold; margin-left: 16px;">Bill To</div>
+        </div>
+ 
+        ${(invoice.bill_to_address || invoice.billing_address) ? `
+        <div style="background:#1f2937;color:#fff;height:36px;display:flex;align-items:center;margin-bottom:8px;">
+          <div style="font-size:14px;font-weight:bold;margin-left:16px;">Bill To</div>
+        </div>
+        <div style="background:#fff;border:2px solid #e5e7eb;padding:12px;color:#374151;font-size:14px;margin-bottom:16px;">
+          ${invoice.bill_to_address || invoice.billing_address}
+        </div>` : ''}
+ 
+        <div style="background:#1f2937;color:#fff;height:36px;display:flex;align-items:center;margin-bottom:8px; ${(invoice.bill_to_address || invoice.billing_address) ? '' : 'margin-top:15px;'}">
+          <div style="font-size:14px;font-weight:bold;margin-left:16px;">To</div>
+        </div>
+        <div style="background:#fff;border:2px solid #e5e7eb;padding:12px;margin-bottom:24px;">
+          <div style="font-weight:600;font-size:16px;color:#374151;">
+            ${job.type === 'contract-based'
+          ? (contractorData?.name || contractorData?.contractor_name || invoice.customer_name || 'Contractor')
+          : (invoice.customer_name || invoice.customer?.name || job.customerName || 'Customer')}
           </div>
-  <div style="background: white; border: 2px solid #e5e7eb; padding: 12px; color: #374151; font-size: 14px; margin-bottom: 16px;">${invoice.bill_to_address || invoice.billing_address}
-  </div>` : ''}
-          <!-- To Section -->
-          <div style="background: #1f2937; color: white; height: 36px; display: flex; align-items: center; margin-bottom: 8px; ${(invoice.bill_to_address || invoice.billing_address) ? '' : 'margin-top: 15px;'}">
-            <div style="font-size: 14px; font-weight: bold; margin-left: 16px;">To</div>
+          <div style="color:#6b7280;font-size:14px;margin-top:4px;">
+            ${inlineInvoiceData.customerAddress || invoice.customer_address || invoice.customer?.address || job.location || 'Address'}
           </div>
-          <div style="background: white; border: 2px solid #e5e7eb; padding: 12px; margin-bottom: 24px;">
-            <div style="font-weight: 600; font-size: 16px; color: #374151;">${job.type === 'contract-based' 
-              ? (contractorData?.name || contractorData?.contractor_name || invoice.customer_name || 'Contractor')
-              : (invoice.customer_name || invoice.customer?.name || job.customerName || 'Customer')
-            }</div>
-            <div style="color: #6b7280; font-size: 14px; margin-top: 4px;">${inlineInvoiceData.customerAddress || invoice.customer_address || invoice.customer?.address || job.location || 'Address'}</div>
-          </div>
-
-          <!-- Project Details -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px;">
-            <div>
-              <div style="background: #1f2937; color: white; height: 36px; display: flex; align-items: center; margin-bottom: 8px;">
-                <div style="font-size: 14px; font-weight: bold; margin-left: 16px;">P.O. No.</div>
-              </div>
-              <div style="background: white; border: 2px solid #e5e7eb; padding: 12px; color: #374151; font-size: 14px;">${invoice.po_number || 'DFRG-678'}</div>
+        </div>
+ 
+        <!-- Project Details -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px;">
+          <div>
+            <div style="background:#1f2937;color:#fff;height:36px;display:flex;align-items:center;margin-bottom:8px;">
+              <div style="font-size:14px;font-weight:bold;margin-left:16px;">P.O. No.</div>
             </div>
-            <div>
-              <div style="background: #1f2937; color: white; height: 36px; display: flex; align-items: center; margin-bottom: 8px;">
-                <div style="font-size: 14px; font-weight: bold; margin-left: 16px;">Project</div>
-              </div>
-              <div style="background: white; border: 2px solid #e5e7eb; padding: 12px; color: #374151; font-size: 14px;">${invoice.estimate_title || invoice.job_title || job.title || 'tech-gb-job'}</div>
-            </div>
+            <div style="background:#fff;border:2px solid #e5e7eb;padding:12px;color:#374151;font-size:14px;">${invoice.po_number || 'DFRG-678'}</div>
           </div>
-
-          <!-- Rep and Due Date Table -->
-          <div style="margin-bottom: 24px;">
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db;">
-              <thead>
-                <tr style="background: #f3f4f6;">
-                  <th style="border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; font-size: 14px; font-weight: 600; color: #374151;">Rep</th>
-                  <th style="border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; font-size: 14px; font-weight: 600; color: #374151;">Due Date</th>
+          <div>
+            <div style="background:#1f2937;color:#fff;height:36px;display:flex;align-items:center;margin-bottom:8px;">
+              <div style="font-size:14px;font-weight:bold;margin-left:16px;">Project</div>
+            </div>
+            <div style="background:#fff;border:2px solid #e5e7eb;padding:12px;color:#374151;font-size:14px;">${invoice.estimate_title || invoice.job_title || job.title || 'tech-gb-job'}</div>
+          </div>
+        </div>
+ 
+        <!-- Rep & Due -->
+        <div style="margin-bottom:24px;">
+          <table style="width:100%;border-collapse:collapse;border:1px solid #d1d5db;">
+            <thead>
+              <tr style="background:#f3f4f6;">
+                <th style="border:1px solid #d1d5db;padding:8px 12px;text-align:left;font-size:14px;font-weight:600;color:#374151;">Rep</th>
+                <th style="border:1px solid #d1d5db;padding:8px 12px;text-align:left;font-size:14px;font-weight:600;color:#374151;">Due Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="border:1px solid #d1d5db;padding:8px 12px;font-size:14px;color:#374151;">${inlineInvoiceData.rep || 'JDP'}</td>
+                <td style="border:1px solid #d1d5db;padding:8px 12px;font-size:14px;color:#374151;">
+                  ${inlineInvoiceData.dueDate ? new Date(inlineInvoiceData.dueDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : '10/17/2025'}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+ 
+        <!-- Line Items -->
+        <div style="margin-bottom:32px;page-break-inside:avoid;">
+          <table style="width:100%;border-collapse:collapse;border:1px solid #d1d5db;margin-bottom:16px;page-break-inside:avoid;">
+            <thead>
+              <tr style="background:#1f2937;color:#fff;">
+                <th style="border:1px solid #d1d5db;padding-bottom:15px;padding-left:12px;text-align:left;font-size:14px;font-weight:600;">Qty</th>
+                <th style="border:1px solid #d1d5db;padding-bottom:15px;padding-left:12px;text-align:left;font-size:14px;font-weight:600;">Item</th>
+                <th style="border:1px solid #d1d5db;padding-bottom:15px;padding-left:12px;text-align:left;font-size:14px;font-weight:600;">Description</th>
+                <th style="border:1px solid #d1d5db;padding-bottom:15px;padding-right:12px;text-align:right;font-size:14px;font-weight:600;">Rate</th>
+                <th style="border:1px solid #d1d5db;padding-bottom:15px;padding-right:12px;text-align:right;font-size:14px;font-weight:600;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${invoice.products?.map((p: any) => `
+                <tr style="border-bottom:1px solid #e5e7eb;">
+                  <td style="border:1px solid #d1d5db;padding:12px 16px;font-size:14px;font-weight:500;">${p.stock_quantity || 1}</td>
+                  <td style="border:1px solid #d1d5db;padding:12px 16px;font-weight:600;font-size:14px;">${p.product_name || 'Item'}</td>
+                  <td style="border:1px solid #d1d5db;padding:12px 16px;font-size:13px;color:#6b7280;line-height:1.4;">${p.description || ''}</td>
+                  <td style="border:1px solid #d1d5db;padding:12px 16px;text-align:right;font-size:14px;font-weight:500;">$${(p.estimated_price || 0).toFixed(2)}</td>
+                  <td style="border:1px solid #d1d5db;padding:12px 16px;text-align:right;font-weight:600;font-size:14px;">$${(p.total_cost || 0).toFixed(2)}</td>
                 </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style="border: 1px solid #d1d5db; padding: 8px 12px; font-size: 14px; color: #374151;">${inlineInvoiceData.rep || 'JDP'}</td>
-                  <td style="border: 1px solid #d1d5db; padding: 8px 12px; font-size: 14px; color: #374151;">${inlineInvoiceData.dueDate ? new Date(inlineInvoiceData.dueDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : '10/17/2025'}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Line Items Table -->
-          <div style="margin-bottom: 32px; page-break-inside: avoid;">
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; margin-bottom: 16px; page-break-inside: avoid;">
-              <thead>
-                <tr style="background: #1f2937; color: white;">
-                  <th style="border: 1px solid #d1d5db;  padding-bottom:15px; padding-left:12px; text-align: left; font-size: 14px; font-weight: 600;">Qty</th>
-                  <th style="border: 1px solid #d1d5db;  padding-bottom:15px; padding-left:12px; text-align: left; font-size: 14px; font-weight: 600;">Item</th>
-                  <th style="border: 1px solid #d1d5db;  padding-bottom:15px; padding-left:12px; text-align: left; font-size: 14px; font-weight: 600;">Description</th>
-                  <th style="border: 1px solid #d1d5db;  padding-bottom:15px; padding-right:12px; text-align: right; font-size: 14px; font-weight: 600;">Rate</th>
-                  <th style="border: 1px solid #d1d5db;  padding-bottom:15px; padding-right:12px; text-align: right; font-size: 14px; font-weight: 600;">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${invoice.products?.map((product: any) => `
-                  <tr style="border-bottom: 1px solid #e5e7eb;">
-                    <td style="border: 1px solid #d1d5db; padding: 12px 16px; font-size: 14px; font-weight: 500;">${product.stock_quantity || 1}</td>
-                    <td style="border: 1px solid #d1d5db; padding: 12px 16px; font-weight: 600; font-size: 14px;">${product.product_name || 'Item'}</td>
-                    <td style="border: 1px solid #d1d5db; padding: 12px 16px; font-size: 13px; color: #6b7280; line-height: 1.4;">${product.description || ''}</td>
-                    <td style="border: 1px solid #d1d5db; padding: 12px 16px; text-align: right; font-size: 14px; font-weight: 500;">$${(product.estimated_price || 0).toFixed(2)}</td>
-                    <td style="border: 1px solid #d1d5db; padding: 12px 16px; text-align: right; font-weight: 600; font-size: 14px;">$${(product.total_cost || 0).toFixed(2)}</td>
-                  </tr>
-                `).join('') || ''}
-              </tbody>
-            </table>
-            
-            <!-- Subtotal -->
-            <div style="display: flex; justify-content: end; margin-top: 20px;">
-              <div style="text-align: right;">
-                <div style="font-weight: bold; font-size: 20px; color: #1f2937;">$${(invoice.total_amount || 0).toFixed(2)}</div>
-              </div>
+              `).join('') || ''}
+            </tbody>
+          </table>
+ 
+          <div style="display:flex;justify-content:end;margin-top:20px;">
+            <div style="text-align:right;">
+              <div style="font-weight:bold;font-size:20px;color:#1f2937;">$${(invoice.total_amount || 0).toFixed(2)}</div>
             </div>
-            
-            <!-- Payment/Credits and Balance Due -->
-            <div style="display: flex; justify-content: end; margin-top: 16px;">
-              <div style="text-align: right; min-width: 200px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                  <span style="font-size: 14px; color: #374151;">Payments / Credits:</span>
-                  <span style="font-size: 14px; color: #374151;">$${parseFloat(inlineInvoiceData.paymentCredits || '0').toFixed(2)}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; background: #f3f4f6; padding: 8px 12px; border-radius: 4px;">
-                  <span style="font-weight: bold; font-size: 14px; color: #374151;">Balance Due:</span>
-                  <span style="font-weight: bold; font-size: 14px; color: #374151;">$${parseFloat(inlineInvoiceData.balanceDue || (invoice.total_amount || 0).toString()).toFixed(2)}</span>
-                </div>
+          </div>
+ 
+          <div style="display:flex;justify-content:end;margin-top:16px;">
+            <div style="text-align:right;min-width:200px;">
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                <span style="font-size:14px;color:#374151;">Payments / Credits:</span>
+                <span style="font-size:14px;color:#374151;">$${(inlineInvoiceData.paymentCredits || 0).toFixed(2)}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;background:#f3f4f6;padding:8px 12px;border-radius:4px;">
+                <span style="font-weight:bold;font-size:14px;color:#374151;">Balance Due:</span>
+                <span style="font-weight:bold;font-size:14px;color:#374151;">$${parseFloat(inlineInvoiceData.balanceDue || (invoice.total_amount || 0).toString()).toFixed(2)}</span>
               </div>
             </div>
           </div>
-
-          <!-- Notes Section -->
-          <div style="border-top: 2px solid #e5e7eb; padding-top: 20px; margin-bottom: 32px;">
-            <div style="background: #f3f4f6; padding: 16px; border-radius: 6px; text-align: center; border: 1px solid #e5e7eb;">
-              <div style="font-size: 14px; font-weight: 500; white-space: pre-line; color: #374151;">${invoice.notes || 'Final payment to complete project billing'}</div>
-            </div>
+        </div>
+ 
+        <!-- Notes -->
+        <div style="border-top:2px solid #e5e7eb;padding-top:20px;margin-bottom:32px;">
+          <div style="background:#f3f4f6;padding:16px;border-radius:6px;text-align:center;border:1px solid #e5e7eb;">
+            <div style="font-size:14px;font-weight:500;white-space:pre-line;color:#374151;">${invoice.notes || 'Final payment to complete project billing'}</div>
           </div>
-
-          <!-- Customer Acceptance Section -->
-          <div style="margin-bottom: 32px; page-break-inside: avoid;">
-          
-            <!-- Disclaimer -->
-          <div style="font-size: 11px; color: #6b7280; margin-bottom: 32px; line-height: 1.5;">
-            <p style="margin: 0;">
-              JDP is not responsible for repair of lamps & landscaping, house owner utilities including cables, 
-              sprinkler systems, television or telephone cables, etc. that may be cut or damaged during installation. 
+        </div>
+ 
+        <!-- Acceptance -->
+        <div style="margin-bottom:32px;page-break-inside:avoid;">
+          <div style="font-size:11px;color:#6b7280;margin-bottom:32px;line-height:1.5;">
+            <p style="margin:0;">
+              JDP is not responsible for repair of lamps & landscaping, house owner utilities including cables,
+              sprinkler systems, television or telephone cables, etc. that may be cut or damaged during installation.
               Price are subject to change prior to receipt of down payment.
             </p>
           </div>
-
-          <!-- Total and Contact -->
-          <div style="text-align: center; margin-bottom: 32px;">
-            <div style="font-size: 28px; font-weight: bold; margin-bottom: 20px; color: #1f2937;">Total $${(invoice.total_amount || 0).toFixed(2)}</div>
-            <div style="font-size: 14px; color: blue; font-weight: 500;">
-              EMAIL: jen@jdpelectric.us 952-449-1088
+ 
+          <div style="text-align:center;margin-bottom:32px;">
+            <div style="font-size:28px;font-weight:bold;margin-bottom:20px;color:#1f2937;">Total $${(invoice.total_amount || 0).toFixed(2)}</div>
+            <div style="font-size:14px;color:blue;font-weight:500;">EMAIL: jen@jdpelectric.us 952-449-1088</div>
+          </div>
+ 
+          <div style="border-top:1px solid #e5e7eb;margin-bottom:24px;"></div>
+ 
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <div style="display:flex;flex-direction:column;">
+              <div style="font-size:14px;font-weight:500;color:#374151;margin-bottom:4px;">Customer Acceptance</div>
+              <div style="font-size:14px;font-weight:500;color:#374151;">Authorized Signature</div>
+            </div>
+            <div style="font-size:14px;font-weight:500;color:#374151;">Date</div>
+          </div>
+ 
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <div style="display:flex;flex-direction:column;width:60%;">
+              <div style="border-bottom:1px solid #374151;height:2px;margin-bottom:8px;"></div>
+              <div style="font-size:12px;color:#374151;text-align:center;">Signature</div>
+            </div>
+            <div style="display:flex;flex-direction:column;width:30%;">
+              <div style="border-bottom:1px solid #374151;height:2px;margin-bottom:8px;"></div>
+              <div style="font-size:12px;color:#374151;text-align:center;">Date</div>
             </div>
           </div>
-
-            <!-- Top separator line -->
-            <div style="border-top: 1px solid #e5e7eb; margin-bottom: 24px;"></div>
-            
-            <!-- Customer Acceptance Header -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-              <div style="display: flex; flex-direction: column;">
-                <div style="font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 4px;">Customer Acceptance</div>
-                <div style="font-size: 14px; font-weight: 500; color: #374151;">Authorized Signature</div>
-              </div>
-              <div style="font-size: 14px; font-weight: 500; color: #374151;">Date</div>
-            </div>
-
-            <!-- Signature Fields -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-              <div style="display: flex; flex-direction: column; width: 60%;">
-                <div style="border-bottom: 1px solid #374151; height: 2px; margin-bottom: 8px;"></div>
-                <div style="font-size: 12px; color: #374151; text-align: center;">Signature</div>
-              </div>
-              <div style="display: flex; flex-direction: column; width: 30%;">
-                <div style="border-bottom: 1px solid #374151; height: 2px; margin-bottom: 8px;"></div>
-                <div style="font-size: 12px; color: #374151; text-align: center;">Date</div>
-              </div>
-            </div>
-            
-            <!-- Disclaimer Box -->
-            <div style="background: #e0f2fe; border: 1px solid #81d4fa; border-radius: 6px; padding: 16px; margin-top: 20px;">
-              <div style="font-size: 12px; color: #374151; line-height: 1.4;">
-                By signing above, you agree to the terms and pricing outlined in this estimate. This becomes a binding agreement upon signature.
-              </div>
+ 
+          <div style="background:#e0f2fe;border:1px solid #81d4fa;border-radius:6px;padding:16px;margin-top:20px;">
+            <div style="font-size:12px;color:#374151;line-height:1.4;">
+              By signing above, you agree to the terms and pricing outlined in this estimate. This becomes a binding agreement upon signature.
             </div>
           </div>
-
-          
         </div>
-      `
+      </div>
+    `;
 
-      tempElement.innerHTML = invoiceHtml
-      document.body.appendChild(tempElement) 
+      tempElement.innerHTML = invoiceHtml;
+      document.body.appendChild(tempElement);
 
-      // Generate PDF using the same logic as preview
+      // Header height in CSS px
+      const headerEl = tempElement.querySelector('#print-header') as HTMLElement | null;
+      const headerCssPx = Math.ceil(headerEl?.getBoundingClientRect().height || 0);
+
+      // Render to canvas
       const canvas = await html2canvas(tempElement, {
         scale: 2,
         useCORS: true,
@@ -1873,58 +1875,105 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         scrollY: 0,
         windowWidth: tempElement.scrollWidth,
         windowHeight: tempElement.scrollHeight
-      })
+      });
 
-      const imageData = canvas.toDataURL('image/png') 
+      // ------ FIX 1: convert CSS px -> SCALED canvas px ------
+      const scaleX = canvas.width / tempElement.scrollWidth;
 
-      // Create PDF using jsPDF - simple approach with footer space
-      const pdf = new jsPDF('p', 'mm', 'a4')
-      const imgWidth = 210 // A4 width in mm
-      const footerSpace = 21 // 80px converted to mm (80px * 25.4mm/inch / 96dpi ≈ 21mm)
-      const pageHeight = 295 - footerSpace // A4 height minus footer space (274mm)
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
-      let heightLeft = imgHeight
+      // page-top → header-bottom tak ka full band (CSS px)
+      const rootRect = tempElement.getBoundingClientRect();
+      const headRect = headerEl?.getBoundingClientRect();
+      const headerBandCssPx = Math.max(
+        1,
+        Math.ceil(((headRect?.bottom ?? 0) - rootRect.top))   // includes top whitespace
+      );
 
-      let position = 0
+      // SCALED canvas px
+      const headerPxScaled = Math.max(1, Math.round(headerBandCssPx * scaleX));
 
-      // Add first page
-      pdf.addImage(imageData, 'PNG', 0, position, imgWidth, imgHeight)
-      heightLeft -= pageHeight
 
-      // Add additional pages if needed
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight
-        pdf.addPage()
-        pdf.addImage(imageData, 'PNG', 0, position, imgWidth, imgHeight)
-        heightLeft -= pageHeight
+      // Slice header (use scaled px)
+      let headerImgData: string | null = null;
+      if (headerPxScaled > 0) {
+        const headerCanvas = document.createElement('canvas');
+        headerCanvas.width = canvas.width;
+        headerCanvas.height = headerPxScaled;
+        const hctx = headerCanvas.getContext('2d')!;
+        // slice: page top (y=0) to header bottom
+        hctx.drawImage(canvas, 0, 0, canvas.width, headerPxScaled, 0, 0, canvas.width, headerPxScaled);
+        headerImgData = headerCanvas.toDataURL('image/png');
       }
 
-      // Create PDF blob and open in print dialog
-      const pdfBlob = pdf.output('blob')
-      const pdfUrl = URL.createObjectURL(pdfBlob)
 
-      // Open PDF in new window for printing
-      const printWindow = window.open(pdfUrl, '_blank')
+      const imageData = canvas.toDataURL('image/png');
 
-      if (printWindow) {
-        printWindow.onload = () => {
-          setTimeout(() => {
-            printWindow.print()
-          }, 1000)
+      // PDF sizing
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;                 // A4 width (mm)
+      const footerSpace = 21;               // reserve bottom
+      const pageHeight = 295 - footerSpace; // usable page height
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      const pxToMm = imgWidth / canvas.width;
+
+      // ------ FIX 2: header reserve with padding ------
+      // const headerHeightMM = headerPxScaled * pxToMm * 1.05; // true header image height
+      const headerTopPadMM = 2.5;     // little cushion on top
+      const headerBottomPadMM = 2.5  // little cushion below
+      // const headerReserveMM = headerHeightMM + headerTopPadMM + headerBottomPadMM;
+
+      // const pageContentHeightMM = pageHeight - headerReserveMM;
+      const headerHeightMM = headerPxScaled * pxToMm; // includes top whitespace
+      const headerReserveMM = headerHeightMM;       // pad ki zaroorat nahi
+      const pageContentHeightMM = pageHeight - headerReserveMM;
+
+
+
+      let heightLeft = imgHeight;
+
+      // First page (full tall image as before)
+      pdf.addImage(imageData, 'PNG', 0, 0, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      // Next pages
+      while (heightLeft > 0.1) {
+        const position = heightLeft - imgHeight; // negative offset of tall image
+        pdf.addPage();
+
+        // Draw page content shifted just below headerReserve
+        // content ko header band ke turant baad start karo
+        const contentYOffset = headerReserveMM;
+        pdf.addImage(imageData, 'PNG', 0, position + contentYOffset, imgWidth, imgHeight);
+
+        // top band ko white mask (safety)
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(0, 0, imgWidth, headerReserveMM, 'F');
+
+        // header band (full-width) bilkul top se draw
+        if (headerImgData && headerHeightMM > 0) {
+          pdf.addImage(headerImgData, 'PNG', 0, 0, imgWidth, headerHeightMM);
         }
+
+
+        heightLeft -= pageContentHeightMM;
       }
 
-      // Clean up
-      document.body.removeChild(tempElement)
-      setTimeout(() => {
-        URL.revokeObjectURL(pdfUrl)
-      }, 10000)
+      // Open + print
+      const pdfBlob = pdf.output('blob');
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      const printWindow = window.open(pdfUrl, '_blank');
+      if (printWindow) {
+        printWindow.onload = () => setTimeout(() => printWindow.print(), 1000);
+      }
 
+      // Cleanup
+      document.body.removeChild(tempElement);
+      setTimeout(() => URL.revokeObjectURL(pdfUrl), 10000);
     } catch (err) {
-      console.error('Print error:', err)
-      toast.error('Failed to print invoice')
+      console.error('Print error:', err);
+      toast.error('Failed to print invoice');
     }
-  }
+  };
 
   const handleDeleteInvoice = async (invoiceId: string) => {
     setEstimateToDelete({ id: invoiceId })
@@ -2005,7 +2054,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   useEffect(() => {
     fetchProducts()
     fetchSuppliers()
-    
+
     // Fetch data based on job type
     if (job.type === 'contract-based' && job.contractor) {
       // For contract-based jobs, fetch contractor data 
@@ -2041,7 +2090,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     }
 
     // Filter out empty line items and check if we have at least one valid item
-    const validLineItems = inlineInvoiceData.lineItems.filter(item => 
+    const validLineItems = inlineInvoiceData.lineItems.filter(item =>
       item.item && item.item.trim() !== '' && item.rate > 0
     )
 
@@ -2086,20 +2135,20 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       const payload = {
         job_id: Number(jobId),
         estimate_title: inlineInvoiceData.project || job.title,
-        ...(job.type === 'contract-based' 
+        ...(job.type === 'contract-based'
           ? { contractor_id: Number(job.contractor) || 0 }
           : { customer_id: Number(job.customer?.id || job.customer) || 0 }
         ),
         priority: 'medium' as 'low' | 'medium' | 'high',
         service_type: job.type === 'contract-based' ? 'contract_based' : 'service_based',
-        email_address: job.type === 'contract-based' 
+        email_address: job.type === 'contract-based'
           ? (contractorData?.email || job.email || 'contractor@example.com')
           : (customerData?.email || job.customer?.email || job.email || 'customer@example.com'),
         estimate_date: inlineInvoiceData.date,
         po_number: inlineInvoiceData.poNumber || '',
         rep: inlineInvoiceData.rep || '',
         due_date: inlineInvoiceData.dueDate || '',
-        payment_credits: inlineInvoiceData.paymentCredits || '',
+        payment_credits: inlineInvoiceData.paymentCredits || 0,
         balance_due: inlineInvoiceData.balanceDue || '',
         ...(inlineInvoiceData.billToAddressEnabled && { bill_to_address: inlineInvoiceData.billToAddress || '' }),
         status: 'draft',
@@ -2139,9 +2188,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         poNumber: '',
         project: job.title || '',
         rep: '',
-                      dueDate: '',
-                      paymentCredits: '',
-                      balanceDue: '',
+        dueDate: '',
+        paymentCredits: 0,
+        balanceDue: '',
         lineItems: [{
           id: Math.random().toString(36).substring(2, 9),
           productId: null,
@@ -2182,7 +2231,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     }
 
     // Filter out empty line items and check if we have at least one valid item
-    const validLineItems = inlineInvoiceData.lineItems.filter(item => 
+    const validLineItems = inlineInvoiceData.lineItems.filter(item =>
       item.item && item.item.trim() !== '' && item.rate > 0
     )
 
@@ -2228,20 +2277,20 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       const payload = {
         job_id: Number(jobId),
         estimate_title: inlineInvoiceData.project || job.title,
-        ...(job.type === 'contract-based' 
+        ...(job.type === 'contract-based'
           ? { contractor_id: Number(job.contractor) || 0 }
           : { customer_id: Number(job.customer?.id || job.customer) || 0 }
         ),
         priority: 'medium' as 'low' | 'medium' | 'high',
         service_type: job.type === 'contract-based' ? 'contract_based' : 'service_based',
-        email_address: job.type === 'contract-based' 
+        email_address: job.type === 'contract-based'
           ? (contractorData?.email || job.email || 'contractor@example.com')
           : (customerData?.email || job.customer?.email || job.email || 'customer@example.com'),
         estimate_date: inlineInvoiceData.date,
         po_number: inlineInvoiceData.poNumber || '',
         rep: inlineInvoiceData.rep || '',
         due_date: inlineInvoiceData.dueDate || '',
-        payment_credits: inlineInvoiceData.paymentCredits || '',
+        payment_credits: inlineInvoiceData.paymentCredits || 0,
         balance_due: inlineInvoiceData.balanceDue || '',
         ...(inlineInvoiceData.billToAddressEnabled && { bill_to_address: inlineInvoiceData.billToAddress || '' }),
         status: 'draft',
@@ -2265,7 +2314,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
       // Refresh estimates to update count
       await fetchEstimates()
-      
+
       // Refresh dashboard data
       try {
         const res = await apiClient.getJobDashboard(jobId);
@@ -2273,7 +2322,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       }
-      
+
       // Then open preview dialog
       setShowPreviewDialog(true)
 
@@ -2299,17 +2348,17 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           day: '2-digit',
           year: 'numeric'
         }),
-        ...(job.type === 'contract-based' 
+        ...(job.type === 'contract-based'
           ? {
             customerName: inlineInvoiceData.customerName || 'Contractor',
             customerEmail: contractorData?.email || job.email || 'contractor@example.com',
             customerAddress: inlineInvoiceData.customerAddress || ''
-            }
+          }
           : {
-              customerName: inlineInvoiceData.customerName || 'Customer',
-              customerEmail: customerData?.email || job.customer?.email || job.customerEmail || 'customer@example.com',
-              customerAddress: inlineInvoiceData.customerAddress || ''
-            }
+            customerName: inlineInvoiceData.customerName || 'Customer',
+            customerEmail: customerData?.email || job.customer?.email || job.customerEmail || 'customer@example.com',
+            customerAddress: inlineInvoiceData.customerAddress || ''
+          }
         ),
         billToAddress: inlineInvoiceData.billToAddressEnabled ? inlineInvoiceData.billToAddress || '' : '',
         poNumber: inlineInvoiceData.poNumber || '',
@@ -2397,20 +2446,20 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       const backendPayload = {
         job_id: Number(jobId),
         estimate_title: inlineInvoiceData.project || job.title,
-        ...(job.type === 'contract-based' 
+        ...(job.type === 'contract-based'
           ? { contractor_id: Number(job.contractor) || 0 }
           : { customer_id: Number(job.customer?.id || job.customer) || 0 }
         ),
         priority: 'medium' as 'low' | 'medium' | 'high',
         service_type: job.type === 'contract-based' ? 'contract_based' : 'service_based',
-        email_address: job.type === 'contract-based' 
+        email_address: job.type === 'contract-based'
           ? (contractorData?.email || job.email || 'contractor@example.com')
           : (customerData?.email || job.customer?.email || job.email || 'customer@example.com'),
         estimate_date: inlineInvoiceData.date,
         po_number: inlineInvoiceData.poNumber || '',
         rep: inlineInvoiceData.rep || '',
         due_date: inlineInvoiceData.dueDate || '',
-        payment_credits: inlineInvoiceData.paymentCredits || '',
+        payment_credits: inlineInvoiceData.paymentCredits || 0,
         balance_due: inlineInvoiceData.balanceDue || '',
         ...(inlineInvoiceData.billToAddressEnabled && { bill_to_address: inlineInvoiceData.billToAddress || '' }),
         status: 'sent',
@@ -2451,9 +2500,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         poNumber: '',
         project: job.title || '',
         rep: '',
-                      dueDate: '',
-                      paymentCredits: '',
-                      balanceDue: '',
+        dueDate: '',
+        paymentCredits: 0,
+        balanceDue: '',
         lineItems: [{
           id: Math.random().toString(36).substring(2, 9),
           productId: null,
@@ -2487,10 +2536,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
   const handlePrintPreview = async () => {
     try {
-      const printElement = document.getElementById('invoice-preview-print')
+      const printElement = document.getElementById('invoice-preview-print');
       if (!printElement) {
-        toast.error('Unable to generate invoice for printing')
-        return
+        toast.error('Unable to generate invoice for printing');
+        return;
       }
 
       const canvas = await html2canvas(printElement, {
@@ -2498,58 +2547,96 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff'
-      })
+      });
+      const imageData = canvas.toDataURL('image/png');
+      const headerEl =
+        printElement.querySelector('#print-header') ||
+        printElement.querySelector('[data-print-header]') ||
+        printElement.querySelector('.print-header') ||
+        document.querySelector('#print-header');
 
-      const imageData = canvas.toDataURL('image/png')
+      const offsetTopRel = (el: HTMLElement, ancestor: HTMLElement) => {
+        let y = 0, n: any = el;
+        while (n && n !== ancestor) {
+          y += n.offsetTop || 0;
+          n = n.offsetParent;
+        }
+        return y;
+      };
 
-      // Create PDF using jsPDF (same as send function)
-      const pdf = new jsPDF('p', 'mm', 'a4')
-      const imgWidth = 210 // A4 width in mm
-      const pageHeight = 295 // A4 height in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
-      let heightLeft = imgHeight
+      let headerBandCssPx = 0;
+      if (headerEl instanceof HTMLElement) {
+        headerBandCssPx = offsetTopRel(headerEl, printElement) + headerEl.offsetHeight;
+      } else {
 
-      let position = 0
-
-      // Add image to PDF
-      pdf.addImage(imageData, 'PNG', 0, position, imgWidth, imgHeight)
-      heightLeft -= pageHeight
-
-      // Add new page if content is longer than one page
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight
-        pdf.addPage()
-        pdf.addImage(imageData, 'PNG', 0, position, imgWidth, imgHeight)
-        heightLeft -= pageHeight
+        headerBandCssPx = 180;
       }
 
-      // Create PDF blob and open in print dialog
-      const pdfBlob = pdf.output('blob')
-      const pdfUrl = URL.createObjectURL(pdfBlob)
+      const scaleX = canvas.width / printElement.scrollWidth;
+      const headerBandPx = Math.max(1, Math.round(headerBandCssPx * scaleX));
 
-      // Open PDF in new window for printing
-      const printWindow = window.open(pdfUrl, '_blank')
+      let headerImgData: string | null = null;
+      if (headerBandPx > 0) {
+        const headerCanvas = document.createElement('canvas');
+        headerCanvas.width = canvas.width;
+        headerCanvas.height = headerBandPx;
+        const hctx = headerCanvas.getContext('2d')!;
+        hctx.drawImage(
+          canvas,
+          0, 0, canvas.width, headerBandPx,
+          0, 0, canvas.width, headerBandPx
+        );
+        headerImgData = headerCanvas.toDataURL('image/png');
+      }
 
-      if (printWindow) {
-        printWindow.onload = () => {
-          setTimeout(() => {
-            printWindow.print()
-            // Don't close immediately, let user see the PDF
-            // printWindow.close()
-          }, 1000)
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const pxToMm = imgWidth / canvas.width;
+
+      const headerBandMM = headerBandPx * pxToMm;
+      const pageContentHeightMM = pageHeight - headerBandMM;
+
+      let heightLeft = imgHeight;
+
+      pdf.addImage(imageData, 'PNG', 0, 0, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0.1) {
+        const position = heightLeft - imgHeight;
+        pdf.addPage();
+
+        if (headerImgData && headerBandMM > 0) {
+
+          pdf.addImage(imageData, 'PNG', 0, position + headerBandMM, imgWidth, imgHeight);
+
+          pdf.setFillColor(255, 255, 255);
+          pdf.rect(0, 0, imgWidth, headerBandMM, 'F');
+
+          pdf.addImage(headerImgData, 'PNG', 0, 0, imgWidth, headerBandMM);
+
+          heightLeft -= pageContentHeightMM;
+        } else {
+
+          pdf.addImage(imageData, 'PNG', 0, position, imgWidth, imgHeight);
+          heightLeft -= pageHeight;
         }
       }
 
-      // Clean up URL after some time
-      setTimeout(() => {
-        URL.revokeObjectURL(pdfUrl)
-      }, 10000)
 
+      const pdfBlob = pdf.output('blob');
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      const printWindow = window.open(pdfUrl, '_blank');
+      if (printWindow) {
+        printWindow.onload = () => setTimeout(() => printWindow.print(), 800);
+      }
+      setTimeout(() => URL.revokeObjectURL(pdfUrl), 10000);
     } catch (err) {
-      console.error('Print error:', err)
-      toast.error('Failed to print invoice')
+      console.error('Print error:', err);
+      toast.error('Failed to print invoice');
     }
-  }
+  };
 
   const handleEditInvoice = async (invoice: any) => {
     try {
@@ -2558,7 +2645,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       // Fetch full estimate details from API
       const response = await apiClient.getEstimateById(invoice.id)
       const estimateData = response?.data || response
- 
+
 
       // Map products to line items
       const lineItems = estimateData.products && estimateData.products.length > 0
@@ -2598,7 +2685,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         billToAddress: estimateData.bill_to_address || job.bill_to_address || '',
         rep: estimateData.rep || '',
         dueDate: estimateData.due_date || '',
-        paymentCredits: estimateData.payment_credits || '',
+        paymentCredits: estimateData.payment_credits || 0,
         balanceDue: estimateData.balance_due || '',
         billToAddressEnabled: true,
         poNumber: estimateData.po_number || '',
@@ -3003,7 +3090,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                           ...prev,
                           assignedLeadLabor: validSelectedItems,
                         }));
- 
+
                       }}
                       placeholder="Select lead labor"
                       fetchData={apiClient.getLeadLabor}
@@ -3055,7 +3142,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                           ...prev,
                           assignedLabor: validSelectedItems,
                         }));
- 
+
                       }}
                       placeholder="Select labor"
                       fetchData={apiClient.getLabor}
@@ -3065,7 +3152,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
                   ) : (
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {(editedJob.assignedLabor || []).map((labor: any, index: number) => { 
+                      {(editedJob.assignedLabor || []).map((labor: any, index: number) => {
 
                         return (
                           <span
@@ -3143,9 +3230,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                       <X className="h-4 w-4" />
                       Cancel
                     </Button>
-                    <Button 
-                      size="sm" 
-                      className="bg-primary text-primary-foreground hover:bg-primary/90" 
+                    <Button
+                      size="sm"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
                       onClick={handleSave}
                       disabled={isSaving}
                     >
@@ -3237,7 +3324,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                       project: job.title || '',
                       rep: '',
                       dueDate: '',
-                      paymentCredits: '',
+                      paymentCredits: 0,
                       balanceDue: '',
                       lineItems: [{
                         id: Math.random().toString(36).substring(2, 9),
@@ -3388,8 +3475,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                             type="button"
                             onClick={() => setInlineInvoiceData(prev => ({ ...prev, billToAddressEnabled: !prev.billToAddressEnabled }))}
                             className={`mr-2 px-3 py-1 rounded text-xs font-medium transition-colors ${inlineInvoiceData.billToAddressEnabled
-                                ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                                : 'bg-green-100 text-green-700 hover:bg-green-200'
+                              ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                              : 'bg-green-100 text-green-700 hover:bg-green-200'
                               }`}
                           >
                             {inlineInvoiceData.billToAddressEnabled ? (
@@ -3407,7 +3494,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                                 Enable
                               </>
                             )}
-                          </button> 
+                          </button>
                         </div>
                       </div>
                       {inlineInvoiceData.billToAddressEnabled && (
@@ -3438,7 +3525,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                       </Label>
                       <div className="border border-gray-300 p-4 min-h-[120px]">
                         <Input
-                          value={job.type === 'contract-based' 
+                          value={job.type === 'contract-based'
                             ? (contractorData?.name || contractorData?.contractor_name || inlineInvoiceData.customerName)
                             : (customerData?.name || customerData?.customer_name || inlineInvoiceData.customerName)
                           }
@@ -3449,7 +3536,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                         />
                         <Textarea
                           key={`customer-address-${inlineInvoiceData.customerAddress}`}
-                          value={inlineInvoiceData.customerAddress}
+                          value={job.type === 'contract-based' ? (contractorData?.address || contractorData?.contractor_address || inlineInvoiceData.customerAddress) : inlineInvoiceData.customerAddress}
                           onChange={(e) => {
                             setInlineInvoiceData(prev => ({ ...prev, customerAddress: e.target.value }))
                           }}
@@ -3508,7 +3595,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                         </div>
                         <Input
                           value={inlineInvoiceData.paymentCredits}
-                          onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, paymentCredits: e.target.value }))}
+                          onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, paymentCredits: parseFloat(e.target.value) || 0 }))}
                           className="px-3 py-2 text-sm rounded-none border-t-0"
                           placeholder="Payment / Credits"
                         />
@@ -3823,7 +3910,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                       </div>
                       <div className='text-center text-sm text-blue-500 font-bold'>
                         <p>1432 Oakpointe Drive Waconia, MN 55387 paul@jdpelectric.us</p>
-                    </div>
+                      </div>
                     </div>
                     <div className="secnacher">
                       {/* Customer Acceptance Section */}
@@ -3885,7 +3972,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                             project: job.title || '',
                             rep: '',
                             dueDate: '',
-                            paymentCredits: '',
+                            paymentCredits: 0,
                             balanceDue: '',
                             lineItems: [{
                               id: Math.random().toString(36).substring(2, 9),
@@ -4047,7 +4134,36 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                 ))
               )}
             </div>
+            {totalEstimates > 0 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t">
+                <div className="text-sm text-muted-foreground">
+                  Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalEstimates)} of {totalEstimates} invoices
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1 || isLoadingEstimates}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm">
+                    Page {currentPage} of {Math.ceil(totalEstimates / itemsPerPage) || 1}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                    disabled={currentPage >= Math.ceil(totalEstimates / itemsPerPage) || isLoadingEstimates}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
+
         </Card>
 
 
@@ -4765,7 +4881,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                   </div>
                   <div className="text-center mb-2 flex justify-center items-center">
                     <div className="text-lg font-bold bg-gray-800 text-white p-[14px] w-[200px]">{(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType)?.toUpperCase() || 'ESTIMATE'} #</div>
-                    <div className="text-sm border border-gray-800 p-[17px] w-[200px]">{inlineInvoiceData.estimateNumber}</div>
+                    <div className="text-sm border border-gray-800 p-[17px] w-[200px]">{InvoioiceNumber}</div>
                   </div>
                 </div>
               </div>
@@ -4917,9 +5033,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                     poNumber: '',
                     project: job.title || '',
                     rep: '',
-                      dueDate: '',
-                      paymentCredits: '',
-                      balanceDue: '',
+                    dueDate: '',
+                    paymentCredits: 0,
+                    balanceDue: '',
                     lineItems: [{
                       id: Math.random().toString(36).substring(2, 9),
                       productId: null,

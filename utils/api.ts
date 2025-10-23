@@ -363,6 +363,7 @@ export const apiClient = {
         customerName: job.customer?.customer_name || job.customer?.company_name,
         contractorName:
           job.contractor?.contractor_name || job.contractor?.company_name,
+        contractorAddress: job.contractor?.address,
         createdBy: job.created_by_user?.full_name,
         assignedLeadLaborDetails: job.assigned_lead_labor || [],
         assignedLaborDetails: job.assigned_labor || [],
@@ -1961,6 +1962,7 @@ getTimesheetDashboardStats: async () => {
           company_name: contractor.company_name,
           email: contractor.email,
           phone: contractor.phone,
+          address: contractor.address,
         };
         return transformedContractor;
       }),
