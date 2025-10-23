@@ -1191,7 +1191,7 @@ useEffect(() => {
                   <TableHead>Customer / Contractor</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Order Date</TableHead>
-                  <TableHead>Invoice</TableHead>
+                  {/* <TableHead>Invoice</TableHead> */}
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1235,7 +1235,7 @@ useEffect(() => {
                       </Badge>
                     </TableCell>
                     <TableCell>{formatDate(order.orderDate)}</TableCell>
-                    <TableCell>
+                    {/* <TableCell>
                       {hasPermission('orders', 'view') && (
                         <Button 
                           variant="outline" 
@@ -1246,7 +1246,7 @@ useEffect(() => {
                           View Invoice
                         </Button>
                       )}
-                    </TableCell>
+                    </TableCell> */}
                     <TableCell>
                       {hasPermission('orders', 'view') && (
                         <Button variant="ghost" size="sm" onClick={() => fetchOrderById(order.id)}>
