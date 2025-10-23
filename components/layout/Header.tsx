@@ -181,9 +181,9 @@ export function Header({
       <header className="bg-card border-b px-6 py-4 animate-fade-in shadow-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4 gap-3 w-[70%]">
-            <h1 className="text-2xl font-medium text-foreground w-[25%]">
+            {/* <h1 className="text-2xl font-medium text-foreground w-[25%]">
               {getPageTitle(currentPath)}
-            </h1>
+            </h1> */}
 
             {/* Search */}
             {/* <div className="relative hidden md:block w-[35%]">
