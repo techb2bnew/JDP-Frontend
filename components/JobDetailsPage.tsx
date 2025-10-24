@@ -1644,9 +1644,72 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     try {
       setIsLoading(true)
       const response = await apiClient.getEstimateById(invoice.id)
-      setSelectedInvoice(response?.data || response)
-      setSelectedInvoiceId(invoice.id)
-      setShowInvoiceModal(true)
+      const invoiceData = response?.data || response
+      
+      // Populate the inline invoice form with the fetched invoice data
+      setInlineInvoiceData({
+        date: invoiceData.estimate_date || new Date().toISOString().split('T')[0],
+        estimateNumber: invoiceData.invoice_number || '',
+        customerName: invoiceData.customer_name || invoiceData.contractor?.contractor_name || '',
+        customerAddress: invoiceData.customer_address || invoiceData.contractor?.address || '',
+        billToAddress: invoiceData.bill_to_address || '',
+        billToAddressEnabled: !!invoiceData.bill_to_address,
+        poNumber: invoiceData.po_number || '',
+        project: invoiceData.estimate_title || '',
+        rep: invoiceData.rep || 'JDP',
+        dueDate: invoiceData.due_date || '',
+        paymentCredits: invoiceData.payment_credits || 0,
+        balanceDue: invoiceData.balance_due || '',
+        lineItems: invoiceData.products?.map((product: any) => ({
+          id: Math.random().toString(36).substring(2, 9),
+          productId: product.id,
+          qty: product.stock_quantity || 1,
+          item: product.product_name || '',
+          description: product.description || '',
+          rate: product.jdp_price || 0,
+          estimatedPrice: product.estimated_price || 0,
+          total: product.total_cost || 0,
+          searchQuery: '',
+          showSearchResults: false,
+          supplierId: product.supplier_id || 1,
+          isCustomProduct: true
+        })) || [{
+          id: Math.random().toString(36).substring(2, 9),
+          productId: null,
+          qty: 1,
+          item: '',
+          description: '',
+          rate: 0,
+          estimatedPrice: 0,
+          total: 0,
+          searchQuery: '',
+          showSearchResults: false,
+          supplierId: 1,
+          isCustomProduct: false
+        }],
+        notes: invoiceData.notes || 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
+        signatureText: invoiceData.signature_text || 'ACCEPTED BY________________DATE_____',
+        invoiceType: (() => {
+          if (!invoiceData.invoice_type) return 'Estimate'
+          
+          const typeMapping: { [key: string]: string } = {
+            'down_payment': 'Downpayment Invoice',
+            'rough_invoice': 'Rough Invoice',
+            'progressive_invoice': 'Progressive Invoice',
+            'final_invoice': 'Final Invoice',
+            'estimate': 'Estimate'
+          }
+          
+          return typeMapping[invoiceData.invoice_type] || invoiceData.invoice_type.charAt(0).toUpperCase() + invoiceData.invoice_type.slice(1)
+        })(),
+        customInvoiceType: invoiceData.custom_invoice_type || '',
+        paymentPercentage: 0,
+        estimateTotal: invoiceData.total_amount || 0,
+        paymentHistory: []
+      })
+      
+      // Show the preview dialog
+      setShowPreviewDialog(true)
     } catch (error) {
       console.error('Error fetching invoice details:', error)
       toast.error('Failed to load invoice details')
@@ -1656,14 +1719,14 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   }
 
   const handleDuplicateInvoice = (invoice: any) => {
-    console.log('Duplicating invoice:', invoice)
+    console.log('Duplicating invoice:', invoice) 
     
     // Populate the inline invoice form with the existing invoice data
     setInlineInvoiceData({
       date: invoice.date || new Date().toISOString().split('T')[0],
       estimateNumber: invoice.estimate_number || '',
-      customerName: invoice.customer_name || '',
-      customerAddress: invoice.customer_address || '',
+      customerName: invoice.customer_name || invoice.contractor?.contractor_name || '',
+      customerAddress: invoice.customer_address || invoice.contractor?.address || '',
       billToAddress: invoice.bill_to_address || '',
       billToAddressEnabled: !!invoice.bill_to_address,
       poNumber: invoice.po_number || '',
@@ -1672,7 +1735,20 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       dueDate: invoice.due_date || '',
       paymentCredits: invoice.payment_credits || 0,
       balanceDue: invoice.balance_due || '',
-      lineItems: invoice.products || [{
+      lineItems: invoice.products?.map((product: any) => ({
+        id: Math.random().toString(36).substring(2, 9),
+        productId: product.id,
+        qty: product.stock_quantity || 1,
+        item: product.product_name || '',
+        description: product.description || '',
+        rate: product.jdp_price || 0,
+        estimatedPrice: product.estimated_price || 0,
+        total: product.total_cost || 0,
+        searchQuery: '',
+        showSearchResults: false,
+        supplierId: product.supplier_id || 1,
+        isCustomProduct: true
+      })) || [{
         id: Math.random().toString(36).substring(2, 9),
         productId: null,
         qty: 1,
@@ -1688,12 +1764,43 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       }],
       notes: invoice.notes || 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
       signatureText: invoice.signature_text || 'ACCEPTED BY________________DATE_____',
-      invoiceType: invoice.invoice_type || 'Estimate',
+      invoiceType: (() => {
+        if (!invoice.invoice_type) return 'Estimate'
+        
+        // Map API values to form values
+        const typeMapping: { [key: string]: string } = {
+          'down_payment': 'Downpayment Invoice',
+          'rough_invoice': 'Rough Invoice',
+          'progressive_invoice': 'Progressive Invoice',
+          'final_invoice': 'Final Invoice',
+          'estimate': 'Estimate'
+        }
+        
+        return typeMapping[invoice.invoice_type] || invoice.invoice_type.charAt(0).toUpperCase() + invoice.invoice_type.slice(1)
+      })(),
       customInvoiceType: invoice.custom_invoice_type || '',
       paymentPercentage: 0,
       estimateTotal: invoice.total || 0,
       paymentHistory: []
     })
+    
+    const mappedInvoiceType = (() => {
+      if (!invoice.invoice_type) return 'Estimate'
+      
+      const typeMapping: { [key: string]: string } = {
+        'down_payment': 'Downpayment Invoice',
+        'rough_invoice': 'Rough Invoice',
+        'progressive_invoice': 'Progressive Invoice',
+        'final_invoice': 'Final Invoice',
+        'estimate': 'Estimate'
+      }
+      
+      return typeMapping[invoice.invoice_type] || invoice.invoice_type.charAt(0).toUpperCase() + invoice.invoice_type.slice(1)
+    })()
+    
+    console.log('Set invoice type to:', mappedInvoiceType)
+    console.log('Set customer name to:', invoice.customer_name || invoice.contractor?.company_name || invoice.contractor?.email || '')
+    console.log('Set customer address to:', invoice.customer_address || invoice.contractor?.address || '')
     
     // Show the inline invoice form
     setShowInlineInvoiceForm(true)
@@ -2420,6 +2527,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         })),
         subtotal: subtotal.toFixed(2),
         total: total.toFixed(2),
+        dueDate: inlineInvoiceData.dueDate || '',
+        rep: inlineInvoiceData.rep || 'JDP',
+        paymentCredits: inlineInvoiceData.paymentCredits || 0,
+        balanceDue: (subtotal - (inlineInvoiceData.paymentCredits || 0)).toFixed(2),
         notes: inlineInvoiceData.notes ? inlineInvoiceData.notes.split('\n').filter(note => note.trim()) : [],
         email: 'jen@jdpelectric.us',
         phone: '952-449-1088',
@@ -3129,7 +3240,14 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                         console.log('Lead Labor selectedValues:', values, 'Original data:', editedJob.assignedLeadLabor);
                         return values;
                       })()}
-                      selectedObjects={editedJob.assignedLeadLabor}
+                      selectedObjects={editedJob.assignedLeadLabor?.map((labor: any) => ({
+                        id: labor.id,
+                        name: labor.name || labor.user?.full_name || labor.labor_code || `Labor ${labor.id}`,
+                        labor_code: labor.labor_code,
+                        department: labor.department,
+                        specialization: labor.specialization,
+                        trade: labor.trade
+                      })) || []}
                       onSelectionChange={(selectedIds, selectedItems) => {
                         console.log('Lead Labor selection changed:', { selectedIds, selectedItems });
                         const validSelectedItems = selectedItems.filter((labor: any) => labor !== undefined);
@@ -3181,7 +3299,14 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                         console.log('Labor selectedValues:', values, 'Original data:', editedJob.assignedLabor);
                         return values;
                       })()}
-                      selectedObjects={editedJob.assignedLabor}
+                      selectedObjects={editedJob.assignedLabor?.map((labor: any) => ({
+                        id: labor.id,
+                        name: labor.name || labor.user?.full_name || labor.labor_code || `Labor ${labor.id}`,
+                        labor_code: labor.labor_code,
+                        trade: labor.trade,
+                        experience: labor.experience,
+                        hourly_rate: labor.hourly_rate
+                      })) || []}
                       onSelectionChange={(selectedIds, selectedItems) => {
                         console.log('Labor selection changed:', { selectedIds, selectedItems });
                         const validSelectedItems = selectedItems.filter((labor: any) => labor !== undefined);
@@ -3655,54 +3780,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                         />
                       </div>
                     </div>
-                    {/* Estimate Selection - Only show for payment invoices */}
-                    {/* {inlineInvoiceData.invoiceType !== 'Estimate' && (
-                        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                          <Label className="text-primary font-semibold mb-2 block">Select Estimate</Label>
-                          <Select 
-                            value={selectedEstimateId || ''} 
-                            onValueChange={(value) => handleEstimateSelection(value)}
-                          >
-                            <SelectTrigger className="border-primary/30 focus:border-primary bg-white">
-                              <SelectValue placeholder="Select an estimate to link..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {getAvailableEstimates().map((estimate: any) => (
-                                <SelectItem key={estimate.id} value={estimate.id}>
-                                  {estimate.invoice_number} - {estimate.estimate_title} (${(estimate.total_amount || 0).toLocaleString()})
-                                </SelectItem>
-                              ))}
-                              {getAvailableEstimates().length === 0 && (
-                                <SelectItem value="none" disabled>No estimates available</SelectItem>
-                              )}
-                            </SelectContent>
-                          </Select>
-                          {selectedEstimateId && (
-                            <p className="text-sm text-muted-foreground mt-2">
-                              Estimate Total: ${inlineInvoiceData.estimateTotal?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                              {inlineInvoiceData.paymentHistory && inlineInvoiceData.paymentHistory.length > 0 && (
-                                <> • Previous Payments: ${inlineInvoiceData.paymentHistory.reduce((sum, p) => sum + p.amount, 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</>
-                              )}
-                            </p>
-                          )}
-                        </div>
-                      )} */}
-
-                    {/* Header Section */}
-                    {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                         
-                          <div className="space-y-2">
-                            <Label className="text-primary">Date</Label>
-                            <Input
-                              value={inlineInvoiceData.date}
-                              onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, date: e.target.value }))}
-                              className="border-primary/30 focus:border-primary"
-                            />
-                          </div>
-
-                        </div> */}
-
+                   
                     {/* Line Items Table */}
                     <div className="mb-6 overflow-x-auto mt-4">
                       <table className="w-full border-collapse">
@@ -3813,22 +3891,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                                 )}
                               </td>
                               <td className="border border-gray-300 p-1">
-                                <Textarea
+                                <textarea
                                   value={item.description}
-                                  onChange={(e) => {
-                                    const value = e.target.value
-                                    const words = value.trim().split(/\s+/).filter(word => word.length > 0)
-                                    if (words.length <= 200) {
-                                      updateInvoiceLineItem(item.id, 'description', value)
-                                    }
-                                  }}
-                                  className="border-0 p-2 min-h-[80px] resize-none leading-relaxed"
-                                  placeholder="Enter product description (max 200 words)"
+                                  onChange={(e) => updateInvoiceLineItem(item.id, 'description', e.target.value)}
+                                  className="border-0 p-2 w-[100%]"
+                                  placeholder="Enter product description"
                                   rows={4}
                                 />
-                                <div className="text-xs text-gray-500 mt-1 text-right">
-                                  {item.description ? item.description.trim().split(/\s+/).filter(word => word.length > 0).length : 0}/200 words
-                                </div>
                               </td>
 
                               <td className="border border-gray-300 p-1">
@@ -3918,19 +3987,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                             <td className="border border-gray-300 p-3 bg-white text-sm" style={{ minHeight: '120px' }}>
                               <Textarea
                                 value={inlineInvoiceData.notes}
-                                onChange={(e) => {
-                                  const value = e.target.value
-                                  const words = value.trim().split(/\s+/).filter(word => word.length > 0)
-                                  if (words.length <= 200) {
-                                    setInlineInvoiceData(prev => ({ ...prev, notes: value }))
-                                  }
-                                }}
+                                onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, notes: e.target.value }))}
                                 className="w-full min-h-[100px] border-0 p-0 focus-visible:ring-0 resize-none"
                                 placeholder="NOTES&#10;JDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE"
                               />
-                              <div className="text-xs text-gray-500 mt-1 text-right">
-                                {inlineInvoiceData.notes ? inlineInvoiceData.notes.trim().split(/\s+/).filter(word => word.length > 0).length : 0}/200 words
-                              </div>
                             </td>
                           </tr>
                         </tbody>
@@ -4933,11 +4993,11 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                 </div>
                 <div className="text-right">
                   <div className="text-center flex justify-center items-center">
-                    <div className="text-lg font-bold bg-gray-800 text-white p-[14px] w-[200px]">{(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType)?.toUpperCase() || 'ESTIMATE'}</div>
+                    <div className="text-lg font-bold bg-gray-800 text-white p-[14px] w-[200px]">Date</div>
                     <div className="text-sm border border-gray-800 p-[17px] w-[200px]">{new Date(inlineInvoiceData.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</div>
                   </div>
                   <div className="text-center mb-2 flex justify-center items-center">
-                    <div className="text-lg font-bold bg-gray-800 text-white p-[14px] w-[200px]">{(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType)?.toUpperCase() || 'ESTIMATE'} #</div>
+                    <div className="text-lg font-bold bg-gray-800 text-white p-[14px] w-[200px]">{(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType) || 'ESTIMATE'} #</div>
                     <div className="text-sm border border-gray-800 p-[17px] w-[200px]">{InvoioiceNumber}</div>
                   </div>
                 </div>
@@ -4957,9 +5017,18 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                 <div className="text-sm font-bold">TO</div>
               </div>
               <div className="mb-6 border border-gray-800 p-3">
-                <div className="font-semibold">{inlineInvoiceData.customerName}</div>
-                <div className="text-gray-600">{inlineInvoiceData.customerAddress}</div>
-
+                <div className="font-semibold">
+                  {job.type === 'contract-based' 
+                    ? (contractorData?.name || contractorData?.contractor_name  || 'Contractor')
+                    : (customerData?.customer_name || customerData?.company_name || inlineInvoiceData.customerName || 'Customer')
+                  }
+                </div>
+                <div className="text-gray-600">
+                  {job.type === 'contract-based' 
+                    ? (contractorData?.address || inlineInvoiceData.customerAddress || '')
+                    : (customerData?.address || inlineInvoiceData.customerAddress || '')
+                  }
+                </div>
               </div>
 
               {/* Project Details */}
@@ -4972,6 +5041,24 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                   <div className="bg-gray-800 text-white text-sm font-semibold border border-gray-800 p-3">Project</div>
                   <div className="text-gray-600 border border-gray-800 p-3">{inlineInvoiceData.project}</div>
                 </div>
+              </div>
+
+              {/* Rep and Due Date */}
+              <div className="mb-4">
+                <table className="w-full border-collapse border border-gray-300">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Rep</th>
+                      <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Due Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="border border-gray-300 px-3 py-2">{inlineInvoiceData.rep || 'JDP'}</td>
+                      <td className="border border-gray-300 px-3 py-2">{inlineInvoiceData.dueDate || new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
 
               {/* Line Items Table */}
@@ -5003,6 +5090,20 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                 <div className="flex justify-end mt-4">
                   <div className="text-right">
                     <div className="font-bold text-lg">${calculateInvoiceSubtotal().toFixed(2)}</div>
+                  </div>
+                </div>
+
+                {/* Payments/Credits and Balance Due */}
+                <div className="flex justify-end mt-4">
+                  <div className="text-right w-64">
+                    <div className="flex justify-between mb-2">
+                      <span className="text-sm text-gray-600">Payments / Credits:</span>
+                      <span className="text-sm text-gray-600">${(inlineInvoiceData.paymentCredits || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between bg-gray-100 p-2 rounded">
+                      <span className="font-bold text-sm">Balance Due:</span>
+                      <span className="font-bold text-sm">${(calculateInvoiceSubtotal() - (inlineInvoiceData.paymentCredits || 0)).toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -5122,14 +5223,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               <X className="h-4 w-4" />
               Close
             </Button>
-            <Button
-              onClick={handlePrintPreview}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <Printer className="h-4 w-4" />
-              Print
-            </Button>
+             
             <Button
               onClick={handleSendFromPreview}
               disabled={isLoading}
