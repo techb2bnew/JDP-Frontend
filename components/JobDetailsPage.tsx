@@ -198,13 +198,16 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
   // Find the job from your jobs array or use sample data
   const job = jobs.find(j => j.id === jobId) || sampleJobData.job
+  
+  console.log('Job data:', job)
+  console.log('Labor timesheets:', job.labor_timesheets)
 
   // Use real job data for materials, timeLogs, and invoices
   // const materials = job.assignedMaterialsDetails || sampleJobData.materials
   // console.log(materials,"testmateris")
   const [materials, setMaterials] = useState<any[]>(job.assignedMaterialsDetails || sampleJobData.materials || []);
 
-  const timeLogs = sampleJobData.timeLogs // Keep sample data for now as we don't have time logs API
+  const timeLogs = Array.isArray(job.labor_timesheets) ? job.labor_timesheets : (Array.isArray(sampleJobData.timeLogs) ? sampleJobData.timeLogs : []) // Ensure timeLogs is always an array
   const invoices = sampleJobData.invoices // Keep sample data for now as we don't have invoices API
 
   // Calculate totals using real job data
@@ -229,7 +232,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
 
   job.estimatedCost || 0
-  const totalHours = timeLogs.reduce((sum, log) => sum + log.hoursWorked, 0)
+  const totalHours = timeLogs.reduce((sum: number, log: any) => sum + log.hoursWorked, 0)
   const totalMaterialItems = materials.reduce((sum: number, material: any) => sum + (material.stock_quantity || material.quantity || 0), 0)
   const totalLaborEntries = job.assignedLaborDetails ? job.assignedLaborDetails.length : timeLogs.length;
   const totalInvoices = invoices.length;
@@ -1376,7 +1379,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
   // Invoice Helper Functions
   const calculateInvoiceSubtotal = (): number => {
-    return inlineInvoiceData.lineItems.reduce((sum, item) => sum + item.total, 0)
+    return inlineInvoiceData.lineItems.reduce((sum, item) => sum + (item.total || 0), 0)
   }
 
   const updateInvoiceLineItem = (itemId: string, field: string, value: any) => {
@@ -1652,7 +1655,52 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     }
   }
 
+  const handleDuplicateInvoice = (invoice: any) => {
+    console.log('Duplicating invoice:', invoice)
+    
+    // Populate the inline invoice form with the existing invoice data
+    setInlineInvoiceData({
+      date: invoice.date || new Date().toISOString().split('T')[0],
+      estimateNumber: invoice.estimate_number || '',
+      customerName: invoice.customer_name || '',
+      customerAddress: invoice.customer_address || '',
+      billToAddress: invoice.bill_to_address || '',
+      billToAddressEnabled: !!invoice.bill_to_address,
+      poNumber: invoice.po_number || '',
+      project: invoice.estimate_title || '',
+      rep: invoice.rep || '',
+      dueDate: invoice.due_date || '',
+      paymentCredits: invoice.payment_credits || 0,
+      balanceDue: invoice.balance_due || '',
+      lineItems: invoice.products || [{
+        id: Math.random().toString(36).substring(2, 9),
+        productId: null,
+        qty: 1,
+        item: '',
+        description: '',
+        rate: 0,
+        estimatedPrice: 0,
+        total: 0,
+        searchQuery: '',
+        showSearchResults: false,
+        supplierId: 1,
+        isCustomProduct: false
+      }],
+      notes: invoice.notes || 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
+      signatureText: invoice.signature_text || 'ACCEPTED BY________________DATE_____',
+      invoiceType: invoice.invoice_type || 'Estimate',
+      customInvoiceType: invoice.custom_invoice_type || '',
+      paymentPercentage: 0,
+      estimateTotal: invoice.total || 0,
+      paymentHistory: []
+    })
+    
+    // Show the inline invoice form
+    setShowInlineInvoiceForm(true)
+  }
+
   const handlePrintInvoice = async (invoice: any) => {
+    console.log(invoice, 'invoice')
     try {
       // Temp container (same)
       const tempElement = document.createElement('div');
@@ -1679,10 +1727,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               <div style="margin-top:8px;font-size:14px;color:#6b7280;">952-449-1088</div>
             </div>
             <div style="display:flex;">
-              <div style="background:#1f2937;color:#fff;padding:16px;text-align:center;border:2px solid #1f2937;width:150px;">
-                <div style="font-size:16px;font-weight:bold;">ESTIMATE</div>
+              <div style="background:#1f2937;color:#fff;padding:16px;text-align:center;border:2px solid #1f2937;width:200px;">
+                <div style="font-size:16px;font-weight:bold;">Date</div>
               </div>
-              <div style="background:#fff;color:#374151;padding:16px;text-align:center;border:2px solid #e5e7eb;width:150px;">
+              <div style="background:#fff;color:#374151;padding:16px;text-align:center;border:2px solid #e5e7eb;width:200px;">
                 <div style="font-size:16px;font-weight:bold;">${new Date(inlineInvoiceData.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</div>
               </div>
             </div>
@@ -1690,10 +1738,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
  
           <div style="display:flex;justify-content:flex-end;margin-bottom:24px;">
             <div style="display:flex;">
-              <div style="background:#1f2937;color:#fff;padding:16px;text-align:center;border:2px solid #1f2937;width:150px;">
-                <div style="font-size:16px;font-weight:bold;">ESTIMATE #</div>
+              <div style="background:#1f2937;color:#fff;padding:16px;text-align:center;border:2px solid #1f2937;width:200px;">
+                <div style="font-size:16px;font-weight:bold;">${invoice.invoice_type || 'Estimate'} #</div>
               </div>
-              <div style="background:#fff;color:#374151;padding:16px;text-align:center;border:2px solid #e5e7eb;width:150px;">
+              <div style="background:#fff;color:#374151;padding:16px;text-align:center;border:2px solid #e5e7eb;width:200px;">
                 <div style="font-size:16px;font-weight:bold;">${InvoioiceNumber || 'INV-2025-029'}</div>
               </div>
             </div>
@@ -2367,8 +2415,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           quantity: item.qty.toString(),
           item: item.item,
           description: item.description || '',
-          rate: item.rate.toFixed(2),
-          amount: item.estimatedPrice.toFixed(2)
+          rate: (item.rate || 0).toFixed(2),
+          amount: (item.estimatedPrice || 0).toFixed(2)
         })),
         subtotal: subtotal.toFixed(2),
         total: total.toFixed(2),
@@ -3811,7 +3859,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                                 </div>
                               </td>
                               <td className="border border-gray-300 p-2 text-right">
-                                ${item.total.toFixed(2)}
+                                ${(item.total || 0).toFixed(2)}
                               </td>
                               <td className="border border-gray-300 p-1 text-center">
                                 {inlineInvoiceData.lineItems.length > 1 && (
@@ -4118,6 +4166,15 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                           >
                             <Printer className="h-4 w-4 mr-1" />
                             Print
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDuplicateInvoice(invoice)}
+                            className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-300"
+                          >
+                            <FileText className="h-4 w-4 mr-1" />
+                            Duplicate
                           </Button>
                           <Button
                             variant="ghost"
@@ -4935,8 +4992,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                         <td className="border border-gray-300 px-3 py-2">{item.qty}</td>
                         <td className="border border-gray-300 px-3 py-2 font-medium">{item.item}</td>
                         <td className="border border-gray-300 px-3 py-2 text-sm text-gray-600">{item.description}</td>
-                        <td className="border border-gray-300 px-3 py-2 text-right">${item.rate.toFixed(2)}</td>
-                        <td className="border border-gray-300 px-3 py-2 text-right font-medium">${item.total.toFixed(2)}</td>
+                        <td className="border border-gray-300 px-3 py-2 text-right">${(item.rate || 0).toFixed(2)}</td>
+                        <td className="border border-gray-300 px-3 py-2 text-right font-medium">${(item.total || 0).toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
