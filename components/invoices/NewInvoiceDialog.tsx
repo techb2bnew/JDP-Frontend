@@ -1661,6 +1661,23 @@ useEffect(() => {
                               </tr>
                             </tbody>
                           </table>
+                         <div className="flex justify-end mt-4">
+                            <div className="text-right min-w-[200px]">
+                              <div className="flex justify-between mb-2">
+                                <span className="text-sm text-gray-700">Payments / Credits:</span>
+                                <span className="text-sm text-gray-700">
+                                  ${(inlineInvoiceData.paymentCredits || 0).toFixed(2)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between bg-gray-100 px-3 py-2 rounded">
+                                <span className="font-bold text-sm text-gray-700">Balance Due:</span>
+                                <span className="font-bold text-sm text-gray-700">
+                                  ${parseFloat((inlineInvoiceData.balanceDue||0 ).toString()).toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
 
                 {/* Add Buttons */}
                 <div className="mt-4 flex gap-3">

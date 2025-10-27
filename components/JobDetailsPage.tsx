@@ -1863,25 +1863,26 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     setShowInlineInvoiceForm(true)
   }
 
-  const handlePrintInvoice = async (invoice: any) => {
-    console.log(invoice, 'invoice')
-    try {
-      // Temp container (same)
-      const tempElement = document.createElement('div');
-      tempElement.id = 'temp-invoice-preview';
-      tempElement.style.position = 'absolute';
-      tempElement.style.left = '-10000px';
-      tempElement.style.top = '0';
-      tempElement.style.width = '8.5in';
-      tempElement.style.background = '#ffffff';
-      tempElement.style.padding = '32px';
-      tempElement.style.pointerEvents = 'none';
-      tempElement.style.fontFamily = 'Arial, sans-serif';
-      tempElement.style.lineHeight = '1.4';
-      tempElement.style.boxSizing = 'border-box';
+const handlePrintInvoice = async (invoice: any) => {
+  console.log(invoice, 'invoice')
+  try {
+    // Temp container (same)
+    const tempElement = document.createElement('div');
+    tempElement.id = 'temp-invoice-preview';
+    tempElement.style.position = 'absolute';
+    tempElement.style.left = '-10000px';
+    tempElement.style.top = '0';
+    tempElement.style.width = '8.5in';
+    tempElement.style.background = '#ffffff';
+    tempElement.style.padding = '32px';
+    tempElement.style.pointerEvents = 'none';
+    tempElement.style.fontFamily = 'Arial, sans-serif';
+    tempElement.style.lineHeight = '1.4';
+    tempElement.style.boxSizing = 'border-box';
 
-      // === YOUR SAME HTML (unchanged) ===
-      const invoiceHtml = `
+    // === SAME HTML ===
+   // === SAME HTML ===
+     const invoiceHtml = `
       <div style="font-family: Arial, sans-serif; page-break-inside: avoid;">
         <!-- Header (wrapped) -->
         <div id="print-header">
@@ -2066,126 +2067,110 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         </div>
       </div>
     `;
+    tempElement.innerHTML = invoiceHtml;
+    document.body.appendChild(tempElement);
 
-      tempElement.innerHTML = invoiceHtml;
-      document.body.appendChild(tempElement);
+    // Header height in CSS px
+    const headerEl = tempElement.querySelector('#print-header') as HTMLElement | null;
+    const headerCssPx = Math.ceil(headerEl?.getBoundingClientRect().height || 0);
 
-      // Header height in CSS px
-      const headerEl = tempElement.querySelector('#print-header') as HTMLElement | null;
-      const headerCssPx = Math.ceil(headerEl?.getBoundingClientRect().height || 0);
+    // Render to canvas
+    const canvas = await html2canvas(tempElement, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      width: tempElement.scrollWidth,
+      height: tempElement.scrollHeight,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: tempElement.scrollWidth,
+      windowHeight: tempElement.scrollHeight
+    });
 
-      // Render to canvas
-      const canvas = await html2canvas(tempElement, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        width: tempElement.scrollWidth,
-        height: tempElement.scrollHeight,
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: tempElement.scrollWidth,
-        windowHeight: tempElement.scrollHeight
-      });
+    const scaleX = canvas.width / tempElement.scrollWidth;
+    const rootRect = tempElement.getBoundingClientRect();
+    const headRect = headerEl?.getBoundingClientRect();
+    const headerBandCssPx = Math.max(1, Math.ceil(((headRect?.bottom ?? 0) - rootRect.top)));
+    const headerPxScaled = Math.max(1, Math.round(headerBandCssPx * scaleX));
 
-      // ------ FIX 1: convert CSS px -> SCALED canvas px ------
-      const scaleX = canvas.width / tempElement.scrollWidth;
+    // Slice header (use scaled px)
+    let headerImgData: string | null = null;
+    if (headerPxScaled > 0) {
+      const headerCanvas = document.createElement('canvas');
+      headerCanvas.width = canvas.width;
+      headerCanvas.height = headerPxScaled;
+      const hctx = headerCanvas.getContext('2d')!;
+      hctx.drawImage(canvas, 0, 0, canvas.width, headerPxScaled, 0, 0, canvas.width, headerPxScaled);
+      headerImgData = headerCanvas.toDataURL('image/png');
+    }
 
-      // page-top → header-bottom tak ka full band (CSS px)
-      const rootRect = tempElement.getBoundingClientRect();
-      const headRect = headerEl?.getBoundingClientRect();
-      const headerBandCssPx = Math.max(
-        1,
-        Math.ceil(((headRect?.bottom ?? 0) - rootRect.top))   // includes top whitespace
+    const imageData = canvas.toDataURL('image/png');
+
+
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const imgWidth = 210;
+    const footerSpace = 21;
+    const pageHeight = 295 - footerSpace;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    const pxToMm = imgWidth / canvas.width;
+    const headerHeightMM = headerPxScaled * pxToMm;
+
+
+    const topPaddingMM = 10;
+    const bottomPaddingMM = 0;
+    const usablePageHeight = pageHeight - topPaddingMM - bottomPaddingMM;
+
+
+    let yPosition = 0; 
+    const pageHeightPx = (usablePageHeight / pxToMm); 
+
+
+    pdf.addImage(imageData, 'PNG', 0, topPaddingMM, imgWidth, imgHeight);
+    yPosition += pageHeightPx; 
+
+  
+    while (yPosition < canvas.height) {
+      pdf.addPage();
+
+  
+      const pageCanvas = document.createElement('canvas');
+      pageCanvas.width = canvas.width;
+      pageCanvas.height = pageHeightPx;
+      const pageCtx = pageCanvas.getContext('2d')!;
+      pageCtx.fillStyle = '#fff';
+      pageCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+      pageCtx.drawImage(
+        canvas,
+        0, yPosition,                       
+        canvas.width, pageHeightPx,         
+        0, 0,
+        canvas.width, pageHeightPx
       );
 
-      // SCALED canvas px
-      const headerPxScaled = Math.max(1, Math.round(headerBandCssPx * scaleX));
+      const pageImg = pageCanvas.toDataURL('image/png');
+      pdf.addImage(pageImg, 'PNG', 0, topPaddingMM, imgWidth, (pageHeightPx * pxToMm));
 
-
-      // Slice header (use scaled px)
-      let headerImgData: string | null = null;
-      if (headerPxScaled > 0) {
-        const headerCanvas = document.createElement('canvas');
-        headerCanvas.width = canvas.width;
-        headerCanvas.height = headerPxScaled;
-        const hctx = headerCanvas.getContext('2d')!;
-        // slice: page top (y=0) to header bottom
-        hctx.drawImage(canvas, 0, 0, canvas.width, headerPxScaled, 0, 0, canvas.width, headerPxScaled);
-        headerImgData = headerCanvas.toDataURL('image/png');
-      }
-
-
-      const imageData = canvas.toDataURL('image/png');
-
-      // PDF sizing
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgWidth = 210;                 // A4 width (mm)
-      const footerSpace = 21;               // reserve bottom
-      const pageHeight = 295 - footerSpace; // usable page height
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      const pxToMm = imgWidth / canvas.width;
-
-      // ------ FIX 2: header reserve with padding ------
-      // const headerHeightMM = headerPxScaled * pxToMm * 1.05; // true header image height
-      const headerTopPadMM = 2.5;     // little cushion on top
-      const headerBottomPadMM = 2.5  // little cushion below
-      // const headerReserveMM = headerHeightMM + headerTopPadMM + headerBottomPadMM;
-
-      // const pageContentHeightMM = pageHeight - headerReserveMM;
-      const headerHeightMM = headerPxScaled * pxToMm; // includes top whitespace
-      const headerReserveMM = headerHeightMM;       // pad ki zaroorat nahi
-      const pageContentHeightMM = pageHeight - headerReserveMM;
-
-
-
-      let heightLeft = imgHeight;
-
-      // First page (full tall image as before)
-      pdf.addImage(imageData, 'PNG', 0, 0, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      // Next pages
-      while (heightLeft > 0.1) {
-        const position = heightLeft - imgHeight; // negative offset of tall image
-        pdf.addPage();
-
-        // Draw page content shifted just below headerReserve
-        // content ko header band ke turant baad start karo
-        const contentYOffset = headerReserveMM;
-        pdf.addImage(imageData, 'PNG', 0, position + contentYOffset, imgWidth, imgHeight);
-
-        // top band ko white mask (safety)
-        pdf.setFillColor(255, 255, 255);
-        pdf.rect(0, 0, imgWidth, headerReserveMM, 'F');
-
-        // header band (full-width) bilkul top se draw
-        if (headerImgData && headerHeightMM > 0) {
-          pdf.addImage(headerImgData, 'PNG', 0, 0, imgWidth, headerHeightMM);
-        }
-
-
-        heightLeft -= pageContentHeightMM;
-      }
-
-      // Open + print
-      const pdfBlob = pdf.output('blob');
-      const pdfUrl = URL.createObjectURL(pdfBlob);
-      const printWindow = window.open(pdfUrl, '_blank');
-      if (printWindow) {
-        printWindow.onload = () => setTimeout(() => printWindow.print(), 1000);
-      }
-
-      // Cleanup
-      document.body.removeChild(tempElement);
-      setTimeout(() => URL.revokeObjectURL(pdfUrl), 10000);
-    } catch (err) {
-      console.error('Print error:', err);
-      toast.error('Failed to print invoice');
+      yPosition += pageHeightPx;
     }
-  };
+
+    const pdfBlob = pdf.output('blob');
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    const printWindow = window.open(pdfUrl, '_blank');
+    if (printWindow) {
+      printWindow.onload = () => setTimeout(() => printWindow.print(), 1000);
+    }
+
+    document.body.removeChild(tempElement);
+    setTimeout(() => URL.revokeObjectURL(pdfUrl), 10000);
+  } catch (err) {
+    console.error('Print error:', err);
+    toast.error('Failed to print invoice');
+  }
+};
+
 
   const handleDeleteInvoice = async (invoiceId: string) => {
     setEstimateToDelete({ id: invoiceId })
