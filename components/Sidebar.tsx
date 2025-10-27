@@ -16,7 +16,8 @@ import {
   ChevronDown,
   ChevronRight,
   LogOut,
-  Bell
+  Bell,
+  Clock
 } from "lucide-react"
 import { cn } from "../lib/utils"
 import { LogoutConfirmationDialog } from "./LogoutConfirmationDialog"
@@ -85,6 +86,12 @@ export function Sidebar({ currentPage, onPageChange, onLogout, isSuperAdmin = fa
       name: "Live Tracking",
       icon: MapPin,
       description: "Real-time job progress and resource tracking"
+    },
+    {
+      id: "timesheets",
+      name: "Time sheets",
+      icon: Clock,
+      description: "Review and approve employee timesheets"
     },
     {
       id: "contractor-listing",

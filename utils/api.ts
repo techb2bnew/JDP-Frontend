@@ -2575,4 +2575,63 @@ getTimesheetDashboardStats: async () => {
 
     return response.json();
   },
+
+  // Bluesheet Labor Management APIs
+  addLaborToBluesheet: async (bluesheetId: number, laborData: any) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL; 
+    const response = await fetch(`${apiBaseUrl}/bluesheet/bluesheet/${bluesheetId}/labor`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+      body: JSON.stringify(laborData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to add labor to bluesheet");
+    }
+
+    return response.json();
+  },
+
+  updateLaborInBluesheet: async (laborEntryId: number, laborData: any) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+
+    const response = await fetch(`${apiBaseUrl}/bluesheet/labor/${laborEntryId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+      body: JSON.stringify(laborData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to update labor in bluesheet");
+    }
+
+    return response.json();
+  },
+
+  getLaborEntryById: async (laborEntryId: number) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+
+    const response = await fetch(`${apiBaseUrl}/bluesheet/labor/${laborEntryId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to fetch labor entry");
+    }
+
+    return response.json();
+  },
 };

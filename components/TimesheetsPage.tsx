@@ -166,15 +166,17 @@ const fetchAlltimesheets = async () => {
   try {
     setIsLoading(true);
     const response = await apiClient.getAllTimesheets();
+    console.log('API Response:', response); // Debug log
     const timesheets = response.data.dashboard_timesheets || [];
     const period = response.data.period || { start_date: '', end_date: '', week_range: '' };
+    
     const transformedTimesheets = timesheets.map((item: any) => ({
       employee: item.employee || 'N/A',
       job: item.job || 'N/A',
-      jobCode: `#${item.job_id}`,
+      jobCode: item.job ? item.job.split('(')[1]?.replace(')', '') || 'N/A' : 'N/A', // Extract job code from job name
       week: period.week_range,
-      jobId: item.job_id?.toString() || '',
-      laborId: item.labor_id?.toString() || '',
+      jobId: item.job_id?.toString() || '', // This might be undefined in API response
+      laborId: item.labor_id?.toString() || '', // This might be undefined in API response
       mon: item.mon || '0h',
       tue: item.tue || '0h',
       wed: item.wed || '0h',
@@ -185,8 +187,11 @@ const fetchAlltimesheets = async () => {
       total: item.total || '0h',
       billable: item.billable || '0h',
       status: item.status || 'Unknown',
+      actions: item.actions || [], // Include actions from API
     }));
 
+    console.log('Transformed timesheets:', transformedTimesheets); // Debug log
+    console.log('Setting filteredTimesheets to:', transformedTimesheets.length, 'items'); // Debug log
     setTimesheets(response.data); 
     setFilteredTimesheets(transformedTimesheets); 
   } catch (error) {
@@ -246,13 +251,14 @@ const fetchBySearchTimesheets = async () => {
 
   try {
     const response = await apiClient.searchTimesheetsByQuery(searchTerm.trim(), 1, 10);
+    console.log('Search API Response:', response); // Debug log
     const timesheetsData = response.data;
     const timesheets = timesheetsData?.dashboard_timesheets || [];
 
     const transformedTimesheets = timesheets.map((item: any) => ({
       employee: item.employee || 'N/A',
       job: item.job || 'N/A',
-      jobCode: `#${item.job_id}`, 
+      jobCode: item.job ? item.job.split('(')[1]?.replace(')', '') || 'N/A' : 'N/A', // Extract job code from job name
       week: timesheetsData?.period?.week_range || '', 
       jobId: item.job_id?.toString() || '',
       laborId: item.labor_id?.toString() || '',
@@ -266,8 +272,10 @@ const fetchBySearchTimesheets = async () => {
       total: item.total || '0h',
       billable: item.billable || '0h',
       status: item.status || 'Unknown',
+      actions: item.actions || [], // Include actions from API
     }));
 
+    console.log('Search transformed timesheets:', transformedTimesheets); // Debug log
     setFilteredTimesheets(transformedTimesheets); 
     setTimesheets(timesheetsData); 
     setTotalTimesheets(transformedTimesheets.length);
@@ -293,66 +301,92 @@ const fetchBySearchTimesheets = async () => {
 useEffect(() => {
   const debounceTimeout = setTimeout(() => {
     if (!searchTerm.trim()) {
-      fetchAlltimesheets();
+      // Only fetch all timesheets if no status filter is applied
+      if (statusFilter === 'all') {
+        fetchAlltimesheets();
+      } else {
+        // Use the status filter logic
+        fetchTimesheetsByFilters();
+      }
     } else {
       fetchBySearchTimesheets(); 
     }
   }, 500); 
 
   return () => clearTimeout(debounceTimeout);
-}, [searchTerm,]);
+}, [searchTerm, statusFilter]);
 
-useEffect(() => {
-  const fetchTimesheetsByFilters = async () => {
-    if (searchTerm.trim()) return;
+const fetchTimesheetsByFilters = async () => {
+  if (searchTerm.trim()) return;
 
-    setIsLoadingTimesheets(true);
+  setIsLoadingTimesheets(true);
 
-    try {
-      let response;
-      if (statusFilter !== 'all') {
-        response = await apiClient.searchTimesheetsByStatus(statusFilter);
-      } else {
-        response = await apiClient.searchTimesheetsByStatus('Active'); 
-      }
-
-      const timesheetsData = response.data;
-
-      setTimesheets(timesheetsData); 
-      setFilteredTimesheets(timesheetsData.dashboard_timesheets || []);
-      setTotalTimesheets((timesheetsData.dashboard_timesheets || []).length);
-    } catch (error) {
-      console.error("Timesheet filter error:", error);
-      setTimesheets({
-        dashboard_timesheets: [],
-        period: {
-          start_date: '',
-          end_date: '',
-          week_range: '',
-        },
-      });
-      setFilteredTimesheets([]);
-      setTotalTimesheets(0);
-    } finally {
-      setIsLoadingTimesheets(false);
+  try {
+    let response;
+    if (statusFilter !== 'all') {
+      response = await apiClient.searchTimesheetsByStatus(statusFilter);
+    } else {
+      response = await apiClient.searchTimesheetsByStatus('Active'); 
     }
-  };
 
-  fetchTimesheetsByFilters();
-}, [statusFilter, searchTerm]);
+    const timesheetsData = response.data;
+    const timesheets = timesheetsData.dashboard_timesheets || [];
+    const period = timesheetsData.period || { start_date: '', end_date: '', week_range: '' };
+
+    const transformedTimesheets = timesheets.map((item: any) => ({
+      employee: item.employee || 'N/A',
+      job: item.job || 'N/A',
+      jobCode: item.job ? item.job.split('(')[1]?.replace(')', '') || 'N/A' : 'N/A',
+      week: period.week_range,
+      jobId: item.job_id?.toString() || '',
+      laborId: item.labor_id?.toString() || '',
+      mon: item.mon || '0h',
+      tue: item.tue || '0h',
+      wed: item.wed || '0h',
+      thu: item.thu || '0h',
+      fri: item.fri || '0h',
+      sat: item.sat || '0h',
+      sun: item.sun || '0h',
+      total: item.total || '0h',
+      billable: item.billable || '0h',
+      status: item.status || 'Unknown',
+      actions: item.actions || [],
+    }));
+
+    setTimesheets(timesheetsData); 
+    setFilteredTimesheets(transformedTimesheets);
+    setTotalTimesheets(transformedTimesheets.length);
+  } catch (error) {
+    console.error("Timesheet filter error:", error);
+    setTimesheets({
+      dashboard_timesheets: [],
+      period: {
+        start_date: '',
+        end_date: '',
+        week_range: '',
+      },
+    });
+    setFilteredTimesheets([]);
+    setTotalTimesheets(0);
+  } finally {
+    setIsLoadingTimesheets(false);
+  }
+};
 
 
 
 
 
 
+  console.log('TimesheetsPage render - filteredTimesheets:', filteredTimesheets.length, 'items');
+  
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="outline" size="icon">
+        {/* <Button variant="outline" size="icon">
           <ArrowLeft className="h-4 w-4" />
-        </Button>
+        </Button> */}
         <div>
           <h2 className="text-xl font-semibold text-foreground">Timesheet Management</h2>
           <p className="text-sm text-muted-foreground">Review and approve employee timesheets</p>
@@ -498,24 +532,27 @@ useEffect(() => {
               </TableHeader>
               <TableBody>
                 {filteredTimesheets.length > 0 ? (
-                  filteredTimesheets.map((item: any) => (
-                    <TableRow key={`${item.employee}-${item.jobId}-${item.week}`} className="odd:bg-white even:bg-slate-50">
+                  filteredTimesheets.map((item: any, index: number) => (
+                    <TableRow key={`timesheet-${index}-${item.employee}-${item.job}-${item.week}`} className="odd:bg-white even:bg-slate-50">
                       <TableCell className="font-medium">{item.employee}</TableCell>
                       <TableCell>
-                        <div>{item.job}</div>
-                        <div className="text-xs text-muted-foreground">{item.jobCode}</div>
+                        <div>{item.job}</div> 
                       </TableCell>
                       <TableCell>{item.week}</TableCell>
                       {['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day: string) => {
                         const hourValue = item[day];
                         return (
                           <TableCell key={day} className="text-center">
-                            {hourValue !== '0h' ? hourValue : '-'}
+                            {hourValue !== '0h' && hourValue !== '0m' ? hourValue : '-'}
                           </TableCell>
                         );
                       })}
-                      <TableCell className="font-bold text-center">{item.total}h</TableCell>
-                      <TableCell className="font-bold text-center">{item.billable}h</TableCell>
+                      <TableCell className="font-bold text-center">
+                        {item.total && item.total !== '0h' && item.total !== '0m' ? item.total : '0h'}
+                      </TableCell>
+                      <TableCell className="font-bold text-center">
+                        {item.billable && item.billable !== '0h' && item.billable !== '0m' ? item.billable : '0h'}
+                      </TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(item.status)}`}>
                           {item.status}
@@ -569,7 +606,7 @@ useEffect(() => {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-6 text-muted-foreground">
+                    <TableCell colSpan={14} className="text-center py-6 text-muted-foreground">
                       No matching timesheets found.
                     </TableCell>
                   </TableRow>
