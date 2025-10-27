@@ -109,6 +109,8 @@ export function ProductsPage() {
   const [selectedBranches, setSelectedBranches] = useState<string[]>([])
   const [selectedStatus, setSelectedStatus] = useState<FilterStatus>('all')
   const [showProductModal, setShowProductModal] = useState(false)
+  const [isFormOpen, setIsFormOpen] = useState(false)
+const [formMode, setFormMode] = useState<ProductAction>('add') // 'add' | 'edit' | 'view'
   const [showDeleteAlert, setShowDeleteAlert] = useState(false)
   const [currentAction, setCurrentAction] = useState<ProductAction>('add')
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
@@ -391,50 +393,55 @@ useEffect(() => {
     }
   }
 
-  const handleAction = (action: ProductAction, product?: Product) => {
-    setCurrentAction(action);
-    setSelectedProduct(product || null);
+const handleAction = (action: ProductAction, product?: Product) => {
+  setCurrentAction(action);
+  setFormMode(action);
+  setSelectedProduct(product || null);
 
-    if (action === 'delete' && product) {
-      setProductToDelete(product);
-      setShowDeleteAlert(true);
-    } else if (action === 'view' && product) {
-      // Fetch product details from API for view
-      fetchProductForView(product.id).then(() => {
-      setShowProductModal(true);
-      }).catch((error) => {
-        console.error('Failed to load product for viewing:', error);
-      });
-    } else if (action === 'edit' && product) {
-      // Fetch product details from API
-      fetchProductById(product.id).then(() => {
-      setShowProductModal(true);
-      }).catch((error) => {
-        console.error('Failed to load product for editing:', error);
-      });
-    } else if (action === 'add') {
-      setFormData({
-        name: '',
-        supplier: '',
-        category: '',
-        description: '',
-        supplierSku: '',
-        jdpSku: '',
-        supplierCostPrice: 0,
-        markupPercentage: configurationData?.markup_percentage || 0,
-        markupAmount: 0,
-        jdpPrice: 0,
-        profitMargin: 0,
-        stockQuantity: 0,
-        unit: 'piece',
-        branchIds: [],
-        status: 'draft',
-        unit_cost:0,
-        estimated_price:0
-      });
-      setShowProductModal(true);
-    }
-  };
+  if (action === 'delete' && product) {
+    setProductToDelete(product);
+    setShowDeleteAlert(true);
+    return;
+  }
+
+  if (action === 'view' && product) {
+    fetchProductForView(product.id)
+      .then(() => setIsFormOpen(true))
+      .catch(err => console.error('Failed to load product for viewing:', err));
+    return;
+  }
+
+  if (action === 'edit' && product) {
+    fetchProductById(product.id)
+      .then(() => setIsFormOpen(true))
+      .catch(err => console.error('Failed to load product for editing:', err));
+    return;
+  }
+
+  if (action === 'add') {
+    setFormData({
+      name: '',
+      supplier: '',
+      category: '',
+      description: '',
+      supplierSku: '',
+      jdpSku: '',
+      supplierCostPrice: 0,
+      markupPercentage: configurationData?.markup_percentage || 0,
+      markupAmount: 0,
+      jdpPrice: 0,
+      profitMargin: 0,
+      stockQuantity: 0,
+      unit: 'piece',
+      branchIds: [],
+      status: 'draft',
+      unit_cost: 0,
+      estimated_price: 0
+    });
+    setIsFormOpen(true);
+  }
+};
+
 
   const handleBranchToggle = (branchId: string, checked: boolean) => {
     if (checked) {
@@ -560,8 +567,7 @@ useEffect(() => {
           toast.success(successMessage);
         }
         
-        setShowProductModal(false);
-        resetForm();
+       handleCloseForm();
         
         // Update categories if a new category was added
         if (formData.category && !categories.includes(formData.category)) {
@@ -661,10 +667,10 @@ useEffect(() => {
     setValidationErrors({})
   }
 
-  const handleModalClose = () => {
-    setShowProductModal(false);
-    resetForm();
-  }
+ const handleCloseForm = () => {
+  setIsFormOpen(false);
+  resetForm();
+};
 
  const handleExport = () => {
   // Prepare CSV headers
@@ -1018,30 +1024,40 @@ useEffect(() => {
           <h1 className="text-2xl font-semibold text-foreground">Products Management</h1>
           <p className="text-muted-foreground">Manage your electrical products catalog with dual SKU and pricing system</p>
         </div>
-        <div className="flex gap-2">
-         
-          {hasPermission('products', 'create') && (
-            <Button variant="outline" onClick={handleImport}>
-              <Upload className="h-4 w-4 mr-2" />
-              Import Products
-            </Button>
-          )}
-          {hasPermission('products', 'view') && (
-            <Button variant="outline" onClick={handleExport}>
-              <Download className="h-4 w-4 mr-2" />
-              Export Products
-            </Button>
-          )}
-          {hasPermission('products', 'create') && (
-            <Button onClick={() => handleAction('add')} className="bg-primary text-primary-foreground hover:bg-primary/90">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Product
-            </Button>
-          )}
-        </div>
+       <div className="flex gap-2">
+  {!isFormOpen ? (
+    <>
+      {hasPermission('products', 'create') && (
+        <Button variant="outline" onClick={handleImport}>
+          <Upload className="h-4 w-4 mr-2" />
+          Import Products
+        </Button>
+      )}
+      {hasPermission('products', 'view') && (
+        <Button variant="outline" onClick={handleExport}>
+          <Download className="h-4 w-4 mr-2" />
+          Export Products
+        </Button>
+      )}
+      {hasPermission('products', 'create') && (
+        <Button onClick={() => handleAction('add')} className="bg-primary text-primary-foreground hover:bg-primary/90">
+          <Plus className="h-4 w-4 mr-2" />
+          Add Product
+        </Button>
+      )}
+    </>
+  ) : (
+    <Button variant="outline" onClick={handleCloseForm}>
+      <X className="h-4 w-4 mr-2" />
+      Back to Products
+    </Button>
+  )}
+</div>
+
       </div>
 
       {/* Summary Cards */}
+      {!isFormOpen && (
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="pb-3">
@@ -1135,8 +1151,10 @@ useEffect(() => {
           </CardHeader>
         </Card>
       </div>
+      )}
 
       {/* Filters and Search */}
+      {!isFormOpen && (
       <Card>
         <CardHeader>
           <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
@@ -1371,582 +1389,580 @@ useEffect(() => {
 
         </CardContent>
       </Card>
+      )}
 
       {/* Product Modal (Add/Edit/View) */}
-      <Dialog open={showProductModal} onOpenChange={handleModalClose} key={selectedProduct?.id || 'new'}>
-        <DialogContent className="max-w-2xl   max-h-[90vh] overflow-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-primary" />
-              {currentAction === 'add' ? 'Add New Product' :
-                currentAction === 'edit' ? 'Edit Product' :
-                  'Product Details'}
-            </DialogTitle>
-            <DialogDescription>
-              {currentAction === 'add' ? 'Create a new product in your inventory' :
-                currentAction === 'edit' ? 'Update product information' :
-                  'View complete product details'}
-            </DialogDescription>
-          </DialogHeader>
+    {/* Inline Add/Edit/View Section */}
+{isFormOpen ? (
+  <Card className="border-2 border-dashed">
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2">
+        <Package className="h-5 w-5 text-primary" />
+        {formMode === 'add' ? 'Add New Product' : formMode === 'edit' ? 'Edit Product' : 'Product Details'}
+      </CardTitle>
+      <p className="text-muted-foreground">
+        {formMode === 'add'
+          ? 'Create a new product in your inventory'
+          : formMode === 'edit'
+          ? 'Update product information'
+          : 'View complete product details'}
+      </p>
+    </CardHeader>
 
-          <div className="space-y-6">
-            {currentAction === 'view' && viewProductData ? (
-              // View Mode - Product Details
-              <div className="space-y-6">
-                {isLoadingView ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                    <span className="ml-2">Loading product details...</span>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {/* Product Information Section */}
-                    <div className="grid grid-cols-2 gap-6">
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Product Name</Label>
-                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                          {viewProductData.product_name}
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Category</Label>
-                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                          {viewProductData.category}
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Supplier SKU</Label>
-                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 font-mono">
-                          {viewProductData.supplier_sku}
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700 mb-2 block">JDP SKU</Label>
-                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 font-mono">
-                          {viewProductData.jdp_sku}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Pricing Information Section */}
-                    <div className="grid grid-cols-2 gap-6">
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Supplier Cost Price</Label>
-                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                          {formatCurrency(viewProductData.supplier_cost_price || 0)}
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700 mb-2 block">JDP Price</Label>
-                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                          {formatCurrency(viewProductData.jdp_price || 0)}
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Markup Percentage</Label>
-                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                          {viewProductData.markup_percentage}%
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Markup Amount</Label>
-                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                          {formatCurrency(viewProductData.markup_amount || 0)}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Stock and Unit Information */}
-                    <div className="grid grid-cols-2 gap-6">
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Stock Quantity</Label>
-                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                          {viewProductData.stock_quantity}
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Unit</Label>
-                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 capitalize">
-                          {viewProductData.unit}
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Unit Cost</Label>
-                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 capitalize">
-                          {viewProductData.unit_cost}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Description */}
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700 mb-2 block">Description</Label>
-                      <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 min-h-[60px]">
-                        {viewProductData.description || 'No description provided'}
-                      </div>
-                    </div>
-
-                    {/* Supplier Information */}
-                    {viewProductData.suppliers && (
-                      <div className="space-y-4">
-                        <h4 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">Supplier Information</h4>
-                        <div className="grid grid-cols-2 gap-6">
-                          <div>
-                            <Label className="text-sm font-medium text-gray-700 mb-2 block">Company Name</Label>
-                            <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                              {viewProductData.suppliers.company_name}
-                            </div>
-                          </div>
-                          <div>
-                            <Label className="text-sm font-medium text-gray-700 mb-2 block">Contact Person</Label>
-                            <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                              {viewProductData.suppliers.contact_person}
-                            </div>
-                          </div>
-                          {viewProductData.suppliers.users && (
-                            <>
-                              <div>
-                                <Label className="text-sm font-medium text-gray-700 mb-2 block">Email</Label>
-                                <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                                  {viewProductData.suppliers.users.email}
-                                </div>
-                              </div>
-                              <div>
-                                <Label className="text-sm font-medium text-gray-700 mb-2 block">Phone</Label>
-                                <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                                  {viewProductData.suppliers.users.phone}
-                                </div>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Timestamps */}
-                    <div className="grid grid-cols-2 gap-6">
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Created At</Label>
-                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                          {new Date(viewProductData.created_at).toLocaleDateString()}
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Last Updated</Label>
-                        <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                          {new Date(viewProductData.updated_at).toLocaleDateString()}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              // Add/Edit Mode - redesigned to match the image
-              <div className="space-y-6">
-                {/* Basic Information Section */}
-                <div className="rounded-lg">
-                  <div className="flex items-center gap-2 border-b pb-2 mb-4">
-                    <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
-                      <BoxIcon className="h-4 w-4" />
-                    </div>
-                    <h3 className="font-semibold">Basic Information</h3>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="name" className="flex items-center gap-1 mb-2">
-                        {/* <TagIcon className="h-4 w-4 text-blue-500" /> */}
-                        Product Name *
-                      </Label>
-                      <Input
-                        id="name"
-                        value={formData.name}
-                        onChange={(e) => {
-                          setFormData(prev => ({ ...prev, name: e.target.value }));
-                          clearValidationError('name');
-                        }}
-                        placeholder="Enter product name"
-                        className={`mt-1 ${validationErrors.name ? 'border-red-500' : ''}`}
-                        required
-                      />
-                      {validationErrors.name && (
-                        <p className="text-red-500 text-sm mt-1">{validationErrors.name}</p>
-                      )}
-                    </div>
-                    <div>
-                      <Label htmlFor="category" className="flex items-center gap-1 mb-2">
-                        {/* <ListIcon className="h-4 w-4 text-blue-500" /> */}
-                        Category *
-                      </Label>
-                      <AutoSuggestInput
-                        label=""
-                        value={formData.category}
-                        onChange={(value) => {
-                          setFormData(prev => ({ ...prev, category: value }));
-                          clearValidationError('category');
-                        }}
-                        suggestions={categories}
-                        placeholder="Enter category"
-                        error={validationErrors.category}
-                         
-                      />
-                      
-                    </div>
-                    <div>
-                      <Label htmlFor="supplier" className="flex items-center gap-1 mb-2">
-                        {/* <TruckIcon className="h-4 w-4 text-blue-500" /> */}
-                        Supplier *
-                      </Label>
-                      <div className="">
-                        <Select
-                          value={formData.supplier}
-                          onValueChange={(value) => {
-                            setFormData(prev => ({ ...prev, supplier: value }));
-                            clearValidationError('supplier');
-                          }}
-                          required
-                        >
-                          <SelectTrigger className={`mt-1 ${validationErrors.supplier ? 'border-red-500' : ''}`}>
-                            <SelectValue placeholder="Select supplier" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {suppliers.map((supplier) => (
-                              <SelectItem key={supplier.id} value={supplier.id}>
-                                {supplier.companyName} - {supplier.contactPerson}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {/* <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="mt-1"
-                          onClick={() => setShowAddSupplierModal(true)}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button> */}
-                      </div>
-                      {validationErrors.supplier && (
-                        <p className="text-red-500 text-sm mt-1">{validationErrors.supplier}</p>
-                      )}
-                    </div>
-                    <div>
-                      <Label htmlFor="description" className="flex items-center gap-1 mb-2">
-                        {/* <FileTextIcon className="h-4 w-4 text-blue-500" /> */}
-                        Description
-                      </Label>
-                      <Input
-                        id="description"
-                        value={formData.description}
-                        onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                        placeholder="Product description" 
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* SKU Information Section */}
-                <div className="rounded-lg">
-                  <div className="flex items-center gap-2 border-b pb-2 mb-4">
-                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <BarcodeIcon className="h-4 w-4 text-blue-500" />
-                    </div>
-                    <h3 className="font-semibold">SKU Information</h3>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="supplierSku" className="flex items-center gap-1 mb-2">
-                        {/* <BarcodeIcon className="h-4 w-4 text-blue-500" /> */}
-                        Supplier SKU *
-                      </Label>
-                      <Input
-                        id="supplierSku"
-                        value={formData.supplierSku}
-                        onChange={(e) => {
-                          setFormData(prev => ({ ...prev, supplierSku: e.target.value }));
-                          clearValidationError('supplierSku');
-                        }}
-                        placeholder="SL-XXX-XXX-B81"
-                        className={`mt-1 ${validationErrors.supplierSku ? 'border-red-500' : ''}`}
-                        required
-                      />
-                      {validationErrors.supplierSku && (
-                        <p className="text-red-500 text-sm mt-1">{validationErrors.supplierSku}</p>
-                      )}
-                    </div>
-                    <div>
-                      <Label htmlFor="jdpSku" className="flex items-center gap-1 mb-2">
-                        {/* <Tag className="h-4 w-4 text-blue-500" /> */}
-                        JDP SKU
-                      </Label>
-                      <Input
-                        id="jdpSku"
-                        value={formData.jdpSku}
-                        readOnly
-                        placeholder="JDP-XXX-XXX-B81 (auto-gen)"
-                        className="mt-1 bg-gray-100"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Pricing Information Section */}
-                <div className="rounded-lg">
-                  <div className="flex items-center gap-2 border-b pb-2 mb-4">
-                    <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                      <DollarSignIcon className="h-4 w-4 text-green-500" />
-                    </div>
-                    <h3 className="font-semibold">Pricing Information</h3>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                     <div>
-                      <Label htmlFor="unit" className="flex items-center gap-1 mb-2">
-                        {/* <RulerIcon className="h-4 w-4 text-blue-500" /> */}
-                        Unit
-                      </Label>
-                      <AutoSuggestInput
-                        label=""
-                        value={formData.unit}
-                        onChange={(value) => setFormData(prev => ({ ...prev, unit: value }))}
-                        suggestions={units}
-                        placeholder="Enter unit"
-                      />
-                    </div>
-                   
-                    <div>
-                      <Label htmlFor="markupPercentage" className="flex items-center gap-1">
-                        {/* <PercentIcon className="h-4 w-4 text-blue-500" /> */}
-                        Markup Percentage *
-                        {configurationData?.markup_percentage && formData.markupPercentage === configurationData.markup_percentage && (
-                          <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
-                            From Config
-                          </span>
-                        )}
-                      </Label>
-                      <div className="relative mt-2">
-                        <span className="absolute right-3 top-1/2 transform -translate-y-1/2">%</span>
-                        <Input
-                          id="markupPercentage"
-                          type="number"
-                          step="1"
-                          min="0"
-                          value={formData.markupPercentage === 0 ? "":formData.markupPercentage}
-                          onChange={(e) => {
-                            setFormData(prev => ({ ...prev, markupPercentage: parseInt(e.target.value) || 0 }));
-                            clearValidationError('markupPercentage');
-                          }}
-                          placeholder="0"
-                          className={`pr-8 ${validationErrors.markupPercentage ? 'border-red-500' : ''}`}
-                          required
-                        />
-                      </div>
-                      {validationErrors.markupPercentage && (
-                        <p className="text-red-500 text-sm mt-1">{validationErrors.markupPercentage}</p>
-                      )}
-                      {configurationData?.markup_percentage && formData.markupPercentage === configurationData.markup_percentage && (
-                        <p className="text-green-600 text-xs mt-1">
-                          ✓ Loaded from Configuration ({configurationData.markup_percentage}%)
-                        </p>
-                      )}
-                    </div>
-                     <div>
-                      <Label htmlFor="supplierCostPrice" className="flex items-center gap-1">
-                        {/* <DollarSignIcon className="h-4 w-4 text-blue-500" /> */}
-                        Unit Cost
-                      </Label>
-                      <div className="relative mt-2">
-                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span>
-                        <Input
-                          id="unit_cost"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={formData.unit_cost=== 0 ? "" :formData.unit_cost}
-                          onChange={(e) => {
-                            setFormData(prev => ({ ...prev, unit_cost: parseFloat(e.target.value) || 0 }));
-                            clearValidationError('unit_cost');
-                          }}
-                          placeholder="0.00"
-                          className={`pl-8 ${validationErrors.unitcost ? 'border-red-500' : ''}`}
-                          required
-                        />
-                      </div>
-                      {validationErrors.unitcost && (
-                        <p className="text-red-500 text-sm mt-1">{validationErrors.unitcost}</p>
-                      )}
-                    </div>
-                   
-                    <div>
-                      <Label htmlFor="supplierCostPrice" className="flex items-center gap-1">
-                        {/* <DollarSignIcon className="h-4 w-4 text-blue-500" /> */}
-                        Estimate Price
-                      </Label>
-                      <div className="relative mt-2">
-                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span>
-                        <Input
-                          id="estimated_price"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={formData.estimated_price=== 0 ? "" :formData.estimated_price}
-                          onChange={(e) => {
-                            setFormData(prev => ({ ...prev, estimated_price: parseFloat(e.target.value) || 0 }));
-                            clearValidationError('estimated_price');
-                          }}
-                          placeholder="0.00"
-                          className={`pl-8 ${validationErrors.estimateprice ? 'border-red-500' : ''}`}
-                          required
-                        />
-                      </div>
-                      {validationErrors.unitcost && (
-                        <p className="text-red-500 text-sm mt-1">{validationErrors.unitcost}</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Calculated Pricing Section */}
+    <CardContent className="space-y-6">
+      {formMode === 'view' && viewProductData ? (
+        // ====== VIEW SECTION (unchanged content from Dialog) ======
+        <div className="space-y-6">
+          {isLoadingView ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <span className="ml-2">Loading product details...</span>
+            </div>
+          ) : (
+            <>
+              {/* ---- copy the exact VIEW markup from your Dialog (kept same) ---- */}
+              {/* Product Information */}
+              <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <div className="flex items-center gap-3 border-b pb-2 mb-4">
-                    <div className="w-8 h-8 bg-purple-100 rounded-md flex items-center justify-center">
-                      <svg className="w-4 h-4 text-purple-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                        <line x1="16" y1="2" x2="16" y2="6" />
-                        <line x1="8" y1="2" x2="8" y2="6" />
-                        <line x1="3" y1="10" x2="21" y2="10" />
-                      </svg>
-                    </div>
-                    <h3 className="text-base font-semibold text-gray-900">Calculated Pricing</h3>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-[#fff7ed] border border-[#fed7aa] rounded-xl p-5 flex flex-col items-center text-center min-h-[120px] justify-center">
-                      <div className="w-10 h-10 bg-[#fed7aa] rounded-lg flex items-center justify-center mb-3">
-                        <svg className="w-5 h-5 text-[#ea580c]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M3 3v18h18" />
-                          <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" />
-                        </svg>
-                      </div>
-                      <div className="text-xs font-medium text-[#ea580c] mb-1">Markup Amount</div>
-                      <div className="text-xl font-bold text-[#ea580c]">${formData.markupAmount.toFixed(2)}</div>
-                    </div>
-
-                    <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-5 flex flex-col items-center text-center min-h-[120px] justify-center">
-                      <div className="w-10 h-10 bg-[#e2e8f0] rounded-lg flex items-center justify-center mb-3">
-                        <svg className="w-5 h-5 text-[#64748b]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                          <line x1="9" y1="9" x2="15" y2="15" />
-                          <line x1="15" y1="9" x2="9" y2="15" />
-                        </svg>
-                      </div>
-                      <div className="text-xs font-medium text-gray-500 mb-1">JDP Price</div>
-                      <div className="text-xl font-bold text-gray-900">${formData.jdpPrice.toFixed(2)}</div>
-                    </div>
-
-                    <div className="bg-[#f0fdf4] border border-[#bbf7d0] rounded-xl p-5 flex flex-col items-center text-center min-h-[120px] justify-center">
-                      <div className="w-10 h-10 bg-[#bbf7d0] rounded-lg flex items-center justify-center mb-3">
-                        <svg className="w-5 h-5 text-[#16a34a]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                          <circle cx="9" cy="7" r="4" />
-                          <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                        </svg>
-                      </div>
-                      <div className="text-xs font-medium text-[#16a34a] mb-1">Profit Margin</div>
-                      <div className="text-xl font-bold text-[#16a34a]">{formData.profitMargin}%</div>
-                    </div>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Product Name</Label>
+                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                    {viewProductData.product_name}
                   </div>
                 </div>
-
-
-
-                {/* Inventory Details Section */}
-                <div className="rounded-lg">
-                  <div className="flex items-center gap-2 border-b pb-2 mb-4">
-                    <div className="w-8 h-8 bg-[#fff7ed] rounded-lg flex items-center justify-center">
-                      <PackageIcon className="h-4 w-4 text-[#ea580c]" />
-                    </div>
-                    <h3 className="font-semibold">Inventory Details</h3>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Category</Label>
+                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                    {viewProductData.category}
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="stockQuantity" className="flex items-center gap-1 mb-2">
-                        {/* <PackageOpenIcon className="h-4 w-4 text-blue-500" /> */}
-                        Stock Quantity
-                      </Label>
-                      <Input
-                        id="stockQuantity"
-                        type="number"
-                        min="0"
-                        value={formData.stockQuantity === 0 ? "":formData.stockQuantity }
-                        onChange={(e) => setFormData(prev => ({ ...prev, stockQuantity: parseInt(e.target.value) || 0 }))}
-                        placeholder="0"
-                        className="mt-1"
-                      />
-                    </div>
-                  
-                    <div>
-                      <Label htmlFor="status" className="flex items-center gap-1 mb-2">
-                        Status
-                      </Label>
-                      <Select
-                        value={formData.status}
-                        onValueChange={(value: 'active' | 'inactive' | 'draft') => setFormData(prev => ({ ...prev, status: value }))}
-                      >
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="inactive">Inactive</SelectItem>
-                          <SelectItem value="draft">Draft</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Supplier SKU</Label>
+                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 font-mono">
+                    {viewProductData.supplier_sku}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">JDP SKU</Label>
+                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 font-mono">
+                    {viewProductData.jdp_sku}
                   </div>
                 </div>
               </div>
-            )}
-          </div>
 
-          <DialogFooter>
-            {currentAction === 'view' ? (
-              <div className="flex gap-2">
-                {hasPermission('products', 'edit') && (
-                  <Button variant="outline" onClick={() => handleAction('edit', selectedProduct!)}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit
-                  </Button>
-                )}
-                {hasPermission('products', 'delete') && (
-                  <Button variant="outline" onClick={() => handleAction('delete', selectedProduct!)}>
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </Button>
-                )}
+              {/* Pricing */}
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Supplier Cost Price</Label>
+                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                    {formatCurrency(viewProductData.supplier_cost_price || 0)}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">JDP Price</Label>
+                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                    {formatCurrency(viewProductData.jdp_price || 0)}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Markup Percentage</Label>
+                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                    {viewProductData.markup_percentage}%
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Markup Amount</Label>
+                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                    {formatCurrency(viewProductData.markup_amount || 0)}
+                  </div>
+                </div>
               </div>
-            ) : (
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={handleModalClose}>
-                  <X className="h-4 w-4 mr-2" />
-                  Cancel
-                </Button>
-                {hasPermission('products', currentAction === 'add' ? 'create' : 'edit') && (
-                  <Button 
-                    onClick={handleSaveProduct} 
-                    disabled={isLoading}
-                    className="bg-primary text-primary-foreground hover:bg-primary/90"
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    {isLoading ? 'Saving...' : 'Save Product'}
-                  </Button>
-                )}
+
+              {/* Stock/Unit */}
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Stock Quantity</Label>
+                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                    {viewProductData.stock_quantity}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Unit</Label>
+                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 capitalize">
+                    {viewProductData.unit}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Unit Cost</Label>
+                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 capitalize">
+                    {viewProductData.unit_cost}
+                  </div>
+                </div>
               </div>
+
+              {/* Description */}
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-2 block">Description</Label>
+                <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 min-h-[60px]">
+                  {viewProductData.description || 'No description provided'}
+                </div>
+              </div>
+
+              {/* Supplier Info */}
+              {viewProductData.suppliers && (
+                <div className="space-y-4">
+                  <h4 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">Supplier Information</h4>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700 mb-2 block">Company Name</Label>
+                      <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                        {viewProductData.suppliers.company_name}
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700 mb-2 block">Contact Person</Label>
+                      <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                        {viewProductData.suppliers.contact_person}
+                      </div>
+                    </div>
+                    {viewProductData.suppliers.users && (
+                      <>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-700 mb-2 block">Email</Label>
+                          <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                            {viewProductData.suppliers.users.email}
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-700 mb-2 block">Phone</Label>
+                          <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                            {viewProductData.suppliers.users.phone}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Timestamps */}
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Created At</Label>
+                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                    {new Date(viewProductData.created_at).toLocaleDateString()}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Last Updated</Label>
+                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
+                    {new Date(viewProductData.updated_at).toLocaleDateString()}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      ) : (
+       <div className="space-y-6">
+  {/* Basic Information Section */}
+  <div className="rounded-lg">
+    <div className="flex items-center gap-2 border-b pb-2 mb-4">
+      <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
+        <BoxIcon className="h-4 w-4" />
+      </div>
+      <h3 className="font-semibold">Basic Information</h3>
+    </div>
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <Label htmlFor="name" className="flex items-center gap-1 mb-2">
+          Product Name *
+        </Label>
+        <Input
+          id="name"
+          value={formData.name}
+          onChange={(e) => {
+            setFormData(prev => ({ ...prev, name: e.target.value }));
+            clearValidationError('name');
+          }}
+          placeholder="Enter product name"
+          className={`mt-1 ${validationErrors.name ? 'border-red-500' : ''}`}
+          required
+        />
+        {validationErrors.name && (
+          <p className="text-red-500 text-sm mt-1">{validationErrors.name}</p>
+        )}
+      </div>
+
+      <div>
+        <Label htmlFor="category" className="flex items-center gap-1 mb-2">
+          Category *
+        </Label>
+        <AutoSuggestInput
+          label=""
+          value={formData.category}
+          onChange={(value) => {
+            setFormData(prev => ({ ...prev, category: value }));
+            clearValidationError('category');
+          }}
+          suggestions={categories}
+          placeholder="Enter category"
+          error={validationErrors.category}
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="supplier" className="flex items-center gap-1 mb-2">
+          Supplier *
+        </Label>
+        <div>
+          <Select
+            value={formData.supplier}
+            onValueChange={(value) => {
+              setFormData(prev => ({ ...prev, supplier: value }));
+              clearValidationError('supplier');
+            }}
+            required
+          >
+            <SelectTrigger className={`mt-1 ${validationErrors.supplier ? 'border-red-500' : ''}`}>
+              <SelectValue placeholder="Select supplier" />
+            </SelectTrigger>
+            <SelectContent>
+              {suppliers.map((supplier) => (
+                <SelectItem key={supplier.id} value={supplier.id}>
+                  {supplier.companyName} - {supplier.contactPerson}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {validationErrors.supplier && (
+          <p className="text-red-500 text-sm mt-1">{validationErrors.supplier}</p>
+        )}
+      </div>
+
+      <div>
+        <Label htmlFor="description" className="flex items-center gap-1 mb-2">
+          Description
+        </Label>
+        <Input
+          id="description"
+          value={formData.description}
+          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+          placeholder="Product description"
+        />
+      </div>
+    </div>
+  </div>
+
+  {/* SKU Information Section */}
+  <div className="rounded-lg">
+    <div className="flex items-center gap-2 border-b pb-2 mb-4">
+      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+        <BarcodeIcon className="h-4 w-4 text-blue-500" />
+      </div>
+      <h3 className="font-semibold">SKU Information</h3>
+    </div>
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <Label htmlFor="supplierSku" className="flex items-center gap-1 mb-2">
+          Supplier SKU *
+        </Label>
+        <Input
+          id="supplierSku"
+          value={formData.supplierSku}
+          onChange={(e) => {
+            setFormData(prev => ({ ...prev, supplierSku: e.target.value }));
+            clearValidationError('supplierSku');
+          }}
+          placeholder="SL-XXX-XXX-B81"
+          className={`mt-1 ${validationErrors.supplierSku ? 'border-red-500' : ''}`}
+          required
+        />
+        {validationErrors.supplierSku && (
+          <p className="text-red-500 text-sm mt-1">{validationErrors.supplierSku}</p>
+        )}
+      </div>
+
+      <div>
+        <Label htmlFor="jdpSku" className="flex items-center gap-1 mb-2">
+          JDP SKU
+        </Label>
+        <Input
+          id="jdpSku"
+          value={formData.jdpSku}
+          readOnly
+          placeholder="JDP-XXX-XXX-B81 (auto-gen)"
+          className="mt-1 bg-gray-100"
+        />
+      </div>
+    </div>
+  </div>
+
+  {/* Pricing Information Section */}
+  <div className="rounded-lg">
+    <div className="flex items-center gap-2 border-b pb-2 mb-4">
+      <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+        <DollarSignIcon className="h-4 w-4 text-green-500" />
+      </div>
+      <h3 className="font-semibold">Pricing Information</h3>
+    </div>
+
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <Label htmlFor="unit" className="flex items-center gap-1 mb-2">
+          Unit
+        </Label>
+        <AutoSuggestInput
+          label=""
+          value={formData.unit}
+          onChange={(value) => setFormData(prev => ({ ...prev, unit: value }))}
+          suggestions={units}
+          placeholder="Enter unit"
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="markupPercentage" className="flex items-center gap-1">
+          Markup Percentage *
+          {configurationData?.markup_percentage &&
+            formData.markupPercentage === configurationData.markup_percentage && (
+              <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded ml-2">
+                From Config
+              </span>
             )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </Label>
+        <div className="relative mt-2">
+          <span className="absolute right-3 top-1/2 transform -translate-y-1/2">%</span>
+          <Input
+            id="markupPercentage"
+            type="number"
+            step="1"
+            min="0"
+            value={formData.markupPercentage === 0 ? '' : formData.markupPercentage}
+            onChange={(e) => {
+              setFormData(prev => ({ ...prev, markupPercentage: parseInt(e.target.value) || 0 }));
+              clearValidationError('markupPercentage');
+            }}
+            placeholder="0"
+            className={`pr-8 ${validationErrors.markupPercentage ? 'border-red-500' : ''}`}
+            required
+          />
+        </div>
+        {validationErrors.markupPercentage && (
+          <p className="text-red-500 text-sm mt-1">{validationErrors.markupPercentage}</p>
+        )}
+        {configurationData?.markup_percentage &&
+          formData.markupPercentage === configurationData.markup_percentage && (
+            <p className="text-green-600 text-xs mt-1">
+              ✓ Loaded from Configuration ({configurationData.markup_percentage}%)
+            </p>
+          )}
+      </div>
+
+      <div>
+        <Label htmlFor="unit_cost" className="flex items-center gap-1">
+          Unit Cost
+        </Label>
+        <div className="relative mt-2">
+          <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span>
+          <Input
+            id="unit_cost"
+            type="number"
+            step="0.01"
+            min="0"
+            value={formData.unit_cost === 0 ? '' : formData.unit_cost}
+            onChange={(e) => {
+              setFormData(prev => ({ ...prev, unit_cost: parseFloat(e.target.value) || 0 }));
+              clearValidationError('unit_cost');
+            }}
+            placeholder="0.00"
+            className={`pl-8 ${validationErrors.unitcost ? 'border-red-500' : ''}`}
+            required
+          />
+        </div>
+        {validationErrors.unitcost && (
+          <p className="text-red-500 text-sm mt-1">{validationErrors.unitcost}</p>
+        )}
+      </div>
+
+      <div>
+        <Label htmlFor="estimated_price" className="flex items-center gap-1">
+          Estimate Price
+        </Label>
+        <div className="relative mt-2">
+          <span className="absolute left-3 top-1/2 transform -translate-y-1/2">$</span>
+          <Input
+            id="estimated_price"
+            type="number"
+            step="0.01"
+            min="0"
+            value={formData.estimated_price === 0 ? '' : formData.estimated_price}
+            onChange={(e) => {
+              setFormData(prev => ({ ...prev, estimated_price: parseFloat(e.target.value) || 0 }));
+              clearValidationError('estimated_price');
+            }}
+            placeholder="0.00"
+            className={`pl-8 ${validationErrors.estimateprice ? 'border-red-500' : ''}`}
+            required
+          />
+        </div>
+        {validationErrors.estimateprice && (
+          <p className="text-red-500 text-sm mt-1">{validationErrors.estimateprice}</p>
+        )}
+      </div>
+    </div>
+  </div>
+
+  {/* Calculated Pricing Section */}
+  <div>
+    <div className="flex items-center gap-3 border-b pb-2 mb-4">
+      <div className="w-8 h-8 bg-purple-100 rounded-md flex items-center justify-center">
+        <svg className="w-4 h-4 text-purple-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+      </div>
+      <h3 className="text-base font-semibold text-gray-900">Calculated Pricing</h3>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-[#fff7ed] border border-[#fed7aa] rounded-xl p-5 flex flex-col items-center text-center min-h-[120px] justify-center">
+        <div className="w-10 h-10 bg-[#fed7aa] rounded-lg flex items-center justify-center mb-3">
+          <svg className="w-5 h-5 text-[#ea580c]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 3v18h18" />
+            <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" />
+          </svg>
+        </div>
+        <div className="text-xs font-medium text-[#ea580c] mb-1">Markup Amount</div>
+        <div className="text-xl font-bold text-[#ea580c]">${formData.markupAmount.toFixed(2)}</div>
+      </div>
+
+      <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-5 flex flex-col items-center text-center min-h-[120px] justify-center">
+        <div className="w-10 h-10 bg-[#e2e8f0] rounded-lg flex items-center justify-center mb-3">
+          <svg className="w-5 h-5 text-[#64748b]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <line x1="9" y1="9" x2="15" y2="15" />
+            <line x1="15" y1="9" x2="9" y2="15" />
+          </svg>
+        </div>
+        <div className="text-xs font-medium text-gray-500 mb-1">JDP Price</div>
+        <div className="text-xl font-bold text-gray-900">${formData.jdpPrice.toFixed(2)}</div>
+      </div>
+
+      <div className="bg-[#f0fdf4] border border-[#bbf7d0] rounded-xl p-5 flex flex-col items-center text-center min-h-[120px] justify-center">
+        <div className="w-10 h-10 bg-[#bbf7d0] rounded-lg flex items-center justify-center mb-3">
+          <svg className="w-5 h-5 text-[#16a34a]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+        </div>
+        <div className="text-xs font-medium text-[#16a34a] mb-1">Profit Margin</div>
+        <div className="text-xl font-bold text-[#16a34a]">{formData.profitMargin}%</div>
+      </div>
+    </div>
+  </div>
+
+  {/* Inventory Details Section */}
+  <div className="rounded-lg">
+    <div className="flex items-center gap-2 border-b pb-2 mb-4">
+      <div className="w-8 h-8 bg-[#fff7ed] rounded-lg flex items-center justify-center">
+        <PackageIcon className="h-4 w-4 text-[#ea580c]" />
+      </div>
+      <h3 className="font-semibold">Inventory Details</h3>
+    </div>
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <Label htmlFor="stockQuantity" className="flex items-center gap-1 mb-2">
+          Stock Quantity
+        </Label>
+        <Input
+          id="stockQuantity"
+          type="number"
+          min="0"
+          value={formData.stockQuantity === 0 ? '' : formData.stockQuantity}
+          onChange={(e) => setFormData(prev => ({ ...prev, stockQuantity: parseInt(e.target.value) || 0 }))}
+          placeholder="0"
+          className="mt-1"
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="status" className="flex items-center gap-1 mb-2">
+          Status
+        </Label>
+        <Select
+          value={formData.status}
+          onValueChange={(value: 'active' | 'inactive' | 'draft') =>
+            setFormData(prev => ({ ...prev, status: value }))
+          }
+        >
+          <SelectTrigger className="mt-1">
+            <SelectValue placeholder="Select status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="inactive">Inactive</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  </div>
+</div>
+
+      )}
+    </CardContent>
+
+    <div className="flex items-center justify-end gap-2 px-6 pb-6">
+      {formMode === 'view' ? (
+        <div className="flex gap-2">
+          {hasPermission('products', 'edit') && (
+            <Button variant="outline" onClick={() => handleAction('edit', selectedProduct!)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Edit
+            </Button>
+          )}
+          {hasPermission('products', 'delete') && (
+            <Button
+              variant="outline"
+              onClick={() => handleAction('delete', selectedProduct!)}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </Button>
+          )}
+          <Button variant="outline" onClick={handleCloseForm}>
+            <X className="h-4 w-4 mr-2" />
+            Close
+          </Button>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleCloseForm}>
+            <X className="h-4 w-4 mr-2" />
+            Cancel
+          </Button>
+          {hasPermission('products', formMode === 'add' ? 'create' : 'edit') && (
+            <Button
+              onClick={handleSaveProduct}
+              disabled={isLoading}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {isLoading ? 'Saving...' : 'Save Product'}
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  </Card>
+) : null}
+
       {/* Add Supplier Modal */}
       <Dialog open={showAddSupplierModal} onOpenChange={setShowAddSupplierModal}>
         <DialogContent className="sm:max-w-[425px]">
