@@ -267,10 +267,12 @@ export const apiClient = {
       assignedLaborDetails: job.assigned_labor || [],
       assignedMaterialsDetails: job.assigned_materials || [],
       customLabor: job.custom_labor || [],
+      bluesheets: job.bluesheets || [],
     };
 
     console.log("Transformed job details:", transformedJob);
     console.log("Location field:", transformedJob.location);
+    console.log("Bluesheets data:", transformedJob.bluesheets);
     return transformedJob;
   },
 

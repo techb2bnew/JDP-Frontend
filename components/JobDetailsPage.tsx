@@ -201,11 +201,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   
   console.log('Job data:', job)
   console.log('Labor timesheets:', job.labor_timesheets)
+  console.log('Bluesheets data:', job.bluesheets)
 
   // Use real job data for materials, timeLogs, and invoices
   // const materials = job.assignedMaterialsDetails || sampleJobData.materials
   // console.log(materials,"testmateris")
   const [materials, setMaterials] = useState<any[]>(job.assignedMaterialsDetails || sampleJobData.materials || []);
+  const [bluesheets, setBluesheets] = useState<any[]>(job.bluesheets || []);
 
   const timeLogs = Array.isArray(job.labor_timesheets) ? job.labor_timesheets : (Array.isArray(sampleJobData.timeLogs) ? sampleJobData.timeLogs : []) // Ensure timeLogs is always an array
   const invoices = sampleJobData.invoices // Keep sample data for now as we don't have invoices API
@@ -589,29 +591,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const validateTimeLogForm = () => {
     const errors: Record<string, string> = {};
 
-    if (!timeLogFormData.workerName.trim()) {
-      errors.workerName = 'Full name is required';
+    if (!timeLogFormData.selectedLabor && !timeLogFormData.selectedLeadLabor) {
+      errors.laborSelection = 'Please select either Labor or Lead Labor';
     }
 
-    if (!timeLogFormData.email.trim()) {
-      errors.email = 'Email is required';
-    } else {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(timeLogFormData.email)) {
-        errors.email = 'Please enter a valid email address';
-      }
-    }
-
-    if (!timeLogFormData.role) {
-      errors.role = 'Role is required';
-    }
-
-    if (timeLogFormData.hoursWorked <= 0) {
+    if (!timeLogFormData.hoursWorked || timeLogFormData.hoursWorked <= 0) {
       errors.hoursWorked = 'Hours worked must be greater than 0';
-    }
-
-    if (timeLogFormData.hourlyRate <= 0) {
-      errors.hourlyRate = 'Hourly rate must be greater than 0';
     }
 
     setTimeLogValidationErrors(errors);
@@ -631,38 +616,38 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     }
 
     try {
+      const selectedLabor = timeLogFormData.selectedLabor || timeLogFormData.selectedLeadLabor;
+      const isLeadLabor = !!timeLogFormData.selectedLeadLabor;
+      
       if (timeLogModalMode === 'create') {
         const timeLogPayload = {
           job_id: jobId,
-          labor_id: '', // Will be set by backend or can be selected from assigned labor
-          full_name: timeLogFormData.workerName,
-          email: timeLogFormData.email,
-          role: timeLogFormData.role,
+          labor_id: selectedLabor?.id?.toString() || '',
+          full_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
+          email: selectedLabor?.users?.email || '',
+          role: isLeadLabor ? 'lead_labor' : 'labor',
           hours_worked: timeLogFormData.hoursWorked,
-          hourly_rate: timeLogFormData.hourlyRate,
+          hourly_rate: selectedLabor?.hourly_rate || 0,
           notes: timeLogFormData.description,
           date_of_joining: timeLogFormData.date,
-          is_custom: true,
-          total_cost: timeLogFormData.hoursWorked * timeLogFormData.hourlyRate,
+          is_custom: selectedLabor?.is_custom || false,
+          total_cost: timeLogFormData.hoursWorked * (selectedLabor?.hourly_rate || 0),
         };
 
         await apiClient.createLaborTimeLog(timeLogPayload);
         toast.success('Labor time log created successfully!');
       } else if (timeLogModalMode === 'edit') {
-        // Determine is_custom value based on labor type
-        const isCustom = currentTimeLog.isCustomLabor || false;
-
         const updatePayload = {
           job_id: jobId,
-          labor_id: currentTimeLog.id,
-          full_name: timeLogFormData.workerName,
-          email: timeLogFormData.email,
-          role: timeLogFormData.role,
+          labor_id: selectedLabor?.id?.toString() || '',
+          full_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
+          email: selectedLabor?.users?.email || '',
+          role: isLeadLabor ? 'lead_labor' : 'labor',
           hours_worked: timeLogFormData.hoursWorked,
-          hourly_rate: timeLogFormData.hourlyRate,
+          hourly_rate: selectedLabor?.hourly_rate || 0,
           notes: timeLogFormData.description,
           date_of_joining: timeLogFormData.date,
-          is_custom: isCustom
+          is_custom: selectedLabor?.is_custom || false
         };
 
         await apiClient.updateLaborTimeLog(currentTimeLog.id, updatePayload);
@@ -684,60 +669,69 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const handleViewTimeLog = async (labor: any) => {
     console.log('View button clicked, labor:', labor);
     try {
-      // Fetch detailed labor data from API
-      const laborDetails = await apiClient.getLaborById(labor.id);
-      console.log('Fetched labor details:', laborDetails);
+      // Set the current time log data
+      setCurrentTimeLog(labor);
 
-      setCurrentTimeLog(laborDetails);
+      // Determine if it's labor or lead labor based on the data structure
+      const isLeadLabor = labor.role === 'lead_labor' || labor.lead_labor_id;
+
       setTimeLogFormData({
-        workerName: laborDetails.users?.full_name || '',
-        email: laborDetails.users?.email || '',
-        role: laborDetails.users.role || '',
-        hoursWorked: laborDetails.hours_worked || 0,
-        hourlyRate: laborDetails.hourly_rate || 0,
-        description: laborDetails.notes || '',
-        date: laborDetails.date_of_joining || new Date().toISOString().split('T')[0]
+        selectedLabor: isLeadLabor ? null : labor,
+        selectedLeadLabor: isLeadLabor ? labor : null,
+        hoursWorked: labor.hours_worked || 0,
+        description: labor.description || '',
+        date: labor.date || new Date().toISOString().split('T')[0]
       });
+
+      // Set input values
+      if (isLeadLabor) {
+        setLeadLaborInputValue(labor.users?.full_name || labor.labor_code || '');
+        setLaborInputValue('');
+      } else {
+        setLaborInputValue(labor.users?.full_name || labor.labor_code || '');
+        setLeadLaborInputValue('');
+      }
+
       setTimeLogModalMode('view');
       setShowTimeLogModal(true);
       console.log('View modal should be open now');
     } catch (error) {
-      console.error('Error fetching labor details:', error);
-      toast.error('Failed to fetch labor details');
+      console.error('Error viewing labor time log:', error);
+      toast.error('Failed to load labor details');
     }
   };
 
   const handleEditTimeLog = async (labor: any) => {
     try {
-      // Fetch detailed labor data from API
-      const laborDetails = await apiClient.getLaborById(labor.id);
+      // Set the current time log data
+      setCurrentTimeLog(labor);
 
-      // Check if this is assigned labor or custom labor
-      const isAssignedLabor = job.assignedLaborDetails && job.assignedLaborDetails.some((al: any) => al.id === labor.id);
-      const isCustomLabor = job.customLabor && job.customLabor.some((cl: any) => cl.id === labor.id);
-
-      // Store the labor type for use in save operation
-      setCurrentTimeLog({
-        ...laborDetails,
-        isAssignedLabor: isAssignedLabor,
-        isCustomLabor: isCustomLabor
-      });
+      // Determine if it's labor or lead labor based on the data structure
+      const isLeadLabor = labor.role === 'lead_labor' || labor.lead_labor_id;
 
       setTimeLogFormData({
-        workerName: laborDetails.users?.full_name || laborDetails.labor_code || '',
-        email: laborDetails.users?.email || '',
-        role: laborDetails.users.role || '',
-        hoursWorked: laborDetails.hours_worked || 0,
-        hourlyRate: laborDetails.hourly_rate || 0,
-        description: laborDetails.notes || '',
-        date: laborDetails.date_of_joining || new Date().toISOString().split('T')[0]
+        selectedLabor: isLeadLabor ? null : labor,
+        selectedLeadLabor: isLeadLabor ? labor : null,
+        hoursWorked: labor.hours_worked || 0,
+        description: labor.description || '',
+        date: labor.date || new Date().toISOString().split('T')[0]
       });
+
+      // Set input values
+      if (isLeadLabor) {
+        setLeadLaborInputValue(labor.users?.full_name || labor.labor_code || '');
+        setLaborInputValue('');
+      } else {
+        setLaborInputValue(labor.users?.full_name || labor.labor_code || '');
+        setLeadLaborInputValue('');
+      }
+
       setTimeLogModalMode('edit');
       setShowTimeLogModal(true);
       console.log('Edit modal should be open now');
     } catch (error) {
-      console.error('Error fetching labor details for edit:', error);
-      toast.error('Failed to fetch labor details');
+      console.error('Error editing labor time log:', error);
+      toast.error('Failed to load labor details');
     }
   };
 
@@ -1117,19 +1111,20 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     }
 
     try {
-      const isCustom = currentTimeLog.isCustomLabor || false;
+      const selectedLabor = timeLogFormData.selectedLabor || timeLogFormData.selectedLeadLabor;
+      const isLeadLabor = !!timeLogFormData.selectedLeadLabor;
 
       const updatePayload = {
         job_id: jobId,
-        labor_id: currentTimeLog.id,
-        full_name: timeLogFormData.workerName,
-        email: timeLogFormData.email,
-        role: timeLogFormData.role,
+        labor_id: selectedLabor?.id?.toString() || '',
+        full_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
+        email: selectedLabor?.users?.email || '',
+        role: isLeadLabor ? 'lead_labor' : 'labor',
         hours_worked: timeLogFormData.hoursWorked,
-        hourly_rate: timeLogFormData.hourlyRate,
+        hourly_rate: selectedLabor?.hourly_rate || 0,
         notes: timeLogFormData.description,
         date_of_joining: timeLogFormData.date,
-        is_custom: isCustom
+        is_custom: selectedLabor?.is_custom || false
       };
 
       await apiClient.updateLaborTimeLog(currentTimeLog.id, updatePayload);
@@ -1159,14 +1154,18 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
   const resetTimeLogForm = () => {
     setTimeLogFormData({
-      workerName: '',
-      email: '',
-      role: '',
+      selectedLabor: null,
+      selectedLeadLabor: null,
       hoursWorked: 0,
-      hourlyRate: 0,
       description: '',
       date: new Date().toISOString().split('T')[0]
     });
+    setLaborInputValue('');
+    setLeadLaborInputValue('');
+    setLaborSearchResults([]);
+    setLeadLaborSearchResults([]);
+    setShowLaborDropdown(false);
+    setShowLeadLaborDropdown(false);
     setTimeLogValidationErrors({});
   };
 
@@ -1228,10 +1227,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     });
   }, [job]);
 
-
-
-
-
+  // Update bluesheets when job data changes
+  useEffect(() => {
+    if (job.bluesheets) {
+      setBluesheets(job.bluesheets);
+      console.log('Updated bluesheets:', job.bluesheets);
+    }
+  }, [job.bluesheets]);
 
   useEffect(() => {
     const fetchSuppliers = async () => {
@@ -1321,14 +1323,69 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   });
 
   const [timeLogFormData, setTimeLogFormData] = useState({
-    workerName: '',
-    email: '',
-    role: '',
+    selectedLabor: null as any,
+    selectedLeadLabor: null as any,
     hoursWorked: 0,
-    hourlyRate: 0,
     description: '',
     date: new Date().toISOString().split('T')[0]
   });
+
+  // Search functionality for labor and lead labor
+  const [laborSearchResults, setLaborSearchResults] = useState<any[]>([]);
+  const [leadLaborSearchResults, setLeadLaborSearchResults] = useState<any[]>([]);
+  const [showLaborDropdown, setShowLaborDropdown] = useState(false);
+  const [showLeadLaborDropdown, setShowLeadLaborDropdown] = useState(false);
+  const [isLoadingLabor, setIsLoadingLabor] = useState(false);
+  const [isLoadingLeadLabor, setIsLoadingLeadLabor] = useState(false);
+  const [laborInputValue, setLaborInputValue] = useState('');
+  const [leadLaborInputValue, setLeadLaborInputValue] = useState('');
+
+  // Search functions
+  const searchLabor = async (query: string) => {
+    if (query.length < 2) return; // Don't search for very short queries
+    
+    setIsLoadingLabor(true);
+    try {
+      const response = await apiClient.searchLaborByQuery(query, 1, 20);
+      setLaborSearchResults(response.data?.labor || []);
+    } catch (error) {
+      console.error('Error searching labor:', error);
+      setLaborSearchResults([]);
+    } finally {
+      setIsLoadingLabor(false);
+    }
+  };
+
+  const searchLeadLabor = async (query: string) => {
+    if (query.length < 2) return; // Don't search for very short queries
+    
+    setIsLoadingLeadLabor(true);
+    try {
+      const response = await apiClient.searchLeadLaborByQuery(query, 1, 20);
+      setLeadLaborSearchResults(response.data?.leadLabor || []);
+    } catch (error) {
+      console.error('Error searching lead labor:', error);
+      setLeadLaborSearchResults([]);
+    } finally {
+      setIsLoadingLeadLabor(false);
+    }
+  };
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.labor-dropdown') && !target.closest('.lead-labor-dropdown')) {
+        setShowLaborDropdown(false);
+        setShowLeadLaborDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Labor Time Log states
   const [laborTimeLogs, setLaborTimeLogs] = useState<any[]>([]);
@@ -3242,7 +3299,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                       })()}
                       selectedObjects={editedJob.assignedLeadLabor?.map((labor: any) => ({
                         id: labor.id,
-                        name: labor.name || labor.user?.full_name || labor.labor_code || `Labor ${labor.id}`,
+                        name: labor.name || labor.users?.full_name || labor.labor_code || `Labor ${labor.id}`,
                         labor_code: labor.labor_code,
                         department: labor.department,
                         specialization: labor.specialization,
@@ -3272,7 +3329,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                           key={labor.id || `labor-${index}`}
                           className="bg-blue-50 text-blue-700 text-sm px-2 py-1 rounded-md border border-blue-200"
                         >
-                          {labor.name || labor.user?.full_name || labor.labor_code}
+                          {labor.name || labor.users?.full_name || labor.labor_code}
                         </span>
                       ))}
                     </div>
@@ -3301,7 +3358,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                       })()}
                       selectedObjects={editedJob.assignedLabor?.map((labor: any) => ({
                         id: labor.id,
-                        name: labor.name || labor.user?.full_name || labor.labor_code || `Labor ${labor.id}`,
+                        name: labor.name || labor.users?.full_name || labor.labor_code || `Labor ${labor.id}`,
                         labor_code: labor.labor_code,
                         trade: labor.trade,
                         experience: labor.experience,
@@ -3332,7 +3389,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                             key={labor.id || `labor-${index}`}
                             className="bg-orange-50 text-orange-700 text-sm px-2 py-1 rounded-md border border-orange-200"
                           >
-                            {labor.name || labor.user?.full_name || labor.labor_code}
+                            {labor.name || labor.users?.full_name || labor.labor_code}
                           </span>
                         );
                       })}
@@ -3357,7 +3414,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                         <div key={index} className="bg-gray-100 p-3 rounded-md">
                           <div className="flex justify-between items-start">
                             <div>
-                              <p className="font-medium text-sm">{labor.user?.full_name || labor.labor_code}</p>
+                              <p className="font-medium text-sm">{labor.users?.full_name || labor.labor_code}</p>
                               <p className="text-xs text-gray-600">{labor.trade} - {labor.experience}</p>
                               <p className="text-xs text-gray-500">Code: {labor.labor_code}</p>
                             </div>
@@ -4186,7 +4243,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                           <p className="text-sm text-muted-foreground mb-2">{invoice.description || invoice.estimate_title}</p>
                           <div className="flex items-center gap-4 text-xs text-muted-foreground">
                             <span>#{invoice.invoice_number}</span>
-                            <span>Created: {formatDate(invoice.estimate_date || invoice.created_at)}</span>
+                            <span>Created : {formatDate(invoice.estimate_date || invoice.created_at)}</span>
+                            <span>Updated : {formatDate(invoice.updated_at || invoice.updated_at)}</span>
                           </div>
                         </div>
                       </div>
@@ -4367,118 +4425,101 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {/* Show assigned labor data */}
-              {job.assignedLaborDetails && job.assignedLaborDetails.length > 0 && (
-                <>
-                  {job.assignedLaborDetails.map((labor: any, index: number) => (
-                    <div key={`assigned-${labor.id}`} className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
-                      <div className="flex items-center gap-4">
-                        <div className="h-10 w-10 bg-green-200 rounded-lg flex items-center justify-center">
-                          <Users className="h-5 w-5 text-green-700" />
-                        </div>
-                        <div>
-                          <h4 className="font-medium">{labor.user?.full_name || labor.labor_code}</h4>
-                          <p className="text-xs text-gray-600">
-                            {labor.trade} • {labor.experience} • {labor.availability}
-                          </p>
-                          <p className="text-xs text-gray-500">Code: {labor.labor_code}</p>
+              {/* Show bluesheets labor entries */}
+              {bluesheets && bluesheets.length > 0 && (
+                <> 
+                  {bluesheets.map((bluesheet: any, bluesheetIndex: number) => (
+                    <div key={`bluesheet-${bluesheet.id}`} className="mb-6 p-4 bg-gray-50 rounded-lg border">
+                      <div className="flex justify-between items-center mb-3">
+                        <h5 className="font-medium text-gray-800">
+                          Bluesheet #{bluesheet.id} - {bluesheet.date}
+                        </h5>
+                        <div className="text-sm text-gray-600">
+                          Created by: {bluesheet.created_by_user?.full_name || 'Unknown'}
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="font-semibold">${labor.hourly_rate || 0}/hr</p>
-                          <p className="text-sm text-gray-600">
-                            {labor.hours_worked || 0} hrs worked
-                          </p>
+                      
+                      {bluesheet.labor_entries && bluesheet.labor_entries.length > 0 && (
+                        <div className="space-y-3">
+                          {bluesheet.labor_entries.map((entry: any, entryIndex: number) => (
+                            <div key={`entry-${entry.id}`} className="flex items-center justify-between p-3 bg-white rounded border">
+                              <div className="flex items-center gap-4">
+                                <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
+                                  <Users className="h-5 w-5 text-blue-700" />
+                                </div>
+                                <div>
+                                  <h6 className="font-medium">
+                                    {entry.role === 'lead_labor' ? 'Lead Labor' : 'Labor'}
+                                  </h6>
+                                  <p className="text-sm text-gray-600">
+                                    {entry.employee_name || entry.labor?.users?.full_name || entry.lead_labor?.users?.full_name || 'Unknown Labor'}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    Code: {entry.labor?.labor_code || entry.lead_labor?.labor_code || 'N/A'}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <div className="text-right">
+                                  <p className="text-sm text-gray-600">
+                                    Regular: {entry.regular_hours || '0h'}
+                                  </p>
+                                  <p className="text-sm text-gray-600">
+                                    Overtime: {entry.overtime_hours || '0h'}
+                                  </p>
+                                  <p className="text-sm text-gray-600">
+                                    Total: {entry.total_hours || '0h'}
+                                  </p>
+                                  <p className="text-sm text-gray-600">
+                                    Rate: ${entry.hourly_rate || 0}/hr
+                                  </p>
+                                  <p className="font-semibold">
+                                    Total Cost: ${entry.total_cost || 0}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                    entry.role === 'lead_labor' 
+                                      ? 'bg-purple-100 text-purple-800' 
+                                      : 'bg-blue-100 text-blue-800'
+                                  }`}>
+                                    {entry.role === 'lead_labor' ? 'Lead' : 'Labor'}
+                                  </span>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-1"
+                                    onClick={() => handleViewTimeLog(entry)}
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                    View
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-1"
+                                    onClick={() => handleEditTimeLog(entry)}
+                                  >
+                                    <Edit className="h-3 w-3" />
+                                    Edit
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            Assigned
-                          </span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1"
-                            onClick={() => handleViewTimeLog(labor)}
-                          >
-                            <Eye className="h-3 w-3" />
-                            View
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1"
-                            onClick={() => handleEditTimeLog(labor)}
-                          >
-                            <Edit className="h-3 w-3" />
-                            Edit
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </>
-              )}
-
-              {/* Show custom labor data */}
-              {job.customLabor && job.customLabor.length > 0 && (
-                <>
-                  {job.customLabor.map((labor: any, index: number) => (
-                    <div key={`custom-${labor.id}`} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                      <div className="flex items-center gap-4">
-                        <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
-                          <Users className="h-5 w-5 text-blue-700" />
-                        </div>
-                        <div>
-                          <h4 className="font-medium">{labor.user?.full_name || labor.labor_code}</h4>
-                          <p className="text-xs text-gray-600">
-                            {labor.trade || 'Custom Labor'} • {labor.experience || 'N/A'} • {labor.availability || 'Available'}
-                          </p>
-                          <p className="text-xs text-gray-500">Code: {labor.labor_code}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="font-semibold">${labor.hourly_rate || 0}/hr</p>
-                          <p className="text-sm text-gray-600">
-                            {labor.hours_worked || 0} hrs worked
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            Custom
-                          </span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1"
-                            onClick={() => handleViewTimeLog(labor)}
-                          >
-                            <Eye className="h-3 w-3" />
-                            View
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1"
-                            onClick={() => handleEditTimeLog(labor)}
-                          >
-                            <Edit className="h-3 w-3" />
-                            Edit
-                          </Button>
-                        </div>
-                      </div>
+                      )}
+                       
                     </div>
                   ))}
                 </>
               )}
 
               {/* Show message if no labor at all */}
-              {(!job.assignedLaborDetails || job.assignedLaborDetails.length === 0) &&
-                (!job.customLabor || job.customLabor.length === 0) && (
+              {(!bluesheets || bluesheets.length === 0) && (
                   <div className="text-center py-8 text-gray-500">
                     <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                    <p>No labor assigned to this job</p>
+                    <p>No labor entries found in bluesheets</p>
                   </div>
                 )}
 
@@ -4720,116 +4761,163 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="mb-2">Full Name *</Label>
+            {/* Labor Selection */}
+            <div className="labor-dropdown">
+              <Label className="mb-2">Select Labor *</Label>
+              <div className="relative">
                 <Input
-                  value={timeLogFormData.workerName}
-                  onChange={(e) => setTimeLogFormData({ ...timeLogFormData, workerName: e.target.value })}
-                  placeholder="Enter full name"
-                  disabled={timeLogModalMode === 'view'}
+                  type="text"
+                  placeholder="Search and select labor..."
+                  value={laborInputValue}
+                  onChange={(e) => {
+                    const searchQuery = e.target.value;
+                    setLaborInputValue(searchQuery);
+                    
+                    if (searchQuery === '') {
+                      setTimeLogFormData({ 
+                        ...timeLogFormData, 
+                        selectedLabor: null 
+                      });
+                      setShowLaborDropdown(false);
+                    } else {
+                      // Trigger search when user types
+                      searchLabor(searchQuery);
+                    }
+                  }}
+                  onFocus={() => setShowLaborDropdown(true)}
+                  disabled={timeLogModalMode === 'view' || !!timeLogFormData.selectedLeadLabor}
                 />
-                {timeLogValidationErrors.workerName && (
-                  <p className="text-red-500 text-xs mt-1">{timeLogValidationErrors.workerName}</p>
-                )}
-              </div>
-              <div>
-                <Label className="mb-2">Email *</Label>
-                <Input
-                  type="email"
-                  value={timeLogFormData.email}
-                  onChange={(e) => setTimeLogFormData({ ...timeLogFormData, email: e.target.value })}
-                  placeholder="Enter email address"
-                  disabled={timeLogModalMode === 'view'}
-                />
-                {timeLogValidationErrors.email && (
-                  <p className="text-red-500 text-xs mt-1">{timeLogValidationErrors.email}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="mb-2">Role *</Label>
-                <Select
-                  value={timeLogFormData.role}
-                  onValueChange={(value) => setTimeLogFormData({ ...timeLogFormData, role: value })}
-                  disabled={timeLogModalMode === 'view'}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {roles.map((role) => (
-                      <SelectItem key={role.id} value={role.roleName}>
-                        {role.roleName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {timeLogValidationErrors.role && (
-                  <p className="text-red-500 text-xs mt-1">{timeLogValidationErrors.role}</p>
-                )}
-              </div>
-              <div>
-                <Label className="mb-2">Date</Label>
-                <Input
-                  type="date"
-                  value={timeLogFormData.date}
-                  onChange={(e) => setTimeLogFormData({ ...timeLogFormData, date: e.target.value })}
-                  disabled={timeLogModalMode === 'view'}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="mb-2">Hours Worked *</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  value={timeLogFormData.hoursWorked === 0 ? "" : timeLogFormData.hoursWorked}
-                  onChange={(e) => setTimeLogFormData({ ...timeLogFormData, hoursWorked: Number(e.target.value) })}
-                  placeholder="0"
-                  disabled={timeLogModalMode === 'view'}
-                />
-                {timeLogValidationErrors.hoursWorked && (
-                  <p className="text-red-500 text-xs mt-1">{timeLogValidationErrors.hoursWorked}</p>
-                )}
-              </div>
-              <div>
-                <Label className="mb-2">Hourly Rate *</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={timeLogFormData.hourlyRate === 0 ? "" : timeLogFormData.hourlyRate}
-                  onChange={(e) => setTimeLogFormData({ ...timeLogFormData, hourlyRate: Number(e.target.value) })}
-                  placeholder="0.00"
-                  disabled={timeLogModalMode === 'view'}
-                />
-                {timeLogValidationErrors.hourlyRate && (
-                  <p className="text-red-500 text-xs mt-1">{timeLogValidationErrors.hourlyRate}</p>
+                {showLaborDropdown && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                    {isLoadingLabor ? (
+                      <div className="flex items-center justify-center p-4">
+                        <LoadingSpinner />
+                      </div>
+                    ) : (
+                      <>
+                        {laborSearchResults.map((labor: any) => (
+                          <div
+                            key={labor.id}
+                            className="flex items-center space-x-2 p-3 hover:bg-gray-50 cursor-pointer"
+                            onClick={() => {
+                              setTimeLogFormData({ 
+                                ...timeLogFormData, 
+                                selectedLabor: labor,
+                                selectedLeadLabor: null // Disable lead labor when labor is selected
+                              });
+                              setLaborInputValue(labor.users?.full_name || labor.labor_code);
+                              setShowLaborDropdown(false);
+                            }}
+                          >
+                            <span className="text-sm font-medium">
+                              {labor.users?.full_name || labor.labor_code} - {labor.labor_code}
+                            </span>
+                          </div>
+                        ))}
+                        {laborSearchResults.length === 0 && (
+                          <div className="text-center text-sm text-gray-500 p-2">
+                            No labor found
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
 
+            {/* Lead Labor Selection */}
+            <div className="lead-labor-dropdown">
+              <Label className="mb-2">Select Lead Labor *</Label>
+              <div className="relative">
+                <Input
+                  type="text"
+                  placeholder="Search and select lead labor..."
+                  value={leadLaborInputValue}
+                  onChange={(e) => {
+                    const searchQuery = e.target.value;
+                    setLeadLaborInputValue(searchQuery);
+                    
+                    if (searchQuery === '') {
+                      setTimeLogFormData({ 
+                        ...timeLogFormData, 
+                        selectedLeadLabor: null 
+                      });
+                      setShowLeadLaborDropdown(false);
+                    } else {
+                      // Trigger search when user types
+                      searchLeadLabor(searchQuery);
+                    }
+                  }}
+                  onFocus={() => setShowLeadLaborDropdown(true)}
+                  disabled={timeLogModalMode === 'view' || !!timeLogFormData.selectedLabor}
+                />
+                {showLeadLaborDropdown && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                    {isLoadingLeadLabor ? (
+                      <div className="flex items-center justify-center p-4">
+                        <LoadingSpinner />
+                      </div>
+                    ) : (
+                      <>
+                        {leadLaborSearchResults.map((labor: any) => (
+                          <div
+                            key={labor.id}
+                            className="flex items-center space-x-2 p-3 hover:bg-gray-50 cursor-pointer"
+                            onClick={() => {
+                              setTimeLogFormData({ 
+                                ...timeLogFormData, 
+                                selectedLeadLabor: labor,
+                                selectedLabor: null // Disable labor when lead labor is selected
+                              });
+                              setLeadLaborInputValue(labor.users?.full_name || labor.labor_code);
+                              setShowLeadLaborDropdown(false);
+                            }}
+                          >
+                            <span className="text-sm font-medium">
+                              {labor.users?.full_name || labor.labor_code} - {labor.labor_code}
+                            </span>
+                          </div>
+                        ))}
+                        {leadLaborSearchResults.length === 0 && (
+                          <div className="text-center text-sm text-gray-500 p-2">
+                            No lead labor found
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Hours Worked */}
+            <div>
+              <Label className="mb-2">Hours Worked *</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.5"
+                value={timeLogFormData.hoursWorked === 0 ? "" : timeLogFormData.hoursWorked}
+                onChange={(e) => setTimeLogFormData({ ...timeLogFormData, hoursWorked: Number(e.target.value) })}
+                placeholder="Enter hours worked"
+                disabled={timeLogModalMode === 'view'}
+              />
+              {timeLogValidationErrors.hoursWorked && (
+                <p className="text-red-500 text-xs mt-1">{timeLogValidationErrors.hoursWorked}</p>
+              )}
+            </div>
+
+            {/* Description */}
             <div>
               <Label className="mb-2">Description</Label>
               <Textarea
                 value={timeLogFormData.description}
-                maxLength={20}
                 onChange={(e) => setTimeLogFormData({ ...timeLogFormData, description: e.target.value })}
                 placeholder="Describe the work performed"
                 rows={3}
                 disabled={timeLogModalMode === 'view'}
               />
-            </div>
-
-            <div className='bg-blue-100 p-3 border border-blue-300 rounded flex items-center gap-2'>
-              <ClockIcon className='w-4 h-4' />
-              <Label>Total Cost: ${(timeLogFormData.hoursWorked * timeLogFormData.hourlyRate).toFixed(2)}</Label>
             </div>
           </div>
           <DialogFooter>
@@ -4971,10 +5059,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
       {/* Invoice Preview Modal */}
       <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
+        <DialogContent className="min-w-[80%] max-h-[90vh] overflow-y-auto p-0">
           <div className="bg-gray-100 p-6">
             {/* Print-ready Invoice Design */}
-            <div id="invoice-preview-print" className="bg-white p-8 shadow-lg" style={{ width: '8.5in', margin: '0 auto' }}>
+            <div id="invoice-preview-print" className="bg-white p-8 shadow-lg" style={{ width: '14.5in', margin: '0 auto' }}>
               {/* Header */}
               <div className="flex justify-between items-start mb-8">
                 <div>
