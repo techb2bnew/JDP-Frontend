@@ -1840,7 +1840,7 @@ useEffect(() => {
             {/* View Mode - Only Close Button */}
             {isViewMode && (
               <div className="border-t bg-gray-50 px-8 py-6">
-                <div className="flex justify-center">
+                <div className="flex items-center justify-between">
                   <Button
                     variant="outline"
                     onClick={() => onOpenChange(false)}
@@ -1849,6 +1849,32 @@ useEffect(() => {
                     <X className="h-4 w-4 mr-2" />
                     Close
                   </Button>
+                  <div className="flex gap-3">
+                            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                              <Button
+                                onClick={handleSaveInvoiceAsDraft}
+                                variant="outline"
+                                size="lg"
+                                className="border-primary text-primary hover:bg-primary/5"
+                        disabled={savingDraft || sendingInvoice}
+                              >
+                                <FileText className="h-5 w-5 mr-2" />
+                        {savingDraft ? 'Saving...' : 'Save as Draft'}
+                              </Button>
+                            </motion.div>
+
+                            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                              <Button
+                                onClick={handlePreviewAndSend}
+                                size="lg"
+                                className="bg-primary hover:bg-primary/90 text-white"
+                        disabled={savingDraft || sendingInvoice}
+                              >
+                                <Eye className="h-5 w-5 mr-2" />
+                        {sendingInvoice ? 'Sending...' : 'Preview & Send to Customer'}
+                              </Button>
+                            </motion.div>
+                          </div>
                 </div>
               </div>
             )}
