@@ -1222,7 +1222,13 @@ searchEstimatesByInvoiceType: async (invoiceType: string, page = 1, limit = 10) 
   return response.json();
 },
 // Search Timesheets by Query 
-searchTimesheetsByQuery: async (query: string, page = 1, limit = 10) => {
+searchTimesheetsByQuery: async (
+  query: string,
+  page = 1,
+  limit = 10,
+  startDate: string | null = null,
+  endDate: string | null = null
+) => {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
   const token = getAuthToken();
 
@@ -1230,7 +1236,17 @@ searchTimesheetsByQuery: async (query: string, page = 1, limit = 10) => {
     throw new Error("No authentication token found");
   }
 
-  const url = `${apiBaseUrl}/job/searchTimesheets?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
+  // Build query params dynamically
+  const params = new URLSearchParams({
+    q: query,
+    page: page.toString(),
+    limit: limit.toString(),
+  });
+
+  if (startDate) params.append("start_date", startDate);
+  if (endDate) params.append("end_date", endDate);
+
+  const url = `${apiBaseUrl}/job/searchTimesheets?${params.toString()}`;
 
   const response = await fetch(url, {
     method: "GET",
@@ -1247,6 +1263,7 @@ searchTimesheetsByQuery: async (query: string, page = 1, limit = 10) => {
 
   return response.json();
 },
+
 // Search Timesheets by Status 
 searchTimesheetsByStatus: async (status: string, page = 1, limit = 10) => {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -1547,12 +1564,14 @@ getCustomersByStatus: async (status: string, page = 1, limit = 10) => {
 approveWeekTimesheet: async ({
   jobId,
   laborId,
+  lead_labor_id,
   startDate,
   endDate,
   status,
 }: {
   jobId: number;
   laborId: number;
+  lead_labor_id:number;
   startDate: string;
   endDate: string;
   status: string;
@@ -1576,6 +1595,7 @@ approveWeekTimesheet: async ({
     body: JSON.stringify({
       jobId,
       laborId,
+      lead_labor_id,
       startDate,
       endDate,
       status,

@@ -45,7 +45,8 @@ interface TimesheetItem {
   jobId?: number;      
   laborId?: number;
   job_id?:number;
-  labor_id?:number;
+  labor_id?:any;
+  lead_labor_id?:any;
 
 }
 
@@ -173,10 +174,11 @@ const fetchAlltimesheets = async () => {
     const transformedTimesheets = timesheets.map((item: any) => ({
       employee: item.employee || 'N/A',
       job: item.job || 'N/A',
-      jobCode: item.job ? item.job.split('(')[1]?.replace(')', '') || 'N/A' : 'N/A', // Extract job code from job name
+      jobCode: item.job ? item.job.split('(')[1]?.replace(')', '') || 'N/A' : 'N/A', 
       week: period.week_range,
-      jobId: item.job_id?.toString() || '', // This might be undefined in API response
-      laborId: item.labor_id?.toString() || '', // This might be undefined in API response
+      jobId: item.job_id?.toString() || '', 
+      laborId: item.labor_id?.toString() || '', 
+      lead_labor_id:item.lead_labor_id?.toString()|| '',
       mon: item.mon || '0h',
       tue: item.tue || '0h',
       wed: item.wed || '0h',
@@ -187,7 +189,7 @@ const fetchAlltimesheets = async () => {
       total: item.total || '0h',
       billable: item.billable || '0h',
       status: item.status || 'Unknown',
-      actions: item.actions || [], // Include actions from API
+      actions: item.actions || [], 
     }));
 
     console.log('Transformed timesheets:', transformedTimesheets); // Debug log
@@ -223,17 +225,57 @@ const handleApproveTimesheet = async (item: TimesheetItem) => {
     setIsLoading(true);
 
     const payload = {
-      jobId: item.jobId ||item.job_id|| 0,
-      laborId: item.laborId || item.labor_id|| 0,
+      jobId: item.jobId || item.job_id || 0,
       startDate: timesheets?.period.start_date || '2025-09-20',
       endDate: timesheets?.period.end_date || '2025-09-26',
-      status: 'approved',
+      status: 'Approved',
+      laborId: item.laborId || item.labor_id || null,
+      lead_labor_id: item.lead_labor_id || item.lead_labor_id || null,
     };
-    console.log(payload,"playload ")
-  
 
-    await apiClient.approveWeekTimesheet(payload); 
+    if (payload.laborId) payload.lead_labor_id = null;
+    else if (payload.lead_labor_id) payload.laborId = null;
+
+    console.log(payload, "payload");
+
+    await apiClient.approveWeekTimesheet(payload);
+
     const refreshed = await apiClient.getAllTimesheets();
+    console.log("Refreshed data:", refreshed.data);
+   setTimesheets(refreshed.data);
+
+  } catch (error) {
+    console.error('Error approving timesheet:', error);
+    alert("Failed to approve timesheet.");
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+
+
+const handleDraftTimesheet = async (item: TimesheetItem) => {
+  try {
+    setIsLoading(true);
+
+    const payload = {
+      jobId: item.jobId || item.job_id || 0,
+      startDate: timesheets?.period.start_date || '2025-09-20',
+      endDate: timesheets?.period.end_date || '2025-09-26',
+      status: 'Draft',
+      laborId: item.laborId || item.labor_id || null,
+      lead_labor_id: item.lead_labor_id || item.lead_labor_id || null,
+    };
+
+    if (payload.laborId) payload.lead_labor_id = null;
+    else if (payload.lead_labor_id) payload.laborId = null;
+
+    console.log(payload, "payload");
+
+    await apiClient.approveWeekTimesheet(payload);
+
+    const refreshed = await apiClient.getAllTimesheets();
+    console.log("Refreshed data:", refreshed.data);
     setTimesheets(refreshed.data);
 
   } catch (error) {
@@ -243,6 +285,8 @@ const handleApproveTimesheet = async (item: TimesheetItem) => {
     setIsLoading(false);
   }
 };
+
+
 
 const fetchBySearchTimesheets = async () => {
   if (!searchTerm.trim()) return;
@@ -254,11 +298,11 @@ const fetchBySearchTimesheets = async () => {
     console.log('Search API Response:', response); // Debug log
     const timesheetsData = response.data;
     const timesheets = timesheetsData?.dashboard_timesheets || [];
-
+    // const period = timesheetsData.period || { start_date: '', end_date: '', week_range: '' };
     const transformedTimesheets = timesheets.map((item: any) => ({
       employee: item.employee || 'N/A',
       job: item.job || 'N/A',
-      jobCode: item.job ? item.job.split('(')[1]?.replace(')', '') || 'N/A' : 'N/A', // Extract job code from job name
+      jobCode: item.job ? item.job.split('(')[1]?.replace(')', '') || 'N/A' : 'N/A', 
       week: timesheetsData?.period?.week_range || '', 
       jobId: item.job_id?.toString() || '',
       laborId: item.labor_id?.toString() || '',
@@ -272,10 +316,10 @@ const fetchBySearchTimesheets = async () => {
       total: item.total || '0h',
       billable: item.billable || '0h',
       status: item.status || 'Unknown',
-      actions: item.actions || [], // Include actions from API
+      actions: item.actions || [], 
     }));
 
-    console.log('Search transformed timesheets:', transformedTimesheets); // Debug log
+    console.log('Search transformed timesheets:', transformedTimesheets); 
     setFilteredTimesheets(transformedTimesheets); 
     setTimesheets(timesheetsData); 
     setTotalTimesheets(transformedTimesheets.length);
@@ -455,8 +499,6 @@ const fetchTimesheetsByFilters = async () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                   <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Submitted">Submitted</SelectItem>
                   <SelectItem value="Approved">Approved</SelectItem>
                   <SelectItem value="Draft">Draft</SelectItem>
                 </SelectContent>
@@ -561,16 +603,18 @@ const fetchTimesheetsByFilters = async () => {
                       <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         {item.status.toLowerCase() === 'approved' && (
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="border-green-500 text-green-500 hover:bg-green-50 hover:text-green-600"
-                          >
-                            <Check className="w-4 h-4" />
-                          </Button>
+                           <Button
+                              variant="outline"
+                              size="icon"
+                              className="border-red-500 text-red-500 hover:bg-red-50 hover:text-red-600"
+                              onClick={()=>handleDraftTimesheet(item)}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
                         )}
 
-                        {item.status.toLowerCase() === 'draft' && (
+                        {/* {item.status.toLowerCase() === 'draft' && (
+                          
                           <Button
                             variant="outline"
                             size="icon"
@@ -578,9 +622,9 @@ const fetchTimesheetsByFilters = async () => {
                           >
                             <X className="w-4 h-4" />
                           </Button>
-                        )}
+                        )} */}
 
-                        {item.status.toLowerCase() === 'active' && (
+                        {item.status.toLowerCase() === 'draft' && (
                           <>
                             <Button
                               variant="outline"
@@ -590,13 +634,7 @@ const fetchTimesheetsByFilters = async () => {
                             >
                               <Check className="w-4 h-4" />
                             </Button>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="border-red-500 text-red-500 hover:bg-red-50 hover:text-red-600"
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
+                            
                           </>
                         )}
                       </div>
