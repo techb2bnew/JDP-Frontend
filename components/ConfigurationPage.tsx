@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Info, Clock, TrendingUp, Table, Settings, CheckCircle, RefreshCw, Save, PlusCircle, X } from 'lucide-react';
+import { Info, Clock, TrendingUp, Table, Settings, CheckCircle, RefreshCw, Save } from 'lucide-react';
 import { apiClient } from '../utils/api';
 import { toast } from 'sonner';
 
@@ -60,14 +60,32 @@ export function ConfigurationPage() {
             rate: rate.rate
           }));
 
-          setTiers(loadedTiers);
+          // Ensure exactly 2 tiers - pad with empty ones if needed
+          const defaultTiers = [
+            { description: '', maxHours: '', rate: '' },
+            { description: '', maxHours: '', rate: '' }
+          ];
+          
+          const finalTiers = loadedTiers.length >= 2 
+            ? loadedTiers.slice(0, 2) // Take only first 2 tiers
+            : [...loadedTiers, ...defaultTiers.slice(loadedTiers.length)]; // Pad with empty tiers
+
+          setTiers(finalTiers);
           setMarkupPercentage(response.data.markup_percentage);
           
           // Store original loaded data for reset functionality
-          setOriginalLoadedTiers(loadedTiers);
+          setOriginalLoadedTiers(finalTiers);
           setOriginalLoadedMarkup(response.data.markup_percentage);
           
           console.log('Configuration loaded:', response.data);
+        } else {
+          // If no data from API, set default 2 empty tiers
+          const defaultTiers = [
+            { description: '', maxHours: '', rate: '' },
+            { description: '', maxHours: '', rate: '' }
+          ];
+          setTiers(defaultTiers);
+          setOriginalLoadedTiers(defaultTiers);
         }
       } catch (error) {
         console.error('Error loading configuration:', error);
@@ -81,30 +99,7 @@ export function ConfigurationPage() {
     loadConfiguration();
   }, []);
  
-  const handleAddTier = () => {
-    setTiers([...tiers, { description: '', maxHours: '', rate: '' }]);
-  };
-
-  const handleRemoveTier = async (index: number) => {
-    if (tiers.length > 1) { // Prevent removing the last tier
-      const tierToRemove = tiers[index];
-      
-      // If the tier has an ID (loaded from API), call delete API
-      if (tierToRemove.id) {
-        try {
-          await apiClient.removeHourlyRates([tierToRemove.id]);
-          toast.success('Tier removed successfully!');
-        } catch (error) {
-          console.error('Error removing tier:', error);
-          toast.error('Failed to remove tier');
-          return; // Don't remove from UI if API call fails
-        }
-      }
-      
-      // Remove from UI state
-      setTiers(tiers.filter((_, i) => i !== index));
-    }
-  };
+  // Fixed 2 tiers - no add/remove functionality
 
   const handleTierChange = (index: number, field: keyof RateTier, value: string | number) => {
     setTiers(tiers.map((tier, i) => 
@@ -193,17 +188,7 @@ export function ConfigurationPage() {
                   <div key={index} className="p-5 border rounded-lg bg-gray-50 space-y-4">
                     <div className="flex justify-between items-center">
                       <h3 className="font-semibold text-gray-600">Tier {index + 1}</h3>
-                      {tiers.length > 1 && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRemoveTier(index)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                        >
-                          <X className="w-4 h-4 mr-1" />
-                          Remove
-                        </Button>
-                      )}
+                      {/* Fixed 2 tiers - no remove button */}
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
@@ -215,18 +200,16 @@ export function ConfigurationPage() {
                           placeholder="e.g., Up to 3 hours" 
                         />
                       </div>
-                      {index === 0 && (
-                        <div>
-                          <label htmlFor={`max-hours-${index}`} className="block text-sm font-medium text-gray-600 mb-1">Maximum Hours</label>
-                          <Input 
-                            id={`max-hours-${index}`} 
-                            type="number" 
-                            value={tier.maxHours} 
-                            onChange={(e) => handleTierChange(index, 'maxHours', e.target.value)}
-                            placeholder="e.g., 3" 
-                          />
-                        </div>
-                      )}
+                      <div>
+                        <label htmlFor={`max-hours-${index}`} className="block text-sm font-medium text-gray-600 mb-1">Maximum Hours</label>
+                        <Input 
+                          id={`max-hours-${index}`} 
+                          type="number" 
+                          value={tier.maxHours} 
+                          onChange={(e) => handleTierChange(index, 'maxHours', e.target.value)}
+                          placeholder="e.g., 3" 
+                        />
+                      </div>
                     </div>
                     <div>
                       <label htmlFor={`rate-${index}`} className="block text-sm font-medium text-gray-600 mb-1">Hourly Rate</label>
@@ -247,9 +230,7 @@ export function ConfigurationPage() {
                     </div>
                   </div>
                 ))}
-                <Button variant="outline" className="w-full flex items-center gap-2 border-dashed" onClick={handleAddTier}>
-                  <PlusCircle className="w-4 h-4" /> Add New Tier
-                </Button>
+                {/* Fixed 2 tiers - no add button */}
               </CardContent>
             </Card>
           </div>

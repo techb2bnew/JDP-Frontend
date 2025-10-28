@@ -211,7 +211,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
   const timeLogs = Array.isArray(job.labor_timesheets) ? job.labor_timesheets : (Array.isArray(sampleJobData.timeLogs) ? sampleJobData.timeLogs : []) // Ensure timeLogs is always an array
   const invoices = sampleJobData.invoices // Keep sample data for now as we don't have invoices API
-
+console.log(materials,"testmaterials")
   // Calculate totals using real job data
   const totalMaterialCost = materials.reduce(
     (sum: number, material: any) =>
@@ -437,7 +437,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       searchQuery: '',
       showSearchResults: false,
       supplierId: 1,
-      isCustomProduct: false
+      isCustomProduct: false,
+      estimate_product_id: null
     }],
     notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
     signatureText: 'ACCEPTED BY________________DATE_____',
@@ -595,8 +596,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       errors.laborSelection = 'Please select either Labor or Lead Labor';
     }
 
-    if (!timeLogFormData.hoursWorked || timeLogFormData.hoursWorked <= 0) {
-      errors.hoursWorked = 'Hours worked must be greater than 0';
+    if (!timeLogFormData.hoursWorked || timeLogFormData.hoursWorked === '') {
+      errors.hoursWorked = 'Hours worked is required';
     }
 
     if (!timeLogFormData.date) {
@@ -628,41 +629,60 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         bluesheet.date === timeLogFormData.date
       );
 
-      if (!selectedBluesheet) {
-        toast.error('No bluesheet found for the selected date. Please create a bluesheet first.');
-        return;
-      }
+      if (selectedBluesheet) {
+        // Add labor to existing bluesheet
+        if (timeLogModalMode === 'create') {
+          const timeLogPayload = {
+            [isLeadLabor ? 'lead_labor_id' : 'labor_id']: selectedLabor?.id,
+            employee_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
+            role: isLeadLabor ? 'lead_labor' : 'labor',
+            regular_hours: timeLogFormData.hoursWorked,
+            hourly_rate: selectedLabor?.hourly_rate || 0,
+            date: timeLogFormData.date,
+            description: timeLogFormData.description || ''
+          };
 
-      if (timeLogModalMode === 'create') {
-        const timeLogPayload = {
-          [isLeadLabor ? 'lead_labor_id' : 'labor_id']: selectedLabor?.id,
-          employee_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
-          role: isLeadLabor ? 'lead_labor' : 'labor',
-          regular_hours: `${timeLogFormData.hoursWorked}h`,
-          hourly_rate: selectedLabor?.hourly_rate || 0,
+          // Call the bluesheet API
+          await apiClient.addLaborToBluesheet(selectedBluesheet.id, timeLogPayload);
+          toast.success('Labor time log added to existing bluesheet successfully!');
+        } else if (timeLogModalMode === 'edit') {
+          // For edit, we might need a different API endpoint
+          const updatePayload = {
+            [isLeadLabor ? 'lead_labor_id' : 'labor_id']: selectedLabor?.id,
+            employee_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
+            role: isLeadLabor ? 'lead_labor' : 'labor',
+            regular_hours: timeLogFormData.hoursWorked,
+            hourly_rate: selectedLabor?.hourly_rate || 0,
+            date: timeLogFormData.date,
+            description: timeLogFormData.description || ''
+          };
+
+          // You might need to implement updateLaborInBluesheet API method
+          await apiClient.updateLaborInBluesheet(currentTimeLog.id, updatePayload);
+          toast.success('Labor time log updated successfully!');
+        }
+      } else {
+        // Create new complete bluesheet with labor
+        const completeBluesheetPayload = {
+          job_id: job.id,
           date: timeLogFormData.date,
-          description: timeLogFormData.description || ''
-        };
- 
-
-        // Call the bluesheet API
-        await apiClient.addLaborToBluesheet(selectedBluesheet.id, timeLogPayload);
-        toast.success('Labor time log added to bluesheet successfully!');
-      } else if (timeLogModalMode === 'edit') {
-        // For edit, we might need a different API endpoint
-        const updatePayload = {
-          [isLeadLabor ? 'lead_labor_id' : 'labor_id']: selectedLabor?.id,
-          employee_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
-          role: isLeadLabor ? 'lead_labor' : 'labor',
-          regular_hours: `${timeLogFormData.hoursWorked}h`,
-          hourly_rate: selectedLabor?.hourly_rate || 0,
-          date: timeLogFormData.date,
-          description: timeLogFormData.description || ''
+          notes: `Daily work bluesheet for ${job.title || 'construction site'}`,
+          additional_charges: 0,
+          labor_entries: [
+            {
+              [isLeadLabor ? 'lead_labor_id' : 'labor_id']: selectedLabor?.id,
+              employee_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
+              role: isLeadLabor ? 'lead_labor' : 'labor',
+              regular_hours: timeLogFormData.hoursWorked,
+              overtime_hours: '0h',
+              hourly_rate: selectedLabor?.hourly_rate || 0
+            }
+          ],
+          material_entries: [] // Empty material entries for now
         };
 
-        // You might need to implement updateLaborInBluesheet API method
-        await apiClient.updateLaborInBluesheet(currentTimeLog.id, updatePayload);
-        toast.success('Labor time log updated successfully!');
+        await apiClient.createCompleteBluesheet(completeBluesheetPayload);
+        toast.success('New bluesheet created with labor successfully!');
       }
 
       setShowTimeLogModal(false);
@@ -725,7 +745,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       setTimeLogFormData({
         selectedLabor: isLeadLabor ? null : laborData,
         selectedLeadLabor: isLeadLabor ? laborData : null,
-        hoursWorked: hoursWorked,
+        hoursWorked: hoursWorked.toString(),
         description: laborEntry.description || '',
         date: laborEntry.date || new Date().toISOString().split('T')[0]
       });
@@ -771,7 +791,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       setTimeLogFormData({
         selectedLabor: isLeadLabor ? null : laborData,
         selectedLeadLabor: isLeadLabor ? laborData : null,
-        hoursWorked: hoursWorked,
+        hoursWorked: hoursWorked.toString(),
         description: laborEntry.description || '',
         date: laborEntry.date || new Date().toISOString().split('T')[0]
       });
@@ -802,13 +822,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   };
 
   const isValidForm = () => {
-    if (!materialFormData.name.trim()) {
-      toast.error("Product name is required");
+    if (!materialFormData.product_id) {
+      toast.error("Please select a product");
       return false;
     }
 
-    if (!materialFormData.sku.trim()) {
-      toast.error("SKU is required");
+    if (!materialFormData.material_name.trim()) {
+      toast.error("Material name is required");
       return false;
     }
 
@@ -817,7 +837,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       return false;
     }
 
-    if (!materialFormData.unitCost || materialFormData.unitCost <= 0) {
+    if (!materialFormData.unit_cost || materialFormData.unit_cost <= 0) {
       toast.error("Unit cost must be greater than 0");
       return false;
     }
@@ -827,41 +847,133 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       return false;
     }
 
-    if (!materialFormData.supplier) {
-      toast.error("Supplier is required");
-      return false;
-    }
-
     return true;
   };
 
 
+  // Product search function
+  const searchProducts = async (query: string) => {
+    if (query.length < 2) {
+      setProductSearchResults([]);
+      return;
+    }
+    
+    setIsSearchingProducts(true);
+    try {
+      const response = await apiClient.searchProductsByQuery(query);
+      console.log('Search API response:', response); // Debug log
+      
+      // Filter out custom products (is_custom: true)
+      const filteredProducts = (response.data?.products || []).filter((product: any) => 
+        product.is_custom === false || product.is_custom === undefined
+      );
+      
+      console.log('Filtered products:', filteredProducts); // Debug log
+      setProductSearchResults(filteredProducts);
+    } catch (error) {
+      console.error('Error searching products:', error);
+      setProductSearchResults([]);
+    } finally {
+      setIsSearchingProducts(false);
+    }
+  };
+
+  // Handle product selection
+  const handleProductSelect = (product: any) => {
+    console.log('Selected product:', product); // Debug log
+    setSelectedProduct(product);
+    setMaterialFormData({
+      ...materialFormData,
+      product_id: product.id,
+      material_name: product.product_name || product.name,
+      quantity: product.stock_quantity || 0, // Use stock_quantity from product
+      unit: product.unit || 'pieces', // Use unit from product
+      unit_cost: product.unit_cost || product.price || 0 // Keep for calculation
+    });
+    setProductSearchQuery(product.product_name || product.name);
+    setProductSearchResults([]);
+  };
+
   const handleAddProduct = async () => {
-    if (!isValidForm()) return;
+    if (!materialFormData.product_id || !materialFormData.material_name) {
+      toast.error('Please select a product');
+      return;
+    }
 
     setIsLoading(true);
     try {
-      const newProduct = await apiClient.createProduct({
-        product_name: materialFormData.name,
-        supplier_id: Number(materialFormData.supplier) || 0,
-        supplier_sku: materialFormData.sku,
-        jdp_sku: '',
-        stock_quantity: materialFormData.quantity,
-        unit: materialFormData.unit,
-        job_id: job.id || 2,
-        is_custom: true,
-        unit_cost: materialFormData.unitCost,
-        total_cost: materialFormData.quantity * materialFormData.unitCost,
-      });
+      // Find existing bluesheet by date
+      const existingBluesheet = job.bluesheets?.find((bluesheet: any) => 
+        bluesheet.date === materialFormData.date
+      );
 
-      triggerRefreshMaterials();
+      if (existingBluesheet) {
+        // Add material to existing bluesheet
+        const materialPayload = {
+          product_id: materialFormData.product_id,
+          material_name: materialFormData.material_name,
+          quantity: selectedProduct?.stock_quantity || materialFormData.quantity, // Use stock_quantity from selected product
+          unit: materialFormData.unit,
+          total_ordered: materialFormData.total_ordered,
+          material_used: materialFormData.material_used,
+          supplier_order_id: materialFormData.supplier_order_id,
+          return_to_warehouse: materialFormData.return_to_warehouse,
+          unit_cost: materialFormData.unit_cost
+        };
 
-      dispatch(addProduct(newProduct));
-      toast.success('Product added successfully!');
+        await apiClient.createBluesheetMaterial(materialPayload, existingBluesheet.id);
+        toast.success('Material added to existing bluesheet successfully!');
+      } else {
+        // Create new complete bluesheet with material
+        const completeBluesheetPayload = {
+          job_id: job.id,
+          date: materialFormData.date,
+          notes: `Daily work bluesheet for ${job.title || 'construction site'}`,
+          additional_charges: 0,
+          labor_entries: [], // Empty labor entries for now
+          material_entries: [
+            {
+              product_id: materialFormData.product_id,
+              material_name: materialFormData.material_name,
+              quantity: selectedProduct?.stock_quantity || materialFormData.quantity, // Use stock_quantity from selected product
+              unit: materialFormData.unit,
+              total_ordered: materialFormData.total_ordered,
+              material_used: materialFormData.material_used,
+              supplier_order_id: materialFormData.supplier_order_id,
+              return_to_warehouse: materialFormData.return_to_warehouse,
+              unit_cost: materialFormData.unit_cost
+            }
+          ]
+        };
+
+        await apiClient.createCompleteBluesheet(completeBluesheetPayload);
+        toast.success('New bluesheet created with material successfully!');
+      }
+
+      // Close modal first
       setShowAddMaterialModal(false);
+      
+      // Reset form
+      setMaterialFormData({
+        product_id: null,
+        material_name: '',
+        quantity: 0,
+        unit: 'pieces',
+        total_ordered: 0,
+        material_used: 0,
+        supplier_order_id: '',
+        return_to_warehouse: false,
+        unit_cost: 0,
+        date: new Date().toISOString().split('T')[0]
+      });
+      setSelectedProduct(null);
+      setProductSearchQuery('');
+      
+      // Refresh job data to show updated materials
+      await refreshJobData();
     } catch (error) {
-      console.error('Error adding product:', error);
-      toast.error('Failed to add product');
+      console.error('Error adding material:', error);
+      toast.error('Failed to add material');
     } finally {
       setIsLoading(false);
     }
@@ -898,17 +1010,22 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     if (!productToDelete) return;
     setIsDeleting(true);
     try {
-      await apiClient.deleteProduct(productToDelete.id);
-      dispatch(deleteProduct(String(productToDelete.id)));
-      triggerRefreshMaterials();
-      toast.success("Product deleted successfully!");
-    } catch (error) {
-      console.error("Error deleting product:", error);
-      toast.error("Failed to delete product");
-    } finally {
-      setIsDeleting(false);
+      // Call bluesheet material delete API
+      await apiClient.deleteBluesheetMaterial(productToDelete.id);
+      
+      // Close dialog first
       setShowDeleteProductDialog(false);
       setProductToDelete(null);
+      
+      // Refresh job data to show updated materials
+      await refreshJobData();
+      
+      toast.success("Material deleted successfully!");
+    } catch (error) {
+      console.error("Error deleting material:", error);
+      toast.error("Failed to delete material");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -935,13 +1052,19 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   useEffect(() => {
     if (showAddMaterialModal) {
       setMaterialFormData({
-        name: '',
+        product_id: null,
+        material_name: '',
         quantity: 0,
-        unitCost: 0,
-        sku: '',
-        unit: 'Pieces',
-        supplier: ''
+        unit: 'pieces',
+        total_ordered: 0,
+        material_used: 0,
+        supplier_order_id: '',
+        return_to_warehouse: false,
+        unit_cost: 0,
+        date: new Date().toISOString().split('T')[0]
       });
+      setSelectedProduct(null);
+      setProductSearchQuery('');
     }
   }, [showAddMaterialModal]);
 
@@ -1179,7 +1302,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         full_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
         email: selectedLabor?.users?.email || '',
         role: isLeadLabor ? 'lead_labor' : 'labor',
-        hours_worked: timeLogFormData.hoursWorked,
+        hours_worked: parseFloat(timeLogFormData.hoursWorked) || 0,
         hourly_rate: selectedLabor?.hourly_rate || 0,
         notes: timeLogFormData.description,
         date_of_joining: timeLogFormData.date,
@@ -1215,7 +1338,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     setTimeLogFormData({
       selectedLabor: null,
       selectedLeadLabor: null,
-      hoursWorked: 0,
+      hoursWorked: '',
       description: '',
       date: new Date().toISOString().split('T')[0]
     });
@@ -1233,6 +1356,16 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       const updatedJobData = await apiClient.getJobById(jobId);
       const updatedJobs = jobs.map((j: any) => j.id === jobId ? updatedJobData : j);
       setJobs(updatedJobs);
+      
+      // Update the current job from the updated jobs array
+      const currentJob = updatedJobs.find((j: any) => j.id === jobId);
+      if (currentJob) {
+        // Update the job state if it exists in the component
+        // Note: This assumes you have a way to update the current job state
+      }
+      
+      // Trigger materials refresh to show updated data
+      triggerRefreshMaterials();
 
     } catch (error) {
       console.error('Error refreshing job data:', error);
@@ -1244,9 +1377,40 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const fetchMaterials = async () => {
     setIsLoadingMaterials(true);
     try {
-      const response = await apiClient.getJobById(jobId);
-      const materialsFromAPI = response.assignedMaterialsDetails || [];
-      setMaterials(materialsFromAPI);
+      // Extract material_entries from bluesheets only
+      const bluesheetMaterials: any[] = [];
+      if (job.bluesheets && job.bluesheets.length > 0) {
+        job.bluesheets.forEach((bluesheet: any) => {
+          if (bluesheet.material_entries && bluesheet.material_entries.length > 0) {
+            bluesheet.material_entries.forEach((entry: any) => {
+              bluesheetMaterials.push({
+                id: entry.id,
+                material_name: entry.material_name,
+                product_name: entry.product?.product_name || entry.product?.name,
+                quantity: entry.quantity,
+                unit: entry.unit,
+                unit_cost: entry.unit_cost,
+                unitCost: entry.unit_cost,
+                price: entry.unit_cost,
+                supplier: entry.product?.supplier?.company_name || entry.product?.supplier,
+                supplier_sku: entry.product?.supplier_sku,
+                jdp_sku: entry.product?.jdp_sku,
+                sku: entry.product?.sku,
+                stock_quantity: entry.quantity,
+                bluesheet_id: bluesheet.id,
+                bluesheet_date: bluesheet.date,
+                bluesheet_notes: bluesheet.notes,
+                product: entry.product, // Include full product object
+                jdp_price: entry.product?.jdp_price, // Add jdp_price at root level
+                is_bluesheet_material: true
+              });
+            });
+          }
+        });
+      }
+      
+      // Set only bluesheet materials
+      setMaterials(bluesheetMaterials);
     } catch (error) {
       console.error('Failed to fetch materials:', error);
     } finally {
@@ -1373,18 +1537,28 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   });
 
   const [materialFormData, setMaterialFormData] = useState({
-    name: '',
+    product_id: null as number | null,
+    material_name: '',
     quantity: 0,
-    unitCost: 0,
-    sku: '',
-    unit: 'Pieces',
-    supplier: ''
+    unit: 'pieces',
+    total_ordered: 0,
+    material_used: 0,
+    supplier_order_id: '',
+    return_to_warehouse: false,
+    unit_cost: 0,
+    date: new Date().toISOString().split('T')[0]
   });
+
+  // Product search states
+  const [productSearchQuery, setProductSearchQuery] = useState('');
+  const [productSearchResults, setProductSearchResults] = useState<any[]>([]);
+  const [isSearchingProducts, setIsSearchingProducts] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
 
   const [timeLogFormData, setTimeLogFormData] = useState({
     selectedLabor: null as any,
     selectedLeadLabor: null as any,
-    hoursWorked: 0,
+    hoursWorked: '',
     description: '',
     date: new Date().toISOString().split('T')[0]
   });
@@ -1540,7 +1714,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         searchQuery: '',
         showSearchResults: false,
         supplierId: selectedSupplierId || 1,
-        isCustomProduct: false
+        isCustomProduct: false,
+        estimate_product_id: null
       }]
     }))
   }
@@ -1560,7 +1735,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         searchQuery: '',
         showSearchResults: false,
         supplierId: selectedSupplierId || 1,
-        isCustomProduct: true
+        isCustomProduct: true,
+        estimate_product_id: null
       }]
     }))
   }
@@ -1637,11 +1813,26 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     }
   }
 
-  const removeInvoiceLineItem = (itemId: string) => {
-    setInlineInvoiceData(prev => ({
-      ...prev,
-      lineItems: prev.lineItems.filter(item => item.id !== itemId)
-    }))
+  const removeInvoiceLineItem = async (itemId: string) => {
+    try {
+      // Find the item to get estimate_product_id
+      const itemToDelete = inlineInvoiceData.lineItems.find(item => item.id === itemId);
+      if (itemToDelete && itemToDelete.estimate_product_id) {
+        // Call delete API
+        console.log(itemToDelete.estimate_product_id, 'itemToDelete.estimate_product_id')
+        await apiClient.deleteProductFromEstimate(itemToDelete.estimate_product_id);
+        toast.success('Product removed from estimate successfully!');
+      }
+      
+      // Remove from local state
+      setInlineInvoiceData(prev => ({
+        ...prev,
+        lineItems: prev.lineItems.filter(item => item.id !== itemId)
+      }));
+    } catch (error) {
+      console.error('Error removing product from estimate:', error);
+      toast.error('Failed to remove product from estimate');
+    }
   }
 
   const getFilteredProducts = (query: string) => {
@@ -1788,7 +1979,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           searchQuery: '',
           showSearchResults: false,
           supplierId: product.supplier_id || 1,
-          isCustomProduct: true
+          isCustomProduct: true,
+          estimate_product_id: product.estimate_product_id || null
         })) || [{
           id: Math.random().toString(36).substring(2, 9),
           productId: null,
@@ -1801,7 +1993,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           searchQuery: '',
           showSearchResults: false,
           supplierId: 1,
-          isCustomProduct: false
+          isCustomProduct: false,
+          estimate_product_id: null
         }],
         notes: invoiceData.notes || 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
         signatureText: invoiceData.signature_text || 'ACCEPTED BY________________DATE_____',
@@ -1863,7 +2056,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         searchQuery: '',
         showSearchResults: false,
         supplierId: product.supplier_id || 1,
-        isCustomProduct: true
+        isCustomProduct: true,
+        estimate_product_id: product.estimate_product_id || null
       })) || [{
         id: Math.random().toString(36).substring(2, 9),
         productId: null,
@@ -2459,7 +2653,8 @@ const handlePrintInvoice = async (invoice: any) => {
           searchQuery: '',
           showSearchResults: false,
           supplierId: 1,
-          isCustomProduct: false
+          isCustomProduct: false,
+          estimate_product_id: null
         }],
         notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
         signatureText: 'ACCEPTED BY________________DATE_____',
@@ -2775,7 +2970,8 @@ const handlePrintInvoice = async (invoice: any) => {
           searchQuery: '',
           showSearchResults: false,
           supplierId: 1,
-          isCustomProduct: false
+          isCustomProduct: false,
+          estimate_product_id: null
         }],
         notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
         signatureText: 'ACCEPTED BY________________DATE_____',
@@ -2920,7 +3116,9 @@ const handlePrintInvoice = async (invoice: any) => {
           total: (product.stock_quantity || 1) * (product.estimated_price || product.unit_cost || 0),
           searchQuery: '',
           showSearchResults: false,
-          supplierId: product.supplier_id || 1
+          supplierId: product.supplier_id || 1,
+          isCustomProduct: false,
+          estimate_product_id: product.estimate_product_id || null
         }))
         : [{
           id: Math.random().toString(36).substring(2, 9),
@@ -2934,7 +3132,8 @@ const handlePrintInvoice = async (invoice: any) => {
           searchQuery: '',
           showSearchResults: false,
           supplierId: 1,
-          isCustomProduct: false
+          isCustomProduct: false,
+          estimate_product_id: null
         }]
 
       setInlineInvoiceData({
@@ -3612,7 +3811,8 @@ const handlePrintInvoice = async (invoice: any) => {
                         searchQuery: '',
                         showSearchResults: false,
                         supplierId: 1,
-                        isCustomProduct: false
+                        isCustomProduct: false,
+                        estimate_product_id: null
                       }],
                       notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
                       signatureText: 'ACCEPTED BY________________DATE_____',
@@ -4195,7 +4395,8 @@ const handlePrintInvoice = async (invoice: any) => {
                               searchQuery: '',
                               showSearchResults: false,
                               supplierId: 1,
-                              isCustomProduct: false
+                              isCustomProduct: false,
+                              estimate_product_id: null
                             }],
                             notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
                             signatureText: 'ACCEPTED BY________________DATE_____',
@@ -4218,7 +4419,7 @@ const handlePrintInvoice = async (invoice: any) => {
                             variant="outline"
                             size="lg"
                             className="border-primary text-primary hover:bg-primary/5"
-                            disabled={isLoadingDraft}
+                            disabled={isLoadingDraft || isLoadingPreview}
                           >
                             {isLoadingDraft ? (
                               <>
@@ -4239,7 +4440,7 @@ const handlePrintInvoice = async (invoice: any) => {
                             onClick={handlePreviewAndSend}
                             size="lg"
                             className="bg-primary hover:bg-primary/90 text-white"
-                            disabled={isLoadingPreview}
+                            disabled={isLoadingPreview || isLoadingDraft}
                           >
                             {isLoadingPreview ? (
                               <>
@@ -4395,9 +4596,14 @@ const handlePrintInvoice = async (invoice: any) => {
               Product Usage
             </CardTitle>
             <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600">
+              {/* <span className="text-sm text-gray-600">
                 Total Cost: <span className="font-semibold">{formatCurrency(totalMaterialCost)}</span>
-              </span>
+                {materials.length > 0 && (
+                  <span className="ml-2 text-green-600">
+                    ({materials.length} from Bluesheets)
+                  </span>
+                )}
+              </span> */}
               <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowAddMaterialModal(true)}>
                 <Plus className="h-4 w-4" />
                 Add Product
@@ -4412,28 +4618,39 @@ const handlePrintInvoice = async (invoice: any) => {
             ) : (
               <div className="space-y-4">
                 {materials.map((material: any, index: number) => (
-                  <div key={material.id ?? material.sku ?? index} className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                  <div key={material.id ?? material.sku ?? index} className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
                     <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
-                        <Package className="h-5 w-5 text-blue-700" />
+                      <div className="h-10 w-10 bg-green-200 rounded-lg flex items-center justify-center">
+                        <Package className="h-5 w-5 text-green-700" />
                       </div>
                       <div>
-                        <h4 className="font-medium">{material.product_name || material.name}</h4>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-medium">{material.material_name || material.product_name || material.name}</h4>
+                          <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">
+                            Bluesheet #{material.bluesheet_id}
+                          </span>
+                        </div>
                         <p className="text-xs text-gray-600">
                           {material.supplier?.company_name || material.supplier} • SKU: {material.supplier_sku || material.jdp_sku} • {material.unit}
                         </p>
+                        <p className="text-xs text-gray-500">
+                          Unit Cost: ${ material.unit_cost || 0}  
+                        </p>
+                        {material.bluesheet_date && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Date: {material.bluesheet_date}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <p className="font-semibold">
-                          {formatCurrency(
-                            (Number(material.stock_quantity ?? material.quantity ?? 0) || 0) *
-                            (Number(material.unit_cost ?? material.unitCost ?? material.price ?? 0) || 0)
-                          )}
+                        <p className="font-semibold">  
+                         $ {material.jdp_price || 0}
+                           
                         </p>
 
-                        <p className="text-sm text-gray-600">{material.stock_quantity || material.quantity || 0} {material.unit}</p>
+                        <p className="text-sm text-gray-600">  {material.unit}</p>
                       </div>
                       <Button variant="outline" size="sm" className="gap-1" onClick={() => {
                         setProductToDelete(material);
@@ -4669,99 +4886,152 @@ const handlePrintInvoice = async (invoice: any) => {
             <DialogDescription>Add a new product to this job</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className='grid grid-cols-2 gap-2'>
-              <div>
-                <Label className="mb-2">Product Name</Label>
+            {/* Product Search */}
+            <div>
+              <Label className="mb-2">Search Product</Label>
+              <div className="relative">
                 <Input
-                  value={materialFormData.name}
-                  maxLength={15}
-                  onChange={(e) => setMaterialFormData({ ...materialFormData, name: e.target.value })}
+                  value={productSearchQuery}
+                  onChange={(e) => {
+                    setProductSearchQuery(e.target.value);
+                    searchProducts(e.target.value);
+                  }}
+                  placeholder="Type to search products..."
+                  className="pr-10"
                 />
+                {isSearchingProducts && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  </div>
+                )}
               </div>
-              <div>
-                <Label className="mb-2">SKU</Label>
-                <Input
-                  value={materialFormData.sku}
-                  maxLength={15}
-                  onChange={(e) => setMaterialFormData({ ...materialFormData, sku: e.target.value })}
-                />
-              </div>
-
+              
+              {/* Search Results Dropdown */}
+              {productSearchResults.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                  {productSearchResults.map((product) => (
+                    <div
+                      key={product.id}
+                      className="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-200 last:border-b-0"
+                      onClick={() => handleProductSelect(product)}
+                    >
+                      <div className="font-medium">{product.product_name || product.name}</div>
+                      <div className="text-sm text-gray-600">
+                        SKU: {product.sku || product.supplier_sku || 'N/A'} • Unit: {product.unit || 'N/A'} • Cost: ${product.unit_cost || product.price || 0}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="grid grid-cols-2 gap-2">
+
+            {/* Selected Product Info */}
+            {selectedProduct && (
+              <div className="bg-green-50 p-3 border border-green-200 rounded-md">
+                <div className="flex items-center gap-2 mb-2">
+                  <Package className="w-4 h-4 text-green-600" />
+                  <span className="font-medium text-green-800">Selected Product</span>
+                </div>
+                <div className="text-sm">
+                  <div><strong>Name:</strong> {selectedProduct.product_name || selectedProduct.name}</div>
+                  <div><strong>SKU:</strong> {selectedProduct.sku || selectedProduct.supplier_sku || 'N/A'}</div>
+                  <div><strong>Stock Quantity:</strong> {selectedProduct.stock_quantity || 0}</div>
+                  <div><strong>Unit:</strong> {selectedProduct.unit || 'N/A'}</div>
+                  <div><strong>Unit Cost:</strong> ${selectedProduct.unit_cost || selectedProduct.price || 0}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Date */}
+            <div>
+              <Label className="mb-2">Date</Label>
+              <Input
+                type="date"
+                value={materialFormData.date}
+                onChange={(e) => setMaterialFormData({ ...materialFormData, date: e.target.value })}
+              />
+            </div>
+
+            {/* <div className="grid grid-cols-2 gap-4"> 
               <div>
                 <Label className="mb-2">Quantity</Label>
                 <Input
                   type="number"
-                  maxLength={10}
-                  value={materialFormData.quantity === 0 ? "" : materialFormData.quantity}
-                  onChange={(e) => setMaterialFormData({ ...materialFormData, quantity: Number(e.target.value) })}
+                  value={materialFormData.quantity}
+                  readOnly
+                  className="bg-gray-100"
                 />
               </div>
+               
               <div>
                 <Label className="mb-2">Unit</Label>
-                <Select
+                <Input
                   value={materialFormData.unit}
-                  onValueChange={(value) => setMaterialFormData({ ...materialFormData, unit: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select unit" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Pieces">Pieces</SelectItem>
-                    <SelectItem value="Feet">Feet</SelectItem>
-                    <SelectItem value="Box">Box</SelectItem>
-                    <SelectItem value="Roll">Roll</SelectItem>
-                  </SelectContent>
-                </Select>
+                  readOnly
+                  className="bg-gray-100"
+                />
               </div>
+            </div> */}
 
-
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-4">
+              {/* Total Ordered */}
               <div>
-                <Label className="mb-2">Unit Cost</Label>
+                <Label className="mb-2">Total Ordered</Label>
                 <Input
                   type="number"
-                  maxLength={10}
-                  value={materialFormData.unitCost === 0 ? "" : materialFormData.unitCost}
-                  onChange={(e) => setMaterialFormData({ ...materialFormData, unitCost: Number(e.target.value) })}
+                  value={materialFormData.total_ordered === 0 ? "" : materialFormData.total_ordered}
+                  onChange={(e) => setMaterialFormData({ ...materialFormData, total_ordered: Number(e.target.value) })}
                 />
               </div>
+              
+              {/* Material Used */}
               <div>
-                <Label className="mb-2">Supplier</Label>
-                <Select
-                  value={materialFormData.supplier}
-                  onValueChange={(value) =>
-                    setMaterialFormData({ ...materialFormData, supplier: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Supplier" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {suppliers?.map((supplier) => (
-                      <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                        {supplier?.users?.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* <div>
-                <Label className="mb-2">Supplier</Label>
+                <Label className="mb-2">Material Used</Label>
                 <Input
-                  value={materialFormData.supplier}
-                  onChange={(e) => setMaterialFormData({ ...materialFormData, supplier: e.target.value })}
+                  type="number"
+                  value={materialFormData.material_used === 0 ? "" : materialFormData.material_used}
+                  onChange={(e) => setMaterialFormData({ ...materialFormData, material_used: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Supplier Order ID */}
+              {/* <div>
+                <Label className="mb-2">Supplier Order ID</Label>
+                <Input
+                  value={materialFormData.supplier_order_id}
+                  onChange={(e) => setMaterialFormData({ ...materialFormData, supplier_order_id: e.target.value })}
+                  placeholder="e.g., SO-2025-001"
                 />
               </div> */}
+              
+              {/* Unit Cost */}
+             
             </div>
-            <div className='bg-blue-100 p-3 border border-blue-300 rounded flex items-center gap-2'>
+
+            {/* Return to Warehouse Checkbox */}
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="return_to_warehouse"
+                checked={materialFormData.return_to_warehouse}
+                onChange={(e) => setMaterialFormData({ ...materialFormData, return_to_warehouse: e.target.checked })}
+                className="rounded border-gray-300"
+              />
+              <Label htmlFor="return_to_warehouse" className="text-sm font-medium">
+                Return to Warehouse
+              </Label>
+            </div>
+
+            {/* Total Cost Display */}
+            {/* <div className='bg-blue-100 p-3 border border-blue-300 rounded flex items-center gap-2'>
               <Building className='w-4 h-4' />
-              <Label>Total Cost: ${(materialFormData.quantity * materialFormData.unitCost).toFixed(2)}</Label>
-            </div>
+              <Label>Total Cost: ${(materialFormData.quantity * materialFormData.unit_cost).toFixed(2)}</Label>
+            </div> */}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddMaterialModal(false)} disabled={isLoading}>
@@ -4972,11 +5242,25 @@ const handlePrintInvoice = async (invoice: any) => {
             <div>
               <Label className="mb-2">Hours Worked *</Label>
               <Input
-                type="number"
-                min="0"
-                step="0.5"
-                value={timeLogFormData.hoursWorked === 0 ? "" : timeLogFormData.hoursWorked}
-                onChange={(e) => setTimeLogFormData({ ...timeLogFormData, hoursWorked: Number(e.target.value) })}
+                type="text" 
+                value={timeLogFormData.hoursWorked}
+                onChange={(e) => {
+                  const timeValue = e.target.value;
+                  setTimeLogFormData({ ...timeLogFormData, hoursWorked: timeValue });
+                }}
+                onBlur={(e) => {
+                  const timeValue = e.target.value;
+                  // Convert decimal hours to HH:MM:SS format only on blur
+                  if (timeValue && !isNaN(parseFloat(timeValue)) && !timeValue.includes(':')) {
+                    const hours = parseFloat(timeValue);
+                    const h = Math.floor(hours);
+                    const decimalPart = hours - h;
+                    const m = Math.round(decimalPart * 60);
+                    const s = 0;
+                    const formattedTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+                    setTimeLogFormData({ ...timeLogFormData, hoursWorked: formattedTime });
+                  }
+                }}
                 placeholder="Enter hours worked"
                 disabled={timeLogModalMode === 'view'}
               />
@@ -5373,7 +5657,8 @@ const handlePrintInvoice = async (invoice: any) => {
                       searchQuery: '',
                       showSearchResults: false,
                       supplierId: 1,
-                      isCustomProduct: false
+                      isCustomProduct: false,
+                      estimate_product_id: null
                     }],
                     notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
                     signatureText: 'ACCEPTED BY________________DATE_____',

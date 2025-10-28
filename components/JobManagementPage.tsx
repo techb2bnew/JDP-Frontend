@@ -732,7 +732,7 @@ useEffect(() => {
       </Card>
 
       {/* Jobs Grid */}
-      {isLoadingJobs ? (
+      {isLoadingJobs || loading ? (
         <div className="flex justify-center items-center py-12">
           <LoadingSpinner />
         </div>
