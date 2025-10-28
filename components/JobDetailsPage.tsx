@@ -643,9 +643,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           date: timeLogFormData.date,
           description: timeLogFormData.description || ''
         };
-
-        console.log('Bluesheet API Payload:', timeLogPayload);
-        console.log('Bluesheet ID:', selectedBluesheet.id);
+ 
 
         // Call the bluesheet API
         await apiClient.addLaborToBluesheet(selectedBluesheet.id, timeLogPayload);
