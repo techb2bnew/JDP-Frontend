@@ -2634,4 +2634,80 @@ getTimesheetDashboardStats: async () => {
 
     return response.json();
   },
+
+  createBluesheetMaterial: async (materialData: any, bluesheetId: number) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+
+    const response = await fetch(`${apiBaseUrl}/bluesheet/bluesheet/${bluesheetId}/material`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+      body: JSON.stringify(materialData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to create bluesheet material");
+    }
+
+    return response.json();
+  },
+
+  createCompleteBluesheet: async (bluesheetData: any) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+
+    const response = await fetch(`${apiBaseUrl}/bluesheet/bluesheet/complete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+      body: JSON.stringify(bluesheetData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to create complete bluesheet");
+    }
+
+    return response.json();
+  },
+
+  deleteBluesheetMaterial: async (materialId: number) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+
+    const response = await fetch(`${apiBaseUrl}/bluesheet/material/${materialId}`, {
+      method: 'DELETE',
+      headers: { 
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to delete bluesheet material");
+    }
+
+    return response.json();
+  },
+
+  deleteProductFromEstimate: async (estimateProductId: number) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+
+    const response = await fetch(`${apiBaseUrl}/estimates/deleteProductFromEstimate/${estimateProductId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to delete product from estimate");
+    }
+
+    return response.json();
+  },
 };

@@ -1746,6 +1746,7 @@ const handleAction = (action: ProductAction, product?: Product) => {
             placeholder="0"
             className={`pr-8 ${validationErrors.markupPercentage ? 'border-red-500' : ''}`}
             required
+            readOnly
           />
         </div>
         {validationErrors.markupPercentage && (

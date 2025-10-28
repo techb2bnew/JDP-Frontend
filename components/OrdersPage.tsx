@@ -48,6 +48,7 @@ interface Order {
   contractorName?: string
   customerEmail: string
   customerPhone: string
+  job_title?: string
   billingAddress: {
     fullName: string
     address: string
@@ -460,6 +461,7 @@ useEffect(() => {
         id: apiOrder.id?.toString(),
         orderNumber: apiOrder.order_number,
         jobId: apiOrder.job_id?.toString() || 'N/A',
+        job_title: apiOrder.job?.job_title || apiOrder.job_title || 'N/A',
         customerName: apiOrder.customer?.customer_name || 'Unknown',
         contractorName: apiOrder.contractor?.full_name || apiOrder.contractor?.company_name || apiOrder.customer?.company_name || 'N/A',
         status: apiOrder.status,
@@ -1038,7 +1040,7 @@ useEffect(() => {
           </CardHeader>
         </Card>
         
-        <Card>
+        {/* <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
@@ -1056,7 +1058,7 @@ useEffect(() => {
               </div>
             </div>
           </CardHeader>
-        </Card>
+        </Card> */}
         
         <Card>
           <CardHeader className="pb-3">
@@ -1187,7 +1189,7 @@ useEffect(() => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Order ID</TableHead>
-                  <TableHead>Job ID</TableHead>
+                  <TableHead>Job Name</TableHead>
                   <TableHead>Customer / Contractor</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Order Date</TableHead>
@@ -1218,7 +1220,7 @@ useEffect(() => {
                       <div className="font-medium font-mono">{order.orderNumber}</div>
                     </TableCell>
                     <TableCell>
-                      <div className="font-medium text-primary">{order.jobId}</div>
+                      <div className="font-medium  ">{order.job_title}</div>
                     </TableCell>
                     <TableCell>
                       <div>

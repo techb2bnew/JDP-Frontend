@@ -13,6 +13,7 @@ interface ActionButtonsPopupProps {
   showView?: boolean
   showEdit?: boolean
   showDelete?: boolean
+  isLoading?: boolean
 }
 
 export function ActionButtonsPopup({ 
@@ -23,7 +24,8 @@ export function ActionButtonsPopup({
   itemType = 'item',
   showView = true,
   showEdit = true,
-  showDelete = true
+  showDelete = true,
+  isLoading = false
 }: ActionButtonsPopupProps) {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false)
 
