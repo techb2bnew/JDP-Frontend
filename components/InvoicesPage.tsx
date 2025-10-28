@@ -23,7 +23,6 @@ import {
   AlertCircle,
   Printer,
   Mail,
-  Clock, // Timesheets ke liye icon
   GitCompare, // Invoice Comparison ke liye icon
   CheckSquare // Approvals ke liye icon
 } from 'lucide-react'
@@ -32,7 +31,6 @@ import { invoicesData, customersData, jobsData } from '../data/invoiceData'
 import { InvoiceTemplate } from './invoices/InvoiceTemplate'
 import { NewInvoiceDialog } from './invoices/NewInvoiceDialog'
 import { useRouter } from 'next/navigation';
-import { TimesheetsPage } from './TimesheetsPage';
 import { InvoiceComparisonPage } from './InvoiceComparisonPage';
 import { ApprovalsPage } from './ApprovalsPage';
 import html2canvas from 'html2canvas'
@@ -622,7 +620,6 @@ export function InvoicesPage() {
 
   const tabItems = [
     { id: 'invoices', label: 'Invoices', icon: Receipt },
-    { id: 'timesheets', label: 'Timesheets', icon: Clock },
     { id: 'invoice-comparison', label: 'Invoice Comparison', icon: GitCompare },
     { id: 'approvals', label: 'Approvals', icon: CheckSquare, notification: 2 },
   ]
@@ -883,7 +880,7 @@ export function InvoicesPage() {
 
       {/* Tabs Navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 bg-gray-100 p-1 h-auto">
+        <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1 h-auto">
           {tabItems.map((item) => {
             const Icon = item.icon
             return (
@@ -1172,7 +1169,6 @@ export function InvoicesPage() {
         </TabsContent>
 
         {/* Other Tabs Content */}
-        <TabsContent value="timesheets"><TimesheetsPage /></TabsContent>
         <TabsContent value="invoice-comparison"><InvoiceComparisonPage
           onBack={handleBackToInvoices}
           jobs={mockJobs} /></TabsContent>

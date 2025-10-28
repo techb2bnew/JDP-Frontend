@@ -599,6 +599,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       errors.hoursWorked = 'Hours worked must be greater than 0';
     }
 
+    if (!timeLogFormData.date) {
+      errors.date = 'Please select a date';
+    }
+
     setTimeLogValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -618,39 +622,46 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     try {
       const selectedLabor = timeLogFormData.selectedLabor || timeLogFormData.selectedLeadLabor;
       const isLeadLabor = !!timeLogFormData.selectedLeadLabor;
-      
+
+      // Find the bluesheet ID based on the selected date
+      const selectedBluesheet = bluesheets.find((bluesheet: any) => 
+        bluesheet.date === timeLogFormData.date
+      );
+
+      if (!selectedBluesheet) {
+        toast.error('No bluesheet found for the selected date. Please create a bluesheet first.');
+        return;
+      }
+
       if (timeLogModalMode === 'create') {
         const timeLogPayload = {
-          job_id: jobId,
-          labor_id: selectedLabor?.id?.toString() || '',
-          full_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
-          email: selectedLabor?.users?.email || '',
+          [isLeadLabor ? 'lead_labor_id' : 'labor_id']: selectedLabor?.id,
+          employee_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
           role: isLeadLabor ? 'lead_labor' : 'labor',
-          hours_worked: timeLogFormData.hoursWorked,
+          regular_hours: `${timeLogFormData.hoursWorked}h`,
           hourly_rate: selectedLabor?.hourly_rate || 0,
-          notes: timeLogFormData.description,
-          date_of_joining: timeLogFormData.date,
-          is_custom: selectedLabor?.is_custom || false,
-          total_cost: timeLogFormData.hoursWorked * (selectedLabor?.hourly_rate || 0),
+          date: timeLogFormData.date,
+          description: timeLogFormData.description || ''
         };
+ 
 
-        await apiClient.createLaborTimeLog(timeLogPayload);
-        toast.success('Labor time log created successfully!');
+        // Call the bluesheet API
+        await apiClient.addLaborToBluesheet(selectedBluesheet.id, timeLogPayload);
+        toast.success('Labor time log added to bluesheet successfully!');
       } else if (timeLogModalMode === 'edit') {
+        // For edit, we might need a different API endpoint
         const updatePayload = {
-          job_id: jobId,
-          labor_id: selectedLabor?.id?.toString() || '',
-          full_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
-          email: selectedLabor?.users?.email || '',
+          [isLeadLabor ? 'lead_labor_id' : 'labor_id']: selectedLabor?.id,
+          employee_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
           role: isLeadLabor ? 'lead_labor' : 'labor',
-          hours_worked: timeLogFormData.hoursWorked,
+          regular_hours: `${timeLogFormData.hoursWorked}h`,
           hourly_rate: selectedLabor?.hourly_rate || 0,
-          notes: timeLogFormData.description,
-          date_of_joining: timeLogFormData.date,
-          is_custom: selectedLabor?.is_custom || false
+          date: timeLogFormData.date,
+          description: timeLogFormData.description || ''
         };
 
-        await apiClient.updateLaborTimeLog(currentTimeLog.id, updatePayload);
+        // You might need to implement updateLaborInBluesheet API method
+        await apiClient.updateLaborInBluesheet(currentTimeLog.id, updatePayload);
         toast.success('Labor time log updated successfully!');
       }
 
@@ -666,72 +677,120 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     }
   };
 
+  // Helper function to parse hours from different formats
+  const parseHoursFromString = (hoursString: string): number => {
+    if (!hoursString) return 0;
+    
+    // Handle "8h" format
+    if (hoursString.includes('h')) {
+      return parseFloat(hoursString.replace('h', ''));
+    }
+    
+    // Handle "00:01:48" format (HH:MM:SS)
+    if (hoursString.includes(':')) {
+      const parts = hoursString.split(':');
+      if (parts.length === 3) {
+        const hours = parseInt(parts[0]) || 0;
+        const minutes = parseInt(parts[1]) || 0;
+        const seconds = parseInt(parts[2]) || 0;
+        
+        // Convert to decimal hours
+        return hours + (minutes / 60) + (seconds / 3600);
+      }
+    }
+    
+    // Handle plain number
+    return parseFloat(hoursString) || 0;
+  };
+
   const handleViewTimeLog = async (labor: any) => {
     console.log('View button clicked, labor:', labor);
     try {
+      // Fetch the full labor entry details from the API
+      const response = await apiClient.getLaborEntryById(labor.id);
+      console.log('API Response for labor entry (view):', response);
+      
+      const laborEntry = response.data;
+      
       // Set the current time log data
-      setCurrentTimeLog(labor);
+      setCurrentTimeLog(laborEntry);
 
-      // Determine if it's labor or lead labor based on the data structure
-      const isLeadLabor = labor.role === 'lead_labor' || labor.lead_labor_id;
+      // Determine if it's labor or lead labor based on the API response
+      const isLeadLabor = laborEntry.lead_labor_id !== null;
+      const laborData = isLeadLabor ? laborEntry.lead_labor : laborEntry.labor;
+
+      // Parse hours from different formats ("8h" or "00:01:48")
+      const hoursWorked = parseHoursFromString(laborEntry.regular_hours || '0');
 
       setTimeLogFormData({
-        selectedLabor: isLeadLabor ? null : labor,
-        selectedLeadLabor: isLeadLabor ? labor : null,
-        hoursWorked: labor.hours_worked || 0,
-        description: labor.description || '',
-        date: labor.date || new Date().toISOString().split('T')[0]
+        selectedLabor: isLeadLabor ? null : laborData,
+        selectedLeadLabor: isLeadLabor ? laborData : null,
+        hoursWorked: hoursWorked,
+        description: laborEntry.description || '',
+        date: laborEntry.date || new Date().toISOString().split('T')[0]
       });
 
-      // Set input values
+      // Set input values based on the fetched data
       if (isLeadLabor) {
-        setLeadLaborInputValue(labor.users?.full_name || labor.labor_code || '');
+        setLeadLaborInputValue(laborData?.users?.full_name || laborData?.labor_code || '');
         setLaborInputValue('');
       } else {
-        setLaborInputValue(labor.users?.full_name || labor.labor_code || '');
+        setLaborInputValue(laborData?.users?.full_name || laborData?.labor_code || '');
         setLeadLaborInputValue('');
       }
 
       setTimeLogModalMode('view');
       setShowTimeLogModal(true);
-      console.log('View modal should be open now');
+      console.log('View modal should be open now with fetched data');
     } catch (error) {
       console.error('Error viewing labor time log:', error);
-      toast.error('Failed to load labor details');
+      toast.error('Failed to load labor entry details');
     }
   };
 
   const handleEditTimeLog = async (labor: any) => {
     try {
+      console.log('Edit button clicked, labor entry:', labor);
+      
+      // Fetch the full labor entry details from the API
+      const response = await apiClient.getLaborEntryById(labor.id);
+      console.log('API Response for labor entry:', response);
+      
+      const laborEntry = response.data;
+      
       // Set the current time log data
-      setCurrentTimeLog(labor);
+      setCurrentTimeLog(laborEntry);
 
-      // Determine if it's labor or lead labor based on the data structure
-      const isLeadLabor = labor.role === 'lead_labor' || labor.lead_labor_id;
+      // Determine if it's labor or lead labor based on the API response
+      const isLeadLabor = laborEntry.lead_labor_id !== null;
+      const laborData = isLeadLabor ? laborEntry.lead_labor : laborEntry.labor;
+
+      // Parse hours from different formats ("8h" or "00:01:48")
+      const hoursWorked = parseHoursFromString(laborEntry.regular_hours || '0');
 
       setTimeLogFormData({
-        selectedLabor: isLeadLabor ? null : labor,
-        selectedLeadLabor: isLeadLabor ? labor : null,
-        hoursWorked: labor.hours_worked || 0,
-        description: labor.description || '',
-        date: labor.date || new Date().toISOString().split('T')[0]
+        selectedLabor: isLeadLabor ? null : laborData,
+        selectedLeadLabor: isLeadLabor ? laborData : null,
+        hoursWorked: hoursWorked,
+        description: laborEntry.description || '',
+        date: laborEntry.date || new Date().toISOString().split('T')[0]
       });
 
-      // Set input values
+      // Set input values based on the fetched data
       if (isLeadLabor) {
-        setLeadLaborInputValue(labor.users?.full_name || labor.labor_code || '');
+        setLeadLaborInputValue(laborData?.users?.full_name || laborData?.labor_code || '');
         setLaborInputValue('');
       } else {
-        setLaborInputValue(labor.users?.full_name || labor.labor_code || '');
+        setLaborInputValue(laborData?.users?.full_name || laborData?.labor_code || '');
         setLeadLaborInputValue('');
       }
 
       setTimeLogModalMode('edit');
       setShowTimeLogModal(true);
-      console.log('Edit modal should be open now');
+      console.log('Edit modal should be open now with fetched data');
     } catch (error) {
       console.error('Error editing labor time log:', error);
-      toast.error('Failed to load labor details');
+      toast.error('Failed to load labor entry details');
     }
   };
 
@@ -3284,7 +3343,7 @@ const handlePrintInvoice = async (invoice: any) => {
                       })()}
                       selectedObjects={editedJob.assignedLeadLabor?.map((labor: any) => ({
                         id: labor.id,
-                        name: labor.name || labor.users?.full_name || labor.labor_code || `Labor ${labor.id}`,
+                        name: labor.name || labor.user?.full_name || labor.labor_code || `Labor ${labor.id}`,
                         labor_code: labor.labor_code,
                         department: labor.department,
                         specialization: labor.specialization,
@@ -3314,7 +3373,7 @@ const handlePrintInvoice = async (invoice: any) => {
                           key={labor.id || `labor-${index}`}
                           className="bg-blue-50 text-blue-700 text-sm px-2 py-1 rounded-md border border-blue-200"
                         >
-                          {labor.name || labor.users?.full_name || labor.labor_code}
+                          {labor.name || labor.user?.full_name || labor.labor_code}
                         </span>
                       ))}
                     </div>
@@ -3343,7 +3402,7 @@ const handlePrintInvoice = async (invoice: any) => {
                       })()}
                       selectedObjects={editedJob.assignedLabor?.map((labor: any) => ({
                         id: labor.id,
-                        name: labor.name || labor.users?.full_name || labor.labor_code || `Labor ${labor.id}`,
+                        name: labor.name || labor.user?.full_name || labor.labor_code || `Labor ${labor.id}`,
                         labor_code: labor.labor_code,
                         trade: labor.trade,
                         experience: labor.experience,
@@ -3374,7 +3433,7 @@ const handlePrintInvoice = async (invoice: any) => {
                             key={labor.id || `labor-${index}`}
                             className="bg-orange-50 text-orange-700 text-sm px-2 py-1 rounded-md border border-orange-200"
                           >
-                            {labor.name || labor.users?.full_name || labor.labor_code}
+                            {labor.name || labor.user?.full_name || labor.labor_code}
                           </span>
                         );
                       })}
@@ -4400,7 +4459,18 @@ const handlePrintInvoice = async (invoice: any) => {
             </CardTitle>
             <div className="flex items-center gap-4">
               <span className="text-sm text-gray-600">
-                Total Cost: <span className="font-semibold">{formatCurrency(totalLaborCost)}</span>
+                Total Hours: <span className="font-bold"> {(() => {
+                            let totalHours = 0;
+                            bluesheets.forEach((bluesheet: any) => {
+                              if (bluesheet.labor_entries) {
+                                bluesheet.labor_entries.forEach((entry: any) => {
+                                  const hours = parseFloat(entry.regular_hours?.replace('h', '') || '0');
+                                  totalHours += hours;
+                                });
+                              }
+                            });
+                            return `${totalHours}h`;
+                          })()} </span>
               </span>
               <Button variant="outline" size="sm" className="gap-2" onClick={handleCreateTimeLog}>
                 <Plus className="h-4 w-4" />
@@ -4416,9 +4486,9 @@ const handlePrintInvoice = async (invoice: any) => {
                   {bluesheets.map((bluesheet: any, bluesheetIndex: number) => (
                     <div key={`bluesheet-${bluesheet.id}`} className="mb-6 p-4 bg-gray-50 rounded-lg border">
                       <div className="flex justify-between items-center mb-3">
-                        <h5 className="font-medium text-gray-800">
+                        {/* <h5 className="font-medium text-gray-800">
                           Bluesheet #{bluesheet.id} - {bluesheet.date}
-                        </h5>
+                        </h5> */}
                         <div className="text-sm text-gray-600">
                           Created by: {bluesheet.created_by_user?.full_name || 'Unknown'}
                         </div>
@@ -4449,18 +4519,18 @@ const handlePrintInvoice = async (invoice: any) => {
                                   <p className="text-sm text-gray-600">
                                     Regular: {entry.regular_hours || '0h'}
                                   </p>
-                                  <p className="text-sm text-gray-600">
+                                  {/* <p className="text-sm text-gray-600">
                                     Overtime: {entry.overtime_hours || '0h'}
                                   </p>
                                   <p className="text-sm text-gray-600">
                                     Total: {entry.total_hours || '0h'}
-                                  </p>
-                                  <p className="text-sm text-gray-600">
+                                  </p> */}
+                                  {/* <p className="text-sm text-gray-600">
                                     Rate: ${entry.hourly_rate || 0}/hr
-                                  </p>
-                                  <p className="font-semibold">
+                                  </p> */}
+                                  {/* <p className="font-semibold">
                                     Total Cost: ${entry.total_cost || 0}
-                                  </p>
+                                  </p> */}
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -4497,6 +4567,7 @@ const handlePrintInvoice = async (invoice: any) => {
                        
                     </div>
                   ))}
+                   
                 </>
               )}
 
@@ -4746,6 +4817,7 @@ const handlePrintInvoice = async (invoice: any) => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-2">
             {/* Labor Selection */}
             <div className="labor-dropdown">
               <Label className="mb-2">Select Labor *</Label>
@@ -4809,6 +4881,9 @@ const handlePrintInvoice = async (invoice: any) => {
                   </div>
                 )}
               </div>
+              {timeLogValidationErrors.laborSelection && (
+                <p className="text-red-500 text-xs mt-1">{timeLogValidationErrors.laborSelection}</p>
+              )}
             </div>
 
             {/* Lead Labor Selection */}
@@ -4874,6 +4949,23 @@ const handlePrintInvoice = async (invoice: any) => {
                   </div>
                 )}
               </div>
+              {timeLogValidationErrors.laborSelection && (
+                <p className="text-red-500 text-xs mt-1">{timeLogValidationErrors.laborSelection}</p>
+              )}
+            </div>
+            </div>
+            {/* Date Selection */}
+            <div>
+              <Label className="mb-2">Date *</Label>
+              <Input
+                type="date"
+                value={timeLogFormData.date}
+                onChange={(e) => setTimeLogFormData({ ...timeLogFormData, date: e.target.value })}
+                disabled={timeLogModalMode === 'view'}
+              />
+              {timeLogValidationErrors.date && (
+                <p className="text-red-500 text-xs mt-1">{timeLogValidationErrors.date}</p>
+              )}
             </div>
 
             {/* Hours Worked */}
@@ -4921,6 +5013,8 @@ const handlePrintInvoice = async (invoice: any) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      
       <Dialog open={showInvoiceModal} onOpenChange={setShowInvoiceModal}>
         <DialogContent className="w-[500px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>

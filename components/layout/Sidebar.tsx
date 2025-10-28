@@ -18,7 +18,8 @@ import {
   ChevronRight,
   LogOut,
   Settings2,
-  Bell
+  Bell,
+  Clock
 } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { LogoutConfirmationDialog } from "../LogoutConfirmationDialog"
@@ -78,6 +79,15 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       icon: FileText,
       href: "/invoices",
       description: "View and generate billing documents",
+      module: "invoices",
+      requiredActions: ["view", "create", "edit", "delete"]
+    },
+    {
+      id: "timesheets",
+      name: "Time sheets",
+      icon: Clock,
+      href: "/timesheets",
+      description: "Review and approve employee timesheets",
       module: "invoices",
       requiredActions: ["view", "create", "edit", "delete"]
     },
