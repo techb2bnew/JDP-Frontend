@@ -2955,7 +2955,37 @@ export function ContractorListingPage() {
                   }
                   
                   const allJobs = [jobWithCustomerData]
-                  console.log(jobWithCustomerData, 'jobWithCustomerData==>>')
+                  
+                  // Create a proper setJobs function that updates the contractor data
+                  const handleSetJobs = (updatedJobs: any[]) => {
+                    if (updatedJobs.length > 0) {
+                      const updatedJob = updatedJobs[0]
+                      // Update the contractor's jobs array with the updated job data
+                      setContractors(prevContractors => 
+                        prevContractors.map(contractor => {
+                          if (contractor.id.toString() === selectedContractor) {
+                            return {
+                              ...contractor,
+                              jobs: contractor.jobs.map((job: Job) => {
+                                if (job.id.toString() === selectedJob) {
+                                  return {
+                                    ...job,
+                                    subJobs: job.subJobs?.map((subJobItem: Job) => 
+                                      subJobItem.id.toString() === updatedJob.id 
+                                        ? { ...subJobItem, ...updatedJob }
+                                        : subJobItem
+                                    ) || []
+                                  }
+                                }
+                                return job
+                              })
+                            }
+                          }
+                          return contractor
+                        })
+                      )
+                    }
+                  }
                   
                   return (
                     <JobDetailsPage 
@@ -2963,7 +2993,7 @@ export function ContractorListingPage() {
                       jobId={subJob.id.toString()} 
                       onBack={() => setSelectedSubJob(null)}
                       jobs={allJobs} 
-                      setJobs={() => {}}
+                      setJobs={handleSetJobs}
                     />
                   )
                 })}
