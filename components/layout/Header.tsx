@@ -155,7 +155,6 @@ const fetchNotifications = async () => {
   }
 };
 
-
 useEffect(() => {
   fetchNotifications();
   const interval = setInterval(fetchNotifications, 1000);
