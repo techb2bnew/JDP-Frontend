@@ -1,0 +1,32 @@
+# Image Assets Directory
+
+Place all your image assets in this directory with the following structure:
+
+## Recommended Structure:
+- `/public/assets/images/` - General images
+- `/public/assets/icons/` - Icon files
+- `/public/assets/logos/` - Company and brand logos
+- `/public/assets/avatars/` - User avatar images
+- `/public/assets/graphics/` - UI graphics and illustrations
+
+## Usage in Components:
+Import images using Next.js Image component:
+
+```tsx
+import Image from 'next/image'
+import logoImage from '@/public/assets/logos/company-logo.png'
+
+// Or use dynamic imports
+<Image 
+  src="/assets/images/dashboard-hero.jpg" 
+  alt="Dashboard"
+  width={800}
+  height={400}
+/>
+```
+
+## Image Optimization:
+- Use modern formats (WebP, AVIF) when possible
+- Provide appropriate alt text for accessibility
+- Use Next.js Image component for automatic optimization
+- Consider responsive images for different screen sizes
