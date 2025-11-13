@@ -4984,10 +4984,10 @@ const handlePrintInvoice = async (invoice: any) => {
                                     Regular: {entry.regular_hours || '0h'}
                                   </p>  
                                   <p className="text-sm text-gray-600">
-                                    Hourly Rate: ${entry.computed_hourly_rate || 0}/hr
+                                    Hourly Rate: ${entry.hourly_rate || 0}/hr
                                   </p>  
                                     <p className="font-semibold">
-                                    Total Cost: ${entry.computed_total_cost || 0}
+                                    Total Cost: ${entry.total_cost || 0}
                                   </p>
                                 </div>
                                 <div className="flex items-center gap-2">
