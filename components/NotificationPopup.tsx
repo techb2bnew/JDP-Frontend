@@ -19,12 +19,14 @@ interface Notification {
 
 interface NotificationPopupProps {
   notifications: Notification[]
+  setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>;
   onClose: () => void
   onViewAll: () => void
 }
 
 export function NotificationPopup({
   notifications,
+  setNotifications,
   onClose,
   onViewAll,
 }: NotificationPopupProps) {
@@ -64,7 +66,7 @@ export function NotificationPopup({
 
 
   const handleViewInvoice = () => { 
-    router.push(`/invoiceDetail?id=INV-001`);
+    // router.push(`/invoiceDetail?id=INV-001`);
   }
 
   return (

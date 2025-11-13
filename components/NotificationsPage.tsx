@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -12,6 +12,7 @@ import { Checkbox } from './ui/checkbox'
 import { toast } from 'sonner'
 import { apiClient } from '../utils/api'
 import { usePermissions } from '../contexts/PermissionContext'
+import { initFirebaseMessaging, onForegroundMessage } from '../lib/firebase'
 import { 
   Bell,
   BellRing,
@@ -49,6 +50,15 @@ interface Notification {
   category: 'job-management' | 'invoicing' | 'materials' | 'timesheets' | 'system'
 }
 
+interface Role {
+  id: string
+  roleName: string
+  description?: string
+  permissions: string[]
+  createdAt?: string
+  updatedAt?: string
+}
+
 const availableRoles = [
   { value: 'admin', label: 'Admin' },
   { value: 'staff', label: 'Staff' },
@@ -84,6 +94,9 @@ export function NotificationsPage() {
   const [formErrors, setFormErrors] = useState<{ title?: string; message?: string; roles?: string }>({})
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
+  const [roles, setRoles] = useState<Role[]>([])
+  const [isLoadingRoles, setIsLoadingRoles] = useState(false)
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || ''
 
   const [notifications, setNotifications] = useState<Notification[]>([
     // Admin Notifications
@@ -333,6 +346,171 @@ export function NotificationsPage() {
     }
   }
 
+
+const fetchRoles = useCallback(async () => {
+    setIsLoadingRoles(true)
+    try {
+      const token = localStorage.getItem('jdp_auth')
+        ? JSON.parse(localStorage.getItem('jdp_auth')!).token
+        : null
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
+      const response = await fetch(`${apiBaseUrl}/permissions/roles-with-permissions`, {
+        method: 'GET',
+        headers
+      })
+
+      if (response.ok) {
+        const responseData = await response.json()
+        if (responseData.success && responseData.data) {
+          const transformedRoles = responseData.data.map((apiRole: any) => ({
+            id: apiRole.id.toString(),
+            roleName: apiRole.role_name || '',
+            description: apiRole.description || '',
+            permissions: apiRole.permissions || [],
+            createdAt: apiRole.created_at ? apiRole.created_at.split('T')[0] : '',
+            updatedAt: apiRole.updated_at ? apiRole.updated_at.split('T')[0] : ''
+          }))
+          setRoles(transformedRoles)
+        } else {
+          setRoles([])
+        }
+      } else {
+        setRoles([])
+      }
+    } catch (error) {
+      setRoles([])
+    } finally {
+      setIsLoadingRoles(false)
+    }
+  }, [apiBaseUrl])
+
+  useEffect(() => {
+    fetchRoles()
+  }, [fetchRoles])
+
+
+  useEffect(() => {
+  if (typeof window === 'undefined') return;
+  initFirebaseMessaging();
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/firebase-messaging-sw.js')
+      .then(reg => {
+        console.log('Service Worker registered for FCM:', reg.scope);
+      })
+      .catch(err => {
+        console.warn('SW registration failed:', err);
+      });
+  }
+  const unsubscribe = onForegroundMessage((payload: any) => {
+    console.log('FCM foreground message payload:', payload);
+    const title = payload.notification?.title || payload.data?.title || 'New Notification';
+    const body = payload.notification?.body || payload.data?.message || payload.data?.body || '';
+    try {
+      if ('Notification' in window) {
+        if (Notification.permission === 'granted') {
+          new Notification(title, { body });
+        } else if (Notification.permission !== 'denied') {
+          Notification.requestPermission().then((perm) => {
+            if (perm === 'granted') {
+              new Notification(title, { body });
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to display native notification', e);
+    }
+
+    const data = payload.data || {};
+    const incoming: Notification = {
+      id: data.id ? data.id.toString() : Date.now().toString(),
+      type: (data.type as any) || 'system',
+      title: title,
+      message: body,
+      timestamp: new Date().toISOString(),
+      isRead: false,
+      priority: (data.priority as any) || 'medium',
+      relatedId: data.relatedId || data.link || undefined,
+      userRole: (data.userRole as any) || 'admin',
+      category: (data.category as any) || 'system'
+    };
+
+    setNotifications(prev => [incoming, ...prev]);
+
+    try { toast.success('New notification received') } catch (e) {}
+  });
+
+  return () => {
+    try { unsubscribe && unsubscribe() } catch (e) {}
+  };
+}, []);
+
+  // const handleToggleRecipientRole = (roleId: string) => {
+  //   setNotificationForm(prev => {
+  //     const exists = prev.selectedRoles.includes(roleId)
+  //     const updatedRoles = exists
+  //       ? prev.selectedRoles.filter(r => r !== roleId)
+  //       : [...prev.selectedRoles, roleId]
+
+  //     setFormErrors(prevErrors => ({
+  //       ...prevErrors,
+  //       roles: prev.recipientType === 'roles' && updatedRoles.length === 0
+  //         ? 'Select at least one role'
+  //         : undefined
+  //     }))
+
+  //     return {
+  //       ...prev,
+  //       selectedRoles: updatedRoles
+  //     }
+  //   })
+  // }
+
+
+const sendNotifications = async () => {
+    console.log("Button clicked");
+    if (!("Notification" in window)) {
+      alert("Browser does not support notifications");
+      return;
+    }
+
+    console.log("Notification API supported");
+    if (Notification.permission !== "granted") {
+      const permission = await Notification.requestPermission();
+      console.log("Permission result:", permission);
+
+      if (permission !== "granted") {
+        alert("Please allow notification permission");
+        return;
+      }
+    }
+
+    console.log("Sending notification...");
+    new Notification("Hello Dev 👋", {
+      body: "This is your notification test!",
+    });
+  };
+
+  // const requestNotificationPermission = useCallback(() => {
+  //   if ('Notification' in window) {
+  //     Notification.requestPermission().then((permission) => {
+  //       if (permission === 'granted') {
+  //         console.log('Notification granted');
+  //         sendNotifications();
+  //       }
+  //     });
+  //   }
+  // }, []);
+
+  // useEffect(() => {
+  //   if ('Notification' in window) {
+  //     requestNotificationPermission();
+  //   }
+  // }, [requestNotificationPermission]);
+
+
   const handleMarkAsRead = (notificationId: string) => {
     setNotifications(notifications.map(notification => 
       notification.id === notificationId 
@@ -379,75 +557,89 @@ export function NotificationsPage() {
     })
   }
 
-  const handleSendNotification = async () => {
-    const errors: { title?: string; message?: string; roles?: string } = {}
+const handleSendNotification = async () => {
+  const errors: { title?: string; message?: string; roles?: string } = {}
 
-    if (!notificationForm.title.trim()) {
-      errors.title = 'Notification title is required'
-    }
-
-    if (!notificationForm.message.trim()) {
-      errors.message = 'Notification message is required'
-    }
-
-    if (notificationForm.recipientType === 'roles' && notificationForm.selectedRoles.length === 0) {
-      errors.roles = 'Select at least one role'
-    }
-
-    setFormErrors(errors)
-
-    if (Object.keys(errors).length > 0) {
-      return
-    }
-
-    setIsSending(true)
-
-    try {
-      const payload = {
-        notification_title: notificationForm.title.trim(),
-        message: notificationForm.message.trim(),
-        custom_link: notificationForm.link.trim() || undefined,
-        send_to_all: notificationForm.recipientType === 'all',
-        recipient_roles:
-          notificationForm.recipientType === 'roles'
-            ? notificationForm.selectedRoles
-            : []
-      }
-
-      await notificationsApiClient.sendNotification(payload)
-
-      const newNotification: Notification = {
-        id: Date.now().toString(),
-        type: 'system',
-        title: notificationForm.title.trim(),
-        message: notificationForm.message.trim(),
-        timestamp: new Date().toISOString(),
-        isRead: false,
-        priority: 'medium',
-        relatedId: notificationForm.link.trim() || undefined,
-        userRole: 'admin',
-        category: 'system'
-      }
-
-      setNotifications(prev => [newNotification, ...prev])
-      setNotificationForm({
-        title: '',
-        message: '',
-        link: '',
-        recipientType: 'all',
-        selectedRoles: []
-      })
-      setFormErrors({})
-      setCurrentPage(1)
-      setMainTab('list')
-      toast.success('Notification sent successfully')
-    } catch (error) {
-      console.error('Failed to send notification:', error)
-      toast.error('Failed to send notification')
-    } finally {
-      setIsSending(false)
-    }
+  if (!notificationForm.title.trim()) {
+    errors.title = 'Notification title is required'
   }
+
+  if (!notificationForm.message.trim()) {
+    errors.message = 'Notification message is required'
+  }
+
+  if (notificationForm.recipientType === 'roles' && notificationForm.selectedRoles.length === 0) {
+    errors.roles = 'Select at least one role'
+  }
+
+  setFormErrors(errors)
+
+  if (Object.keys(errors).length > 0) return
+
+  setIsSending(true)
+
+  try {
+    const recipientRoles = notificationForm.recipientType === 'roles'
+      ? roles
+          .filter(role => notificationForm.selectedRoles.includes(role.id))
+          .map(role => role.roleName)
+      : []
+
+    const payload = {
+      notification_title: notificationForm.title.trim(),
+      message: notificationForm.message.trim(),
+      custom_link: notificationForm.link.trim() || undefined,
+      send_to_all: notificationForm.recipientType === 'all',
+      recipient_roles: recipientRoles
+    }
+    await notificationsApiClient.sendNotification(payload)
+
+    const newNotification: Notification = {
+      id: Date.now().toString(),
+      type: 'system',
+      title: notificationForm.title.trim(),
+      message: notificationForm.message.trim(),
+      timestamp: new Date().toISOString(),
+      isRead: false,
+      priority: 'medium',
+      relatedId: notificationForm.link.trim() || undefined,
+      userRole: 'admin',
+      category: 'system'
+    }
+    setNotifications(prev => [newNotification, ...prev])
+    if ('Notification' in window) {
+      if (Notification.permission === 'granted') {
+        new Notification(newNotification.title, { body: newNotification.message })
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(permission => {
+          if (permission === 'granted') {
+            new Notification(newNotification.title, { body: newNotification.message })
+          }
+        })
+      }
+    }
+
+    setNotificationForm({
+      title: '',
+      message: '',
+      link: '',
+      recipientType: 'all',
+      selectedRoles: []
+    })
+    setFormErrors({})
+    setCurrentPage(1)
+    setMainTab('list')
+
+    toast.success('Notification sent successfully')
+  } catch (error) {
+    console.error('Failed to send notification:', error)
+    toast.error('Failed to send notification')
+  } finally {
+    setIsSending(false)
+  }
+}
+
+
 
   const filteredNotifications = notifications.filter(notification => {
     const matchesSearch = notification.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -620,32 +812,38 @@ export function NotificationsPage() {
                             : undefined
                         }))
                       }}
-                    />
+                    /> 
                     Send to specific roles
                   </label>
                 </div>
 
-                {notificationForm.recipientType === 'roles' && (
-                  <div className="space-y-3">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {availableRoles.map(role => (
-                        <label
-                          key={role.value}
-                          className="flex items-center gap-3 rounded-lg border border-gray-200 bg-[#F9FAFB] p-3 text-sm text-[#2b2b2b]"
-                        >
-                          <Checkbox
-                            checked={notificationForm.selectedRoles.includes(role.value)}
-                            onCheckedChange={() => handleToggleRecipientRole(role.value)}
-                          />
-                          {role.label}
-                        </label>
-                      ))}
-                    </div>
-                    {formErrors.roles && (
-                      <p className="text-sm text-red-500">{formErrors.roles}</p>
-                    )}
-                  </div>
-                )}
+              {notificationForm.recipientType === 'roles' && (
+        <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {isLoadingRoles ? (
+              <p>Loading roles...</p>
+            ) : roles.length === 0 ? (
+              <p>No roles available</p>
+            ) : (
+              roles.map(role => (
+                <label
+                  key={role.id}
+                  className="flex items-center gap-3 rounded-lg border border-gray-200 bg-[#F9FAFB] p-3 text-sm text-[#2b2b2b]"
+                >
+                  <Checkbox
+                    checked={notificationForm.selectedRoles.includes(role.id)}
+                    onCheckedChange={() => handleToggleRecipientRole(role.id)}
+                  />
+                  {role.roleName}
+                </label>
+              ))
+            )}
+          </div>
+          {formErrors.roles && (
+            <p className="text-sm text-red-500">{formErrors.roles}</p>
+          )}
+        </div>
+      )}
               </div>
 
               <div className="flex items-center justify-end">
@@ -657,6 +855,14 @@ export function NotificationsPage() {
                   <Send className="h-4 w-4" />
                   {isSending ? 'Sending...' : 'Send Notification'}
                 </Button>
+                {/* <Button
+                  onClick={sendNotifications}
+                  className="gap-2 text-white"
+                  
+                >
+                  <Send className="h-4 w-4" />
+                  Send 
+                </Button> */}
               </div>
             </CardContent>
           </Card>

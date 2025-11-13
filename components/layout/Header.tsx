@@ -14,7 +14,7 @@ import {
 import { Badge } from "../ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { NotificationPopup } from "../NotificationPopup"
 import { useTheme } from "../../contexts/ThemeContext"
 import { toast } from "sonner"
@@ -40,6 +40,15 @@ interface HeaderProps {
   onProfileClick: () => void
 }
 
+interface Notification {
+  id: string
+  title: string
+  message: string
+  time: string
+   type: "order" | "payment" | "inventory" | "task"
+  unread: boolean
+}
+
 export function Header({
   currentPath,
   onLogout,
@@ -50,8 +59,10 @@ export function Header({
   const { theme, toggleTheme, isLoading } = useTheme()
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
   const { hasPermission } = usePermissions()
+   const [notifications, setNotifications] = useState<Notification[]>([])
+  const [loading, setLoading] = useState(false)
 
-  // Get user data from localStorage
+ 
   const getUserData = () => {
     try {
       const authData = localStorage.getItem('jdp_auth');
@@ -89,9 +100,7 @@ export function Header({
         const responseData = await response.json();
         if (responseData.success) {
           toast.success('Logged out successfully!');
-          // Clear localStorage
           localStorage.removeItem('jdp_auth');
-          // Call the original onLogout function
           onLogout();
         } else {
           toast.error(responseData.message || 'Failed to logout');
@@ -114,6 +123,49 @@ export function Header({
       onLogout();
     }
   };
+
+
+  const userId = userData?.id
+
+
+const fetchNotifications = async () => {
+  if (!userId) return;
+  const authData = localStorage.getItem('jdp_auth');
+  const token = authData ? JSON.parse(authData).token : null;
+  if (!token) return;
+
+  try {
+    const res = await fetch(`${apiBaseUrl}/notifications/user/${userId}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error("Failed to fetch notifications");
+
+    const json = await res.json();
+    const normalized: Notification[] = (json.data.items || []).map((item: any) => ({
+      id: item.notification.id,
+      title: item.notification.notification_title,
+      message: item.notification.message,
+      time: new Date(item.notification.created_at).toLocaleString(),
+      type: "task",
+      unread: item.status === "unread"
+    }));
+    setNotifications(normalized);
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+
+useEffect(() => {
+  fetchNotifications();
+  const interval = setInterval(fetchNotifications, 1000);
+  return () => clearInterval(interval);
+}, [userId]);
+
+
+  const unreadCount = notifications.filter(n => n.unread).length
+
+
 
   const getPageTitle = (path: string): string => {
     const titles: Record<string, string> = {
@@ -139,42 +191,42 @@ export function Header({
     return titles[path] || "Dashboard"
   }
 
-  const notifications = [
-    {
-      id: "1",
-      title: "New Order Received",
-      message: "Order #12345 has been placed by John Doe",
-      time: "2 minutes ago",
-      type: "order" as const,
-      unread: true
-    },
-    {
-      id: "2",
-      title: "Payment Confirmed",
-      message: "Payment of $1,250 has been confirmed for Invoice #INV-001",
-      time: "15 minutes ago",
-      type: "payment" as const,
-      unread: true
-    },
-    {
-      id: "3",
-      title: "Low Stock Alert",
-      message: "Product 'Steel Beams' is running low in inventory",
-      time: "1 hour ago",
-      type: "inventory" as const,
-      unread: false
-    },
-    {
-      id: "4",
-      title: "Task Completed",
-      message: "John Smith has completed the installation task",
-      time: "3 hours ago",
-      type: "task" as const,
-      unread: false
-    }
-  ]
+  // const notifications = [
+  //   {
+  //     id: "1",
+  //     title: "New Order Received",
+  //     message: "Order #12345 has been placed by John Doe",
+  //     time: "2 minutes ago",
+  //     type: "order" as const,
+  //     unread: true
+  //   },
+  //   {
+  //     id: "2",
+  //     title: "Payment Confirmed",
+  //     message: "Payment of $1,250 has been confirmed for Invoice #INV-001",
+  //     time: "15 minutes ago",
+  //     type: "payment" as const,
+  //     unread: true
+  //   },
+  //   {
+  //     id: "3",
+  //     title: "Low Stock Alert",
+  //     message: "Product 'Steel Beams' is running low in inventory",
+  //     time: "1 hour ago",
+  //     type: "inventory" as const,
+  //     unread: false
+  //   },
+  //   {
+  //     id: "4",
+  //     title: "Task Completed",
+  //     message: "John Smith has completed the installation task",
+  //     time: "3 hours ago",
+  //     type: "task" as const,
+  //     unread: false
+  //   }
+  // ]
 
-  const unreadCount = notifications.filter(n => n.unread).length
+  // const unreadCount = notifications.filter(n => n.unread).length
 
   return (
     <TooltipProvider>
@@ -239,45 +291,46 @@ export function Header({
             </Tooltip> */}
 
             {/* Notifications */}
-            <div className="relative">
-              {hasPermission('notification', 'view') && (
+           {hasPermission('notification', 'view') && (
+              <div className="relative">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setShowNotifications(!showNotifications)}
+                      className="notification-button"
+                    >
+                      <Bell className="h-4 w-4" />
+                      {unreadCount > 0 && (
+                        <Badge
+                          variant="destructive"
+                          className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs notification-badge animate-bounce-in"
+                        >
+                          {unreadCount > 9 ? '9+' : unreadCount}
+                        </Badge>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Notifications {unreadCount > 0 && `(${unreadCount} unread)`}</p>
+                  </TooltipContent>
+                </Tooltip>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className="notification-button"
-                  >
-                    <Bell className="h-4 w-4" />
-                    {unreadCount > 0 && (
-                      <Badge
-                        variant="destructive"
-                        className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs notification-badge animate-bounce-in"
-                      >
-                        {unreadCount > 9 ? '9+' : unreadCount}
-                      </Badge>
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Notifications {unreadCount > 0 && `(${unreadCount} unread)`}</p>
-                </TooltipContent>
-              </Tooltip>
-              )}
-              {showNotifications && (
-                <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)}>
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <NotificationPopup
-                      notifications={notifications}
-                      onClose={() => setShowNotifications(false)}
-                      onViewAll={onNotificationViewAll}
-                    />
+                {showNotifications && (
+                  <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)}>
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <NotificationPopup
+                      setNotifications={setNotifications} 
+                        notifications={notifications}
+                        onClose={() => setShowNotifications(false)}
+                        onViewAll={onNotificationViewAll}
+                      />
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             {/* Profile Menu */}
             <DropdownMenu>
