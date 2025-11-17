@@ -89,9 +89,27 @@ export async function getFCMToken(): Promise<string | null> {
 }
 
 export function onForegroundMessage(handler: (payload: any) => void) {
-  if (!messaging) {
-    initFirebaseMessaging();
+  try { 
+    if (!messaging) { 
+      const result = initFirebaseMessaging();
+      if (!result) { 
+        return () => {};
+      }
+      console.log('✅ Messaging initialized successfully');
+    }
+    if (!messaging) {
+      console.error('❌ Messaging not available for foreground listener');
+      return () => {};
+    }
+    console.log('✅ Setting up foreground message listener with onMessage');
+    const unsubscribe = onMessage(messaging, (payload) => {
+      console.log('📨 onMessage callback triggered with payload:', payload);
+      handler(payload);
+    });
+    console.log('✅ onMessage listener registered, unsubscribe function:', typeof unsubscribe);
+    return unsubscribe;
+  } catch (error) {
+    console.error('❌ Error setting up foreground message listener:', error);
+    return () => {};
   }
-  if (!messaging) return () => {};
-  return onMessage(messaging, handler);
 }

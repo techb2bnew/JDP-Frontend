@@ -58,9 +58,13 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
       let pushToken: string | null = null;
       try {
         pushToken = await getFCMToken();
-        console.log('FCM Token:', pushToken);
+        if (pushToken) {
+          console.log('FCM Token retrieved successfully:', pushToken.substring(0, 20) + '...');
+        } else {
+          console.warn('FCM Token is null - notification permission might not be granted');
+        }
       } catch (error) {
-        console.warn('Failed to get FCM token:', error);
+        console.error('Failed to get FCM token:', error);
         // Continue with login even if token fails
       }
 

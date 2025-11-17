@@ -46,6 +46,7 @@
     "@radix-ui/react-toggle-group": "^1.0.4",
     "@radix-ui/react-tooltip": "^1.0.7",
     "@reduxjs/toolkit": "^2.0.1",
+    "@supabase/supabase-js": "2.78.0",
     "@vis.gl/react-google-maps": "1.5.5",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",

@@ -14,11 +14,12 @@ import {
 import { Badge } from "../ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { NotificationPopup } from "../NotificationPopup"
 import { useTheme } from "../../contexts/ThemeContext"
 import { toast } from "sonner"
 import { usePermissions } from '../../contexts/PermissionContext'
+import { supabase } from '../../lib/supabase'
 
 import {
   Plus,
@@ -61,6 +62,8 @@ export function Header({
   const { hasPermission } = usePermissions()
    const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(false)
+  const hasFetchedNotifications = useRef(false)
+  const [realTimeUnreadCount, setRealTimeUnreadCount] = useState<number | null>(null)
 
  
   const getUserData = () => {
@@ -130,40 +133,207 @@ export function Header({
 
 const fetchNotifications = async () => {
   if (!userId) return;
+  
+  // Prevent duplicate calls if already loading
+  if (loading) {
+    return;
+  }
+
   const authData = localStorage.getItem('jdp_auth');
   const token = authData ? JSON.parse(authData).token : null;
   if (!token) return;
 
   try {
-    const res = await fetch(`${apiBaseUrl}/notifications/user/${userId}`, {
+    setLoading(true);
+    
+    const res = await fetch(`${apiBaseUrl}/notifications/user/${userId}?page=1&limit=20`, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
     if (!res.ok) throw new Error("Failed to fetch notifications");
 
     const json = await res.json();
-    const normalized: Notification[] = (json.data.items || []).map((item: any) => ({
-      id: item.notification.id,
-      title: item.notification.notification_title,
-      message: item.notification.message,
-      time: new Date(item.notification.created_at).toLocaleString(),
-      type: "task",
-      unread: item.status === "unread"
-    }));
+    const normalized: Notification[] = (json.data.items || []).map((item: any) => {
+      // Use read_at if notification is read, otherwise use created_at
+      const timeToUse = item.status === 'read' && item.read_at 
+        ? item.read_at 
+        : item.notification?.created_at || item.delivered_at
+      
+      return {
+        id: item.notification?.id || item.notification_id,
+        title: item.notification?.notification_title || 'Notification',
+        message: item.notification?.message || '',
+        time: timeToUse || new Date().toISOString(),
+        type: "task" as const,
+        unread: item.status === "unread"
+      }
+    });
     setNotifications(normalized);
+    hasFetchedNotifications.current = true;
   } catch (err) {
     console.error(err);
+  } finally {
+    setLoading(false);
   }
 };
 
+// Fetch notifications on mount (after login)
 useEffect(() => {
-  fetchNotifications();
-  const interval = setInterval(fetchNotifications, 1000);
-  return () => clearInterval(interval);
+  if (userId && !hasFetchedNotifications.current) {
+    fetchNotifications();
+  }
 }, [userId]);
 
+// Set up Supabase real-time subscription for notification count
+useEffect(() => {
+  if (!userId) {
+    console.log('No userId, skipping Supabase subscription');
+    return;
+  }
 
-  const unreadCount = notifications.filter(n => n.unread).length
+  console.log('Setting up Supabase real-time subscription for user:', userId);
 
+  // Initial count fetch
+  const fetchUnreadCount = async () => {
+    try {
+      console.log('Fetching initial unread count for user:', userId);
+      
+      // First, test the connection with a simple query
+      const { data: testData, error: testError } = await supabase
+        .from('notification_recipients')
+        .select('id')
+        .eq('user_id', userId)
+        .limit(1);
+      
+      console.log('Test query result:', { testData, testError });
+      
+      if (testError) {
+        console.error('❌ Supabase connection error:', testError);
+        console.error('Error details:', {
+          message: testError.message,
+          details: testError.details,
+          hint: testError.hint,
+          code: testError.code
+        });
+        return;
+      }
+      
+      // Now get the count
+      const { count, error } = await supabase
+        .from('notification_recipients')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('status', 'unread');
+
+      console.log('Initial count result:', { count, error });
+
+      if (error) {
+        console.error('Error fetching unread count:', error);
+        return;
+      }
+
+      if (count !== null) {
+        console.log('✅ Setting initial unread count:', count);
+        setRealTimeUnreadCount(count);
+      } else {
+        console.log('Count is null, setting to 0');
+        setRealTimeUnreadCount(0);
+      }
+    } catch (err) {
+      console.error('❌ Exception in fetchUnreadCount:', err);
+    }
+  };
+
+  fetchUnreadCount();
+
+  // Set up real-time subscription
+  console.log('Creating Supabase channel for user:', userId);
+  const channel = supabase
+    .channel(`user-${userId}-notifications`, {
+      config: {
+        broadcast: { self: true }
+      }
+    })
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'notification_recipients',
+        filter: `user_id=eq.${userId}`
+      },
+      async (payload: any) => {
+        console.log('🔔 Real-time notification change received:', payload);
+        console.log('Event type:', payload.eventType);
+        console.log('New record:', payload.new);
+        console.log('Old record:', payload.old);
+        
+        // Refetch count after any change
+        try {
+          const { count, error } = await supabase
+            .from('notification_recipients')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .eq('status', 'unread');
+
+          console.log('Updated count after change:', { count, error });
+
+          if (error) {
+            console.error('Error fetching updated count:', error);
+            return;
+          }
+
+          if (count !== null) {
+            console.log('Updating unread count to:', count);
+            setRealTimeUnreadCount(count);
+          }
+        } catch (err) {
+          console.error('Error in count update:', err);
+        }
+
+        // If notification was added, refresh the notifications list
+        if (payload.eventType === 'INSERT') {
+          console.log('New notification inserted, refreshing list');
+          fetchNotifications();
+        }
+      }
+    )
+    .subscribe((status) => {
+      console.log('Supabase subscription status:', status);
+      if (status === 'SUBSCRIBED') {
+        console.log('✅ Successfully subscribed to real-time notifications');
+      } else if (status === 'CHANNEL_ERROR') {
+        console.error('❌ Channel error in Supabase subscription');
+      } else if (status === 'TIMED_OUT') {
+        console.error('❌ Subscription timed out');
+      } else if (status === 'CLOSED') {
+        console.log('Subscription closed');
+      }
+    });
+
+  // Cleanup subscription on unmount
+  return () => {
+    console.log('Cleaning up Supabase subscription');
+    supabase.removeChannel(channel);
+  };
+}, [userId]);
+
+// Handle notification popup open/close
+const handleNotificationClick = () => {
+  const newShowState = !showNotifications;
+  setShowNotifications(newShowState);
+  
+  // Fetch notifications when opening the popup (always refresh on click)
+  if (newShowState) {
+    fetchNotifications();
+  }
+};
+
+
+  // Use real-time count if available, otherwise fallback to local notifications count
+  // If realTimeUnreadCount is 0, it might be accurate, so check if it's been set
+  const unreadCount = realTimeUnreadCount !== null && realTimeUnreadCount !== undefined 
+    ? realTimeUnreadCount 
+    : notifications.filter(n => n.unread).length
 
 
   const getPageTitle = (path: string): string => {
@@ -297,7 +467,7 @@ useEffect(() => {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => setShowNotifications(!showNotifications)}
+                      onClick={handleNotificationClick}
                       className="notification-button"
                     >
                       <Bell className="h-4 w-4" />

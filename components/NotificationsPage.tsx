@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -13,6 +13,16 @@ import { toast } from 'sonner'
 import { apiClient } from '../utils/api'
 import { usePermissions } from '../contexts/PermissionContext'
 import { initFirebaseMessaging, onForegroundMessage } from '../lib/firebase'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog'
 import { 
   Bell,
   BellRing,
@@ -48,6 +58,9 @@ interface Notification {
   relatedId?: string
   userRole: 'admin' | 'staff' | 'lead-labor' | 'labor' | 'contractor'
   category: 'job-management' | 'invoicing' | 'materials' | 'timesheets' | 'system'
+  recipient_id?: number
+  created_at?: string
+  read_at?: string | null
 }
 
 interface Role {
@@ -93,157 +106,26 @@ export function NotificationsPage() {
   const [isSending, setIsSending] = useState(false)
   const [formErrors, setFormErrors] = useState<{ title?: string; message?: string; roles?: string }>({})
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 10
+  const [itemsPerPage] = useState(20) // Match API limit
   const [roles, setRoles] = useState<Role[]>([])
   const [isLoadingRoles, setIsLoadingRoles] = useState(false)
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || ''
 
-  const [notifications, setNotifications] = useState<Notification[]>([
-    // Admin Notifications
-    {
-      id: '1',
-      type: 'booking',
-      title: 'New Booking Received',
-      message: 'New Booking Received: JOB-2025-005, ABC Corporation. Customer requested electrical panel upgrade for their office building.',
-      timestamp: '2025-01-22T14:30:00Z',
-      isRead: false,
-      priority: 'high',
-      relatedId: 'JOB-2025-005',
-      userRole: 'admin',
-      category: 'job-management'
-    },
-    {
-      id: '2',
-      type: 'overtime',
-      title: 'Overtime Request from Lead Labor',
-      message: 'Overtime Request from John Smith for Job JOB-2025-001. Requested 4 additional hours to complete electrical panel installation. Please review and approve.',
-      timestamp: '2025-01-22T13:15:00Z',
-      isRead: false,
-      priority: 'medium',
-      relatedId: 'JOB-2025-001',
-      userRole: 'admin',
-      category: 'timesheets'
-    },
-    {
-      id: '3',
-      type: 'invoice',
-      title: 'Invoice Overdue Alert',
-      message: 'Invoice INV-2025-003 for Job JOB-2025-002 is 5 days overdue. Amount: $3,200. Please follow up with customer XYZ Office Complex.',
-      timestamp: '2025-01-22T12:00:00Z',
-      isRead: false,
-      priority: 'high',
-      relatedId: 'INV-2025-003',
-      userRole: 'admin',
-      category: 'invoicing'
-    },
-    {
-      id: '4',
-      type: 'material',
-      title: 'Material Request Approval Needed',
-      message: 'Material Request from Lead Labor David Wilson for Job JOB-2025-001. Requesting additional circuit breakers and copper wire. Estimated cost: $450.',
-      timestamp: '2025-01-22T11:45:00Z',
-      isRead: true,
-      priority: 'medium',
-      relatedId: 'JOB-2025-001',
-      userRole: 'admin',
-      category: 'materials'
-    },
-    {
-      id: '5',
-      type: 'bluesheet',
-      title: 'Bluesheet Submitted for Review',
-      message: 'Bluesheet submitted for Job JOB-2025-004 by David Wilson. Emergency Generator Setup - material list and labor hours documented. Please review and approve.',
-      timestamp: '2025-01-22T10:30:00Z',
-      isRead: true,
-      priority: 'medium',
-      relatedId: 'JOB-2025-004',
-      userRole: 'admin',
-      category: 'job-management'
-    },
-    {
-      id: '6',
-      type: 'job-status',
-      title: 'Job Status Updated',
-      message: 'Job JOB-2025-003 Emergency Generator Setup status updated to Completed by Mike Rodriguez. Ready for final invoicing.',
-      timestamp: '2025-01-22T09:15:00Z',
-      isRead: true,
-      priority: 'low',
-      relatedId: 'JOB-2025-003',
-      userRole: 'admin',
-      category: 'job-management'
-    },
-    {
-      id: '7',
-      type: 'contact',
-      title: 'New Contact Form Submission',
-      message: 'New contact form submission from Sarah Johnson regarding project inquiry. Subject: Office Building Electrical Upgrade. Requires follow-up.',
-      timestamp: '2025-01-22T08:00:00Z',
-      isRead: true,
-      priority: 'low',
-      userRole: 'admin',
-      category: 'system'
-    },
-    {
-      id: '8',
-      type: 'milestone',
-      title: 'Job Milestone Completed',
-      message: 'Milestone "Phase 1 - Installation" completed for Job JOB-2025-002 Office Lighting Maintenance. Contract-based job ready for next phase approval.',
-      timestamp: '2025-01-21T16:45:00Z',
-      isRead: true,
-      priority: 'medium',
-      relatedId: 'JOB-2025-002',
-      userRole: 'admin',
-      category: 'job-management'
-    },
-    {
-      id: '9',
-      type: 'approval',
-      title: 'Discrepancy in Invoice Comparison',
-      message: 'Discrepancy found between Bluesheet and Supplier Invoice for Job JOB-2025-001. Price variance of $85 detected in circuit breaker costs. Please investigate.',
-      timestamp: '2025-01-21T15:20:00Z',
-      isRead: false,
-      priority: 'high',
-      relatedId: 'JOB-2025-001',
-      userRole: 'admin',
-      category: 'invoicing'
-    },
-    {
-      id: '10',
-      type: 'assignment',
-      title: 'Job Assignment Confirmation',
-      message: 'Job JOB-2025-006 HVAC System Repair assigned to Climate Control Pro contractor. Labor: Lisa Chen, estimated start date: January 25, 2025.',
-      timestamp: '2025-01-21T14:10:00Z',
-      isRead: true,
-      priority: 'low',
-      relatedId: 'JOB-2025-006',
-      userRole: 'admin',
-      category: 'job-management'
-    },
-    // Staff Notifications
-    {
-      id: '11',
-      type: 'assignment',
-      title: 'New Job Assigned to You',
-      message: 'New job assigned to you: Job JOB-2025-007, Office Security System Installation. Please review the job details and timeline.',
-      timestamp: '2025-01-21T13:30:00Z',
-      isRead: false,
-      priority: 'medium',
-      relatedId: 'JOB-2025-007',
-      userRole: 'staff',
-      category: 'job-management'
-    },
-    {
-      id: '12',
-      type: 'material',
-      title: 'Material Low Stock Alert',
-      message: 'Material Copper Wire 12 AWG is running low (15 units remaining). Replenish stock to avoid delays in upcoming jobs.',
-      timestamp: '2025-01-21T12:15:00Z',
-      isRead: true,
-      priority: 'medium',
-      userRole: 'staff',
-      category: 'materials'
-    }
-  ])
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false)
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total_count: 0,
+    total_pages: 1,
+    unread_count: 0
+  })
+  const isInitialMount = useRef(true)
+  const lastSearchTerm = useRef('')
+  const lastPage = useRef(1)
+  const lastFilterStatus = useRef('all')
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [notificationToDelete, setNotificationToDelete] = useState<string | null>(null)
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -322,8 +204,22 @@ export function NotificationsPage() {
 
   const formatTimestamp = (timestamp: string) => {
     try {
-      const date = new Date(timestamp)
+      if (!timestamp) return '—'
+      
+      // Parse the UTC timestamp and convert to local time
+      // If timestamp doesn't have 'Z' or timezone, treat it as UTC
+      const utcTimestamp = timestamp.endsWith('Z') ? timestamp : timestamp + 'Z'
+      const date = new Date(utcTimestamp)
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return timestamp
+      }
+      
+      // Get current local time
       const now = new Date()
+      
+      // Calculate difference in milliseconds (both dates are in local time after parsing)
       const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
       
       if (diffInMinutes < 1) return 'Just now'
@@ -336,6 +232,7 @@ export function NotificationsPage() {
       if (diffInDays === 1) return 'Yesterday'
       if (diffInDays < 7) return `${diffInDays} days ago`
       
+      // Format as local date
       return date.toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
@@ -390,6 +287,250 @@ const fetchRoles = useCallback(async () => {
     fetchRoles()
   }, [fetchRoles])
 
+  // Helper function to transform API response
+  const transformNotifications = (items: any[]): Notification[] => {
+    return items.map((apiNotification: any) => {
+      // Access nested notification data if it exists
+      const notificationData = apiNotification.notification || {}
+      
+      return {
+        id: apiNotification.notification_id?.toString() || apiNotification.id?.toString() || Date.now().toString(),
+        type: (notificationData.type || apiNotification.type || 'system') as Notification['type'],
+        title: notificationData.notification_title || notificationData.title || apiNotification.notification_title || 'Notification',
+        message: notificationData.message || apiNotification.message || '',
+        timestamp: apiNotification.delivered_at || notificationData.created_at || apiNotification.timestamp || new Date().toISOString(),
+        isRead: apiNotification.status === 'read' || apiNotification.is_read || false,
+        priority: (notificationData.priority || apiNotification.priority || 'medium') as Notification['priority'],
+        relatedId: notificationData.custom_link || apiNotification.custom_link || notificationData.related_id || apiNotification.relatedId || undefined,
+        userRole: (notificationData.user_role || apiNotification.user_role || 'admin') as Notification['userRole'],
+        category: (notificationData.category || apiNotification.category || 'system') as Notification['category'],
+        recipient_id: apiNotification.recipient_id,
+        created_at: notificationData.created_at || apiNotification.created_at,
+        read_at: apiNotification.read_at
+      }
+    })
+  }
+
+  // Fetch notifications for the logged-in user
+  const fetchUserNotifications = useCallback(async (page: number) => {
+    try {
+      // Get user ID from localStorage
+      const authData = localStorage.getItem('jdp_auth')
+      if (!authData) {
+        console.warn('No auth data found in localStorage')
+        return
+      }
+
+      const parsedAuth = JSON.parse(authData)
+      const userId = parsedAuth?.user?.id
+
+      if (!userId) {
+        console.warn('User ID not found in auth data')
+        return
+      }
+
+      setIsLoadingNotifications(true)
+
+      const token = parsedAuth?.token
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      // Add pagination parameters
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: itemsPerPage.toString()
+      })
+
+      const response = await fetch(`${apiBaseUrl}/notifications/user/${userId}?${queryParams}`, {
+        method: 'GET',
+        headers
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch notifications: ${response.statusText}`)
+      }
+
+      const responseData = await response.json()
+      console.log('Notifications API response:', responseData)
+
+      if (responseData.success && responseData.data?.items) {
+        const transformedNotifications = transformNotifications(responseData.data.items)
+        setNotifications(transformedNotifications)
+        
+        // Update pagination state
+        if (responseData.data?.pagination) {
+          setPagination(responseData.data.pagination)
+          setCurrentPage(responseData.data.pagination.page)
+        }
+      } else {
+        console.warn('Invalid API response structure:', responseData)
+        setNotifications([])
+      }
+    } catch (error) {
+      console.error('Error fetching notifications:', error)
+      toast.error('Failed to load notifications')
+      setNotifications([])
+    } finally {
+      setIsLoadingNotifications(false)
+    }
+  }, [apiBaseUrl, itemsPerPage])
+
+  // Search notifications
+  const searchNotifications = useCallback(async (searchQuery: string, page: number = 1, status?: string) => {
+    try {
+      const authData = localStorage.getItem('jdp_auth')
+      if (!authData) {
+        console.warn('No auth data found in localStorage')
+        return
+      }
+
+      const parsedAuth = JSON.parse(authData)
+      const token = parsedAuth?.token
+
+      setIsLoadingNotifications(true)
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      // Add search, status, and pagination parameters
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: itemsPerPage.toString()
+      })
+      
+      if (searchQuery.trim()) {
+        queryParams.append('search', searchQuery.trim())
+      }
+      
+      if (status && status !== 'all') {
+        queryParams.append('status', status)
+      }
+
+      const response = await fetch(`${apiBaseUrl}/notifications/search?${queryParams}`, {
+        method: 'GET',
+        headers
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to search notifications: ${response.statusText}`)
+      }
+
+      const responseData = await response.json()
+      console.log('Search API response:', responseData)
+
+      if (responseData.success && responseData.data?.items) {
+        const transformedNotifications = transformNotifications(responseData.data.items)
+        setNotifications(transformedNotifications)
+        
+        // Update pagination state
+        if (responseData.data?.pagination) {
+          setPagination(responseData.data.pagination)
+          setCurrentPage(responseData.data.pagination.page)
+        }
+      } else {
+        console.warn('Invalid search API response structure:', responseData)
+        setNotifications([])
+      }
+    } catch (error) {
+      console.error('Error searching notifications:', error)
+      toast.error('Failed to search notifications')
+      setNotifications([])
+    } finally {
+      setIsLoadingNotifications(false)
+    }
+  }, [apiBaseUrl, itemsPerPage])
+
+  // Initial fetch on mount (only once)
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      fetchUserNotifications(1)
+    }
+  }, [])
+
+  // Handle status filter changes
+  useEffect(() => {
+    // Skip if status hasn't changed or if it's initial mount
+    if (filterStatus === lastFilterStatus.current || isInitialMount.current) {
+      return
+    }
+
+    lastFilterStatus.current = filterStatus
+
+    // If status is 'all' and no search term, use regular fetch
+    if (filterStatus === 'all' && !searchTerm.trim()) {
+      setCurrentPage(1)
+      lastPage.current = 1
+      fetchUserNotifications(1)
+      return
+    }
+
+    // Otherwise use search API with status filter
+    setCurrentPage(1)
+    lastPage.current = 1
+    const statusToUse = filterStatus !== 'all' ? filterStatus : undefined
+    searchNotifications(searchTerm.trim() || '', 1, statusToUse)
+  }, [filterStatus])
+
+  // Debounce search input
+  useEffect(() => {
+    // Skip if search term hasn't changed
+    if (searchTerm === lastSearchTerm.current) {
+      return
+    }
+
+    lastSearchTerm.current = searchTerm
+
+    if (!searchTerm.trim() && filterStatus === 'all') {
+      // If search is cleared and no status filter, fetch regular notifications
+      if (lastPage.current !== 1) {
+        setCurrentPage(1)
+        lastPage.current = 1
+      }
+      fetchUserNotifications(1)
+      return
+    }
+
+    const debounceTimeout = setTimeout(() => {
+      setCurrentPage(1) // Reset to page 1 when searching/filtering
+      lastPage.current = 1
+      const statusToUse = filterStatus !== 'all' ? filterStatus : undefined
+      searchNotifications(searchTerm.trim() || '', 1, statusToUse)
+    }, 500) // 500ms debounce
+
+    return () => clearTimeout(debounceTimeout)
+  }, [searchTerm])
+
+  // Handle page changes (only when page actually changes, not on initial mount)
+  useEffect(() => {
+    // Skip initial mount (handled by initial fetch)
+    if (isInitialMount.current) {
+      return
+    }
+
+    // Skip if page hasn't actually changed
+    if (currentPage === lastPage.current) {
+      return
+    }
+
+    lastPage.current = currentPage
+
+    if (searchTerm.trim() || filterStatus !== 'all') {
+      const statusToUse = filterStatus !== 'all' ? filterStatus : undefined
+      searchNotifications(searchTerm.trim() || '', currentPage, statusToUse)
+    } else {
+      fetchUserNotifications(currentPage)
+    }
+  }, [currentPage, filterStatus])
+
 
   useEffect(() => {
   if (typeof window === 'undefined') return;
@@ -404,23 +545,87 @@ const fetchRoles = useCallback(async () => {
       });
   }
   const unsubscribe = onForegroundMessage((payload: any) => {
-    console.log('FCM foreground message payload:', payload);
+    console.log('🔔 FCM notification received:', payload);
+    
+    // Extract title and body
     const title = payload.notification?.title || payload.data?.title || 'New Notification';
     const body = payload.notification?.body || payload.data?.message || payload.data?.body || '';
+    
+    // Show native browser notification
     try {
-      if ('Notification' in window) {
-        if (Notification.permission === 'granted') {
-          new Notification(title, { body });
-        } else if (Notification.permission !== 'denied') {
-          Notification.requestPermission().then((perm) => {
-            if (perm === 'granted') {
-              new Notification(title, { body });
-            }
-          });
-        }
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const notification = new Notification(title, {
+          body: body,
+          icon: payload.notification?.icon || '/favicon.ico',
+          badge: '/favicon.ico',
+          tag: payload.messageId || Date.now().toString(),
+          requireInteraction: false,
+          silent: false, // Make sure notification makes sound
+          data: payload.data || {}
+        });
+        
+        // Auto close after 15 seconds (increased for better visibility)
+        setTimeout(() => {
+          notification.close();
+        }, 15000);
+        
+        // Handle notification click
+        notification.onclick = (event) => {
+          event.preventDefault();
+          window.focus();
+          // If there's a custom link, open it
+          if (payload.data?.custom_link || payload.fcmOptions?.link) {
+            window.open(payload.data?.custom_link || payload.fcmOptions?.link, '_blank');
+          }
+          notification.close();
+        };
+        
+        notification.onerror = (error) => {
+          console.error('Notification error:', error);
+        };
+        
+        notification.onshow = () => {
+          console.log('✅ Browser notification displayed successfully');
+        };
+        
+        notification.onclose = () => {
+          console.log('Notification closed');
+        };
+      } else if ('Notification' in window && Notification.permission !== 'denied') {
+        // Request permission if not already denied
+        Notification.requestPermission().then((perm) => {
+          if (perm === 'granted') {
+            const notification = new Notification(title, {
+              body: body,
+              icon: payload.notification?.icon || '/favicon.ico',
+              badge: '/favicon.ico',
+              tag: payload.messageId || Date.now().toString(),
+              requireInteraction: false,
+              silent: false,
+              data: payload.data || {}
+            });
+            
+            setTimeout(() => {
+              notification.close();
+            }, 15000);
+            
+            notification.onclick = (event) => {
+              event.preventDefault();
+              window.focus();
+              if (payload.data?.custom_link || payload.fcmOptions?.link) {
+                window.open(payload.data?.custom_link || payload.fcmOptions?.link, '_blank');
+              }
+              notification.close();
+            };
+            
+            notification.onshow = () => {
+              console.log('✅ Browser notification displayed after permission grant');
+            };
+          }
+        });
       }
     } catch (e) {
-      console.warn('Failed to display native notification', e);
+      console.error('Error creating notification:', e);
     }
 
     const data = payload.data || {};
@@ -441,10 +646,10 @@ const fetchRoles = useCallback(async () => {
 
     // Show toast with notification details
     try {
-      toast.success(title, {
-        description: body,
-        duration: 5000,
-      });
+      // toast.success(title, {
+      //   description: body,
+      //   duration: 5000,
+      // });
     } catch (e) {
       console.warn('Failed to show toast notification', e);
     }
@@ -455,95 +660,213 @@ const fetchRoles = useCallback(async () => {
   };
 }, []);
 
-  // const handleToggleRecipientRole = (roleId: string) => {
-  //   setNotificationForm(prev => {
-  //     const exists = prev.selectedRoles.includes(roleId)
-  //     const updatedRoles = exists
-  //       ? prev.selectedRoles.filter(r => r !== roleId)
-  //       : [...prev.selectedRoles, roleId]
-
-  //     setFormErrors(prevErrors => ({
-  //       ...prevErrors,
-  //       roles: prev.recipientType === 'roles' && updatedRoles.length === 0
-  //         ? 'Select at least one role'
-  //         : undefined
-  //     }))
-
-  //     return {
-  //       ...prev,
-  //       selectedRoles: updatedRoles
-  //     }
-  //   })
-  // }
 
 
-const sendNotifications = async () => {
-    console.log("Button clicked");
-    if (!("Notification" in window)) {
-      alert("Browser does not support notifications");
-      return;
-    }
 
-    console.log("Notification API supported");
-    if (Notification.permission !== "granted") {
-      const permission = await Notification.requestPermission();
-      console.log("Permission result:", permission);
-
-      if (permission !== "granted") {
-        alert("Please allow notification permission");
-        return;
+  const handleMarkAsRead = async (notificationId: string) => {
+    try {
+      // Find the notification to get recipient_id
+      const notification = notifications.find(n => n.id === notificationId)
+      
+      if (!notification || !notification.recipient_id) {
+        toast.error('Notification not found or recipient ID missing')
+        return
       }
+
+      const authData = localStorage.getItem('jdp_auth')
+      if (!authData) {
+        toast.error('User not authenticated')
+        return
+      }
+
+      const parsedAuth = JSON.parse(authData)
+      const token = parsedAuth?.token
+      const headers: Record<string, string> = {}
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch(`${apiBaseUrl}/notifications/markNotificationAsRead/${notification.recipient_id}/read`, {
+        method: 'PUT',
+        headers
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to mark notification as read')
+      }
+
+      const responseData = await response.json()
+      
+      if (responseData.success) {
+        // Update local state
+        setNotifications(notifications.map(n => 
+          n.id === notificationId 
+            ? { ...n, isRead: true, read_at: new Date().toISOString() }
+            : n
+        ))
+        
+        // Update pagination unread count
+        setPagination(prev => ({
+          ...prev,
+          unread_count: Math.max(0, prev.unread_count - 1)
+        }))
+        
+        toast.success('Notification marked as read')
+      } else {
+        throw new Error(responseData.message || 'Failed to mark notification as read')
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error)
+      toast.error('Failed to mark notification as read')
     }
-
-    console.log("Sending notification...");
-    new Notification("Hello Dev 👋", {
-      body: "This is your notification test!",
-    });
-  };
-
-  // const requestNotificationPermission = useCallback(() => {
-  //   if ('Notification' in window) {
-  //     Notification.requestPermission().then((permission) => {
-  //       if (permission === 'granted') {
-  //         console.log('Notification granted');
-  //         sendNotifications();
-  //       }
-  //     });
-  //   }
-  // }, []);
-
-  // useEffect(() => {
-  //   if ('Notification' in window) {
-  //     requestNotificationPermission();
-  //   }
-  // }, [requestNotificationPermission]);
-
-
-  const handleMarkAsRead = (notificationId: string) => {
-    setNotifications(notifications.map(notification => 
-      notification.id === notificationId 
-        ? { ...notification, isRead: true }
-        : notification
-    ))
   }
 
   const handleMarkAsUnread = (notificationId: string) => {
+    // For now, just update local state
+    // If there's an API for unread, we can add it later
     setNotifications(notifications.map(notification => 
       notification.id === notificationId 
-        ? { ...notification, isRead: false }
+        ? { ...notification, isRead: false, read_at: null }
         : notification
     ))
+    
+    // Update pagination unread count
+    setPagination(prev => ({
+      ...prev,
+      unread_count: prev.unread_count + 1
+    }))
   }
 
-  const handleDeleteNotification = (notificationId: string) => {
-    setNotifications(notifications.filter(notification => notification.id !== notificationId))
+  const handleDeleteClick = (notificationId: string) => {
+    setNotificationToDelete(notificationId)
+    setDeleteDialogOpen(true)
   }
 
-  const handleMarkAllAsRead = () => {
-    setNotifications(notifications.map(notification => ({
-      ...notification,
-      isRead: true
-    })))
+  const handleDeleteNotification = async () => {
+    if (!notificationToDelete) return
+
+    try {
+      // Find the notification to get recipient_id
+      const notification = notifications.find(n => n.id === notificationToDelete)
+      
+      if (!notification || !notification.recipient_id) {
+        toast.error('Notification not found or recipient ID missing')
+        setDeleteDialogOpen(false)
+        setNotificationToDelete(null)
+        return
+      }
+
+      const authData = localStorage.getItem('jdp_auth')
+      if (!authData) {
+        toast.error('User not authenticated')
+        setDeleteDialogOpen(false)
+        setNotificationToDelete(null)
+        return
+      }
+
+      const parsedAuth = JSON.parse(authData)
+      const token = parsedAuth?.token
+      const headers: Record<string, string> = { 
+      }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch(`${apiBaseUrl}/notifications/deleteNotificationRecipient/${notification.recipient_id}`, {
+        method: 'DELETE',
+        headers
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete notification')
+      }
+
+      const responseData = await response.json()
+      
+      if (responseData.success) {
+        // Remove notification from local state
+        setNotifications(notifications.filter(n => n.id !== notificationToDelete))
+        
+        // Update pagination total count
+        setPagination(prev => ({
+          ...prev,
+          total_count: Math.max(0, prev.total_count - 1)
+        }))
+        
+        toast.success('Notification deleted successfully')
+        setDeleteDialogOpen(false)
+        setNotificationToDelete(null)
+      } else {
+        throw new Error(responseData.message || 'Failed to delete notification')
+      }
+    } catch (error) {
+      console.error('Error deleting notification:', error)
+      toast.error('Failed to delete notification')
+      setDeleteDialogOpen(false)
+      setNotificationToDelete(null)
+    }
+  }
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      // Get user ID from localStorage
+      const authData = localStorage.getItem('jdp_auth')
+      if (!authData) {
+        toast.error('User not authenticated')
+        return
+      }
+
+      const parsedAuth = JSON.parse(authData)
+      const userId = parsedAuth?.user?.id
+
+      if (!userId) {
+        toast.error('User ID not found')
+        return
+      }
+
+      const token = parsedAuth?.token
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch(`${apiBaseUrl}/notifications/markAllAsRead`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({
+          user_id: userId
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to mark all notifications as read')
+      }
+
+      const responseData = await response.json()
+      
+      if (responseData.success) {
+        // Update local state
+        setNotifications(notifications.map(notification => ({
+          ...notification,
+          isRead: true
+        })))
+        
+        // Update pagination unread count
+        setPagination(prev => ({
+          ...prev,
+          unread_count: 0
+        }))
+        
+        toast.success('All notifications marked as read')
+      } else {
+        throw new Error(responseData.message || 'Failed to mark all notifications as read')
+      }
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error)
+      toast.error('Failed to mark all notifications as read')
+    }
   }
 
   const handleToggleRecipientRole = (role: string) => {
@@ -602,30 +925,10 @@ const handleSendNotification = async () => {
     }
     await notificationsApiClient.sendNotification(payload)
 
-    const newNotification: Notification = {
-      id: Date.now().toString(),
-      type: 'system',
-      title: notificationForm.title.trim(),
-      message: notificationForm.message.trim(),
-      timestamp: new Date().toISOString(),
-      isRead: false,
-      priority: 'medium',
-      relatedId: notificationForm.link.trim() || undefined,
-      userRole: 'admin',
-      category: 'system'
-    }
-    setNotifications(prev => [newNotification, ...prev])
-    if ('Notification' in window) {
-      if (Notification.permission === 'granted') {
-        new Notification(newNotification.title, { body: newNotification.message })
-      } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then(permission => {
-          if (permission === 'granted') {
-            new Notification(newNotification.title, { body: newNotification.message })
-          }
-        })
-      }
-    }
+    toast.success('Notification sent successfully')
+    
+    // Refresh notifications list from API
+    await fetchUserNotifications(currentPage)
 
     setNotificationForm({
       title: '',
@@ -662,14 +965,13 @@ const handleSendNotification = async () => {
     return matchesSearch && matchesType && matchesPriority && matchesStatus && matchesCategory
   })
 
-  const paginatedNotifications = filteredNotifications.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
+  // Use API pagination - no need to slice since API handles pagination
+  const paginatedNotifications = filteredNotifications
 
-  const totalPages = Math.ceil(filteredNotifications.length / itemsPerPage)
+  // Use pagination from API response
+  const totalPages = pagination.total_pages || 1
 
-  const unreadCount = notifications.filter(n => !n.isRead).length
+  const unreadCount = pagination.unread_count
   const totalCount = notifications.length
 
   const categoryCount = {
@@ -727,7 +1029,7 @@ const handleSendNotification = async () => {
                 value="list"
                 className="rounded-none border-b-2 border-transparent px-6 py-4 text-sm font-medium text-[#2b2b2b] data-[state=active]:border-[#00A1FF] data-[state=active]:bg-white data-[state=active]:text-[#00A1FF]"
               >
-                Notification List ({totalCount})
+                Notification List ({pagination.total_count || filteredNotifications.length})
               </TabsTrigger>
             </TabsList>
           </CardContent>
@@ -888,23 +1190,12 @@ const handleSendNotification = async () => {
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
                   />
-                </div>
+                </div> 
 
-                {/* <Select value={filterCategory} onValueChange={setFilterCategory}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="All Notifications" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Notifications</SelectItem>
-                    <SelectItem value="job-management">Job Management</SelectItem>
-                    <SelectItem value="invoicing">Invoicing</SelectItem>
-                    <SelectItem value="materials">Materials</SelectItem>
-                    <SelectItem value="timesheets">Timesheets</SelectItem>
-                    <SelectItem value="system">System</SelectItem>
-                  </SelectContent>
-                </Select> */}
-
-                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <Select value={filterStatus} onValueChange={(value) => {
+                  setFilterStatus(value)
+                  setCurrentPage(1) // Reset to page 1 when filter changes
+                }}>
                   <SelectTrigger className="w-40">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
@@ -914,22 +1205,16 @@ const handleSendNotification = async () => {
                     <SelectItem value="read">Read</SelectItem>
                   </SelectContent>
                 </Select>
-
-                {/* <Select value={filterPriority} onValueChange={setFilterPriority}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Priority</SelectItem>
-                    <SelectItem value="high">High Priority</SelectItem>
-                    <SelectItem value="medium">Medium Priority</SelectItem>
-                    <SelectItem value="low">Low Priority</SelectItem>
-                  </SelectContent>
-                </Select> */}
+ 
 
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Filter className="h-4 w-4" />
-                  <span>{filteredNotifications.length} notifications</span>
+                  <span>{pagination.total_count || filteredNotifications.length} notifications</span>
+                  {pagination.unread_count > 0 && (
+                    <Badge variant="destructive" className="ml-2">
+                      {pagination.unread_count} unread
+                    </Badge>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -937,7 +1222,13 @@ const handleSendNotification = async () => {
 
           <Card className="bg-white shadow-md border-0">
             <CardContent className="p-0">
-              {paginatedNotifications.length === 0 ? (
+              {isLoadingNotifications ? (
+                <div className="p-12 text-center">
+                  <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-[#00A1FF]"></div>
+                  <h3 className="mb-2 text-lg font-medium text-[#2b2b2b]">Loading notifications...</h3>
+                  <p className="text-gray-600">Please wait while we fetch your notifications</p>
+                </div>
+              ) : paginatedNotifications.length === 0 ? (
                 <div className="p-12 text-center">
                   <Bell className="mx-auto mb-4 h-12 w-12 text-gray-300" />
                   <h3 className="mb-2 text-lg font-medium text-[#2b2b2b]">No notifications found</h3>
@@ -966,8 +1257,7 @@ const handleSendNotification = async () => {
                               </h3>
                               <p className="mt-1 text-sm text-gray-600 leading-relaxed">{notification.message}</p>
                               <div className="mt-3 flex items-center gap-3 text-xs">
-                                {getPriorityBadge(notification.priority)}
-                                {getCategoryBadge(notification.category)}
+                              
                                 {notification.relatedId && (
                                   <Badge variant="outline" className="text-xs">
                                     {notification.relatedId}
@@ -976,14 +1266,19 @@ const handleSendNotification = async () => {
                               </div>
                             </div>
                             <div className="flex items-center gap-3">
-                              <span className="text-sm text-gray-500">{formatTimestamp(notification.timestamp)}</span>
+                              <span className="text-sm text-gray-500">
+                                {formatTimestamp(
+                                  notification.isRead && notification.read_at 
+                                    ? notification.read_at 
+                                    : notification.created_at || notification.timestamp
+                                )}
+                              </span>
                               <div className="flex items-center gap-1">
                                 {hasPermission('notification', 'edit') && (
                                   notification.isRead ? (
                                     <Button
                                       variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleMarkAsUnread(notification.id)}
+                                      size="sm" 
                                       className="h-auto p-1"
                                     >
                                       <EyeOff className="h-4 w-4 text-gray-400" />
@@ -1003,7 +1298,7 @@ const handleSendNotification = async () => {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => handleDeleteNotification(notification.id)}
+                                    onClick={() => handleDeleteClick(notification.id)}
                                     className="h-auto p-1 text-red-500 hover:text-red-700"
                                   >
                                     <Trash2 className="h-4 w-4" />
@@ -1027,7 +1322,7 @@ const handleSendNotification = async () => {
               <Button
                 variant="outline"
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
+                disabled={currentPage === 1 || isLoadingNotifications}
               >
                 Previous
               </Button>
@@ -1043,8 +1338,8 @@ const handleSendNotification = async () => {
               ))}
               <Button
                 variant="outline"
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages || isLoadingNotifications}
               >
                 Next
               </Button>
@@ -1052,6 +1347,32 @@ const handleSendNotification = async () => {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Notification</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this notification? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setDeleteDialogOpen(false)
+              setNotificationToDelete(null)
+            }}>
+              No
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteNotification}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              Yes, Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

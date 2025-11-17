@@ -43,37 +43,154 @@ function AppContent() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    // Initialize Firebase messaging
-    initFirebaseMessaging();
+    let unsubscribe: (() => void) | null = null;
     
-    // Register service worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/firebase-messaging-sw.js')
-        .then(reg => {
-          console.log('Service Worker registered for FCM:', reg.scope);
-        })
-        .catch(err => {
-          console.warn('SW registration failed:', err);
+    const setupFirebaseMessaging = async () => {
+      try {
+        // Request notification permission first
+        if ('Notification' in window && Notification.permission === 'default') {
+          try {
+            const permission = await Notification.requestPermission();
+            console.log('Notification permission:', permission);
+          } catch (err) {
+            console.warn('Failed to request notification permission:', err);
+          }
+        }
+        
+        // Initialize Firebase messaging
+        const messaging = initFirebaseMessaging();
+        
+        if (!messaging) {
+          console.warn('Firebase messaging initialization failed');
+          return;
+        }
+        
+        console.log('Firebase messaging initialized successfully');
+        
+        // Register service worker
+        if ('serviceWorker' in navigator) {
+          try {
+            const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+            console.log('Service Worker registered for FCM:', registration.scope);
+          } catch (err) {
+            console.warn('SW registration failed:', err);
+          }
+        }
+ 
+        unsubscribe = onForegroundMessage((payload: any) => {
+ 
+          const title = payload.notification?.title || payload.data?.title || payload.data?.notification_title || 'New Notification';
+          const body = payload.notification?.body || payload.data?.message || payload.data?.body || '';
+          
+ 
+          
+          // Show native browser notification
+          if ('Notification' in window) {
+            console.log('Notification API is available');
+            
+            if (Notification.permission === 'granted') {
+              console.log('Permission is granted, creating notification...');
+              try {
+                const notification = new Notification(title, {
+                  body: body,
+                  icon: '/favicon.ico',
+                  badge: '/favicon.ico',
+                  tag: payload.messageId || Date.now().toString(),
+                  requireInteraction: false,
+                  data: payload.data || {}
+                }); 
+                
+                // Auto close after 10 seconds (increased for visibility)
+                setTimeout(() => {
+                  notification.close();
+                  console.log('Notification auto-closed');
+                }, 10000);
+                
+                // Handle notification click
+                notification.onclick = () => {
+                  console.log('Notification clicked');
+                  window.focus();
+                  notification.close();
+                };
+                
+                notification.onerror = (error) => {
+                  console.error('Notification error:', error);
+                };
+                
+                notification.onshow = () => {
+                  console.log('Notification shown');
+                };
+                
+                notification.onclose = () => {
+                  console.log('Notification closed');
+                };
+              } catch (error) {
+                console.error('Error creating notification:', error);
+              }
+            } else if (Notification.permission === 'denied') {
+              console.warn('Notification permission is denied');
+            } else {
+              console.log('Requesting notification permission...');
+              // Request permission if not already denied
+              Notification.requestPermission().then((permission) => {
+                console.log('Permission result:', permission);
+                if (permission === 'granted') {
+                  try {
+                    const notification = new Notification(title, {
+                      body: body,
+                      icon: '/favicon.ico',
+                      badge: '/favicon.ico',
+                      tag: payload.messageId || Date.now().toString(),
+                      requireInteraction: false,
+                      data: payload.data || {}
+                    });
+                    
+                    console.log('Notification created after permission grant:', notification);
+                    
+                    setTimeout(() => {
+                      notification.close();
+                    }, 10000);
+                    
+                    notification.onclick = () => {
+                      window.focus();
+                      notification.close();
+                    };
+                  } catch (error) {
+                    console.error('Error creating notification after permission grant:', error);
+                  }
+                }
+              });
+            }
+          } else {
+            console.warn('Notification API is not available in this browser');
+          }
+          
+          // Also show toast notification as fallback
+          toast.success(title, {
+            description: body,
+            duration: 5000,
+          });
         });
-    }
+        
+        if (unsubscribe) {
+          console.log('✅ Firebase foreground message listener set up successfully');
+          console.log('Unsubscribe function:', typeof unsubscribe);
+        } else {
+          console.error('❌ Failed to set up foreground message listener - unsubscribe is null');
+        }
+      } catch (error) {
+        console.error('❌ Error setting up Firebase messaging:', error);
+      }
+    };
 
-    // Listen for foreground messages
-    const unsubscribe = onForegroundMessage((payload: any) => {
-      console.log('FCM foreground message received:', payload);
-      const title = payload.notification?.title || payload.data?.title || payload.data?.notification_title || 'New Notification';
-      const body = payload.notification?.body || payload.data?.message || payload.data?.body || '';
-      
-      // Show toast notification
-      toast.success(title, {
-        description: body,
-        duration: 5000,
-      });
-    });
+    console.log('🚀 Starting Firebase messaging setup...');
+    setupFirebaseMessaging();
 
     return () => {
       try {
         if (unsubscribe && typeof unsubscribe === 'function') {
           unsubscribe();
+          console.log('Firebase listener unsubscribed');
         }
       } catch (e) {
         console.warn('Error unsubscribing from FCM:', e);

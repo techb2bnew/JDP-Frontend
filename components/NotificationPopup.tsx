@@ -34,6 +34,47 @@ export function NotificationPopup({
 
   const unreadCount = localNotifications.filter(n => n.unread).length;
 
+  const formatTimestamp = (timestamp: string) => {
+    try {
+      if (!timestamp) return '—'
+      
+      // Parse the UTC timestamp and convert to local time
+      // If timestamp doesn't have 'Z' or timezone, treat it as UTC
+      const utcTimestamp = timestamp.endsWith('Z') ? timestamp : timestamp + 'Z'
+      const date = new Date(utcTimestamp)
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return timestamp
+      }
+      
+      // Get current local time
+      const now = new Date()
+      
+      // Calculate difference in milliseconds (both dates are in local time after parsing)
+      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
+      
+      if (diffInMinutes < 1) return 'Just now'
+      if (diffInMinutes < 60) return `${diffInMinutes}m ago`
+      
+      const diffInHours = Math.floor(diffInMinutes / 60)
+      if (diffInHours < 24) return `${diffInHours}h ago`
+      
+      const diffInDays = Math.floor(diffInHours / 24)
+      if (diffInDays === 1) return 'Yesterday'
+      if (diffInDays < 7) return `${diffInDays} days ago`
+      
+      // Format as local date
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+      })
+    } catch {
+      return timestamp
+    }
+  }
+
   const getNotificationIcon = (type: Notification["type"]) => {
     const iconProps = "h-4 w-4";
     switch (type) {
@@ -124,7 +165,7 @@ export function NotificationPopup({
                           {notification.unread && <div className="h-2 w-2 bg-primary rounded-full notification-badge" />}
                         </div>
                         <p className="text-xs text-muted-foreground leading-relaxed mb-2">{notification.message}</p>
-                        <p className="text-xs text-muted-foreground/80">{notification.time}</p>
+                        <p className="text-xs text-muted-foreground/80">{formatTimestamp(notification.time)}</p>
                       </div>
                     </div>
                   </div>
