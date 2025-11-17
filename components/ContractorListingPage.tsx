@@ -2912,15 +2912,7 @@ export function ContractorListingPage() {
                     // Use enhanced job data if available (from API call), otherwise use subJob data
                     const jobData = enhancedJobData && enhancedJobData.id.toString() === subJob.id.toString() ? enhancedJobData : subJob
                     
-                    console.log('=== DEBUGGING SUB-JOB DATA ===')
-                    console.log('subJob.id:', subJob.id, 'type:', typeof subJob.id)
-                    console.log('enhancedJobData:', enhancedJobData)
-                    console.log('enhancedJobData.id:', enhancedJobData?.id, 'type:', typeof enhancedJobData?.id)
-                    console.log('IDs match:', enhancedJobData && enhancedJobData.id.toString() === subJob.id.toString())
-                    console.log('Using job data:', jobData)
-                    console.log('Enhanced job data available:', !!enhancedJobData)
-                    console.log('Job data assignedLaborDetails:', jobData.assignedLaborDetails)
-                    console.log('Job data assignedLeadLaborDetails:', jobData.assignedLeadLaborDetails)
+                   
                     
                     // Ensure the subJob has the customer data properly structured
                     const jobWithCustomerData = {
@@ -3004,15 +2996,7 @@ export function ContractorListingPage() {
                     // Use enhanced job data if available (from API call), otherwise use selectedJobData
                     const jobData = enhancedJobData && enhancedJobData.id.toString() === selectedJobData.id.toString() ? enhancedJobData : selectedJobData
                     
-                    console.log('=== DEBUGGING MAIN JOB DATA ===')
-                    console.log('selectedJobData.id:', selectedJobData.id, 'type:', typeof selectedJobData.id)
-                    console.log('enhancedJobData:', enhancedJobData)
-                    console.log('enhancedJobData.id:', enhancedJobData?.id, 'type:', typeof enhancedJobData?.id)
-                    console.log('IDs match:', enhancedJobData && enhancedJobData.id.toString() === selectedJobData.id.toString())
-                    console.log('Using job data:', jobData)
-                    console.log('Enhanced job data available:', !!enhancedJobData)
-                    console.log('Job data assignedLaborDetails:', jobData.assignedLaborDetails)
-                    console.log('Job data assignedLeadLaborDetails:', jobData.assignedLeadLaborDetails)
+                   
                     
                     // Ensure the job has the customer data properly structured
                     const jobWithCustomerData = {

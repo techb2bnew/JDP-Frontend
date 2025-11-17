@@ -511,6 +511,14 @@ console.log(materials,"testmaterials")
     }
   };
 
+  // Normalize status helper function
+  const normalizeStatus = (status: string | undefined): string => {
+    if (!status) return 'draft';
+    // Convert hyphen to underscore for consistency
+    if (status === 'in-progress') return 'in_progress';
+    return status;
+  };
+
   const [editedJob, setEditedJob] = useState({
     title: job.title,
     type: job.type,
@@ -519,7 +527,7 @@ console.log(materials,"testmaterials")
     contractor: job.contractor || job.customer,
     startDate: '01/15/2025',
     priority: 'High',
-    status: 'draft',
+    status: normalizeStatus(job.status),
     assignedLabor: job.assignedLaborDetails || [],
     assignedLeadLabor: job.assignedLeadLaborDetails || [],
   });
@@ -746,7 +754,7 @@ console.log(materials,"testmaterials")
       contractor: job.contractor || job.customer,
       startDate: '01/15/2025',
       priority: 'High',
-      status: 'draft',
+      status: job.status,
       assignedLabor: job.assignedLaborDetails || [],
       assignedLeadLabor: job.assignedLeadLaborDetails || [],
     });
@@ -1642,6 +1650,14 @@ console.log(materials,"testmaterials")
 
   // Update editedJob when job data changes
   useEffect(() => {
+    // Normalize status: convert "in-progress" to "in_progress" if needed
+    const normalizeStatus = (status: string | undefined): string => {
+      if (!status) return 'draft';
+      // Convert hyphen to underscore for consistency
+      if (status === 'in-progress') return 'in_progress';
+      return status;
+    };
+
     setEditedJob({
       title: job.title,
       type: job.type,
@@ -1652,7 +1668,7 @@ console.log(materials,"testmaterials")
         || (job.createdDate && formatDate(job.createdDate)) 
         || '',
       priority: job.priority || 'High',
-      status: job.status || 'draft',
+      status: normalizeStatus(job.status),
       assignedLabor: job.assignedLaborDetails || [],
       assignedLeadLabor: job.assignedLeadLaborDetails || [],
     });

@@ -194,8 +194,7 @@ useEffect(() => {
 
   // Initial count fetch
   const fetchUnreadCount = async () => {
-    try {
-      console.log('Fetching initial unread count for user:', userId);
+    try { 
       
       // First, test the connection with a simple query
       const { data: testData, error: testError } = await supabase
@@ -203,8 +202,7 @@ useEffect(() => {
         .select('id')
         .eq('user_id', userId)
         .limit(1);
-      
-      console.log('Test query result:', { testData, testError });
+       
       
       if (testError) {
         console.error('❌ Supabase connection error:', testError);

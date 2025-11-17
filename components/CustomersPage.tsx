@@ -8,6 +8,9 @@ import { Badge } from './ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
 import { usePermissions } from '../contexts/PermissionContext'
 import { globalApiCall } from '../utils/globalApiHandler'
+import { JobDetailsPage } from './JobDetailsPage'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible'
+import { ScrollArea } from './ui/scroll-area'
 import {
   Search,
   UserPlus,
@@ -23,7 +26,16 @@ import {
   Users,
   UserCheck,
   UserRoundX,
-  ArrowUpAZ
+  ArrowUpAZ,
+  ChevronDown,
+  ChevronRight,
+  User,
+  Building,
+  Circle,
+  Minus,
+  CheckCircle,
+  Activity,
+  Plus
 } from 'lucide-react';
 import {
   Dialog,
@@ -94,11 +106,132 @@ export function CustomersPage() {
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 
+  // Customer Listing Page State (similar to ContractorListingPage)
+  const [selectedJob, setSelectedJob] = useState<string | null>(null)
+  const [selectedSubJob, setSelectedSubJob] = useState<string | null>(null)
+  const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null)
+  const [enhancedJobData, setEnhancedJobData] = useState<any>(null)
+  const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set())
+  const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set())
+  const [expandedSubJobs, setExpandedSubJobs] = useState<Set<string>>(new Set())
+  const [customersWithJobs, setCustomersWithJobs] = useState<any[]>([])
+
   // Fetch customers data and stats on component mount and when page changes
   useEffect(() => {
     fetchCustomersData(currentPage, itemsPerPage);
     fetchCustomerStats();
   }, [currentPage, itemsPerPage]);
+
+  // Helper functions for customer listing (similar to ContractorListingPage)
+  const toggleCustomer = (customerId: string) => {
+    setExpandedCustomers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(customerId)) {
+        newSet.delete(customerId);
+      } else {
+        newSet.add(customerId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleJob = (jobId: string) => {
+    setExpandedJobs(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(jobId)) {
+        newSet.delete(jobId);
+      } else {
+        newSet.add(jobId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSubJob = (subJobId: string) => {
+    setExpandedSubJobs(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(subJobId)) {
+        newSet.delete(subJobId);
+      } else {
+        newSet.add(subJobId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectCustomer = (customerId: string) => {
+    setSelectedCustomer(customerId);
+    setSelectedJob(null);
+    setSelectedSubJob(null);
+  };
+
+  const selectJob = (jobId: string, customerId: string) => {
+    setSelectedJob(jobId);
+    setSelectedCustomer(customerId);
+    setSelectedSubJob(null);
+  };
+
+  const selectSubJob = (subJobId: string, jobId: string, customerId: string) => {
+    setSelectedSubJob(subJobId);
+    setSelectedJob(jobId);
+    setSelectedCustomer(customerId);
+  };
+
+  // Helper functions for status badges and icons (similar to ContractorListingPage)
+  const getStatusBadge = (status: string) => {
+    const baseClasses = "text-xs font-medium px-2 py-1 rounded-full border";
+    switch (status) {
+      case 'complete':
+      case 'completed':
+        return <Badge className={`${baseClasses} bg-green-100 text-green-800 border-green-200`}>Complete</Badge>;
+      case 'ongoing':
+      case 'in_progress':
+        return <Badge className={`${baseClasses} bg-blue-100 text-blue-800 border-blue-200`}>Ongoing</Badge>;
+      case 'pending':
+        return <Badge className={`${baseClasses} bg-yellow-100 text-yellow-800 border-yellow-200`}>Pending</Badge>;
+      default:
+        return <Badge className={`${baseClasses} bg-gray-100 text-gray-700 border-gray-300`}>{status}</Badge>;
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'complete':
+      case 'completed':
+        return <CheckCircle className="h-3 w-3 text-green-600" />;
+      case 'ongoing':
+      case 'in_progress':
+        return <Activity className="h-3 w-3 text-blue-600" />;
+      case 'pending':
+        return <Circle className="h-3 w-3 text-yellow-600" />;
+      default:
+        return <Circle className="h-3 w-3 text-gray-400" />;
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const selectedCustomerData = selectedCustomer ? customersWithJobs.find(c => c.id.toString() === selectedCustomer) : null;
+  const selectedJobData = selectedJob ? selectedCustomerData?.jobs?.find((j: any) => j.id.toString() === selectedJob) : null;
 
   const clearValidationError = (field: string) => {
     if (validationErrors[field]) {
@@ -244,20 +377,24 @@ export function CustomersPage() {
     }
   };
 
-  const fetchCustomersData = async (page: number, limit: number) => {
+  // Fetch customers with jobs (similar to contractors)
+  const fetchCustomersWithJobs = async () => {
     try {
       setIsLoadingCustomers(true);
       
-      const response = await globalApiCall(`${apiBaseUrl}/customer/getCustomers?page=${page}&limit=${limit}`, {
+      const response = await globalApiCall(`${apiBaseUrl}/customer/getCustomers?include_jobs=true&page=${currentPage}&limit=${itemsPerPage}`, {
         method: 'GET'
       });
 
       const responseData = await response.json();
-      console.log('Customers API Response:', responseData);
+      console.log('Customers with Jobs API Response:', responseData);
 
       if (responseData.success && responseData.data) {
-        // Transform API response to match component's expected format
-        const transformedCustomers = responseData.data?.customers.map((apiCustomer: any) => ({
+        setCustomersWithJobs(responseData.data.customers || []);
+        setTotalCustomers(responseData.data.pagination?.total || 0);
+        
+        // Also set for table view compatibility
+        const transformedCustomers = (responseData.data?.customers || []).map((apiCustomer: any) => ({
           id: apiCustomer.id?.toString() || `CUST-${Date.now()}`,
           name: apiCustomer.customer_name || '',
           email: apiCustomer.email || '',
@@ -269,28 +406,31 @@ export function CustomersPage() {
           status: apiCustomer.status || 'active',
           company: apiCustomer.company_name || '',
           contactPerson: apiCustomer.contact_person || '',
-          avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face' // Default avatar
+          avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face',
+          jobs: apiCustomer.jobs || [],
+          total_jobs: apiCustomer.jobs?.length || 0
         }));
-
         setCustomersData(transformedCustomers);
         setFilteredCustomers(transformedCustomers);
-        setTotalCustomers(responseData.data.pagination?.total || transformedCustomers.length);
-        console.log('Total customers:', responseData.data.pagination?.total);
-        console.log('Items per page:', itemsPerPage);
-        console.log('Should show pagination:', (responseData.data.pagination?.total || transformedCustomers.length) > itemsPerPage);
       } else {
         console.error('Invalid customers API response structure:', responseData);
+        setCustomersWithJobs([]);
         setCustomersData([]);
       }
     } catch (error) {
-      console.error('Error fetching customers:', error);
-      // Error is already handled by globalApiCall (token revocation, etc.)
+      console.error('Error fetching customers with jobs:', error);
       if (!(error instanceof Error && error.message?.includes('Session expired'))) {
+        setCustomersWithJobs([]);
         setCustomersData([]);
       }
     } finally {
       setIsLoadingCustomers(false);
     }
+  };
+
+  const fetchCustomersData = async (page: number, limit: number) => {
+    // Use the new function that includes jobs
+    await fetchCustomersWithJobs();
   };
 
   const fetchBySearchCustomers = async () => {
@@ -624,341 +764,489 @@ useEffect(() => {
 }, [statusFilter, currentPage, itemsPerPage]);
 
 
-
-
-  // const filteredCustomers = customersData
-  //   .filter(customer => {
-  //     // Search filter
-  //     const matchesSearch =
-  //       customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-  //       customer.email.toLowerCase().includes(searchTerm.toLowerCase());
-
-  //     // Status filter
-  //     const matchesStatus =
-  //       statusFilter === 'all' ||
-  //       customer.status === statusFilter;
-
-  //     return matchesSearch && matchesStatus;
-  //   })
-  //   .sort((a, b) => {
-  //     // Only sort if sortBy is set (button clicked)
-  //     if (!sortBy) return 0;
-      
-  //     // Sorting logic
-  //     if (sortBy === 'name') {
-  //       return sortOrder === 'asc'
-  //         ? a.name.localeCompare(b.name)
-  //         : b.name.localeCompare(a.name);
-  //     } else if (sortBy === 'orders') {
-  //       return sortOrder === 'asc'
-  //         ? a.orders - b.orders
-  //         : b.orders - a.orders;
-  //     } else if (sortBy === 'joinDate') {
-  //       return sortOrder === 'asc'
-  //         ? new Date(a.joinDate).getTime() - new Date(b.joinDate).getTime()
-  //         : new Date(b.joinDate).getTime() - new Date(a.joinDate).getTime();
-  //     }
-  //     return 0;
-  //   });
-
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-2xl font-medium text-[#2b2b2b]">Customer Management</h1>
-          <p className="text-muted-foreground">Manage and track all customer relationships and service history</p>
-        </div>
-        <div className='flex gap-2'>
-          {hasPermission('customers', 'view') && (
-            <Button variant="outline" onClick={handleExportCustomers}>
-              <Download className="h-4 w-4 mr-2" />
-              Export Customers
-            </Button>
-          )}
-          {hasPermission('customers', 'create') && (
-            <Button className='text-white' onClick={() => {
-              setCurrentAction('add');
-              setEditingCustomer(null);
-              setViewCustomerData(null);
-              setShowAddCustomerModal(true);
-            }}>
-              <UserPlus className="h-4 w-4 mr-2" />
-              Add Customer
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className='bg-blue-100 border border-blue-300'>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">
-              <div className="flex gap-2 items-center text-blue-500">
-                <Users />
-                Total Customers
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {isLoadingStats ? (
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-              ) : (
-                customerStats.total
-              )}
+    <div className="h-full flex">
+      {/* Left Sidebar - Customer Listings */}
+      <div className="w-80 bg-gray-50 border-r border-gray-200 flex flex-col sticky top-0 h-screen">
+        {/* Sidebar Header */}
+        <div className="p-4 border-b border-gray-200 bg-white">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+              <Building className="w-4 h-4 text-primary" />
             </div>
-            <p className='text-blue-500'>All registered customers</p>
-          </CardContent>
-        </Card>
-
-        <Card className='bg-green-50 border border-green-300'>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">
-              <div className="flex gap-2 items-center text-green-500">
-                <UserCheck />
-                Active Customers
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {isLoadingStats ? (
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div>
-              ) : (
-                customerStats.active
-              )}
-            </div> 
-
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">
-              <div className="flex gap-2 items-center">
-                <UserRoundX />
-                Inactive Customers
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {isLoadingStats ? (
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-500"></div>
-              ) : (
-                customerStats.inactive
-              )}
-            </div> 
-
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search and Customer List */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search customers..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            <div className="flex gap-4">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-auto min-w-[150px]">
-                  <SelectValue placeholder="All Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem> 
-                </SelectContent>
-              </Select>
-              {/* <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-auto min-w-[150px]">
-                  <SelectValue placeholder="Sort By Name" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name">Sort By Name</SelectItem>
-                  <SelectItem value="orders">Sort By Total Jobs</SelectItem>
-                  <SelectItem value="joinDate">Sort By Join Date</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                variant="outline"
-                size="icon"
-                className='w-[70px]'
-                onClick={() => {
-                  setSortBy('name');
-                  setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                }}
-              >
-                <ArrowUpAZ className="w-4 h-4" />
-                {sortOrder === 'asc' ? 'A-Z' : 'Z-A'}
-              </Button> */}
+            <div>
+              <h2 className="font-medium text-gray-900">Customers & Jobs</h2>
+              <p className="text-sm text-gray-500">Select to view details</p>
             </div>
           </div>
-        </CardHeader>
+        </div>
 
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Customer</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Location</TableHead>
-                {/* <TableHead>Total Jobs</TableHead>
-                <TableHead>Total Spent</TableHead>  */}
-                <TableHead>Status</TableHead>
-                <TableHead>Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoadingCustomers ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
-                    <div className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                      <span className="ml-2">Loading customers...</span>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : filteredCustomers?.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    No customers found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredCustomers?.map((customer:any) => (
-                <TableRow key={customer.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3"> 
-                      <div>
-                        <p className="font-medium">{customer.name}</p>
-                        <p className="text-sm text-muted-foreground">#{customer.id}</p>
-                        <p className="text-xs text-muted-foreground">Contact: {customer.contactPerson || 'N/A'}</p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Mail className="h-3 w-3" />
-                        {customer.email}
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Phone className="h-3 w-3" />
-                        {customer.phone}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2 text-sm">
-                      <MapPin className="h-3 w-3" />
-                      {customer.location}
-                    </div>
-                  </TableCell>
-                  {/* <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Briefcase className='w-4 h-4' /> {customer.orders}
+        {/* Search */}
+        <div className="p-4 bg-white border-b border-gray-200">
+          <input 
+            type="text" 
+            placeholder="Search customers or jobs..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-transparent"
+          />
+        </div>
 
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-medium">${customer.totalSpent}</TableCell> */}
-                  
-                  <TableCell>
-                    <Badge className={getStatusColor(customer.status)}>
-                      {customer.status.toUpperCase()}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {hasPermission('customers', 'view') && (
-                        <Button variant="outline" size="icon" onClick={() => {
-                          setCurrentAction('view');
-                          // Fetch customer details from API for view
-                          fetchCustomerForView(customer.id).then(() => {
-                            setShowAddCustomerModal(true);
-                          }).catch((error) => {
-                            console.error('Failed to load customer for viewing:', error);
-                          });
-                        }}>
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      )}
-                      {hasPermission('customers', 'edit') && (
-                        <Button variant="outline" size="icon" onClick={() => {
-                          setCurrentAction('edit');
-                          setEditingCustomer(customer);
-                          // Fetch customer details from API for editing
-                          fetchCustomerById(customer.id).then(() => {
-                            setShowAddCustomerModal(true);
-                          }).catch((error) => {
-                            console.error('Failed to load customer for editing:', error);
-                          });
-                        }}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                      )}
-                      {hasPermission('customers', 'delete') && (
-                        <Button 
-                          variant="outline" 
-                          size="icon" 
-                          onClick={() => {
-                            setCustomerToDelete(customer);
-                            setShowDeleteAlert(true);
-                          }}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-          
-          {/* Pagination Controls */}
-          {totalCustomers > 0 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t">
-              <div className="text-sm text-muted-foreground">
-                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalCustomers)} of {totalCustomers} customers
+        {/* Customer Listings */}
+        <ScrollArea className="flex-1 bg-white">
+          <div className="p-2">
+            {isLoadingCustomers ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                <span className="ml-2 text-sm text-gray-500">Loading customers...</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1 || isLoadingCustomers}
-                >
-                  Previous
+            ) : customersWithJobs.length === 0 ? (
+              <div className="text-center py-8 text-sm text-gray-500">
+                No customers found
+              </div>
+            ) : (
+              customersWithJobs.map((customer) => {
+                const customerJobs = customer.jobs || []
+                const isExpanded = expandedCustomers.has(customer.id.toString())
+                const isSelected = selectedCustomer === customer.id.toString() && !selectedJob
+
+                return (
+                  <div key={customer.id} className="mb-2">
+                    <Collapsible
+                      open={isExpanded}
+                      onOpenChange={() => toggleCustomer(customer.id.toString())}
+                    >
+                      <CollapsibleTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          className={`w-full justify-start p-3 text-left h-auto hover:bg-primary/5 ${
+                            isSelected ? 'bg-primary/10 shadow-sm border border-primary/20' : ''
+                          }`}
+                          onClick={() => selectCustomer(customer.id.toString())}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2">
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4 text-primary" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4 text-primary" />
+                                )}
+                                <User className="h-4 w-4 text-primary" />
+                              </div>
+                              <div>
+                                <div className="font-medium text-gray-900">{customer.customer_name || customer.name}</div>
+                                <div className="text-xs text-gray-500">{customer.total_jobs || customerJobs.length} jobs</div>
+                              </div>
+                            </div>
+                          </div>
+                        </Button>
+                      </CollapsibleTrigger>
+
+                      <CollapsibleContent className="ml-6 mt-1">
+                        {customerJobs.map((job: any) => {
+                          const hasSubJobs = job.subJobs && job.subJobs.length > 0
+                          const isJobExpanded = expandedJobs.has(job.id.toString())
+                          const isJobSelected = selectedJob === job.id.toString() && !selectedSubJob
+
+                          return (
+                            <div key={job.id} className="mb-1">
+                              <div className="flex items-start">
+                                <Minus className="h-4 w-4 text-primary/40 mt-2 mr-2" />
+                                <div className="flex-1">
+                                  <Collapsible
+                                    open={isJobExpanded}
+                                    onOpenChange={() => toggleJob(job.id.toString())}
+                                  >
+                                    <CollapsibleTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        className={`w-full justify-start p-2 text-left h-auto text-sm hover:bg-primary/5 ${
+                                          isJobSelected ? 'bg-primary/10 shadow-sm border border-primary/20' : ''
+                                        }`}
+                                        onClick={() => selectJob(job.id.toString(), customer.id.toString())}
+                                      >
+                                        <div className="flex items-center justify-between w-full">
+                                          <div className="flex items-center gap-2">
+                                            {hasSubJobs && (
+                                              isJobExpanded ? (
+                                                <ChevronDown className="h-3 w-3 text-primary" />
+                                              ) : (
+                                                <ChevronRight className="h-3 w-3 text-primary" />
+                                              )
+                                            )}
+                                            {getStatusIcon(job.status)}
+                                            <div className="flex-1 min-w-0">
+                                              <div className="text-xs font-medium text-gray-800 truncate">
+                                                {job.job_title || job.title}
+                                              </div>
+                                              <div className="text-xs text-gray-500">
+                                                {job.status} • {job.progress || 0}%
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </Button>
+                                    </CollapsibleTrigger>
+
+                                    {hasSubJobs && (
+                                      <CollapsibleContent className="ml-4 mt-1">
+                                        {job.subJobs?.map((subJob: any) => {
+                                          const isSubJobSelected = selectedSubJob === subJob.id.toString()
+
+                                          return (
+                                            <div key={subJob.id} className="flex items-start mb-1">
+                                              <Minus className="h-3 w-3 text-primary/30 mt-1.5 mr-2" />
+                                              <Button
+                                                variant="ghost"
+                                                className={`flex-1 justify-start p-1.5 text-left h-auto text-xs hover:bg-primary/5 ${
+                                                  isSubJobSelected ? 'bg-primary/10 shadow-sm border border-primary/20' : ''
+                                                }`}
+                                                onClick={() => selectSubJob(subJob.id.toString(), job.id.toString(), customer.id.toString())}
+                                              >
+                                                <div className="flex items-center gap-2 w-full">
+                                                  {getStatusIcon(subJob.status)}
+                                                  <div className="flex-1 min-w-0">
+                                                    <div className="text-xs text-gray-700 truncate">
+                                                      {subJob.job_title || subJob.title}
+                                                    </div>
+                                                    <div className="text-xs text-gray-500">
+                                                      {subJob.progress || 0}% • 0h
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              </Button>
+                                            </div>
+                                          )
+                                        })}
+                                      </CollapsibleContent>
+                                    )}
+                                  </Collapsible>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+
+      {/* Right Content - Job Details */}
+      <div className="flex-1 bg-white">
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-medium text-[#2b2b2b]">Customer Management</h1>
+              <p className="text-muted-foreground">Manage and track all customer relationships and service history</p>
+            </div>
+            <div className='flex gap-2'>
+              {hasPermission('customers', 'view') && (
+                <Button variant="outline" onClick={handleExportCustomers}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export Customers
                 </Button>
-                <span className="text-sm">
-                  Page {currentPage} of {Math.ceil(totalCustomers / itemsPerPage)}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => prev + 1)}
-                  disabled={currentPage >= Math.ceil(totalCustomers / itemsPerPage) || isLoadingCustomers}
-                >
-                  Next
+              )}
+              {hasPermission('customers', 'create') && (
+                <Button className='text-white' onClick={() => {
+                  setCurrentAction('add');
+                  setEditingCustomer(null);
+                  setViewCustomerData(null);
+                  setShowAddCustomerModal(true);
+                }}>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add Customer
                 </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Job Details or Summary Cards */}
+        {selectedJobData && selectedCustomerData ? (
+          <div className="p-6 space-y-6">
+            {/* Job Overview */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Briefcase className="h-5 w-5 text-primary" />
+                  Job Overview
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Status</p>
+                    {getStatusBadge(selectedJobData.status)}
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Estimated Cost</p>
+                    <p className="font-medium text-primary">{formatCurrency(selectedJobData.estimated_cost || 0)}</p>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Job Title</p>
+                    <p className="font-medium">{selectedJobData.job_title || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Address</p>
+                    <p className="font-medium">{selectedJobData.address || 'N/A'}</p>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Start Date</p>
+                    <p className="font-medium">{formatDate(selectedJobData.created_at || '')}</p>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Due Date</p>
+                    <p className="font-medium">{formatDate(selectedJobData.due_date || '')}</p>
+                  </div>
+                  {selectedJobData.actualCost && (
+                    <div>
+                      <p className="text-sm text-gray-600 mb-1">Actual Cost</p>
+                      <p className="font-medium text-green-600">{formatCurrency(selectedJobData.actualCost)}</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Job Details - Show main job or sub-job based on selection */}
+            {selectedJobData && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl font-medium text-gray-900">
+                    {selectedSubJob ? 'Sub-Job Details' : 'Job Details'}
+                  </h3>
+                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+                    {selectedJobData.subJobs?.length || 0} Sub-Jobs
+                  </Badge>
+                </div>
+                
+                {/* Show sub-job details if sub-job is selected */}
+                {selectedSubJob ? (
+                  selectedJobData.subJobs?.map((subJob: any) => {
+                    if (subJob.id.toString() !== selectedSubJob) return null;
+                    
+                    const jobData = enhancedJobData && enhancedJobData.id.toString() === subJob.id.toString() ? enhancedJobData : subJob;
+                    
+                    const jobWithCustomerData = {
+                      ...jobData,
+                      id: subJob.id.toString(),
+                      customer: subJob.customer?.id?.toString() || subJob.customer_id?.toString(),
+                      customerName: subJob.customer?.customer_name || subJob.customer?.company_name,
+                      customerEmail: subJob.customer?.email,
+                      title: subJob.job_title,
+                      type: subJob.job_type === 'contract_based' ? 'contract-based' : 'service-based',
+                      location: subJob.address,
+                      address: subJob.address,
+                      cityZip: subJob.city_zip,
+                      estimatedCost: subJob.estimated_cost,
+                      estimatedHours: subJob.estimated_hours,
+                      startDate: subJob.created_at,
+                      dueDate: subJob.due_date,
+                      priority: subJob.priority,
+                      status: subJob.status,
+                      progress: subJob.progress || 0,
+                      labor_timesheets: subJob.labor_timesheets || [],
+                      assigned_labor_ids: subJob.assigned_labor_ids,
+                      assigned_lead_labor_ids: subJob.assigned_lead_labor_ids,
+                      assignedLaborDetails: jobData.assignedLaborDetails || [],
+                      assignedLeadLaborDetails: jobData.assignedLeadLaborDetails || []
+                    };
+                    
+                    const allJobs = [jobWithCustomerData];
+                    
+                    const handleSetJobs = (updatedJobs: any[]) => {
+                      if (updatedJobs.length > 0) {
+                        const updatedJob = updatedJobs[0];
+                        setCustomersWithJobs(prevCustomers => 
+                          prevCustomers.map(customer => {
+                            if (customer.id.toString() === selectedCustomer) {
+                              return {
+                                ...customer,
+                                jobs: customer.jobs.map((job: any) => {
+                                  if (job.id.toString() === selectedJob) {
+                                    return {
+                                      ...job,
+                                      subJobs: job.subJobs?.map((subJobItem: any) => 
+                                        subJobItem.id.toString() === updatedJob.id 
+                                          ? { ...subJobItem, ...updatedJob }
+                                          : subJobItem
+                                      ) || []
+                                    };
+                                  }
+                                  return job;
+                                })
+                              };
+                            }
+                            return customer;
+                          })
+                        );
+                      }
+                    };
+                    
+                    return (
+                      <JobDetailsPage 
+                        key={subJob.id} 
+                        jobId={subJob.id.toString()} 
+                        onBack={() => setSelectedSubJob(null)}
+                        jobs={allJobs} 
+                        setJobs={handleSetJobs}
+                      />
+                    );
+                  })
+                ) : (
+                  /* Show main job details if no sub-job is selected */
+                  (() => {
+                    const jobData = enhancedJobData && enhancedJobData.id.toString() === selectedJobData.id.toString() ? enhancedJobData : selectedJobData;
+                    
+                    const jobWithCustomerData = {
+                      ...jobData,
+                      id: selectedJobData.id.toString(),
+                      customer: selectedJobData.customer?.id?.toString() || selectedJobData.customer_id?.toString(),
+                      customerName: selectedJobData.customer?.customer_name || selectedJobData.customer?.company_name,
+                      customerEmail: selectedJobData.customer?.email,
+                      title: selectedJobData.job_title,
+                      type: selectedJobData.job_type === 'contract_based' ? 'contract-based' : 'service-based',
+                      location: selectedJobData.address,
+                      address: selectedJobData.address,
+                      cityZip: selectedJobData.city_zip,
+                      estimatedCost: selectedJobData.estimated_cost,
+                      estimatedHours: selectedJobData.estimated_hours,
+                      startDate: selectedJobData.created_at,
+                      dueDate: selectedJobData.due_date,
+                      priority: selectedJobData.priority,
+                      status: selectedJobData.status,
+                      progress: selectedJobData.progress || 0,
+                      labor_timesheets: selectedJobData.labor_timesheets || [],
+                      assigned_labor_ids: selectedJobData.assigned_labor_ids,
+                      assigned_lead_labor_ids: selectedJobData.assigned_lead_labor_ids,
+                      assignedLaborDetails: jobData.assignedLaborDetails || [],
+                      assignedLeadLaborDetails: jobData.assignedLeadLaborDetails || []
+                    };
+                    
+                    const allJobs = [jobWithCustomerData];
+                    
+                    const handleSetJobs = (updatedJobs: any[]) => {
+                      if (updatedJobs.length > 0) {
+                        const updatedJob = updatedJobs[0];
+                        setCustomersWithJobs(prevCustomers => 
+                          prevCustomers.map(customer => {
+                            if (customer.id.toString() === selectedCustomer) {
+                              return {
+                                ...customer,
+                                jobs: customer.jobs.map((job: any) => 
+                                  job.id.toString() === selectedJob 
+                                    ? { ...job, ...updatedJob }
+                                    : job
+                                )
+                              };
+                            }
+                            return customer;
+                          })
+                        );
+                      }
+                    };
+                    
+                    return (
+                      <JobDetailsPage 
+                        key={selectedJobData.id} 
+                        jobId={selectedJobData.id.toString()} 
+                        onBack={() => setSelectedJob(null)}
+                        jobs={allJobs} 
+                        setJobs={handleSetJobs}
+                      />
+                    );
+                  })()
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-6">
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <Card className='bg-blue-100 border border-blue-300'>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    <div className="flex gap-2 items-center text-blue-500">
+                      <Users />
+                      Total Customers
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {isLoadingStats ? (
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                    ) : (
+                      customerStats.total
+                    )}
+                  </div>
+                  <p className='text-blue-500'>All registered customers</p>
+                </CardContent>
+              </Card>
+
+              <Card className='bg-green-50 border border-green-300'>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    <div className="flex gap-2 items-center text-green-500">
+                      <UserCheck />
+                      Active Customers
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {isLoadingStats ? (
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div>
+                    ) : (
+                      customerStats.active
+                    )}
+                  </div> 
+                </CardContent>
+              </Card>
+              <Card className='bg-red-50 border border-red-300'>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    <div className="flex gap-2 items-center text-red-500">
+                      <UserRoundX />
+                      Inactive Customers
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-red-500">
+                    {isLoadingStats ? (
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-500 "></div>
+                    ) : (
+                      customerStats.inactive
+                    )}
+                  </div> 
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <Building className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Job</h3>
+                <p className="text-sm text-gray-500">Choose a customer and job from the sidebar to view detailed information</p>
               </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </div>
 
       <Dialog open={showAddCustomerModal} onOpenChange={(open) => {
         if (!open) {
