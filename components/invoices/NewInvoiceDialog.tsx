@@ -198,10 +198,39 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
   // Update form when job is provided
   useEffect(() => {
     if (currentJob) {
+      // Determine if it's contract-based
+      const isContractBased = currentJob.type === 'contract_based' || currentJob.type === 'contract-based';
+      
+      // Get customer/contractor name and address
+      let customerName = '';
+      let customerAddress = '';
+      
+      if (isContractBased) {
+        customerName = currentJob.contractorName || 
+                       currentJob.contractor?.contractor_name || 
+                       currentJob.contractor?.name || 
+                       currentJob.contractor?.full_name || 
+                       '';
+        customerAddress = currentJob.contractorAddress || 
+                         currentJob.contractor?.address || 
+                         currentJob.location || 
+                         currentJob.address || 
+                         '';
+      } else {
+        customerName = currentJob.customerName || 
+                       currentJob.customer?.customer_name || 
+                       currentJob.customer?.name || 
+                       '';
+        customerAddress = currentJob.location || 
+                         currentJob.address || 
+                         currentJob.customer?.address || 
+                         '';
+      }
+      
       setInlineInvoiceData(prev => ({
         ...prev,
-        customerName: currentJob.customerName || '',
-        customerAddress: currentJob.location || currentJob.address || '',
+        customerName: customerName,
+        customerAddress: customerAddress,
         project: currentJob.title || '',
         jobId: currentJob.id || jobId
       }))
@@ -328,9 +357,63 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
   // Send invoice to customer function
   const sendInvoiceToCustomer = async (invoiceId: number) => {
     try {
-      const currentJob = jobsList.find((j: any) => j.id === inlineInvoiceData.jobId)
-      if (!currentJob) {
-        throw new Error('Job not found')
+      // Get customer_id or contractor_id from viewInvoiceData if in view mode, otherwise from currentJob
+      let customerId: number | null = null;
+      let contractorId: number | null = null;
+      let isContractBased = false;
+      
+      if (isViewMode && viewInvoiceData) {
+        // In view mode, get from viewInvoiceData
+        isContractBased = viewInvoiceData.service_type === 'contract_based' || 
+                          viewInvoiceData.job?.job_type === 'contract_based' ||
+                          viewInvoiceData.contractor_id !== null && viewInvoiceData.contractor_id !== undefined;
+        
+        // Try multiple ways to get the IDs
+        customerId = viewInvoiceData.customer_id || 
+                     viewInvoiceData.customer?.id || 
+                     (viewInvoiceData.customer && typeof viewInvoiceData.customer === 'number' ? viewInvoiceData.customer : null) ||
+                     null;
+        
+        contractorId = viewInvoiceData.contractor_id || 
+                       viewInvoiceData.contractor?.id || 
+                       (viewInvoiceData.contractor && typeof viewInvoiceData.contractor === 'number' ? viewInvoiceData.contractor : null) ||
+                       null;
+        
+        console.log('View mode - IDs from viewInvoiceData:', {
+          customer_id: customerId,
+          contractor_id: contractorId,
+          isContractBased: isContractBased,
+          viewInvoiceData: viewInvoiceData
+        });
+      } else {
+        // In create mode, get from currentJob
+        const currentJob = jobsList.find((j: any) => j.id === inlineInvoiceData.jobId)
+        if (!currentJob) {
+          throw new Error('Job not found')
+        }
+        
+        isContractBased = currentJob.type === 'contract_based' || currentJob.type === 'contract-based';
+        
+        if (isContractBased) {
+          contractorId = currentJob.contractor_id || 
+                         (currentJob.contractor && typeof currentJob.contractor === 'number' ? Number(currentJob.contractor) : null) ||
+                         (currentJob.contractor && typeof currentJob.contractor === 'string' ? Number(currentJob.contractor) : null) ||
+                         null;
+          console.log('Create mode - contractor_id from currentJob:', contractorId);
+        } else {
+          customerId = currentJob.customer_id || 
+                       (currentJob.customer && typeof currentJob.customer === 'number' ? currentJob.customer : null) ||
+                       (currentJob.customer && typeof currentJob.customer === 'string' ? Number(currentJob.customer) : null) ||
+                       Number(currentJob?.customer) || 
+                       null;
+          console.log('Create mode - customer_id from currentJob:', customerId);
+        }
+      }
+
+      if (!customerId && !contractorId) {
+        console.error('Customer/Contractor ID not found');
+        toast.error('Customer/Contractor ID is missing. Cannot send invoice.');
+        return;
       }
 
       // Get token properly
@@ -356,7 +439,18 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
         throw new Error('No authentication token found')
       }
 
-      const payload = {
+      // Get customer email - from viewInvoiceData in view mode, otherwise from currentJob
+      let customerEmail = 'customer@example.com';
+      if (isViewMode && viewInvoiceData) {
+        customerEmail = viewInvoiceData.customer?.email || 
+                        viewInvoiceData.email_address || 
+                        'customer@example.com';
+      } else {
+        const currentJob = jobsList.find((j: any) => j.id === inlineInvoiceData.jobId)
+        customerEmail = currentJob?.email || 'customer@example.com';
+      }
+
+      const payload: any = {
         estimateNumber: inlineInvoiceData.estimateNumber || 'Draft',
         estimateDate: new Date(inlineInvoiceData.date).toLocaleDateString('en-US', {
           month: '2-digit',
@@ -364,7 +458,7 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
           year: 'numeric'
         }),
         customerName: inlineInvoiceData.customerName || 'Customer',
-        customerEmail: currentJob.email || 'customer@example.com',
+        customerEmail: customerEmail,
         customerAddress: inlineInvoiceData.customerAddress || '',
         billToAddress: inlineInvoiceData.billToAddressEnabled ? inlineInvoiceData.billToAddress || '' : '',
         poNumber: inlineInvoiceData.poNumber || '',
@@ -387,8 +481,16 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
         total: calculateInvoiceSubtotal()
       }
 
+      // Add customer_id or contractor_id based on job type
+      if (isContractBased && contractorId) {
+        payload.contractor_id = contractorId;
+      } else if (customerId) {
+        payload.customer_id = customerId;
+      }
+
       console.log('Sending invoice to customer with ID:', invoiceId)
       console.log('Payload:', payload)
+      console.log('isContractBased:', isContractBased, 'customerId:', customerId, 'contractorId:', contractorId)
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/invoices/sendInvoiceToCustomer/${invoiceId}`, {
         method: 'POST',
@@ -611,17 +713,56 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
     const job = jobsList.find((j: any) => j.id === jobId)
     if (job) {
       setSelectedJob(job)
+      
+      // Determine if it's contract-based
+      const isContractBased = job.type === 'contract_based' || job.type === 'contract-based';
+      
+      // Get customer/contractor name and address
+      let customerName = '';
+      let customerAddress = '';
+      
+      if (isContractBased) {
+        customerName = job.contractorName || 
+                       job.contractor?.contractor_name || 
+                       job.contractor?.name || 
+                       job.contractor?.full_name || 
+                       '';
+        customerAddress = job.contractorAddress || 
+                         job.contractor?.address || 
+                         job.location || 
+                         job.address || 
+                         '';
+      } else {
+        customerName = job.customerName || 
+                       job.customer?.customer_name || 
+                       job.customer?.name || 
+                       '';
+        customerAddress = job.location || 
+                         job.address || 
+                         job.customer?.address || 
+                         '';
+      }
+      
       setInlineInvoiceData(prev => ({
         ...prev,
         jobId: job.id,
-        customerName: job.type === 'contract-based' ? (job.contractorName || job.contractor?.name || '') : (job.customerName || ''),
-        customerAddress: job.type === 'contract-based' ? (job.contractorAddress || job.contractor?.address || job.location || job.address || '') : (job.location || job.address || ''),
+        customerName: customerName,
+        customerAddress: customerAddress,
         billToAddress: job.billToAddress || '',
         project: job.title || ''
       }))
+      
+      console.log('Selected job:', job);
+      console.log('isContractBased:', isContractBased);
+      console.log('customerName:', customerName);
+      console.log('customerAddress:', customerAddress);
+      console.log('Updated inlineInvoiceData:', {
+        jobId: job.id,
+        customerName: customerName,
+        customerAddress: customerAddress,
+        project: job.title
+      });
     }
-    console.log(selectedJob, 'selectedJob');
-    console.log(inlineInvoiceData, 'setInlineInvoiceData');
   }
 
   const handleSaveInvoiceAsDraft = async () => {
@@ -668,15 +809,49 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
         total_cost: item.total 
       }))
 
-      const payload = {
+      // Get customer_id or contractor_id - from viewInvoiceData if in view mode, otherwise from currentJob
+      let customerId: number | null = null;
+      let contractorId: number | null = null;
+      let isContractBased = false;
+      
+      if (isViewMode && viewInvoiceData) {
+        // In view mode, get from viewInvoiceData
+        isContractBased = viewInvoiceData.service_type === 'contract_based' || 
+                          viewInvoiceData.job?.job_type === 'contract_based' ||
+                          (viewInvoiceData.contractor_id !== null && viewInvoiceData.contractor_id !== undefined);
+        
+        customerId = viewInvoiceData.customer_id || 
+                     viewInvoiceData.customer?.id || 
+                     (viewInvoiceData.customer && typeof viewInvoiceData.customer === 'number' ? viewInvoiceData.customer : null) ||
+                     null;
+        
+        contractorId = viewInvoiceData.contractor_id || 
+                       viewInvoiceData.contractor?.id || 
+                       (viewInvoiceData.contractor && typeof viewInvoiceData.contractor === 'number' ? viewInvoiceData.contractor : null) ||
+                       null;
+      } else {
+        // In create mode, get from currentJob
+        isContractBased = currentJob?.type === 'contract_based' || currentJob?.type === 'contract-based';
+        
+        if (isContractBased) {
+          contractorId = currentJob.contractor_id || 
+                         (currentJob.contractor && typeof currentJob.contractor === 'number' ? Number(currentJob.contractor) : null) ||
+                         (currentJob.contractor && typeof currentJob.contractor === 'string' ? Number(currentJob.contractor) : null) ||
+                         null;
+        } else {
+          customerId = currentJob.customer_id || 
+                       (currentJob.customer && typeof currentJob.customer === 'number' ? currentJob.customer : null) ||
+                       (currentJob.customer && typeof currentJob.customer === 'string' ? Number(currentJob.customer) : null) ||
+                       Number(currentJob?.customer) || 
+                       null;
+        }
+      }
+
+      const payload: any = {
         job_id: Number(inlineInvoiceData.jobId),
         estimate_title: inlineInvoiceData.project || currentJob?.title,
-        ...(currentJob?.type === 'contract-based'
-          ? { contractor_id: Number(currentJob?.contractor) || 0 }
-          : { customer_id: Number(currentJob?.customer) || 0 }
-        ),
         priority: 'medium' as 'low' | 'medium' | 'high',
-        service_type: currentJob?.type === 'contract-based' ? 'contract_based' : 'service_based',
+        service_type: isContractBased ? 'contract_based' : 'service_based',
         email_address: currentJob?.email || 'customer@example.com',
         estimate_date: inlineInvoiceData.date,
         po_number: inlineInvoiceData.poNumber || '',
@@ -690,6 +865,19 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
         custom_products: customProducts
       }
+
+      // Add customer_id or contractor_id based on job type
+      if (isContractBased && contractorId) {
+        payload.contractor_id = contractorId;
+      } else if (customerId) {
+        payload.customer_id = customerId;
+      }
+      
+      console.log('Draft invoice payload with IDs:', {
+        customer_id: payload.customer_id,
+        contractor_id: payload.contractor_id,
+        isContractBased: isContractBased
+      });
 
       await apiClient.createEstimate(payload as any)
       toast.success('Invoice saved as draft!')
@@ -792,15 +980,49 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
         total_cost: item.total
       }))
 
-      const payload = {
+      // Get customer_id or contractor_id - from viewInvoiceData if in view mode, otherwise from currentJob
+      let customerId: number | null = null;
+      let contractorId: number | null = null;
+      let isContractBased = false;
+      
+      if (isViewMode && viewInvoiceData) {
+        // In view mode, get from viewInvoiceData
+        isContractBased = viewInvoiceData.service_type === 'contract_based' || 
+                          viewInvoiceData.job?.job_type === 'contract_based' ||
+                          (viewInvoiceData.contractor_id !== null && viewInvoiceData.contractor_id !== undefined);
+        
+        customerId = viewInvoiceData.customer_id || 
+                     viewInvoiceData.customer?.id || 
+                     (viewInvoiceData.customer && typeof viewInvoiceData.customer === 'number' ? viewInvoiceData.customer : null) ||
+                     null;
+        
+        contractorId = viewInvoiceData.contractor_id || 
+                       viewInvoiceData.contractor?.id || 
+                       (viewInvoiceData.contractor && typeof viewInvoiceData.contractor === 'number' ? viewInvoiceData.contractor : null) ||
+                       null;
+      } else {
+        // In create mode, get from currentJob
+        isContractBased = currentJob?.type === 'contract_based' || currentJob?.type === 'contract-based';
+        
+        if (isContractBased) {
+          contractorId = currentJob.contractor_id || 
+                         (currentJob.contractor && typeof currentJob.contractor === 'number' ? Number(currentJob.contractor) : null) ||
+                         (currentJob.contractor && typeof currentJob.contractor === 'string' ? Number(currentJob.contractor) : null) ||
+                         null;
+        } else {
+          customerId = currentJob.customer_id || 
+                       (currentJob.customer && typeof currentJob.customer === 'number' ? currentJob.customer : null) ||
+                       (currentJob.customer && typeof currentJob.customer === 'string' ? Number(currentJob.customer) : null) ||
+                       Number(currentJob?.customer) || 
+                       null;
+        }
+      }
+
+      const payload: any = {
         job_id: Number(inlineInvoiceData.jobId),
         estimate_title: inlineInvoiceData.project || currentJob?.title,
-        ...(currentJob?.type === 'contract-based'
-          ? { contractor_id: Number(currentJob?.contractor) || 0 }
-          : { customer_id: Number(currentJob?.customer) || 0 }
-        ),
         priority: 'medium' as 'low' | 'medium' | 'high',
-        service_type: currentJob?.type === 'contract-based' ? 'contract_based' : 'service_based',
+        service_type: isContractBased ? 'contract_based' : 'service_based',
         email_address: currentJob?.email || 'customer@example.com',
         estimate_date: inlineInvoiceData.date,
         po_number: inlineInvoiceData.poNumber || '',
@@ -814,6 +1036,19 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
         custom_products: customProducts
       }
+
+      // Add customer_id or contractor_id based on job type
+      if (isContractBased && contractorId) {
+        payload.contractor_id = contractorId;
+      } else if (customerId) {
+        payload.customer_id = customerId;
+      }
+      
+      console.log('Send invoice payload with IDs:', {
+        customer_id: payload.customer_id,
+        contractor_id: payload.contractor_id,
+        isContractBased: isContractBased
+      });
 
       const response = await apiClient.createEstimate(payload as any)
       toast.success('Invoice created successfully!')

@@ -235,15 +235,35 @@ export function InvoicesPage() {
 
 
         // Set the data with processed values
+        // Extract customer_id or contractor_id from API response
+        const customerId = response.data.customer_id || 
+                           response.data.customer?.id || 
+                           (typeof response.data.customer === 'number' ? response.data.customer : null);
+        const contractorId = response.data.contractor_id || 
+                             response.data.contractor?.id || 
+                             (typeof response.data.contractor === 'number' ? response.data.contractor : null);
+        const isContractBased = response.data.service_type === 'contract_based' || 
+                                response.data.job?.job_type === 'contract_based';
+        
         const processedData = {
           ...response.data,
+          customer_id: customerId,
+          contractor_id: contractorId,
           customer: {
             ...response.data.customer,
+            id: response.data.customer?.id || response.data.customer_id || (typeof response.data.customer === 'number' ? response.data.customer : null),
             customer_name: customerName,
             address: customerAddress
           },
           estimate_title: project
         };
+        
+        console.log('Processed invoice data with IDs:', {
+          customer_id: processedData.customer_id,
+          contractor_id: processedData.contractor_id,
+          isContractBased: isContractBased,
+          customer: processedData.customer
+        });
 
         setSelectedInvoiceData(processedData)
         setShowViewInvoiceDialog(true)
