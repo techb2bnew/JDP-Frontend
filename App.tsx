@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Provider } from 'react-redux'
 import { store } from './redux/store'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { PermissionProvider } from './contexts/PermissionContext'
-import { Toaster } from 'sonner'
+import { Toaster, toast } from 'sonner'
+import { initFirebaseMessaging, onForegroundMessage } from './lib/firebase'
 import { Sidebar } from './components/Sidebar'
 import { Header } from './components/Header'
 import { AuthFlow } from './components/AuthFlow'
@@ -37,6 +38,48 @@ function AppContent() {
   const [selectedLeadLabourId, setSelectedLeadLabourId] = useState<string | null>(null)
   const [showLeadLabourDetails, setShowLeadLabourDetails] = useState<boolean>(false)
   const dispatch = useAppDispatch()
+
+  // Set up Firebase Cloud Messaging listener for global notifications
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    // Initialize Firebase messaging
+    initFirebaseMessaging();
+    
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/firebase-messaging-sw.js')
+        .then(reg => {
+          console.log('Service Worker registered for FCM:', reg.scope);
+        })
+        .catch(err => {
+          console.warn('SW registration failed:', err);
+        });
+    }
+
+    // Listen for foreground messages
+    const unsubscribe = onForegroundMessage((payload: any) => {
+      console.log('FCM foreground message received:', payload);
+      const title = payload.notification?.title || payload.data?.title || payload.data?.notification_title || 'New Notification';
+      const body = payload.notification?.body || payload.data?.message || payload.data?.body || '';
+      
+      // Show toast notification
+      toast.success(title, {
+        description: body,
+        duration: 5000,
+      });
+    });
+
+    return () => {
+      try {
+        if (unsubscribe && typeof unsubscribe === 'function') {
+          unsubscribe();
+        }
+      } catch (e) {
+        console.warn('Error unsubscribing from FCM:', e);
+      }
+    };
+  }, []);
 
   const handleLeadLabourView = (id: string) => {
     setSelectedLeadLabourId(id)

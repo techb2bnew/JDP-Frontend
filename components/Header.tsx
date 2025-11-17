@@ -36,34 +36,7 @@ export function Header({
   const [showNotifications, setShowNotifications] = useState(false)
   const { theme, toggleTheme, isLoading } = useTheme()
 
-  // If super admin, don't show header
-  if (isSuperAdmin) {
-    return null;
-  }
-
-  const getPageTitle = (page: string): string => {
-    const titles: Record<string, string> = {
-      dashboard: "Dashboard",
-      analytics: "Analytics", 
-      products: "Products",
-      orders: "Orders",
-      invoices: "Invoices",
-      customers: "Customers",
-      "job-management": "Job Management",
-      "live-tracking": "Live Tracking",
-      "contractor-listing": "Contractor Listing",
-      "staff-management": "Staff Management",
-      notifications: "Notifications",
-      profile: "Profile",
-      profiles: "Profiles",
-      "staff-profile": "Staff Profile",
-      "lead-labour-profile": "Lead Labour Profile",
-      "labour-profile": "Labour Profile"
-    }
-    return titles[page] || "Dashboard"
-  }
-
-  const notifications = [
+  const [notifications, setNotifications] = useState([
     {
       id: "1",
       title: "New Order Received",
@@ -96,7 +69,34 @@ export function Header({
       type: "task" as const,
       unread: false
     }
-  ]
+  ])
+
+  // If super admin, don't show header
+  if (isSuperAdmin) {
+    return null;
+  }
+
+  const getPageTitle = (page: string): string => {
+    const titles: Record<string, string> = {
+      dashboard: "Dashboard",
+      analytics: "Analytics", 
+      products: "Products",
+      orders: "Orders",
+      invoices: "Invoices",
+      customers: "Customers",
+      "job-management": "Job Management",
+      "live-tracking": "Live Tracking",
+      "contractor-listing": "Contractor Listing",
+      "staff-management": "Staff Management",
+      notifications: "Notifications",
+      profile: "Profile",
+      profiles: "Profiles",
+      "staff-profile": "Staff Profile",
+      "lead-labour-profile": "Lead Labour Profile",
+      "labour-profile": "Labour Profile"
+    }
+    return titles[page] || "Dashboard"
+  }
 
   const unreadCount = notifications.filter(n => n.unread).length
 
@@ -175,6 +175,7 @@ export function Header({
                   <div onClick={(e) => e.stopPropagation()}>
                     <NotificationPopup
                       notifications={notifications}
+                      setNotifications={setNotifications}
                       onClose={() => setShowNotifications(false)}
                       onViewAll={onNotificationViewAll}
                     />

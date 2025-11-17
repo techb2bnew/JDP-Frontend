@@ -439,7 +439,15 @@ const fetchRoles = useCallback(async () => {
 
     setNotifications(prev => [incoming, ...prev]);
 
-    try { toast.success('New notification received') } catch (e) {}
+    // Show toast with notification details
+    try {
+      toast.success(title, {
+        description: body,
+        duration: 5000,
+      });
+    } catch (e) {
+      console.warn('Failed to show toast notification', e);
+    }
   });
 
   return () => {
@@ -629,8 +637,6 @@ const handleSendNotification = async () => {
     setFormErrors({})
     setCurrentPage(1)
     setMainTab('list')
-
-    toast.success('Notification sent successfully')
   } catch (error) {
     console.error('Failed to send notification:', error)
     toast.error('Failed to send notification')

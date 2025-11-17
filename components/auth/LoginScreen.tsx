@@ -9,6 +9,7 @@ import { loginSuccess } from '../../redux/slices/authSlice'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff } from 'lucide-react'
 import Image from 'next/image'
+import { getFCMToken } from '../../lib/firebase'
 
 interface LoginScreenProps {
   onStepChange: (step: AuthStep, email?: string) => void
@@ -53,13 +54,36 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
     setIsLoading(true)
 
     try {
+      // Get FCM push token
+      let pushToken: string | null = null;
+      try {
+        pushToken = await getFCMToken();
+        console.log('FCM Token:', pushToken);
+      } catch (error) {
+        console.warn('Failed to get FCM token:', error);
+        // Continue with login even if token fails
+      }
+
+      // Prepare login payload
+      const loginPayload: any = {
+        email,
+        password,
+        login_by: "admin",
+        push_platform: "web"
+      };
+
+      // Add push_token only if we got one
+      if (pushToken) {
+        loginPayload.push_token = pushToken;
+      }
+
       // Call external API directly
       const response = await fetch(`${apiBaseUrl}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password, login_by: "admin" }),
+        body: JSON.stringify(loginPayload),
       });
 
       if (response.ok) {
