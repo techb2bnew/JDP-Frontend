@@ -2726,7 +2726,7 @@ export function ContractorListingPage() {
                                               {job.job_title}
                                             </div>
                                             <div className="text-xs text-gray-500">
-                                              {job.status} • {job.progress}%
+                                              {job.status}  
                                             </div>
                                           </div>
                                         </div>
@@ -2756,8 +2756,8 @@ export function ContractorListingPage() {
                                                     {subJob.job_title}
                                                   </div>
                                                   <div className="text-xs text-gray-500">
-                                                    {subJob.progress}% • 0h
-                                                  </div>
+                                              {subJob.status}  
+                                            </div>
                                                 </div>
                                               </div>
                                             </Button>

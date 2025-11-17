@@ -168,8 +168,10 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
       errors.contractor = 'Contractor selection is required for contract-based jobs'
     }
 
-    // Email validation (if provided)
-    if (formData.email && !validateEmail(formData.email)) {
+    // Email validation (required)
+    if (!formData.email || !formData.email.trim()) {
+      errors.email = 'Email is required'
+    } else if (!validateEmail(formData.email)) {
       errors.email = 'Please enter a valid email address'
     }
 

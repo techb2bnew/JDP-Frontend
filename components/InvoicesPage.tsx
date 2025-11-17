@@ -921,7 +921,7 @@ export function InvoicesPage() {
 
           <div className="space-y-6">
             {(isLoadingDashboard || dashboardCards) && (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card>
                   <CardContent className="p-6 flex items-center justify-between">
                     <div>
@@ -987,7 +987,7 @@ export function InvoicesPage() {
                 </Card>
 
                 {/* Pending */}
-                <Card>
+                {/* <Card>
                   <CardContent className="p-6 flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Pending</p>
@@ -1005,7 +1005,7 @@ export function InvoicesPage() {
                       <AlertCircle className="h-6 w-6 text-orange-600" />
                     </div>
                   </CardContent>
-                </Card>
+                </Card> */}
               </div>
             )}
 
@@ -1092,7 +1092,7 @@ export function InvoicesPage() {
                               <TableCell className="max-w-48 truncate">{invoice.job?.job_title || 'N/A'}</TableCell>
                               <TableCell>{invoice.invoice_type || 'N/A'}</TableCell>
                               <TableCell>{invoice.created_at ? new Date(invoice.created_at).toLocaleDateString() : 'N/A'}</TableCell>
-                              <TableCell>{invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : 'N/A'}</TableCell>
+                              <TableCell>{invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}</TableCell>
                               <TableCell className="font-medium">
                                 ${Number(invoice.total_amount || 0).toFixed(2)}
                               </TableCell>
