@@ -264,7 +264,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
 
       // Extract staff ID from user data - try multiple possible locations
       const staffId = 
-        userData.user.staff_id || 
+        userData.user.staff.id || 
         (userData.user.staff && Array.isArray(userData.user.staff) && userData.user.staff.length > 0 ? userData.user.staff[0].id : null) ||
         (userData.user.staff && !Array.isArray(userData.user.staff) ? userData.user.staff.id : null) ||
         userData.user.id || 
@@ -306,7 +306,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
         } else {
           setProfileImageUrl(null)
         }
-        toast.success('Profile data refreshed successfully!')
+        // toast.success('Profile data refreshed successfully!')
       } else {
         throw new Error(response.message || 'Failed to fetch profile data')
       }
@@ -359,7 +359,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
       }
       
       // Extract staff ID from user data
-      const staffId = userData.user.staff && userData.user.staff.length > 0 ? userData.user.staff[0].id : null
+      const staffId = userData.user.staff.id ? userData.user.staff.id : null
       if (!staffId) {
         throw new Error('Staff profile not found. Please contact administrator.')
       }

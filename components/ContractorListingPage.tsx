@@ -1199,6 +1199,16 @@ export function ContractorListingPage() {
     fetchContractorsData()
   }, [currentPage])
 
+  // Auto-select first contractor when contractors are loaded
+  useEffect(() => {
+    if (contractors.length > 0 && !selectedContractor) {
+      const firstContractor = contractors[0]
+      if (firstContractor && firstContractor.id) {
+        selectContractor(firstContractor.id.toString())
+      }
+    }
+  }, [contractors])
+
   // Validation function
   const validateForm = () => {
     const errors: {[key: string]: string} = {}

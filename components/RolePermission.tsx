@@ -2,10 +2,18 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from './ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { Badge } from './ui/badge'
 import {
   Edit,
   Trash2,
   Eye,
+  Shield,
+  Plus,
+  Users,
+  Circle,
+  FileText,
+  UserCheck
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { updateUserPermissions } from '../utils/auth'
@@ -19,6 +27,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog'
+import { ScrollArea } from './ui/scroll-area'
+import { CheckCircle2, X } from 'lucide-react'
 
 interface Permission {
   module: string;
@@ -56,6 +74,20 @@ export default function RolePermission() {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
   // State to track permissions for new roles
   const [newRolePermissions, setNewRolePermissions] = useState<Permission[]>([]);
+  
+  // Stats state
+  const [roleStats, setRoleStats] = useState({
+    totalRoles: 0,
+    systemRoles: 0,
+    customRoles: 0,
+    totalUsers: 0
+  });
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
+  
+  // View modal state
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewingRole, setViewingRole] = useState<Role | null>(null);
+  const [isLoadingViewRole, setIsLoadingViewRole] = useState(false);
 
   const fetchRoles = useCallback(async () => {
     setIsLoadingRoles(true);
@@ -98,10 +130,74 @@ export default function RolePermission() {
     }
   }, [apiBaseUrl]);
 
+  // Fetch role stats
+  const fetchRoleStats = useCallback(async () => {
+    setIsLoadingStats(true);
+    try {
+      const token = localStorage.getItem('jdp_auth')
+        ? JSON.parse(localStorage.getItem('jdp_auth')!).token
+        : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      // Calculate stats from roles data
+      const totalRoles = roles.length;
+      const systemRoles = roles.filter(role => {
+        // System roles are typically predefined (STAFF, LEAD_LABOUR, LABOUR, ADMIN, etc.)
+        const systemRoleNames = ['STAFF', 'LEAD_LABOUR', 'LABOUR', 'ADMIN', 'SUPER_ADMIN'];
+        return systemRoleNames.includes(role.roleName.toUpperCase());
+      }).length;
+      const customRoles = totalRoles - systemRoles;
+      
+      // Fetch total users count (you may need to adjust this API endpoint)
+      try {
+        const usersResponse = await fetch(`${apiBaseUrl}/staff/getStaff`, {
+          method: 'GET',
+          headers
+        });
+        if (usersResponse.ok) {
+          const usersData = await usersResponse.json();
+          const totalUsers = usersData.data?.pagination?.total || usersData.data?.staff?.length || 0;
+          setRoleStats({
+            totalRoles,
+            systemRoles,
+            customRoles,
+            totalUsers
+          });
+        } else {
+          setRoleStats({
+            totalRoles,
+            systemRoles,
+            customRoles,
+            totalUsers: 0
+          });
+        }
+      } catch (error) {
+        setRoleStats({
+          totalRoles,
+          systemRoles,
+          customRoles,
+          totalUsers: 0
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching role stats:', error);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  }, [roles, apiBaseUrl]);
+
   // Fetch roles from API when component mounts
   useEffect(() => {
     fetchRoles();
   }, [fetchRoles]);
+
+  // Update stats when roles change
+  useEffect(() => {
+    if (roles.length > 0) {
+      fetchRoleStats();
+    }
+  }, [roles, fetchRoleStats]);
 
   // Pagination logic
   const paginatedRoles = roles.slice(
@@ -111,7 +207,7 @@ export default function RolePermission() {
 
   const totalPages = Math.ceil(roles.length / itemsPerPage);
 
-  const fetchRoleById = async (roleId: string) => {
+  const fetchRoleById = async (roleId: string, forView: boolean = false): Promise<Role | null> => {
     try {
       const token = localStorage.getItem('jdp_auth')
         ? JSON.parse(localStorage.getItem('jdp_auth')!).token
@@ -172,20 +268,29 @@ export default function RolePermission() {
             updatedAt: apiRole.updated_at ? apiRole.updated_at.split('T')[0] : ''
           };
 
-          setEditingRole(transformedRole);
-          setFormData({
-            roleName: transformedRole.roleName,
-            description: transformedRole.description
-          });
+          if (forView) {
+            setViewingRole(transformedRole);
+          } else {
+            setEditingRole(transformedRole);
+            setFormData({
+              roleName: transformedRole.roleName,
+              description: transformedRole.description
+            });
+          }
+          
+          return transformedRole;
         } else {
           toast.error('Failed to fetch role details');
+          return null;
         }
       } else {
         toast.error('Failed to fetch role details');
+        return null;
       }
     } catch (error) {
       console.error('RolePermission: Error fetching role details:', error);
       toast.error('Error fetching role details');
+      return null;
     }
   };
 
@@ -255,10 +360,59 @@ export default function RolePermission() {
     setNewRolePermissions([]); // Clear new role permissions when editing
   };
 
-  const handleViewRole = (role: Role) => {
-    // For now, just show role details in console
-    console.log('Viewing role:', role);
-    // You can implement a view modal or redirect to a detail page here
+  const handleViewRole = async (role: Role) => {
+    setIsLoadingViewRole(true);
+    setShowViewModal(true);
+    try {
+      // Fetch fresh role data from API for view
+      const roleData = await fetchRoleById(role.id, true);
+      if (!roleData) {
+        // If fetch failed, use the role from the list
+        setViewingRole(role);
+      }
+    } catch (error) {
+      console.error('Error fetching role for view:', error);
+      // Use the role from the list as fallback
+      setViewingRole(role);
+    } finally {
+      setIsLoadingViewRole(false);
+    }
+  };
+  
+  // Helper to group permissions by module
+  const groupPermissionsByModule = (permissions: Permission[]) => {
+    const grouped: { [key: string]: Permission[] } = {};
+    permissions.forEach(perm => {
+      if (perm.allowed) {
+        if (!grouped[perm.module]) {
+          grouped[perm.module] = [];
+        }
+        grouped[perm.module].push(perm);
+      }
+    });
+    return grouped;
+  };
+  
+  // Helper to format module name for display
+  const formatModuleName = (module: string): string => {
+    return module
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+  
+  // Helper to format action name for display
+  const formatActionName = (action: string): string => {
+    const actionMap: { [key: string]: string } = {
+      'view': 'View',
+      'create': 'Create',
+      'edit': 'Edit',
+      'delete': 'Delete',
+      'assign': 'Assign',
+      'upload': 'Upload',
+      'export': 'Export'
+    };
+    return actionMap[action] || action.charAt(0).toUpperCase() + action.slice(1);
   };
 
   const handleDeleteRole = (role: Role) => {
@@ -710,132 +864,295 @@ export default function RolePermission() {
     setErrors({ roleName: '' });
   };
 
+  // Helper function to check if role is system role
+  const isSystemRole = (roleName: string): boolean => {
+    const systemRoleNames = ['STAFF', 'LEAD_LABOUR', 'LABOUR', 'ADMIN', 'SUPER_ADMIN'];
+    return systemRoleNames.includes(roleName.toUpperCase());
+  };
+
+  // Helper function to get permission count
+  const getPermissionCount = (role: Role): number => {
+    return role.permissions?.filter(p => p.allowed).length || 0;
+  };
+
+  // Helper function to get user count for a role (mock for now, you'll need to fetch from API)
+  const getUserCountForRole = (roleName: string): number => {
+    // This should be fetched from API, for now returning mock data
+    const mockUserCounts: { [key: string]: number } = {
+      'STAFF': 3,
+      'LEAD_LABOUR': 5,
+      'LABOUR': 12
+    };
+    return mockUserCounts[roleName.toUpperCase()] || 0;
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Role Management</h1>
+        <div className="flex justify-between items-start">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <Shield className="h-8 w-8 text-primary" />
+              <h1 className="text-3xl font-bold text-gray-900">Role Management</h1>
+            </div>
+            <p className="text-gray-600 mt-1">
+              Create and manage custom roles with specific permissions. Assign roles to users for automatic permission configuration.
+            </p>
+          </div>
           {!showAddForm && (
             <Button
               onClick={handleAddRole}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
             >
-              Add Role
+              <Plus className="h-4 w-4" />
+              Create Role
             </Button>
           )}
         </div>
 
+        {/* Summary Cards */}
+        {/* {!showAddForm && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Total Roles</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{isLoadingStats ? '...' : roleStats.totalRoles}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">System Roles</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{isLoadingStats ? '...' : roleStats.systemRoles}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Custom Roles</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{isLoadingStats ? '...' : roleStats.customRoles}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Total Users</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{isLoadingStats ? '...' : roleStats.totalUsers}</div>
+              </CardContent>
+            </Card>
+          </div>
+        )} */}
+
         {/* Role Listing */}
         {!showAddForm && (
-          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-800">All Roles</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Updated</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {isLoadingRoles ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl font-semibold text-gray-800">All Roles</CardTitle>
+              <p className="text-sm text-gray-600 mt-1">
+                Manage role definitions and permissions. Users will inherit permissions based on their assigned role.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
                     <tr>
-                      <td colSpan={5} className="text-center py-8">
-                        <div className="flex items-center justify-center">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                          <span className="ml-2 text-gray-500">Loading roles...</span>
-                        </div>
-                      </td>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role Name</th>
+                      {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th> */}
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Permissions</th>
+                      {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Users</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th> */}
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
-                  ) : paginatedRoles.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="text-center py-8">
-                        <div className="flex flex-col items-center justify-center text-gray-500">
-                          <div className="text-lg font-medium mb-2">No data available</div>
-                          <div className="text-sm">No roles found. Create your first role.</div>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    paginatedRoles.map((role) => (
-                      <tr key={role.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{role.roleName}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{role.createdAt}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{role.updatedAt}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          <div className="flex space-x-2">
-                            {/* <Button
-                                onClick={() => handleViewRole(role)}
-                                variant="ghost"
-                                size="sm"
-                              >
-                                <Eye className="h-3 w-3" />
-                              </Button> */}
-                            <Button
-                              onClick={() => handleEditRole(role)}
-                              variant="ghost"
-                              size="sm"
-                            >
-                              <Edit className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              onClick={() => handleDeleteRole(role)}
-                              variant="ghost"
-                              size="sm"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {isLoadingRoles ? (
+                      <tr>
+                        <td colSpan={6} className="text-center py-8">
+                          <div className="flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                            <span className="ml-2 text-gray-500">Loading roles...</span>
                           </div>
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    ) : paginatedRoles.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="text-center py-8">
+                          <div className="flex flex-col items-center justify-center text-gray-500">
+                            <div className="text-lg font-medium mb-2">No data available</div>
+                            <div className="text-sm">No roles found. Create your first role.</div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedRoles.map((role) => {
+                        const permissionCount = getPermissionCount(role);
+                        const userCount = getUserCountForRole(role.roleName);
+                        const isSystem = isSystemRole(role.roleName);
+                        
+                        return (
+                          <tr key={role.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <Circle className="h-4 w-4 text-blue-600" />
+                                <span className="text-sm font-medium text-gray-900">{role.roleName}</span>
+                              </div>
+                            </td>
+                            {/* <td className="px-6 py-4">
+                              <span className="text-sm text-gray-700">{role.description || 'No description'}</span>
+                            </td> */}
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <Badge 
+                                className={permissionCount > 0 ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}
+                              >
+                                {permissionCount} permissions
+                              </Badge>
+                            </td>
+                            {/* <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="text-sm text-gray-700">{userCount} users</span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <Badge variant="outline" className="bg-gray-100 text-gray-700">
+                                {isSystem ? 'System' : 'Custom'}
+                              </Badge>
+                            </td> */}
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex space-x-2">
+                                <Button
+                                  onClick={() => handleViewRole(role)}
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  onClick={() => handleEditRole(role)}
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  onClick={() => handleDeleteRole(role)}
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
             
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
-                <div className="text-sm text-gray-700">
-                  Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, roles.length)} of {roles.length} roles
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                  >
-                    Previous
-                  </Button>
-                  
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
+                  <div className="text-sm text-gray-700">
+                    Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, roles.length)} of {roles.length} roles
+                  </div>
+                  <div className="flex items-center space-x-2">
                     <Button
-                      key={page}
-                      variant={currentPage === page ? "default" : "outline"}
-                      onClick={() => setCurrentPage(page)}
-                      className={currentPage === page ? "bg-primary text-white hover:bg-[#0090e6]" : ""}
+                      variant="outline"
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
                     >
-                      {page}
+                      Previous
                     </Button>
-                  ))}
-                  
-                  <Button
-                    variant="outline"
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
-                  >
-                    Next
-                  </Button>
+                    
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        onClick={() => setCurrentPage(page)}
+                        className={currentPage === page ? "bg-primary text-white hover:bg-[#0090e6]" : ""}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                    
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* How Role-Based Permissions Work Section */}
+        {!showAddForm && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl font-semibold text-gray-800">How Role-Based Permissions Work</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Step 1 */}
+                <div className="flex gap-4 p-4 rounded-lg border-2 bg-blue-50 border-blue-200">
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 bg-blue-100 border border-blue-300 rounded-lg flex items-center justify-center font-bold text-lg text-gray-700">
+                      1
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 mb-2">Create Roles</h3>
+                    <p className="text-sm text-gray-600">
+                      Define roles with specific permission sets. For example: &quot;Warehouse Manager&quot;, &quot;Sales Representative&quot;, &quot;Accountant&quot;
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 2 */}
+                <div className="flex gap-4 p-4 rounded-lg border-2 bg-green-50 border-green-200">
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 bg-green-100 border border-green-300 rounded-lg flex items-center justify-center font-bold text-lg text-gray-700">
+                      2
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 mb-2">Assign Permissions</h3>
+                    <p className="text-sm text-gray-600">
+                      Select the permissions each role should have. Permissions are organized by category for easy management.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 3 */}
+                <div className="flex gap-4 p-4 rounded-lg border-2 bg-purple-50 border-purple-200">
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 bg-purple-100 border border-purple-300 rounded-lg flex items-center justify-center font-bold text-lg text-gray-700">
+                      3
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 mb-2">Assign to Users</h3>
+                    <p className="text-sm text-gray-600">
+                      In Staff Management, simply select a role when creating a user. All permissions are automatically assigned!
+                    </p>
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Add/Edit Role Form */}
@@ -855,7 +1172,7 @@ export default function RolePermission() {
 
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Role Details */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Role Name *
@@ -875,7 +1192,18 @@ export default function RolePermission() {
                     <p className="mt-1 text-sm text-red-600">{errors.roleName}</p>
                   )}
                 </div>
-                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Role description"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50"
+                  />
+                </div>
               </div>
 
               {/* Permissions Matrix */}
@@ -1070,6 +1398,115 @@ export default function RolePermission() {
           </div>
         )}
       </div>
+
+      {/* View Role Modal */}
+      <Dialog open={showViewModal} onOpenChange={setShowViewModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Shield className="h-6 w-6 text-primary" />
+                <DialogTitle className="text-2xl font-bold uppercase">
+                  {viewingRole?.roleName || 'Role Details'}
+                </DialogTitle>
+              </div>
+              <button
+                onClick={() => setShowViewModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <DialogDescription className="text-base mt-2">
+              {viewingRole?.description || 'No description available'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {isLoadingViewRole ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <span className="ml-2 text-gray-500">Loading role details...</span>
+            </div>
+          ) : viewingRole ? (
+            <div className="flex-1 overflow-y-auto space-y-6">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-600">Total Permissions</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold">
+                      {viewingRole.permissions?.filter(p => p.allowed).length || 0}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-600">Assigned Users</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold">
+                      {getUserCountForRole(viewingRole.roleName)}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Permissions List */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Permissions List</h3>
+                <ScrollArea className="h-[400px] pr-4">
+                  <div className="space-y-4">
+                    {(() => {
+                      const groupedPermissions = groupPermissionsByModule(viewingRole.permissions || []);
+                      const moduleOrder = modules.filter(mod => groupedPermissions[mod]);
+                      
+                      return moduleOrder.length > 0 ? (
+                        moduleOrder.map((module) => {
+                          const modulePermissions = groupedPermissions[module];
+                          const moduleName = formatModuleName(module);
+                          
+                          return (
+                            <div key={module} className="border border-gray-200 rounded-lg p-4">
+                              <div className="flex items-center justify-between mb-3">
+                                <h4 className="font-semibold text-gray-900">{moduleName}</h4>
+                                <Badge variant="outline" className="bg-gray-100 text-gray-700">
+                                  {modulePermissions.length}
+                                </Badge>
+                              </div>
+                              <div className="space-y-2">
+                                {modulePermissions.map((perm, idx) => (
+                                  <div key={`${perm.module}-${perm.action}-${idx}`} className="flex items-center gap-2 text-sm">
+                                    <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                                    <span className="text-gray-700">
+                                      {formatActionName(perm.action)} {moduleName}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          No permissions assigned to this role.
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </ScrollArea>
+              </div>
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <Button onClick={() => setShowViewModal(false)} variant="outline">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Modal */}
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
