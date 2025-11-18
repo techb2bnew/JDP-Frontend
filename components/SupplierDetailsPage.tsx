@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
-import { ArrowLeft, Download, Edit, FileText, Mail, Phone, MapPin, Globe, User } from 'lucide-react'
+import { ArrowLeft, Download, Edit, FileText, Mail, Phone, MapPin, Globe, User, Calendar } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
 import { toast } from 'sonner'
 
@@ -15,12 +15,17 @@ type SupplierDocument = {
 type SupplierOrder = {
   orderNumber: string
   product: string
+  jdpPrice: number
   quantity: number
+  totalPrice: number
   orderDate: string
   deliveryDate: string
   delivery_address?: string
   status: string
   totalAmount: number
+  job?: {
+    job_title?: string
+  }
 }
 
 type SupplierContact = {
@@ -67,29 +72,42 @@ export function SupplierDetailsPage({ supplierId, onBack, supplierData }: Suppli
     // Extract product and quantity from order_items array
     let product = 'N/A'
     let quantity = 0
+    let totalPrice = 0
+    let jdpPrice = 0
     
     if (Array.isArray(order.order_items) && order.order_items.length > 0) {
       // Get first product name or SKU
       const firstItem = order.order_items[0]
       product = firstItem.product?.name  || firstItem.product?.product_name || 'N/A'
+      jdpPrice = firstItem.product?.jdp_price ?? 0
       
       // Sum all quantities from order items
       quantity = order.order_items.reduce((sum: number, item: any) => sum + (item.quantity ?? 0), 0)
+      
+      // Sum all total_price from order items
+      totalPrice = order.order_items.reduce((sum: number, item: any) => sum + (item.total_price ?? 0), 0)
     } else {
       // Fallback to direct order properties if order_items is not available
       product = order.product_name || order.product?.name || order.product || 'N/A'
+      jdpPrice = order.product?.jdp_price ?? 0
       quantity = order.quantity ?? order.qty ?? 0
+      totalPrice = order.total_price ?? 0
     }
     
     return {
       orderNumber: order.order_number || order.po_number || `ORD-${order.id ?? ''}`,
       product,
+      jdpPrice,
       quantity,
+      totalPrice,
       orderDate: order.order_date || order.created_at || '',
       deliveryDate: order.delivery_date || order.expected_delivery || order.due_date || '',
       delivery_address: order.delivery_address || order.shipping_address || order.address || 'N/A',
       status: order.status || 'N/A',
-      totalAmount: order.total_amount ?? order.amount ?? order.total ?? 0
+      totalAmount: order.total_amount ?? order.amount ?? order.total ?? 0,
+      job: order.job ? {
+        job_title: order.job.job_title || order.job.title || 'N/A'
+      } : undefined
     }
   }
 
@@ -360,12 +378,30 @@ export function SupplierDetailsPage({ supplierId, onBack, supplierData }: Suppli
                 <p className="text-sm font-medium text-[#2b2b2b]">{data.address || data.business_address || 'Not provided'}</p>
               </div>
             </div>
+            <div className="flex items-start gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50">
+              <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm">
+                <Calendar className="h-4 w-4 text-[#00A1FF]" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Contract Start Date</p>
+                <p className="text-sm font-medium text-[#2b2b2b]">{data.contract_start ? formatDate(data.contract_start) : 'Not provided'}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50">
+              <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm">
+                <Calendar className="h-4 w-4 text-[#00A1FF]" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Contract End Date</p>
+                <p className="text-sm font-medium text-[#2b2b2b]">{data.contract_end ? formatDate(data.contract_end) : 'Not provided'}</p>
+              </div>
+            </div>
           </div>
 
-          {data.about || data.description ? (
-            <div>
-              <p className="text-xs text-gray-500 mb-2">About Business</p>
-              <p className="text-sm text-[#2b2b2b] leading-relaxed">{data.about || data.description}</p>
+          {data.notes || data.notes ? (
+            <div className=' p-4 rounded-xl border border-slate-200 bg-slate-50'>
+              <p className="text-xs text-gray-500 mb-2">Notes</p>
+              <p className="text-sm text-[#2b2b2b] leading-relaxed">{data.notes || data.description}</p>
             </div>
           ) : null}
 
@@ -386,8 +422,10 @@ export function SupplierDetailsPage({ supplierId, onBack, supplierData }: Suppli
               <TableHeader className="bg-slate-50">
                 <TableRow>
                   <TableHead>Order Number</TableHead>
+                  <TableHead>Job Title</TableHead>
                   <TableHead>Product</TableHead>
                   <TableHead>Quantity</TableHead>
+                  <TableHead>Price</TableHead>
                   <TableHead>Order Date</TableHead>
                   <TableHead>Delivery Address</TableHead>
                   <TableHead>Status</TableHead>
@@ -397,13 +435,13 @@ export function SupplierDetailsPage({ supplierId, onBack, supplierData }: Suppli
               <TableBody>
                 {isOrderLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-6 text-sm text-gray-500">
+                    <TableCell colSpan={9} className="text-center py-6 text-sm text-gray-500">
                       Loading orders...
                     </TableCell>
                   </TableRow>
                 ) : orderRows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-6 text-sm text-gray-500">
+                    <TableCell colSpan={9} className="text-center py-6 text-sm text-gray-500">
                       No order history available.
                     </TableCell>
                   </TableRow>
@@ -411,12 +449,14 @@ export function SupplierDetailsPage({ supplierId, onBack, supplierData }: Suppli
                   orderRows.map((order, index) => (
                     <TableRow key={`${order.orderNumber}-${index}`}>
                       <TableCell className="font-medium text-[#2b2b2b]">{order.orderNumber}</TableCell>
+                      <TableCell className="font-medium text-[#2b2b2b]">{order.job?.job_title || 'N/A'}</TableCell>
                       <TableCell>{order.product}</TableCell>
                       <TableCell>{order.quantity}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(order.jdpPrice)}</TableCell>
                       <TableCell>{order.orderDate ? formatDate(order.orderDate) : '—'}</TableCell>
                       <TableCell>{order.delivery_address || 'N/A'}</TableCell>
                       <TableCell>{renderOrderStatusBadge(order.status)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(order.totalAmount)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(order.totalPrice)}</TableCell>
                     </TableRow>
                   ))
                 )}

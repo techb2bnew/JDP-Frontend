@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { apiClient } from '../utils/api'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -63,6 +63,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { motion } from 'framer-motion'
 import { Logo } from './common/Logo'
 import Image from 'next/image'
+import TimeRangePicker from '@wojtekmaj/react-timerange-picker'
+import '@wojtekmaj/react-timerange-picker/dist/TimeRangePicker.css'
 
 // Sample data structure - replace with your actual data
 const sampleJobData = {
@@ -211,7 +213,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
   // Find the job from your jobs array or use sample data
   const job = jobs.find(j => j.id === jobId) || sampleJobData.job
-  
+
   console.log('Job data:', job)
   console.log('Labor timesheets:', job.labor_timesheets)
   console.log('Bluesheets data:', job.bluesheets)
@@ -224,7 +226,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
   const timeLogs = Array.isArray(job.labor_timesheets) ? job.labor_timesheets : (Array.isArray(sampleJobData.timeLogs) ? sampleJobData.timeLogs : []) // Ensure timeLogs is always an array
   const invoices = sampleJobData.invoices // Keep sample data for now as we don't have invoices API
-console.log(materials,"testmaterials")
+  console.log(materials, "testmaterials")
   // Calculate totals using real job data
   const totalMaterialCost = materials.reduce(
     (sum: number, material: any) =>
@@ -278,7 +280,7 @@ console.log(materials,"testmaterials")
   const [localInvoices, setLocalInvoices] = useState<Invoice[]>([]);
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
   const [isLoadingEstimates, setIsLoadingEstimates] = useState(false);
-  
+
   // Job Documents state
   const [jobDocuments, setJobDocuments] = useState<JobDocumentItem[]>([]);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
@@ -788,6 +790,26 @@ console.log(materials,"testmaterials")
 
     if (!timeLogFormData.hoursWorked || timeLogFormData.hoursWorked === '') {
       errors.hoursWorked = 'Hours worked is required';
+    } else {
+      // Validate hoursWorked format - should be HH:MM:SS and not contain NaN
+      if (timeLogFormData.hoursWorked.includes('NaN') || timeLogFormData.hoursWorked.includes('NaN')) {
+        errors.hoursWorked = 'Invalid time format. Please select a valid time range.';
+      } else {
+        // Check if it's in HH:MM:SS format
+        const timePattern = /^\d{2}:\d{2}:\d{2}$/;
+        if (!timePattern.test(timeLogFormData.hoursWorked)) {
+          errors.hoursWorked = 'Invalid time format. Expected format: HH:MM:SS';
+        } else {
+          // Validate that all parts are valid numbers
+          const parts = timeLogFormData.hoursWorked.split(':');
+          const h = parseInt(parts[0]);
+          const m = parseInt(parts[1]);
+          const s = parseInt(parts[2]);
+          if (isNaN(h) || isNaN(m) || isNaN(s)) {
+            errors.hoursWorked = 'Invalid time values. Please select a valid time range.';
+          }
+        }
+      }
     }
 
     if (!timeLogFormData.date) {
@@ -815,42 +837,52 @@ console.log(materials,"testmaterials")
       const isLeadLabor = !!timeLogFormData.selectedLeadLabor;
 
       // Find the bluesheet ID based on the selected date
-      const selectedBluesheet = bluesheets.find((bluesheet: any) => 
+      const selectedBluesheet = bluesheets.find((bluesheet: any) =>
         bluesheet.date === timeLogFormData.date
       );
 
       if (selectedBluesheet) {
         // Add labor to existing bluesheet
-      if (timeLogModalMode === 'create') {
-        const timeLogPayload = {
-          [isLeadLabor ? 'lead_labor_id' : 'labor_id']: selectedLabor?.id,
-          employee_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
-          role: isLeadLabor ? 'lead_labor' : 'labor',
-            regular_hours: timeLogFormData.hoursWorked,
-          hourly_rate: selectedLabor?.hourly_rate || 0,
-          date: timeLogFormData.date,
-          description: timeLogFormData.description || '',
-          status: 'approved'
-        };
+        if (timeLogModalMode === 'create') {
+          // Validate hoursWorked before sending
+          const hoursWorked = timeLogFormData.hoursWorked && !timeLogFormData.hoursWorked.includes('NaN')
+            ? timeLogFormData.hoursWorked
+            : '00:00:00';
 
-        // Call the bluesheet API
-        await apiClient.addLaborToBluesheet(selectedBluesheet.id, timeLogPayload);
+          const timeLogPayload = {
+            [isLeadLabor ? 'lead_labor_id' : 'labor_id']: selectedLabor?.id,
+            employee_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
+            role: isLeadLabor ? 'lead_labor' : 'labor',
+            regular_hours: hoursWorked,
+            hourly_rate: selectedLabor?.hourly_rate || 0,
+            date: timeLogFormData.date,
+            description: timeLogFormData.description || '',
+            status: 'approved'
+          };
+
+          // Call the bluesheet API
+          await apiClient.addLaborToBluesheet(selectedBluesheet.id, timeLogPayload);
           toast.success('Labor time log added to existing bluesheet successfully!');
-      } else if (timeLogModalMode === 'edit') {
-        // For edit, we might need a different API endpoint
-        const updatePayload = {
-          [isLeadLabor ? 'lead_labor_id' : 'labor_id']: selectedLabor?.id,
-          employee_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
-          role: isLeadLabor ? 'lead_labor' : 'labor',
-            regular_hours: timeLogFormData.hoursWorked,
-          hourly_rate: selectedLabor?.hourly_rate || 0,
-          date: timeLogFormData.date,
-          description: timeLogFormData.description || '', 
-        };
+        } else if (timeLogModalMode === 'edit') {
+          // For edit, we might need a different API endpoint
+          // Validate hoursWorked before sending
+          const hoursWorked = timeLogFormData.hoursWorked && !timeLogFormData.hoursWorked.includes('NaN')
+            ? timeLogFormData.hoursWorked
+            : '00:00:00';
 
-        // You might need to implement updateLaborInBluesheet API method
-        await apiClient.updateLaborInBluesheet(currentTimeLog.id, updatePayload);
-        toast.success('Labor time log updated successfully!');
+          const updatePayload = {
+            [isLeadLabor ? 'lead_labor_id' : 'labor_id']: selectedLabor?.id,
+            employee_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
+            role: isLeadLabor ? 'lead_labor' : 'labor',
+            regular_hours: hoursWorked,
+            hourly_rate: selectedLabor?.hourly_rate || 0,
+            date: timeLogFormData.date,
+            description: timeLogFormData.description || '',
+          };
+
+          // You might need to implement updateLaborInBluesheet API method
+          await apiClient.updateLaborInBluesheet(currentTimeLog.id, updatePayload);
+          toast.success('Labor time log updated successfully!');
         }
       } else {
         // Create new complete bluesheet with labor
@@ -865,9 +897,11 @@ console.log(materials,"testmaterials")
               [isLeadLabor ? 'lead_labor_id' : 'labor_id']: selectedLabor?.id,
               employee_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
               role: isLeadLabor ? 'lead_labor' : 'labor',
-              regular_hours: timeLogFormData.hoursWorked,
+              regular_hours: timeLogFormData.hoursWorked && !timeLogFormData.hoursWorked.includes('NaN')
+                ? timeLogFormData.hoursWorked
+                : '00:00:00',
               overtime_hours: '0h',
-              hourly_rate: selectedLabor?.hourly_rate || 0, 
+              hourly_rate: selectedLabor?.hourly_rate || 0,
             }
           ],
           material_entries: [] // Empty material entries for now
@@ -892,12 +926,12 @@ console.log(materials,"testmaterials")
   // Helper function to parse hours from different formats
   const parseHoursFromString = (hoursString: string): number => {
     if (!hoursString) return 0;
-    
+
     // Handle "8h" format
     if (hoursString.includes('h')) {
       return parseFloat(hoursString.replace('h', ''));
     }
-    
+
     // Handle "00:01:48" format (HH:MM:SS)
     if (hoursString.includes(':')) {
       const parts = hoursString.split(':');
@@ -905,12 +939,12 @@ console.log(materials,"testmaterials")
         const hours = parseInt(parts[0]) || 0;
         const minutes = parseInt(parts[1]) || 0;
         const seconds = parseInt(parts[2]) || 0;
-        
+
         // Convert to decimal hours
         return hours + (minutes / 60) + (seconds / 3600);
       }
     }
-    
+
     // Handle plain number
     return parseFloat(hoursString) || 0;
   };
@@ -921,9 +955,9 @@ console.log(materials,"testmaterials")
       // Fetch the full labor entry details from the API
       const response = await apiClient.getLaborEntryById(labor.id);
       console.log('API Response for labor entry (view):', response);
-      
+
       const laborEntry = response.data;
-      
+
       // Set the current time log data
       setCurrentTimeLog(laborEntry);
 
@@ -931,13 +965,37 @@ console.log(materials,"testmaterials")
       const isLeadLabor = laborEntry.lead_labor_id !== null;
       const laborData = isLeadLabor ? laborEntry.lead_labor : laborEntry.labor;
 
-      // Parse hours from different formats ("8h" or "00:01:48")
-      const hoursWorked = parseHoursFromString(laborEntry.regular_hours || '0');
+      // Keep hoursWorked in HH:MM:SS format for TimeRangePicker
+      // If it's already in HH:MM:SS format, use it directly
+      // Otherwise, convert from other formats
+      let hoursWorkedStr = '';
+      if (laborEntry.regular_hours) {
+        if (laborEntry.regular_hours.includes(':')) {
+          // Already in HH:MM:SS or HH:MM format
+          const parts = laborEntry.regular_hours.split(':');
+          if (parts.length === 2) {
+            // HH:MM format, add seconds
+            hoursWorkedStr = `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:00`;
+          } else if (parts.length === 3) {
+            // HH:MM:SS format, use as is (ensure proper padding)
+            hoursWorkedStr = `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:${parts[2].padStart(2, '0')}`;
+          } else {
+            hoursWorkedStr = laborEntry.regular_hours;
+          }
+        } else {
+          // Convert from "8h" or decimal format to HH:MM:SS
+          const hours = parseHoursFromString(laborEntry.regular_hours);
+          const h = Math.floor(hours);
+          const m = Math.floor((hours - h) * 60);
+          const s = Math.floor(((hours - h) * 60 - m) * 60);
+          hoursWorkedStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+      }
 
       setTimeLogFormData({
         selectedLabor: isLeadLabor ? null : laborData,
         selectedLeadLabor: isLeadLabor ? laborData : null,
-        hoursWorked: hoursWorked.toString(),
+        hoursWorked: hoursWorkedStr,
         description: laborEntry.description || '',
         date: laborEntry.date || new Date().toISOString().split('T')[0]
       });
@@ -951,6 +1009,9 @@ console.log(materials,"testmaterials")
         setLeadLaborInputValue('');
       }
 
+      // Reset the ref to allow useEffect to sync timeRangeValue
+      timeRangeValueRef.current = false;
+      
       setTimeLogModalMode('view');
       setShowTimeLogModal(true);
       console.log('View modal should be open now with fetched data');
@@ -963,13 +1024,13 @@ console.log(materials,"testmaterials")
   const handleEditTimeLog = async (labor: any) => {
     try {
       console.log('Edit button clicked, labor entry:', labor);
-      
+
       // Fetch the full labor entry details from the API
       const response = await apiClient.getLaborEntryById(labor.id);
       console.log('API Response for labor entry:', response);
-      
+
       const laborEntry = response.data;
-      
+
       // Set the current time log data
       setCurrentTimeLog(laborEntry);
 
@@ -977,13 +1038,37 @@ console.log(materials,"testmaterials")
       const isLeadLabor = laborEntry.lead_labor_id !== null;
       const laborData = isLeadLabor ? laborEntry.lead_labor : laborEntry.labor;
 
-      // Parse hours from different formats ("8h" or "00:01:48")
-      const hoursWorked = parseHoursFromString(laborEntry.regular_hours || '0');
+      // Keep hoursWorked in HH:MM:SS format for TimeRangePicker
+      // If it's already in HH:MM:SS format, use it directly
+      // Otherwise, convert from other formats
+      let hoursWorkedStr = '';
+      if (laborEntry.regular_hours) {
+        if (laborEntry.regular_hours.includes(':')) {
+          // Already in HH:MM:SS or HH:MM format
+          const parts = laborEntry.regular_hours.split(':');
+          if (parts.length === 2) {
+            // HH:MM format, add seconds
+            hoursWorkedStr = `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:00`;
+          } else if (parts.length === 3) {
+            // HH:MM:SS format, use as is (ensure proper padding)
+            hoursWorkedStr = `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:${parts[2].padStart(2, '0')}`;
+          } else {
+            hoursWorkedStr = laborEntry.regular_hours;
+          }
+        } else {
+          // Convert from "8h" or decimal format to HH:MM:SS
+          const hours = parseHoursFromString(laborEntry.regular_hours);
+          const h = Math.floor(hours);
+          const m = Math.floor((hours - h) * 60);
+          const s = Math.floor(((hours - h) * 60 - m) * 60);
+          hoursWorkedStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+      }
 
       setTimeLogFormData({
         selectedLabor: isLeadLabor ? null : laborData,
         selectedLeadLabor: isLeadLabor ? laborData : null,
-        hoursWorked: hoursWorked.toString(),
+        hoursWorked: hoursWorkedStr,
         description: laborEntry.description || '',
         date: laborEntry.date || new Date().toISOString().split('T')[0]
       });
@@ -1049,17 +1134,17 @@ console.log(materials,"testmaterials")
       setProductSearchResults([]);
       return;
     }
-    
+
     setIsSearchingProducts(true);
     try {
       const response = await apiClient.searchProductsByQuery(query);
       console.log('Search API response:', response); // Debug log
-      
+
       // Filter out custom products (is_custom: true)
-      const filteredProducts = (response.data?.products || []).filter((product: any) => 
+      const filteredProducts = (response.data?.products || []).filter((product: any) =>
         product.is_custom === false || product.is_custom === undefined
       );
-      
+
       console.log('Filtered products:', filteredProducts); // Debug log
       setProductSearchResults(filteredProducts);
     } catch (error) {
@@ -1115,7 +1200,7 @@ console.log(materials,"testmaterials")
     setIsLoading(true);
     try {
       // Find existing bluesheet by date
-      const existingBluesheet = job.bluesheets?.find((bluesheet: any) => 
+      const existingBluesheet = job.bluesheets?.find((bluesheet: any) =>
         bluesheet.date === materialFormData.date
       );
 
@@ -1125,7 +1210,7 @@ console.log(materials,"testmaterials")
           product_id: materialFormData.product_id,
           material_name: materialFormData.material_name,
           quantity: selectedProduct?.stock_quantity || materialFormData.quantity, // Use stock_quantity from selected product
-        unit: materialFormData.unit,
+          unit: materialFormData.unit,
           total_ordered: materialFormData.total_ordered,
           material_used: materialFormData.material_used,
           supplier_order_id: materialFormData.supplier_order_id,
@@ -1155,7 +1240,7 @@ console.log(materials,"testmaterials")
               material_used: materialFormData.material_used,
               supplier_order_id: materialFormData.supplier_order_id,
               return_to_warehouse: materialFormData.return_to_warehouse,
-              unit_cost: materialFormData.unit_cost, 
+              unit_cost: materialFormData.unit_cost,
             }
           ]
         };
@@ -1166,7 +1251,7 @@ console.log(materials,"testmaterials")
 
       // Close modal first
       setShowAddMaterialModal(false);
-      
+
       // Reset form
       setMaterialFormData({
         product_id: null,
@@ -1182,7 +1267,7 @@ console.log(materials,"testmaterials")
       });
       setSelectedProduct(null);
       setProductSearchQuery('');
-      
+
       // Refresh job data to show updated materials
       await refreshJobData();
     } catch (error) {
@@ -1226,14 +1311,14 @@ console.log(materials,"testmaterials")
     try {
       // Call bluesheet material delete API
       await apiClient.deleteBluesheetMaterial(productToDelete.id);
-      
+
       // Close dialog first
       setShowDeleteProductDialog(false);
       setProductToDelete(null);
-      
+
       // Refresh job data to show updated materials
       await refreshJobData();
-      
+
       toast.success("Material deleted successfully!");
     } catch (error) {
       console.error("Error deleting material:", error);
@@ -1549,6 +1634,7 @@ console.log(materials,"testmaterials")
   };
 
   const resetTimeLogForm = () => {
+    setTimeRangeValue(null);
     setTimeLogFormData({
       selectedLabor: null,
       selectedLeadLabor: null,
@@ -1570,14 +1656,14 @@ console.log(materials,"testmaterials")
       const updatedJobData = await apiClient.getJobById(jobId);
       const updatedJobs = jobs.map((j: any) => j.id === jobId ? updatedJobData : j);
       setJobs(updatedJobs);
-      
+
       // Update the current job from the updated jobs array
       const currentJob = updatedJobs.find((j: any) => j.id === jobId);
       if (currentJob) {
         // Update the job state if it exists in the component
         // Note: This assumes you have a way to update the current job state
       }
-      
+
       // Trigger materials refresh to show updated data
       triggerRefreshMaterials();
 
@@ -1622,7 +1708,7 @@ console.log(materials,"testmaterials")
           }
         });
       }
-      
+
       // Set only bluesheet materials
       setMaterials(bluesheetMaterials);
     } catch (error) {
@@ -1664,8 +1750,8 @@ console.log(materials,"testmaterials")
       location: job.location || `${job.address || ''}, ${job.cityZip || ''}`,
       description: job.description,
       contractor: job.contractor || job.customer,
-      startDate: (job.created_at && formatDate(job.created_at)) 
-        || (job.createdDate && formatDate(job.createdDate)) 
+      startDate: (job.created_at && formatDate(job.created_at))
+        || (job.createdDate && formatDate(job.createdDate))
         || '',
       priority: job.priority || 'High',
       status: normalizeStatus(job.status),
@@ -1793,6 +1879,53 @@ console.log(materials,"testmaterials")
     date: new Date().toISOString().split('T')[0]
   });
 
+  // State for time range picker value
+  const [timeRangeValue, setTimeRangeValue] = useState<[Date, Date] | null>(null);
+  // Flag to prevent useEffect from overwriting user-selected time range
+  const timeRangeValueRef = useRef(false);
+
+  // Sync timeRangeValue when hoursWorked changes (for edit mode only, not when user selects time)
+  useEffect(() => {
+    // Only sync if timeRangeValueRef is false (meaning change came from edit mode, not from user selection)
+    if (!timeRangeValueRef.current && timeLogFormData.hoursWorked && timeLogFormData.hoursWorked.includes(':')) {
+      try {
+        const parts = timeLogFormData.hoursWorked.split(':');
+        const h = parseInt(parts[0]) || 0;
+        const m = parseInt(parts[1]) || 0;
+        const s = parseInt(parts[2]) || 0;
+
+        // Default start at 9 AM, end at start + hours worked
+        const startTime = new Date();
+        startTime.setHours(9, 0, 0, 0);
+        const endTime = new Date(startTime);
+        endTime.setHours(startTime.getHours() + h, startTime.getMinutes() + m, startTime.getSeconds() + s, 0);
+
+        // Convert to time strings for TimeRangePicker (format: "HH:MM")
+        const startTimeStr = `${String(startTime.getHours()).padStart(2, '0')}:${String(startTime.getMinutes()).padStart(2, '0')}`;
+        const endTimeStr = `${String(endTime.getHours()).padStart(2, '0')}:${String(endTime.getMinutes()).padStart(2, '0')}`;
+
+        // TimeRangePicker accepts time strings or Date objects
+        // Try using time strings first
+        setTimeRangeValue([startTimeStr, endTimeStr] as any);
+
+        console.log('Syncing timeRangeValue from hoursWorked:', {
+          hoursWorked: timeLogFormData.hoursWorked,
+          startTimeStr,
+          endTimeStr,
+          startTime: startTime.toString(),
+          endTime: endTime.toString()
+        });
+      } catch (e) {
+        console.error('Error syncing timeRangeValue:', e);
+        setTimeRangeValue(null);
+      }
+    } else if (!timeLogFormData.hoursWorked && !timeRangeValueRef.current) {
+      setTimeRangeValue(null);
+    }
+    // Reset the flag after processing
+    timeRangeValueRef.current = false;
+  }, [timeLogFormData.hoursWorked]);
+
   // Search functionality for labor and lead labor
   const [laborSearchResults, setLaborSearchResults] = useState<any[]>([]);
   const [leadLaborSearchResults, setLeadLaborSearchResults] = useState<any[]>([]);
@@ -1806,7 +1939,7 @@ console.log(materials,"testmaterials")
   // Search functions
   const searchLabor = async (query: string) => {
     if (query.length < 1) return; // Don't search for empty queries
-    
+
     setIsLoadingLabor(true);
     try {
       const response = await apiClient.searchLaborByQuery(query, 1, 20);
@@ -1821,7 +1954,7 @@ console.log(materials,"testmaterials")
 
   const searchLeadLabor = async (query: string) => {
     if (query.length < 1) return; // Don't search for empty queries
-    
+
     setIsLoadingLeadLabor(true);
     try {
       const response = await apiClient.searchLeadLaborByQuery(query, 1, 20);
@@ -2053,11 +2186,11 @@ console.log(materials,"testmaterials")
         await apiClient.deleteProductFromEstimate(itemToDelete.estimate_product_id);
         toast.success('Product removed from estimate successfully!');
       }
-      
+
       // Remove from local state
-    setInlineInvoiceData(prev => ({
-      ...prev,
-      lineItems: prev.lineItems.filter(item => item.id !== itemId)
+      setInlineInvoiceData(prev => ({
+        ...prev,
+        lineItems: prev.lineItems.filter(item => item.id !== itemId)
       }));
     } catch (error) {
       console.error('Error removing product from estimate:', error);
@@ -2182,7 +2315,7 @@ console.log(materials,"testmaterials")
       setIsLoading(true)
       const response = await apiClient.getEstimateById(invoice.id)
       const invoiceData = response?.data || response
-      
+
       // Populate the inline invoice form with the fetched invoice data
       setInlineInvoiceData({
         date: invoiceData.estimate_date || new Date().toISOString().split('T')[0],
@@ -2230,7 +2363,7 @@ console.log(materials,"testmaterials")
         signatureText: invoiceData.signature_text || 'ACCEPTED BY________________DATE_____',
         invoiceType: (() => {
           if (!invoiceData.invoice_type) return 'Estimate'
-          
+
           const typeMapping: { [key: string]: string } = {
             'down_payment': 'Downpayment Invoice',
             'rough_invoice': 'Rough Invoice',
@@ -2238,7 +2371,7 @@ console.log(materials,"testmaterials")
             'final_invoice': 'Final Invoice',
             'estimate': 'Estimate'
           }
-          
+
           return typeMapping[invoiceData.invoice_type] || invoiceData.invoice_type.charAt(0).toUpperCase() + invoiceData.invoice_type.slice(1)
         })(),
         customInvoiceType: invoiceData.custom_invoice_type || '',
@@ -2246,7 +2379,7 @@ console.log(materials,"testmaterials")
         estimateTotal: invoiceData.total_amount || 0,
         paymentHistory: []
       })
-      
+
       // Show the preview dialog
       setShowPreviewDialog(true)
     } catch (error) {
@@ -2258,8 +2391,8 @@ console.log(materials,"testmaterials")
   }
 
   const handleDuplicateInvoice = (invoice: any) => {
-    console.log('Duplicating invoice:', invoice) 
-    
+    console.log('Duplicating invoice:', invoice)
+
     // Populate the inline invoice form with the existing invoice data
     setInlineInvoiceData({
       date: invoice.date || new Date().toISOString().split('T')[0],
@@ -2306,7 +2439,7 @@ console.log(materials,"testmaterials")
       signatureText: invoice.signature_text || 'ACCEPTED BY________________DATE_____',
       invoiceType: (() => {
         if (!invoice.invoice_type) return 'Estimate'
-        
+
         // Map API values to form values
         const typeMapping: { [key: string]: string } = {
           'down_payment': 'Downpayment Invoice',
@@ -2315,7 +2448,7 @@ console.log(materials,"testmaterials")
           'final_invoice': 'Final Invoice',
           'estimate': 'Estimate'
         }
-        
+
         return typeMapping[invoice.invoice_type] || invoice.invoice_type.charAt(0).toUpperCase() + invoice.invoice_type.slice(1)
       })(),
       customInvoiceType: invoice.custom_invoice_type || '',
@@ -2323,10 +2456,10 @@ console.log(materials,"testmaterials")
       estimateTotal: invoice.total || 0,
       paymentHistory: []
     })
-    
+
     const mappedInvoiceType = (() => {
       if (!invoice.invoice_type) return 'Estimate'
-      
+
       const typeMapping: { [key: string]: string } = {
         'down_payment': 'Downpayment Invoice',
         'rough_invoice': 'Rough Invoice',
@@ -2334,38 +2467,38 @@ console.log(materials,"testmaterials")
         'final_invoice': 'Final Invoice',
         'estimate': 'Estimate'
       }
-      
+
       return typeMapping[invoice.invoice_type] || invoice.invoice_type.charAt(0).toUpperCase() + invoice.invoice_type.slice(1)
     })()
-    
+
     console.log('Set invoice type to:', mappedInvoiceType)
     console.log('Set customer name to:', invoice.customer_name || invoice.contractor?.company_name || invoice.contractor?.email || '')
     console.log('Set customer address to:', invoice.customer_address || invoice.contractor?.address || '')
-    
+
     // Show the inline invoice form
     setShowInlineInvoiceForm(true)
   }
 
-const handlePrintInvoice = async (invoice: any) => {
-  console.log(invoice, 'invoice')
-  try {
-    // Temp container (same)
-    const tempElement = document.createElement('div');
-    tempElement.id = 'temp-invoice-preview';
-    tempElement.style.position = 'absolute';
-    tempElement.style.left = '-10000px';
-    tempElement.style.top = '0';
-    tempElement.style.width = '8.5in';
-    tempElement.style.background = '#ffffff';
-    tempElement.style.padding = '32px';
-    tempElement.style.pointerEvents = 'none';
-    tempElement.style.fontFamily = 'Arial, sans-serif';
-    tempElement.style.lineHeight = '1.1';
-    tempElement.style.boxSizing = 'border-box';
+  const handlePrintInvoice = async (invoice: any) => {
+    console.log(invoice, 'invoice')
+    try {
+      // Temp container (same)
+      const tempElement = document.createElement('div');
+      tempElement.id = 'temp-invoice-preview';
+      tempElement.style.position = 'absolute';
+      tempElement.style.left = '-10000px';
+      tempElement.style.top = '0';
+      tempElement.style.width = '8.5in';
+      tempElement.style.background = '#ffffff';
+      tempElement.style.padding = '32px';
+      tempElement.style.pointerEvents = 'none';
+      tempElement.style.fontFamily = 'Arial, sans-serif';
+      tempElement.style.lineHeight = '1.1';
+      tempElement.style.boxSizing = 'border-box';
 
-    // === SAME HTML ===
-   // === SAME HTML ===
-     const invoiceHtml = `
+      // === SAME HTML ===
+      // === SAME HTML ===
+      const invoiceHtml = `
       <div style="font-family: Arial, sans-serif; page-break-inside: avoid;">
         <!-- Header (wrapped) -->
         <div id="print-header">
@@ -2552,109 +2685,109 @@ const handlePrintInvoice = async (invoice: any) => {
         </div>
       </div>
     `;
-    tempElement.innerHTML = invoiceHtml;
-    document.body.appendChild(tempElement);
+      tempElement.innerHTML = invoiceHtml;
+      document.body.appendChild(tempElement);
 
-    // Header height in CSS px
-    const headerEl = tempElement.querySelector('#print-header') as HTMLElement | null;
-    const headerCssPx = Math.ceil(headerEl?.getBoundingClientRect().height || 0);
+      // Header height in CSS px
+      const headerEl = tempElement.querySelector('#print-header') as HTMLElement | null;
+      const headerCssPx = Math.ceil(headerEl?.getBoundingClientRect().height || 0);
 
-    // Render to canvas
-    const canvas = await html2canvas(tempElement, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      logging: false,
-      width: tempElement.scrollWidth,
-      height: tempElement.scrollHeight,
-      scrollX: 0,
-      scrollY: 0,
-      windowWidth: tempElement.scrollWidth,
-      windowHeight: tempElement.scrollHeight
-    });
+      // Render to canvas
+      const canvas = await html2canvas(tempElement, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        width: tempElement.scrollWidth,
+        height: tempElement.scrollHeight,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: tempElement.scrollWidth,
+        windowHeight: tempElement.scrollHeight
+      });
 
-    const scaleX = canvas.width / tempElement.scrollWidth;
-    const rootRect = tempElement.getBoundingClientRect();
-    const headRect = headerEl?.getBoundingClientRect();
-    const headerBandCssPx = Math.max(1, Math.ceil(((headRect?.bottom ?? 0) - rootRect.top)));
-    const headerPxScaled = Math.max(1, Math.round(headerBandCssPx * scaleX));
+      const scaleX = canvas.width / tempElement.scrollWidth;
+      const rootRect = tempElement.getBoundingClientRect();
+      const headRect = headerEl?.getBoundingClientRect();
+      const headerBandCssPx = Math.max(1, Math.ceil(((headRect?.bottom ?? 0) - rootRect.top)));
+      const headerPxScaled = Math.max(1, Math.round(headerBandCssPx * scaleX));
 
-    // Slice header (use scaled px)
-    let headerImgData: string | null = null;
-    if (headerPxScaled > 0) {
-      const headerCanvas = document.createElement('canvas');
-      headerCanvas.width = canvas.width;
-      headerCanvas.height = headerPxScaled;
-      const hctx = headerCanvas.getContext('2d')!;
-      hctx.drawImage(canvas, 0, 0, canvas.width, headerPxScaled, 0, 0, canvas.width, headerPxScaled);
-      headerImgData = headerCanvas.toDataURL('image/png');
-    }
+      // Slice header (use scaled px)
+      let headerImgData: string | null = null;
+      if (headerPxScaled > 0) {
+        const headerCanvas = document.createElement('canvas');
+        headerCanvas.width = canvas.width;
+        headerCanvas.height = headerPxScaled;
+        const hctx = headerCanvas.getContext('2d')!;
+        hctx.drawImage(canvas, 0, 0, canvas.width, headerPxScaled, 0, 0, canvas.width, headerPxScaled);
+        headerImgData = headerCanvas.toDataURL('image/png');
+      }
 
-    const imageData = canvas.toDataURL('image/png');
-
-
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const imgWidth = 210;
-    const footerSpace = 11;
-    const pageHeight = 295 - footerSpace;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-    const pxToMm = imgWidth / canvas.width;
-    const headerHeightMM = headerPxScaled * pxToMm;
+      const imageData = canvas.toDataURL('image/png');
 
 
-    const topPaddingMM = 10;
-    const bottomPaddingMM = 0;
-    const usablePageHeight = pageHeight - topPaddingMM - bottomPaddingMM;
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const footerSpace = 11;
+      const pageHeight = 295 - footerSpace;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      const pxToMm = imgWidth / canvas.width;
+      const headerHeightMM = headerPxScaled * pxToMm;
 
 
-    let yPosition = 0; 
-    const pageHeightPx = (usablePageHeight / pxToMm); 
+      const topPaddingMM = 10;
+      const bottomPaddingMM = 0;
+      const usablePageHeight = pageHeight - topPaddingMM - bottomPaddingMM;
 
 
-    pdf.addImage(imageData, 'PNG', 0, topPaddingMM, imgWidth, imgHeight);
-    yPosition += pageHeightPx; 
+      let yPosition = 0;
+      const pageHeightPx = (usablePageHeight / pxToMm);
 
-  
-    while (yPosition < canvas.height) {
-      pdf.addPage();
 
-  
-      const pageCanvas = document.createElement('canvas');
-      pageCanvas.width = canvas.width;
-      pageCanvas.height = pageHeightPx;
-      const pageCtx = pageCanvas.getContext('2d')!;
-      pageCtx.fillStyle = '#fff';
-      pageCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-      pageCtx.drawImage(
-        canvas,
-        0, yPosition,                       
-        canvas.width, pageHeightPx,         
-        0, 0,
-        canvas.width, pageHeightPx
-      );
-
-      const pageImg = pageCanvas.toDataURL('image/png');
-      pdf.addImage(pageImg, 'PNG', 0, topPaddingMM, imgWidth, (pageHeightPx * pxToMm));
-
+      pdf.addImage(imageData, 'PNG', 0, topPaddingMM, imgWidth, imgHeight);
       yPosition += pageHeightPx;
-    }
 
-    const pdfBlob = pdf.output('blob');
-    const pdfUrl = URL.createObjectURL(pdfBlob);
-    const printWindow = window.open(pdfUrl, '_blank');
-    if (printWindow) {
-      printWindow.onload = () => setTimeout(() => printWindow.print(), 1000);
-    }
 
-    document.body.removeChild(tempElement);
-    setTimeout(() => URL.revokeObjectURL(pdfUrl), 10000);
-  } catch (err) {
-    console.error('Print error:', err);
-    toast.error('Failed to print invoice');
-  }
-};
+      while (yPosition < canvas.height) {
+        pdf.addPage();
+
+
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = pageHeightPx;
+        const pageCtx = pageCanvas.getContext('2d')!;
+        pageCtx.fillStyle = '#fff';
+        pageCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        pageCtx.drawImage(
+          canvas,
+          0, yPosition,
+          canvas.width, pageHeightPx,
+          0, 0,
+          canvas.width, pageHeightPx
+        );
+
+        const pageImg = pageCanvas.toDataURL('image/png');
+        pdf.addImage(pageImg, 'PNG', 0, topPaddingMM, imgWidth, (pageHeightPx * pxToMm));
+
+        yPosition += pageHeightPx;
+      }
+
+      const pdfBlob = pdf.output('blob');
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      const printWindow = window.open(pdfUrl, '_blank');
+      if (printWindow) {
+        printWindow.onload = () => setTimeout(() => printWindow.print(), 1000);
+      }
+
+      document.body.removeChild(tempElement);
+      setTimeout(() => URL.revokeObjectURL(pdfUrl), 10000);
+    } catch (err) {
+      console.error('Print error:', err);
+      toast.error('Failed to print invoice');
+    }
+  };
 
 
   const handleDeleteInvoice = async (invoiceId: string) => {
@@ -3462,7 +3595,7 @@ const handlePrintInvoice = async (invoice: any) => {
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">{job.title}</h1>
             <p className="text-sm text-gray-600">#{job.id}</p>
-          </div> 
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {/* Total Hours Worked */}
@@ -3602,7 +3735,7 @@ const handlePrintInvoice = async (invoice: any) => {
                             onChange={(e) => setEditedJob({ ...editedJob, title: e.target.value })}
                           />
                         ) : (
-                          <p className="font-medium">{job.customerName || job.contractorName ||'No customer assigned'}</p>
+                          <p className="font-medium">{job.customerName || job.contractorName || 'No customer assigned'}</p>
                         )}
                       </div>
                     </div>
@@ -3646,7 +3779,7 @@ const handlePrintInvoice = async (invoice: any) => {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="service-based">Service-based</SelectItem>
-                            <SelectItem value="contract-based">Contract-based</SelectItem> 
+                            <SelectItem value="contract-based">Contract-based</SelectItem>
                           </SelectContent>
                         </Select>
 
@@ -3705,7 +3838,7 @@ const handlePrintInvoice = async (invoice: any) => {
                         <p className="font-medium">{editedJob.status}</p>
                       )}
                     </div>
-                     
+
 
                   </div>
 
@@ -4294,7 +4427,7 @@ const handlePrintInvoice = async (invoice: any) => {
                         />
                       </div>
                     </div>
-                   
+
                     {/* Line Items Table */}
                     <div className="mb-6 overflow-x-auto mt-4">
                       <table className="w-full border-collapse">
@@ -4837,52 +4970,52 @@ const handlePrintInvoice = async (invoice: any) => {
                 return <p className="text-sm text-gray-500">No approved bluesheet materials found.</p>
               }
               return (
-              <div className="space-y-4">
-                {filteredMaterials.map((material: any, index: number) => (
-                  <div key={material.id ?? material.sku ?? index} className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 bg-green-200 rounded-lg flex items-center justify-center">
-                        <Package className="h-5 w-5 text-green-700" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-medium">{material.material_name || material.product_name || material.name}</h4>
-                          <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">
-                            Bluesheet #{material.bluesheet_id}
-                          </span>
+                <div className="space-y-4">
+                  {filteredMaterials.map((material: any, index: number) => (
+                    <div key={material.id ?? material.sku ?? index} className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center gap-4">
+                        <div className="h-10 w-10 bg-green-200 rounded-lg flex items-center justify-center">
+                          <Package className="h-5 w-5 text-green-700" />
                         </div>
-                        {/* <p className="text-xs text-gray-600">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-medium">{material.material_name || material.product_name || material.name}</h4>
+                            <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">
+                              Bluesheet #{material.bluesheet_id}
+                            </span>
+                          </div>
+                          {/* <p className="text-xs text-gray-600">
                           {material.supplier?.company_name || material.supplier} • SKU: {material.supplier_sku || material.jdp_sku} • {material.unit}
                         </p> */}
-                        <p className="text-xs text-gray-500">
-                          Unit Cost: ${ material.unit_cost || 0}  
-                        </p>
-                        {material.bluesheet_date && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            Date: {material.bluesheet_date}
+                          <p className="text-xs text-gray-500">
+                            Unit Cost: ${material.unit_cost || 0}
                           </p>
-                        )}
+                          {material.bluesheet_date && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              Date: {material.bluesheet_date}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="font-semibold">
-                         $ {material.jdp_price || 0}
-                           
-                        </p>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="font-semibold">
+                            $ {material.jdp_price || 0}
 
-                        <p className="text-sm text-gray-600">  {material.unit}</p>
+                          </p>
+
+                          <p className="text-sm text-gray-600">  {material.unit}</p>
+                        </div>
+                        <Button variant="outline" size="sm" className="gap-1" onClick={() => {
+                          setProductToDelete(material);
+                          setShowDeleteProductDialog(true);
+                        }}>
+                          <Trash2 className="h-3 w-3 text-red-600" />
+                        </Button>
                       </div>
-                      <Button variant="outline" size="sm" className="gap-1" onClick={() => {
-                        setProductToDelete(material);
-                        setShowDeleteProductDialog(true);
-                      }}>
-                        <Trash2 className="h-3 w-3 text-red-600" />
-                      </Button>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
               )
             })()}
           </CardContent>
@@ -4899,58 +5032,58 @@ const handlePrintInvoice = async (invoice: any) => {
             <div className="flex items-center gap-4">
               <span className="text-sm text-gray-600">
                 Total Hours: <span className="font-bold"> {(() => {
-                            let totalSeconds = 0;
-                            // Only count hours from approved bluesheets
-                            const approvedBluesheets = bluesheets.filter((b: any) => b.status === 'approved');
-                            
-                            approvedBluesheets.forEach((bluesheet: any) => {
-                              if (bluesheet.labor_entries && Array.isArray(bluesheet.labor_entries)) {
-                                bluesheet.labor_entries.forEach((entry: any) => {
-                                  const timeString = entry.regular_hours || '0h';
-                                  
-                                  // Handle different time formats
-                                  if (timeString.includes(':')) {
-                                    // Format: HH:MM:SS or HH:MM
-                                    const parts = timeString.split(':');
-                                    const hours = parseInt(parts[0]) || 0;
-                                    const minutes = parseInt(parts[1]) || 0;
-                                    const seconds = parts.length > 2 ? (parseInt(parts[2]) || 0) : 0;
-                                    totalSeconds += (hours * 3600) + (minutes * 60) + seconds;
-                                  } else if (timeString.includes('h')) {
-                                    // Format: Xh, XhYm, optionally XhYmZs
-                                    const hMatch = timeString.match(/(\d+(?:\.\d+)?)h/);
-                                    const mMatch = timeString.match(/(\d+)m/);
-                                    const sMatch = timeString.match(/(\d+)s/);
-                                    const hours = hMatch ? parseFloat(hMatch[1]) : 0;
-                                    const minutes = mMatch ? parseInt(mMatch[1]) : 0;
-                                    const seconds = sMatch ? parseInt(sMatch[1]) : 0;
-                                    totalSeconds += Math.round(hours * 3600) + (minutes * 60) + seconds;
-                                  } else if (timeString && !isNaN(parseFloat(timeString))) {
-                                    // Just a number (assume hours)
-                                    totalSeconds += Math.round(parseFloat(timeString) * 3600);
-                                  }
-                                });
-                              }
-                            });
-                            
-                            // If no time, show 0h
-                            if (totalSeconds === 0) {
-                              return '0h';
-                            }
-                            
-                            const hours = Math.floor(totalSeconds / 3600);
-                            const minutes = Math.floor((totalSeconds % 3600) / 60);
-                            const seconds = Math.floor(totalSeconds % 60);
-                            
-                            let result = '';
-                            if (hours > 0) result += `${hours}h`;
-                            if (minutes > 0) result += `${minutes}m`;
-                            if (seconds > 0) result += `${seconds}s`;
-                            
-                            // Ensure at least minutes show if hours exist but minutes are zero
-                            if (result === '' && hours > 0) result = `${hours}h`;
-                            return result || '0h';
-                          })()} </span>
+                  let totalSeconds = 0;
+                  // Only count hours from approved bluesheets
+                  const approvedBluesheets = bluesheets.filter((b: any) => b.status === 'approved');
+
+                  approvedBluesheets.forEach((bluesheet: any) => {
+                    if (bluesheet.labor_entries && Array.isArray(bluesheet.labor_entries)) {
+                      bluesheet.labor_entries.forEach((entry: any) => {
+                        const timeString = entry.regular_hours || '0h';
+
+                        // Handle different time formats
+                        if (timeString.includes(':')) {
+                          // Format: HH:MM:SS or HH:MM
+                          const parts = timeString.split(':');
+                          const hours = parseInt(parts[0]) || 0;
+                          const minutes = parseInt(parts[1]) || 0;
+                          const seconds = parts.length > 2 ? (parseInt(parts[2]) || 0) : 0;
+                          totalSeconds += (hours * 3600) + (minutes * 60) + seconds;
+                        } else if (timeString.includes('h')) {
+                          // Format: Xh, XhYm, optionally XhYmZs
+                          const hMatch = timeString.match(/(\d+(?:\.\d+)?)h/);
+                          const mMatch = timeString.match(/(\d+)m/);
+                          const sMatch = timeString.match(/(\d+)s/);
+                          const hours = hMatch ? parseFloat(hMatch[1]) : 0;
+                          const minutes = mMatch ? parseInt(mMatch[1]) : 0;
+                          const seconds = sMatch ? parseInt(sMatch[1]) : 0;
+                          totalSeconds += Math.round(hours * 3600) + (minutes * 60) + seconds;
+                        } else if (timeString && !isNaN(parseFloat(timeString))) {
+                          // Just a number (assume hours)
+                          totalSeconds += Math.round(parseFloat(timeString) * 3600);
+                        }
+                      });
+                    }
+                  });
+
+                  // If no time, show 0h
+                  if (totalSeconds === 0) {
+                    return '0h';
+                  }
+
+                  const hours = Math.floor(totalSeconds / 3600);
+                  const minutes = Math.floor((totalSeconds % 3600) / 60);
+                  const seconds = Math.floor(totalSeconds % 60);
+
+                  let result = '';
+                  if (hours > 0) result += `${hours}h`;
+                  if (minutes > 0) result += `${minutes}m`;
+                  if (seconds > 0) result += `${seconds}s`;
+
+                  // Ensure at least minutes show if hours exist but minutes are zero
+                  if (result === '' && hours > 0) result = `${hours}h`;
+                  return result || '0h';
+                })()} </span>
               </span>
               <Button variant="outline" size="sm" className="gap-2" onClick={handleCreateTimeLog}>
                 <Plus className="h-4 w-4" />
@@ -4962,7 +5095,7 @@ const handlePrintInvoice = async (invoice: any) => {
             <div className="space-y-4">
               {/* Show bluesheets labor entries - only for approved bluesheets */}
               {bluesheets && bluesheets.filter((b: any) => b.status === 'approved').length > 0 && (
-                <> 
+                <>
                   {bluesheets.filter((bluesheet: any) => bluesheet.status === 'approved').map((bluesheet: any, bluesheetIndex: number) => (
                     <div key={`bluesheet-${bluesheet.id}`} className="mb-6 ">
                       {/* <div className="flex justify-between items-center mb-3">
@@ -4973,7 +5106,7 @@ const handlePrintInvoice = async (invoice: any) => {
                           Created by: {bluesheet.created_by_user?.full_name || 'Unknown'}
                         </div>
                       </div> */}
-                      
+
                       {bluesheet.labor_entries && bluesheet.labor_entries.length > 0 && (
                         <div className="space-y-3 p-4 bg-gray-50 rounded-lg border">
                           {bluesheet.labor_entries.map((entry: any, entryIndex: number) => (
@@ -4998,20 +5131,19 @@ const handlePrintInvoice = async (invoice: any) => {
                                 <div className="text-right">
                                   <p className="text-sm text-gray-600">
                                     Regular: {entry.regular_hours || '0h'}
-                                  </p>  
+                                  </p>
                                   <p className="text-sm text-gray-600">
                                     Hourly Rate: ${entry.hourly_rate || 0}/hr
-                                  </p>  
-                                    <p className="font-semibold">
+                                  </p>
+                                  <p className="font-semibold">
                                     Total Cost: ${entry.total_cost || 0}
                                   </p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                    entry.role === 'lead_labor' 
-                                      ? 'bg-purple-100 text-purple-800' 
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${entry.role === 'lead_labor'
+                                      ? 'bg-purple-100 text-purple-800'
                                       : 'bg-blue-100 text-blue-800'
-                                  }`}>
+                                    }`}>
                                     {entry.role === 'lead_labor' ? 'Lead' : 'Labor'}
                                   </span>
                                   <Button
@@ -5038,20 +5170,20 @@ const handlePrintInvoice = async (invoice: any) => {
                           ))}
                         </div>
                       )}
-                       
+
                     </div>
                   ))}
-                   
+
                 </>
               )}
 
               {/* Show message if no approved bluesheets or labor at all */}
               {(!bluesheets || bluesheets.filter((b: any) => b.status === 'approved').length === 0) && (
-                  <div className="text-center py-8 text-gray-500">
-                    <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                    <p>No approved bluesheet labor entries found</p>
-                  </div>
-                )}
+                <div className="text-center py-8 text-gray-500">
+                  <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p>No approved bluesheet labor entries found</p>
+                </div>
+              )}
 
 
             </div>
@@ -5059,113 +5191,113 @@ const handlePrintInvoice = async (invoice: any) => {
         </Card>
 
 
-      {/* Job Documents */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Job Documents
-          </CardTitle>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600">
-              Total: {jobDocuments.length} document{jobDocuments.length !== 1 ? 's' : ''}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowUploadDocumentModal(true)}
-              className="gap-2"
-            >
-              <Upload className="h-4 w-4" />
-              Upload Document
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-6">
-          {isLoadingDocuments ? (
-            <div className="py-12 flex justify-center">
-              <LoadingSpinner />
-            </div>
-          ) : jobDocuments.length === 0 ? (
-            // Empty State
-            <div className="text-center py-12">
-              <FileText className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-              <p className="text-gray-600 mb-4">No documents uploaded yet</p>
+        {/* Job Documents */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Job Documents
+            </CardTitle>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-600">
+                Total: {jobDocuments.length} document{jobDocuments.length !== 1 ? 's' : ''}
+              </span>
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => setShowUploadDocumentModal(true)}
                 className="gap-2"
               >
-                <Plus className="h-4 w-4" />
-                Upload First Document
+                <Upload className="h-4 w-4" />
+                Upload Document
               </Button>
             </div>
-          ) : (
-            // Documents List
-            <div className="space-y-3">
-              {jobDocuments.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200"
+          </CardHeader>
+          <CardContent className="pt-6">
+            {isLoadingDocuments ? (
+              <div className="py-12 flex justify-center">
+                <LoadingSpinner />
+              </div>
+            ) : jobDocuments.length === 0 ? (
+              // Empty State
+              <div className="text-center py-12">
+                <FileText className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                <p className="text-gray-600 mb-4">No documents uploaded yet</p>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowUploadDocumentModal(true)}
+                  className="gap-2"
                 >
-                  <div className="flex-shrink-0">
-                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <File className="h-6 w-6 text-blue-600" />
+                  <Plus className="h-4 w-4" />
+                  Upload First Document
+                </Button>
+              </div>
+            ) : (
+              // Documents List
+              <div className="space-y-3">
+                {jobDocuments.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200"
+                  >
+                    <div className="flex-shrink-0">
+                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <File className="h-6 w-6 text-blue-600" />
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 truncate">{doc.title}</p>
+                      <p className="text-sm text-gray-600 truncate">{doc.fileName}</p>
+                      <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                        <Clock className="h-3 w-3" />
+                        {formatDocumentTimestamp(doc.uploadedAt)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (!doc.fileUrl) {
+                            toast.error('Document URL not available');
+                            return;
+                          }
+                          window.open(doc.fileUrl, '_blank');
+                        }}
+                        className="gap-2"
+                      >
+                        <Eye className="h-4 w-4" />
+                        View
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownloadDocument(doc)}
+                        disabled={downloadingDocumentIds.includes(doc.id)}
+                        className="gap-2 border-blue-500 text-blue-600 hover:bg-blue-50"
+                      >
+                        <Download className={`h-4 w-4 ${downloadingDocumentIds.includes(doc.id) ? 'animate-spin' : ''}`} />
+                        {downloadingDocumentIds.includes(doc.id) ? 'Downloading...' : 'Download'}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteDocument(doc.id)}
+                        disabled={deletingDocumentIds.includes(doc.id)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className={`h-4 w-4 ${deletingDocumentIds.includes(doc.id) ? 'animate-pulse' : ''}`} />
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 truncate">{doc.title}</p>
-                    <p className="text-sm text-gray-600 truncate">{doc.fileName}</p>
-                    <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                      <Clock className="h-3 w-3" />
-                      {formatDocumentTimestamp(doc.uploadedAt)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (!doc.fileUrl) {
-                          toast.error('Document URL not available');
-                          return;
-                        }
-                        window.open(doc.fileUrl, '_blank');
-                      }}
-                      className="gap-2"
-                    >
-                      <Eye className="h-4 w-4" />
-                      View
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDownloadDocument(doc)}
-                      disabled={downloadingDocumentIds.includes(doc.id)}
-                      className="gap-2 border-blue-500 text-blue-600 hover:bg-blue-50"
-                    >
-                      <Download className={`h-4 w-4 ${downloadingDocumentIds.includes(doc.id) ? 'animate-spin' : ''}`} />
-                      {downloadingDocumentIds.includes(doc.id) ? 'Downloading...' : 'Download'}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteDocument(doc.id)}
-                      disabled={deletingDocumentIds.includes(doc.id)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className={`h-4 w-4 ${deletingDocumentIds.includes(doc.id) ? 'animate-pulse' : ''}`} />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
       </div>
-      
+
       {/* Upload Document Modal */}
       <Dialog open={showUploadDocumentModal} onOpenChange={setShowUploadDocumentModal}>
         <DialogContent className="sm:max-w-[500px]">
@@ -5339,7 +5471,7 @@ const handlePrintInvoice = async (invoice: any) => {
           </DialogHeader>
           <div className="space-y-4">
             {/* Product Search */}
-              <div>
+            <div>
               <Label className="mb-2">Search Product</Label>
               <div className="relative">
                 <Input
@@ -5360,10 +5492,10 @@ const handlePrintInvoice = async (invoice: any) => {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
-              </div>
+                  </div>
                 )}
               </div>
-              
+
               {/* Search Results Dropdown */}
               {productSearchResults.length > 0 && (
                 <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
@@ -5401,19 +5533,19 @@ const handlePrintInvoice = async (invoice: any) => {
             )}
 
             {/* Date */}
-              <div>
+            <div>
               <Label className="mb-2">Date</Label>
-                <Input
+              <Input
                 type="date"
                 value={materialFormData.date}
                 onChange={(e) => setMaterialFormData({ ...materialFormData, date: e.target.value })}
-                />
+              />
               {materialErrors.date && (
                 <p className="text-xs text-red-600 mt-1">{materialErrors.date}</p>
               )}
-              </div>
+            </div>
 
-             
+
 
             <div className="grid grid-cols-2 gap-4">
               {/* Total Ordered */}
@@ -5427,7 +5559,7 @@ const handlePrintInvoice = async (invoice: any) => {
                 {materialErrors.total_ordered && (
                   <p className="text-xs text-red-600 mt-1">{materialErrors.total_ordered}</p>
                 )}
-            </div>
+              </div>
 
               {/* Material Used */}
               <div>
@@ -5441,8 +5573,8 @@ const handlePrintInvoice = async (invoice: any) => {
                   <p className="text-xs text-red-600 mt-1">{materialErrors.material_used}</p>
                 )}
               </div>
-              </div>
- 
+            </div>
+
 
             {/* Return to Warehouse Checkbox */}
             <div className="flex items-center space-x-2">
@@ -5519,141 +5651,141 @@ const handlePrintInvoice = async (invoice: any) => {
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-2">
-            {/* Labor Selection */}
-            <div className="labor-dropdown">
-              <Label className="mb-2">Select Labor *</Label>
-              <div className="relative">
-                <Input
-                  type="text"
-                  placeholder="Search and select labor..."
-                  value={laborInputValue}
-                  onChange={(e) => {
-                    const searchQuery = e.target.value;
-                    setLaborInputValue(searchQuery);
-                    
-                    if (searchQuery === '') {
-                      setTimeLogFormData({ 
-                        ...timeLogFormData, 
-                        selectedLabor: null 
-                      });
-                      setShowLaborDropdown(false);
-                    } else {
-                      // Trigger search when user types
-                      searchLabor(searchQuery);
-                    }
-                  }}
-                  onFocus={() => setShowLaborDropdown(true)}
-                  disabled={timeLogModalMode === 'view' || !!timeLogFormData.selectedLeadLabor}
-                />
-                {showLaborDropdown && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                    {isLoadingLabor ? (
-                      <div className="flex items-center justify-center p-4">
-                        <LoadingSpinner />
-                      </div>
-                    ) : (
-                      <>
-                        {laborSearchResults.map((labor: any) => (
-                          <div
-                            key={labor.id}
-                            className="flex items-center space-x-2 p-3 hover:bg-gray-50 cursor-pointer"
-                            onClick={() => {
-                              setTimeLogFormData({ 
-                                ...timeLogFormData, 
-                                selectedLabor: labor,
-                                selectedLeadLabor: null // Disable lead labor when labor is selected
-                              });
-                              setLaborInputValue(labor.users?.full_name || labor.labor_code);
-                              setShowLaborDropdown(false);
-                            }}
-                          >
-                            <span className="text-sm font-medium">
-                              {labor.users?.full_name || labor.labor_code} - {labor.labor_code}
-                            </span>
-                          </div>
-                        ))}
-                        {laborSearchResults.length === 0 && (
-                          <div className="text-center text-sm text-gray-500 p-2">
-                            No labor found
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-              {timeLogValidationErrors.laborSelection && (
-                <p className="text-red-500 text-xs mt-1">{timeLogValidationErrors.laborSelection}</p>
-              )}
-            </div>
+              {/* Labor Selection */}
+              <div className="labor-dropdown">
+                <Label className="mb-2">Select Labor *</Label>
+                <div className="relative">
+                  <Input
+                    type="text"
+                    placeholder="Search and select labor..."
+                    value={laborInputValue}
+                    onChange={(e) => {
+                      const searchQuery = e.target.value;
+                      setLaborInputValue(searchQuery);
 
-            {/* Lead Labor Selection */}
-            <div className="lead-labor-dropdown">
-              <Label className="mb-2">Select Lead Labor *</Label>
-              <div className="relative">
-                <Input
-                  type="text"
-                  placeholder="Search and select lead labor..."
-                  value={leadLaborInputValue}
-                  onChange={(e) => {
-                    const searchQuery = e.target.value;
-                    setLeadLaborInputValue(searchQuery);
-                    
-                    if (searchQuery === '') {
-                      setTimeLogFormData({ 
-                        ...timeLogFormData, 
-                        selectedLeadLabor: null 
-                      });
-                      setShowLeadLaborDropdown(false);
-                    } else {
-                      // Trigger search when user types
-                      searchLeadLabor(searchQuery);
-                    }
-                  }}
-                  onFocus={() => setShowLeadLaborDropdown(true)}
-                  disabled={timeLogModalMode === 'view' || !!timeLogFormData.selectedLabor}
-                />
-                {showLeadLaborDropdown && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                    {isLoadingLeadLabor ? (
-                      <div className="flex items-center justify-center p-4">
-                        <LoadingSpinner />
-                      </div>
-                    ) : (
-                      <>
-                        {leadLaborSearchResults.map((labor: any) => (
-                          <div
-                            key={labor.id}
-                            className="flex items-center space-x-2 p-3 hover:bg-gray-50 cursor-pointer"
-                            onClick={() => {
-                              setTimeLogFormData({ 
-                                ...timeLogFormData, 
-                                selectedLeadLabor: labor,
-                                selectedLabor: null // Disable labor when lead labor is selected
-                              });
-                              setLeadLaborInputValue(labor.users?.full_name || labor.labor_code);
-                              setShowLeadLaborDropdown(false);
-                            }}
-                          >
-                            <span className="text-sm font-medium">
-                              {labor.users?.full_name || labor.labor_code} - {labor.labor_code}
-                            </span>
-                          </div>
-                        ))}
-                        {leadLaborSearchResults.length === 0 && (
-                          <div className="text-center text-sm text-gray-500 p-2">
-                            No lead labor found
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
+                      if (searchQuery === '') {
+                        setTimeLogFormData({
+                          ...timeLogFormData,
+                          selectedLabor: null
+                        });
+                        setShowLaborDropdown(false);
+                      } else {
+                        // Trigger search when user types
+                        searchLabor(searchQuery);
+                      }
+                    }}
+                    onFocus={() => setShowLaborDropdown(true)}
+                    disabled={timeLogModalMode === 'view' || !!timeLogFormData.selectedLeadLabor}
+                  />
+                  {showLaborDropdown && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                      {isLoadingLabor ? (
+                        <div className="flex items-center justify-center p-4">
+                          <LoadingSpinner />
+                        </div>
+                      ) : (
+                        <>
+                          {laborSearchResults.map((labor: any) => (
+                            <div
+                              key={labor.id}
+                              className="flex items-center space-x-2 p-3 hover:bg-gray-50 cursor-pointer"
+                              onClick={() => {
+                                setTimeLogFormData({
+                                  ...timeLogFormData,
+                                  selectedLabor: labor,
+                                  selectedLeadLabor: null // Disable lead labor when labor is selected
+                                });
+                                setLaborInputValue(labor.users?.full_name || labor.labor_code);
+                                setShowLaborDropdown(false);
+                              }}
+                            >
+                              <span className="text-sm font-medium">
+                                {labor.users?.full_name || labor.labor_code} - {labor.labor_code}
+                              </span>
+                            </div>
+                          ))}
+                          {laborSearchResults.length === 0 && (
+                            <div className="text-center text-sm text-gray-500 p-2">
+                              No labor found
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {timeLogValidationErrors.laborSelection && (
+                  <p className="text-red-500 text-xs mt-1">{timeLogValidationErrors.laborSelection}</p>
                 )}
               </div>
-              {timeLogValidationErrors.laborSelection && (
-                <p className="text-red-500 text-xs mt-1">{timeLogValidationErrors.laborSelection}</p>
-              )}
-            </div>
+
+              {/* Lead Labor Selection */}
+              <div className="lead-labor-dropdown">
+                <Label className="mb-2">Select Lead Labor *</Label>
+                <div className="relative">
+                  <Input
+                    type="text"
+                    placeholder="Search and select lead labor..."
+                    value={leadLaborInputValue}
+                    onChange={(e) => {
+                      const searchQuery = e.target.value;
+                      setLeadLaborInputValue(searchQuery);
+
+                      if (searchQuery === '') {
+                        setTimeLogFormData({
+                          ...timeLogFormData,
+                          selectedLeadLabor: null
+                        });
+                        setShowLeadLaborDropdown(false);
+                      } else {
+                        // Trigger search when user types
+                        searchLeadLabor(searchQuery);
+                      }
+                    }}
+                    onFocus={() => setShowLeadLaborDropdown(true)}
+                    disabled={timeLogModalMode === 'view' || !!timeLogFormData.selectedLabor}
+                  />
+                  {showLeadLaborDropdown && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                      {isLoadingLeadLabor ? (
+                        <div className="flex items-center justify-center p-4">
+                          <LoadingSpinner />
+                        </div>
+                      ) : (
+                        <>
+                          {leadLaborSearchResults.map((labor: any) => (
+                            <div
+                              key={labor.id}
+                              className="flex items-center space-x-2 p-3 hover:bg-gray-50 cursor-pointer"
+                              onClick={() => {
+                                setTimeLogFormData({
+                                  ...timeLogFormData,
+                                  selectedLeadLabor: labor,
+                                  selectedLabor: null // Disable labor when lead labor is selected
+                                });
+                                setLeadLaborInputValue(labor.users?.full_name || labor.labor_code);
+                                setShowLeadLaborDropdown(false);
+                              }}
+                            >
+                              <span className="text-sm font-medium">
+                                {labor.users?.full_name || labor.labor_code} - {labor.labor_code}
+                              </span>
+                            </div>
+                          ))}
+                          {leadLaborSearchResults.length === 0 && (
+                            <div className="text-center text-sm text-gray-500 p-2">
+                              No lead labor found
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {timeLogValidationErrors.laborSelection && (
+                  <p className="text-red-500 text-xs mt-1">{timeLogValidationErrors.laborSelection}</p>
+                )}
+              </div>
             </div>
             {/* Date Selection */}
             <div>
@@ -5672,29 +5804,182 @@ const handlePrintInvoice = async (invoice: any) => {
             {/* Hours Worked */}
             <div>
               <Label className="mb-2">Hours Worked *</Label>
-              <Input
-                type="text" 
-                value={timeLogFormData.hoursWorked}
-                onChange={(e) => {
-                  const timeValue = e.target.value;
-                  setTimeLogFormData({ ...timeLogFormData, hoursWorked: timeValue });
-                }}
-                onBlur={(e) => {
-                  const timeValue = e.target.value;
-                  // Convert decimal hours to HH:MM:SS format only on blur
-                  if (timeValue && !isNaN(parseFloat(timeValue)) && !timeValue.includes(':')) {
-                    const hours = parseFloat(timeValue);
-                    const h = Math.floor(hours);
-                    const decimalPart = hours - h;
-                    const m = Math.round(decimalPart * 60);
-                    const s = 0;
-                    const formattedTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-                    setTimeLogFormData({ ...timeLogFormData, hoursWorked: formattedTime });
-                  }
-                }}
-                placeholder="Enter hours worked"
-                disabled={timeLogModalMode === 'view'}
-              />
+              <div className="timerange-picker-wrapper" style={{ zIndex: 1000, borderRadius: '0.5rem', border: '1px solid #e0e0e0', padding: '0.5rem' }}>
+                <TimeRangePicker
+                  // @ts-ignore - TimeRangePicker types may vary
+                  onChange={(value: any) => {
+                    console.log('TimeRangePicker onChange:', value, 'Type:', typeof value, 'IsArray:', Array.isArray(value));
+                    // Set flag to prevent useEffect from overwriting user selection
+                    timeRangeValueRef.current = true;
+                    setTimeRangeValue(value);
+
+                    if (value && Array.isArray(value) && value.length === 2 && value[0] && value[1]) {
+                      try {
+                        let startHours = 0, startMinutes = 0, startSeconds = 0;
+                        let endHours = 0, endMinutes = 0, endSeconds = 0;
+
+                        // Parse start time - can be Date object or time string (HH:MM or HH:MM:SS)
+                        if (value[0] instanceof Date) {
+                          startHours = value[0].getHours();
+                          startMinutes = value[0].getMinutes();
+                          startSeconds = value[0].getSeconds();
+                        } else if (typeof value[0] === 'string') {
+                          // Parse time string like "08:34" or "08:34:00" or "10:00 AM"
+                          let timeStr = value[0].trim();
+                          // Handle 12-hour format with AM/PM
+                          const isPM = timeStr.toUpperCase().includes('PM');
+                          const isAM = timeStr.toUpperCase().includes('AM');
+                          if (isPM || isAM) {
+                            timeStr = timeStr.replace(/[AP]M/gi, '').trim();
+                            const parts = timeStr.split(':');
+                            let parsedHours = parseInt(parts[0]) || 0;
+                            if (isPM && parsedHours !== 12) {
+                              parsedHours += 12;
+                            } else if (isAM && parsedHours === 12) {
+                              parsedHours = 0;
+                            }
+                            startHours = parsedHours;
+                            startMinutes = parseInt(parts[1]) || 0;
+                            startSeconds = parseInt(parts[2]) || 0;
+                          } else {
+                            // 24-hour format
+                            const startParts = timeStr.split(':');
+                            startHours = parseInt(startParts[0]) || 0;
+                            startMinutes = parseInt(startParts[1]) || 0;
+                            startSeconds = parseInt(startParts[2]) || 0;
+                          }
+                        } else {
+                          // Try to create Date from value
+                          const startDate = new Date(value[0]);
+                          if (!isNaN(startDate.getTime())) {
+                            startHours = startDate.getHours();
+                            startMinutes = startDate.getMinutes();
+                            startSeconds = startDate.getSeconds();
+                          } else {
+                            console.error('Invalid start time format:', value[0]);
+                            setTimeLogFormData({ ...timeLogFormData, hoursWorked: '' });
+                            return;
+                          }
+                        }
+
+                        // Parse end time - can be Date object or time string (HH:MM or HH:MM:SS)
+                        if (value[1] instanceof Date) {
+                          endHours = value[1].getHours();
+                          endMinutes = value[1].getMinutes();
+                          endSeconds = value[1].getSeconds();
+                        } else if (typeof value[1] === 'string') {
+                          // Parse time string like "20:45" or "20:45:00" or "8:00 PM"
+                          let timeStr = value[1].trim();
+                          // Handle 12-hour format with AM/PM
+                          const isPM = timeStr.toUpperCase().includes('PM');
+                          const isAM = timeStr.toUpperCase().includes('AM');
+                          if (isPM || isAM) {
+                            timeStr = timeStr.replace(/[AP]M/gi, '').trim();
+                            const parts = timeStr.split(':');
+                            let parsedHours = parseInt(parts[0]) || 0;
+                            if (isPM && parsedHours !== 12) {
+                              parsedHours += 12;
+                            } else if (isAM && parsedHours === 12) {
+                              parsedHours = 0;
+                            }
+                            endHours = parsedHours;
+                            endMinutes = parseInt(parts[1]) || 0;
+                            endSeconds = parseInt(parts[2]) || 0;
+                          } else {
+                            // 24-hour format
+                            const endParts = timeStr.split(':');
+                            endHours = parseInt(endParts[0]) || 0;
+                            endMinutes = parseInt(endParts[1]) || 0;
+                            endSeconds = parseInt(endParts[2]) || 0;
+                          }
+                        } else {
+                          // Try to create Date from value
+                          const endDate = new Date(value[1]);
+                          if (!isNaN(endDate.getTime())) {
+                            endHours = endDate.getHours();
+                            endMinutes = endDate.getMinutes();
+                            endSeconds = endDate.getSeconds();
+                          } else {
+                            console.error('Invalid end time format:', value[1]);
+                            setTimeLogFormData({ ...timeLogFormData, hoursWorked: '' });
+                            return;
+                          }
+                        }
+
+                        // Validate parsed time components
+                        if (isNaN(startHours) || isNaN(startMinutes) || isNaN(endHours) || isNaN(endMinutes)) {
+                          console.error('Invalid time components:', { startHours, startMinutes, endHours, endMinutes });
+                          setTimeLogFormData({ ...timeLogFormData, hoursWorked: '' });
+                          return;
+                        }
+
+                        // Calculate total minutes for each time
+                        const startTotalMinutes = startHours * 60 + startMinutes + startSeconds / 60;
+                        const endTotalMinutes = endHours * 60 + endMinutes + endSeconds / 60;
+
+                        // Calculate difference in minutes
+                        let diffMinutes = endTotalMinutes - startTotalMinutes;
+
+                        // Handle case where end time is before start time (next day)
+                        if (diffMinutes < 0) {
+                          // If end is before start, assume it's next day (add 24 hours)
+                          diffMinutes = (24 * 60) + diffMinutes;
+                        }
+
+                        // Convert minutes to hours
+                        const diffHours = diffMinutes / 60;
+
+                        console.log('Time calculation:', {
+                          startHours, startMinutes, startSeconds,
+                          endHours, endMinutes, endSeconds,
+                          startTotalMinutes, endTotalMinutes,
+                          diffMinutes, diffHours
+                        });
+
+                        // Validate calculated hours
+                        if (isNaN(diffHours) || !isFinite(diffHours) || diffHours < 0) {
+                          console.error('Invalid hours calculation:', diffHours);
+                          setTimeLogFormData({ ...timeLogFormData, hoursWorked: '' });
+                          return;
+                        }
+
+                        // Convert to HH:MM:SS format
+                        const h = Math.floor(diffHours);
+                        const remainingMinutes = diffMinutes - (h * 60);
+                        const m = Math.floor(remainingMinutes);
+                        const s = Math.floor((remainingMinutes - m) * 60);
+
+                        console.log('Time components:', { h, m, s, diffHours, diffMinutes });
+
+                        // Validate all values are numbers
+                        if (isNaN(h) || isNaN(m) || isNaN(s)) {
+                          console.error('Invalid time components:', { h, m, s, diffHours, diffMinutes });
+                          setTimeLogFormData({ ...timeLogFormData, hoursWorked: '' });
+                          return;
+                        }
+
+                        const formattedTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+                        console.log('Formatted time:', formattedTime);
+
+                        setTimeLogFormData({ ...timeLogFormData, hoursWorked: formattedTime });
+                      } catch (error) {
+                        console.error('Error calculating hours from time range:', error, value);
+                        setTimeLogFormData({ ...timeLogFormData, hoursWorked: '' });
+                      }
+                    } else if (value === null || !value) {
+                      console.log('TimeRangePicker value cleared');
+                      setTimeLogFormData({ ...timeLogFormData, hoursWorked: '' });
+                    } else {
+                      console.log('Invalid TimeRangePicker value format:', value);
+                    }
+                  }}
+                  value={timeRangeValue}
+                  disabled={timeLogModalMode === 'view'}
+                  format="h:mm a"
+                  clearIcon={null}
+                  clockIcon={null}
+                />
+              </div>
               {timeLogValidationErrors.hoursWorked && (
                 <p className="text-red-500 text-xs mt-1">{timeLogValidationErrors.hoursWorked}</p>
               )}
@@ -5729,7 +6014,7 @@ const handlePrintInvoice = async (invoice: any) => {
         </DialogContent>
       </Dialog>
 
-      
+
       <Dialog open={showInvoiceModal} onOpenChange={setShowInvoiceModal}>
         <DialogContent className="w-[500px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -5900,13 +6185,13 @@ const handlePrintInvoice = async (invoice: any) => {
               </div>
               <div className="mb-6 border border-gray-800 p-3">
                 <div className="font-semibold">
-                  {job.type === 'contract-based' 
-                    ? (contractorData?.name || contractorData?.contractor_name  || 'Contractor')
+                  {job.type === 'contract-based'
+                    ? (contractorData?.name || contractorData?.contractor_name || 'Contractor')
                     : (customerData?.customer_name || customerData?.company_name || inlineInvoiceData.customerName || 'Customer')
                   }
                 </div>
                 <div className="text-gray-600">
-                  {job.type === 'contract-based' 
+                  {job.type === 'contract-based'
                     ? (contractorData?.address || inlineInvoiceData.customerAddress || '')
                     : (customerData?.address || inlineInvoiceData.customerAddress || '')
                   }
@@ -6106,7 +6391,7 @@ const handlePrintInvoice = async (invoice: any) => {
               <X className="h-4 w-4" />
               Close
             </Button>
-             
+
             <Button
               onClick={handleSendFromPreview}
               disabled={isLoading}

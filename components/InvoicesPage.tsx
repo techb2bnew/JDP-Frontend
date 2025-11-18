@@ -792,7 +792,7 @@ export function InvoicesPage() {
       }));
 
 
-      setEstimates(transformedEstimates);
+      setEstimates(estimates);
       setTotalEstimates(transformedEstimates.length);
     } catch (err) {
       console.error('Estimate search error:', err);
@@ -1040,10 +1040,7 @@ export function InvoicesPage() {
                       <SelectContent>
                         <SelectItem value="all">All Status</SelectItem>
                         <SelectItem value="draft">Draft</SelectItem>
-                        <SelectItem value="sent">Sent</SelectItem>
-                        <SelectItem value="paid">Paid</SelectItem>
-                        <SelectItem value="overdue">Overdue</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                        <SelectItem value="sent">Sent</SelectItem> 
                       </SelectContent>
                     </Select>
                     <Select value={invoiceTypeFilter} onValueChange={setInvoiceTypeFilter}>
@@ -1124,7 +1121,7 @@ export function InvoicesPage() {
                                   )}
                                   {hasPermission('invoices', 'delete') && (
                                     <Button variant="outline" size="icon" onClick={() => handleDeleteInvoice(invoice.id)}>
-                                      <Trash2 className="w-4 h-4" />
+                                      <Trash2 className="w-4 h-4 text-red-500" />
                                     </Button>
                                   )}
                                 </div>

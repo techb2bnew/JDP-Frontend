@@ -39,7 +39,7 @@ export function StaffManagementPage({
   showLeadLabourDetails 
 }: StaffManagementPageProps) {
   const { hasPermission, isLoading: permissionsLoading, permissions } = usePermissions()
-  const [activeTab, setActiveTab] = useState('all')
+  const [activeTab, setActiveTab] = useState('staff')
   
   const [viewState, setViewState] = useState<{
     type: 'list' | 'detail'
@@ -56,7 +56,33 @@ export function StaffManagementPage({
   const [isLeadLabourDetailLoading, setIsLeadLabourDetailLoading] = useState(false)
   const [supplierDetailData, setSupplierDetailData] = useState<any>(null)
   const [isSupplierDetailLoading, setIsSupplierDetailLoading] = useState(false)
+  const [staffStats, setStaffStats] = useState({
+    total_staff: 0,
+    staff: 0,
+    lead_labor: 0,
+    labor: 0,
+    suppliers: 0
+  })
+  const [isStatsLoading, setIsStatsLoading] = useState(false)
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+
+  // Fetch staff statistics on mount
+  useEffect(() => {
+    const fetchStaffStats = async () => {
+      try {
+        setIsStatsLoading(true)
+        const response = await apiClient.getStaffStats()
+        if (response.success && response.data) {
+          setStaffStats(response.data)
+        }
+      } catch (error) {
+        console.error('Error fetching staff stats:', error)
+      } finally {
+        setIsStatsLoading(false)
+      }
+    }
+    fetchStaffStats()
+  }, [])
 
   // Check if user is admin (has no specific permissions but should see all tabs)
   const isAdmin = !permissionsLoading && permissions.length === 0
@@ -299,7 +325,6 @@ export function StaffManagementPage({
 
   // Filter tabs based on permissions
   const allTabItems = [
-    { id: 'all', label: 'All', icon: Users, show: true }, // Always show All tab
     { id: 'staff', label: 'Staff', icon: UserCog, show: hasStaffPermissions },
     { id: 'lead-labour', label: 'Lead Labor', icon: HardHat, show: hasLeadLabourPermissions },
     { id: 'labor', label: 'Labor', icon: Wrench, show: hasLaborPermissions },
@@ -315,8 +340,6 @@ export function StaffManagementPage({
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'all':
-        return <AllStaffPage />
       case 'staff':
         return <StaffPage onViewDetails={(id) => handleViewDetails('staff', id)} />
       case 'lead-labour':
@@ -344,7 +367,7 @@ export function StaffManagementPage({
       //     />
       //   )
       default:
-        return <AllStaffPage />
+        return <StaffPage onViewDetails={(id) => handleViewDetails('staff', id)} />
     }
   }
 
@@ -377,6 +400,79 @@ export function StaffManagementPage({
           <h1 className="text-2xl font-medium text-[#2b2b2b]">Staff Management</h1>
           <p className="text-sm text-[#2b2b2b]/60 mt-1">Manage all your workforce across different categories.</p>
         </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+        <Card className="bg-white shadow-md border-0">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Users className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Total Staff</p>
+                <p className="text-2xl font-medium text-[#2b2b2b]">{isStatsLoading ? '...' : staffStats.total_staff}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-white shadow-md border-0">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-[#E6F6FF] rounded-lg">
+                <UserCog className="h-6 w-6 text-[#00A1FF]" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Staff</p>
+                <p className="text-2xl font-medium text-[#2b2b2b]">{isStatsLoading ? '...' : staffStats.staff}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-white shadow-md border-0">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <HardHat className="h-6 w-6 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Lead Labour</p>
+                <p className="text-2xl font-medium text-[#2b2b2b]">{isStatsLoading ? '...' : staffStats.lead_labor}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-white shadow-md border-0">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-yellow-100 rounded-lg">
+                <Wrench className="h-6 w-6 text-yellow-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Labor</p>
+                <p className="text-2xl font-medium text-[#2b2b2b]">{isStatsLoading ? '...' : staffStats.labor}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white shadow-md border-0">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <Building2 className="h-6 w-6 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Suppliers</p>
+                <p className="text-2xl font-medium text-[#2b2b2b]">{isStatsLoading ? '...' : staffStats.suppliers}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Card className="bg-white shadow-md border-0">

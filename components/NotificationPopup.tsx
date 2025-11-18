@@ -160,11 +160,11 @@ export function NotificationPopup({
                         {getNotificationIcon(notification.type)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-sm font-medium truncate pr-2">{notification.title}</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium truncate pr-2 mb-0">{notification.title}</p>
                           {notification.unread && <div className="h-2 w-2 bg-primary rounded-full notification-badge" />}
                         </div>
-                        <p className="text-xs text-muted-foreground leading-relaxed mb-2">{notification.message}</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed mb-0">{notification.message}</p>
                         <p className="text-xs text-muted-foreground/80">{formatTimestamp(notification.time)}</p>
                       </div>
                     </div>
@@ -180,10 +180,20 @@ export function NotificationPopup({
       {localNotifications.length > 0 && (
         <div className="p-4 border-t border-border bg-muted/20">
           <div className="flex space-x-2">
-            <Button variant="outline" size="sm" onClick={onViewAll} className="flex-1 button-bounce">View All</Button>
-            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-foreground">
-              Mark all read
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {
+                onViewAll();
+                onClose();
+              }} 
+              className="flex-1 button-bounce"
+            >
+              View All
             </Button>
+            {/* <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-foreground">
+              Mark all read
+            </Button> */}
           </div>
         </div>
       )}

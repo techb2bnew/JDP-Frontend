@@ -551,10 +551,10 @@ export function DashboardOverview() {
               ) : activities.length === 0 ? (
                 <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">No recent activities</div>
               ) : (
-                activities.map((activity) => {
+                activities.map((activity, index) => {
                   const { Icon, color, bg } = getActivityStyle(activity.type)
                   return (
-                    <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                    <div key={`activity-${activity.id}-${index}`} className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
                       <div className={`w-8 h-8 rounded-lg ${bg} flex items-center justify-center flex-shrink-0`}>
                         <Icon className={`h-4 w-4 ${color}`} />
                       </div>

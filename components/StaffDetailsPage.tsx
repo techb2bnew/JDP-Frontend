@@ -442,20 +442,15 @@ export function StaffDetailsPage({ staffId, staffDetails, isLoading, onBack }: S
 
   const employmentInfoItems: Array<{ label: string; value: string; icon: LucideIcon }> = [
     {
-      label: 'Manager',
-      value: staff.manager || 'Not assigned',
+      label: 'Position',
+      value: staff.position || 'Not assigned',
       icon: User
     },
     {
       label: 'Work Schedule',
       value: staff.workSchedule || 'Not specified',
       icon: Clock
-    },
-    {
-      label: 'Annual Salary',
-      value: formatSalary(staff.salary),
-      icon: DollarSign
-    }
+    } 
   ]
 
   const jobHistory = staff.jobHistory ?? []

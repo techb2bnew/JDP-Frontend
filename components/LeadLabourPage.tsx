@@ -763,7 +763,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       "Specialization",
       "Experience", 
       "Availability",
-      "Jobs Completed", 
+      "Assigned Jobs", 
     ];
 
     // CSV rows

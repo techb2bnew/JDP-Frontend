@@ -244,7 +244,9 @@ const fetchBySearch = async () => {
       lastUpdated: apiProduct.updated_at ? new Date(apiProduct.updated_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       minStockLevel: 0,
       maxStockLevel: 100,
-      supplier: apiProduct.supplier_name || 'Unknown Supplier'
+      supplier: apiProduct.suppliers?.contact_person  || apiProduct.suppliers?.company_name || 'Unknown Supplier',
+      estimated_price: apiProduct.estimated_price || 0,
+      unit_cost: apiProduct.unit_cost || 0
     }));
 
     let filtered = transformedProducts;
@@ -312,7 +314,9 @@ useEffect(() => {
   lastUpdated: apiProduct.updated_at ? new Date(apiProduct.updated_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
   minStockLevel: 0,
   maxStockLevel: 100,
-  supplier: apiProduct.supplier_name || 'Unknown Supplier'
+  supplier: apiProduct.suppliers?.contact_person || apiProduct.suppliers?.company_name || 'Unknown Supplier',
+  estimated_price: apiProduct.estimated_price || 0,
+  unit_cost: apiProduct.unit_cost || 0
 }));
 
 setProducts(transformedProducts);
@@ -680,45 +684,55 @@ const handleAction = (action: ProductAction, product?: Product) => {
     'Category',
     'Supplier',
     'Supplier SKU',
-    'JDP SKU',
-    'Supplier Cost Price',
+    'JDP SKU', 
     'Markup Percentage',
     'Markup Amount',
     'JDP Price',
-    'Profit Margin',
     'Stock Quantity',
     'Status', 
     'Description',
     'Created Date',
     'Unit Cost',
+    'Estimated Price',
     'Last Updated'
   ];
 
   // Prepare CSV rows
-  const rows = products.map(product => [
-    product.id,
-    product.name,
-    product.category,
-    product.supplier,
-    product.sku || '',
-    product.id, // Using product ID as JDP SKU in this example
-    product.ptrPrice,
-    '40%', // Default markup percentage
-    (product.ptrPrice * 0.4).toFixed(2), // Markup amount
-    (product.ptrPrice * 1.4).toFixed(2), // JDP price
-    '28.6%', // Default profit margin
-    product.stock,
-    product.status, 
-    product.description || '',
-    product.createdDate,
-    product.unit_cost,
-    product.lastUpdated
-  ]);
+  const rows = products.map(product => {
+    const markupPercentage = (product as any).markup_percentage || 0;
+    const markupAmount = (product as any).markup_amount || 0;
+    const jdpPrice = (product as any).jdp_price || 0;
+    
+    return [
+      product.id || '',
+      product.name || '',
+      product.category || '',
+      product.supplier || 'Unknown Supplier',
+      product.sku || '',
+      product.jdpSku || '',  
+      `${markupPercentage}%`,
+      markupAmount.toFixed(2),
+      jdpPrice.toFixed(2),
+      product.stock || 0,
+      product.status || '', 
+      product.description || '',
+      product.createdDate || '',
+      (product as any).unit_cost || 0,
+      (product as any).estimated_price || 0,
+      product.lastUpdated || ''
+    ];
+  });
 
   // Convert to CSV string
   let csvContent = headers.join(',') + '\n';
   rows.forEach(row => {
-    csvContent += row.map(field => `"${field}"`).join(',') + '\n';
+    csvContent += row.map(field => {
+      // Handle null, undefined, and escape quotes in CSV
+      const value = field === null || field === undefined ? '' : String(field);
+      // Escape double quotes by doubling them
+      const escapedValue = value.replace(/"/g, '""');
+      return `"${escapedValue}"`;
+    }).join(',') + '\n';
   });
 
   // Create download link
@@ -726,7 +740,7 @@ const handleAction = (action: ProductAction, product?: Product) => {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.setAttribute('href', url);
-  link.setAttribute('download', 'products_export.csv');
+  link.setAttribute('download', `products_export_${new Date().toISOString().split('T')[0]}.csv`);
   link.style.visibility = 'hidden';
   document.body.appendChild(link);
   link.click();
@@ -838,7 +852,7 @@ const handleAction = (action: ProductAction, product?: Product) => {
           lastUpdated: apiProduct.updated_at ? new Date(apiProduct.updated_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
           minStockLevel: 0, // Default value, can be updated if available in API
           maxStockLevel: 100, // Default value, can be updated if available in API
-          supplier: apiProduct.supplier_name || 'Unknown Supplier',
+          supplier: apiProduct.suppliers?.contact_person || apiProduct.suppliers?.company_name || 'Unknown Supplier',
           estimated_price:apiProduct.estimated_price || 0,
           unit_cost:apiProduct.unit_cost ||0
         }));

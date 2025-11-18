@@ -48,6 +48,7 @@
     "@reduxjs/toolkit": "^2.0.1",
     "@supabase/supabase-js": "2.78.0",
     "@vis.gl/react-google-maps": "1.5.5",
+    "@wojtekmaj/react-timerange-picker": "7.0.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "cmdk": "^0.2.0",

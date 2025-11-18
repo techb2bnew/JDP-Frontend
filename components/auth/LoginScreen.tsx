@@ -124,20 +124,121 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
           onAuthSuccess(true)
 
           // Redirect based on user role
-          // console.log('=== LOGIN DEBUG ===');
-          // console.log('Full API response:', data);
-          // console.log('User data:', data.data.user);
-          // console.log('User role:', data.data.user.role);
-          // console.log('Role comparison:', data.data.user.role === 'Super Admin');
-          // console.log('Role type:', typeof data.data.user.role);
-          // console.log('Role length:', data.data.user.role.length); 
-
           if (data.data.user.role === 'Super Admin') {
             console.log('✅ Redirecting Super Admin to /superDashboard');
             router.push('/superDashboard')
           } else {
-            console.log('✅ Redirecting regular user to /dashboard');
-            router.push('/dashboard')
+            // Get permissions from login response
+            const userPermissions: Array<{ module: string; action: string }> = data.data.permissions || []
+            
+            // Helper function to check if user has any required permission for a module
+            const hasAnyPermission = (module: string, requiredActions: string[]): boolean => {
+              return requiredActions.some(action => 
+                userPermissions.some(perm => perm.module === module && perm.action === action)
+              )
+            }
+
+            // Define navigation items in order (same as Sidebar.tsx)
+            const navigation = [
+              {
+                id: "dashboard",
+                href: "/dashboard",
+                module: "dashboard",
+                requiredActions: ["view"]
+              },
+              {
+                id: "analytics",
+                href: "/analytics",
+                module: "reports",
+                requiredActions: ["view"]
+              },
+              {
+                id: "products",
+                href: "/products",
+                module: "products",
+                requiredActions: ["view", "create", "edit", "delete"]
+              },
+              {
+                id: "orders",
+                href: "/orders",
+                module: "orders",
+                requiredActions: ["view", "create", "edit", "delete"]
+              },
+              {
+                id: "invoices",
+                href: "/invoices",
+                module: "invoices",
+                requiredActions: ["view", "create", "edit", "delete"]
+              },
+              {
+                id: "timesheets",
+                href: "/timesheets",
+                module: "invoices",
+                requiredActions: ["view", "create", "edit", "delete"]
+              },
+              {
+                id: "customers",
+                href: "/customers",
+                module: "customers",
+                requiredActions: ["view", "create", "edit", "delete"]
+              },
+              {
+                id: "jobs",
+                href: "/jobs",
+                module: "jobs",
+                requiredActions: ["view", "create", "edit", "delete"]
+              },
+              {
+                id: "tracking",
+                href: "/tracking",
+                module: "tracking",
+                requiredActions: ["view"]
+              },
+              {
+                id: "contractors",
+                href: "/contractors",
+                module: "suppliers",
+                requiredActions: ["view", "create", "edit", "delete"]
+              },
+              {
+                id: "staff",
+                href: "/staff",
+                module: "staff",
+                requiredActions: ["view", "create", "edit", "delete"]
+              },
+              {
+                id: "notifications",
+                href: "/notifications",
+                module: "notification",
+                requiredActions: ["view", "create", "edit", "delete"]
+              },
+              {
+                id: "role",
+                href: "/role",
+                module: "role_permission",
+                requiredActions: ["view", "create", "edit", "delete"]
+              },
+              {
+                id: "configuration",
+                href: "/configuration",
+                module: "configuration",
+                requiredActions: ["view", "create", "edit", "delete"]
+              }
+            ]
+
+            // Find first available navigation item based on permissions
+            const firstAvailableItem = navigation.find(item => 
+              hasAnyPermission(item.module, item.requiredActions)
+            )
+
+            if (firstAvailableItem) {
+              console.log(`✅ Redirecting user to first available page: ${firstAvailableItem.href}`);
+              router.push(firstAvailableItem.href)
+            } else {
+              // Fallback to dashboard if no permissions match
+              console.log('⚠️ No matching permissions found, redirecting to /dashboard');
+              router.push('/dashboard')
+            }
           }
         } else {
           toast.error(data.message || 'Login failed')

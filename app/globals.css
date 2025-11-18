@@ -171,3 +171,16 @@ body{
   border: 1px solid var(--info-border) !important;
   color: var(--info-text) !important;
 }
+
+/* Hide TimeRangePicker calendar and clock dropdowns */
+.react-timerange-picker__calendar,
+.react-timerange-picker__clock {
+  display: none !important;
+}
+
+.react-timerange-picker__button--open {
+  display: none !important;
+}
+.react-timerange-picker__wrapper { 
+  border: none !important;
+}

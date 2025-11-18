@@ -525,7 +525,7 @@ const getAvailabilityBadge = (availability: string) => {
     'Experience',
     'Hourly Rate',
     'Availability',
-    'Jobs Completed',
+    'Assigned Jobs',
     'Date of Joining',
     'Supervisor',
     'Certifications',
@@ -1432,7 +1432,7 @@ const fetchLaborById = async (id: string) => {
       </Card>
 
       {/* Pagination */}
-      {totalPages > 1 && (
+    
         <div className="flex items-center justify-center gap-2">
           <Button
             variant="outline"
@@ -1472,7 +1472,7 @@ const fetchLaborById = async (id: string) => {
             Next
           </Button>
         </div>
-      )}
+    
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
