@@ -172,6 +172,17 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
 
   // Filter navigation items based on permissions
   const filteredNavigation = navigation.filter(item => {
+    // Special handling for Staff Management - check for labour or lead_labour permissions
+    if (item.id === 'staff') {
+      return hasAnyPermission('labour', item.requiredActions) || 
+             hasAnyPermission('lead_labour', item.requiredActions) ||
+             hasAnyPermission('staff', item.requiredActions) ||
+             hasAnyPermission('suppliers', item.requiredActions)
+    }
+    
+    
+    
+    // For all other items, use standard permission check
     return hasAnyPermission(item.module, item.requiredActions)
   })
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
@@ -39,7 +39,8 @@ export function StaffManagementPage({
   showLeadLabourDetails 
 }: StaffManagementPageProps) {
   const { hasPermission, isLoading: permissionsLoading, permissions } = usePermissions()
-  const [activeTab, setActiveTab] = useState('staff')
+  const [activeTab, setActiveTab] = useState<string>('')
+  const hasInitializedTab = useRef(false)
   
   const [viewState, setViewState] = useState<{
     type: 'list' | 'detail'
@@ -120,6 +121,32 @@ export function StaffManagementPage({
     hasPermission('suppliers', 'edit') || 
     hasPermission('suppliers', 'delete')
   )
+
+  // Filter tabs based on permissions - memoize to prevent unnecessary re-renders
+  const allTabItems = useMemo(() => [
+    { id: 'staff', label: 'Staff', icon: UserCog, show: hasStaffPermissions },
+    { id: 'lead-labour', label: 'Lead Labor', icon: HardHat, show: hasLeadLabourPermissions },
+    { id: 'labor', label: 'Labor', icon: Wrench, show: hasLaborPermissions },
+    { id: 'supplier', label: 'Supplier', icon: Building2, show: hasSupplierPermissions },
+    // { id: 'user', label: 'User', icon: User, show: false },
+  ], [hasStaffPermissions, hasLeadLabourPermissions, hasLaborPermissions, hasSupplierPermissions])
+
+  const tabItems = useMemo(() => allTabItems.filter(item => item.show), [allTabItems])
+
+  // Set active tab to first available tab with permissions
+  useEffect(() => {
+    if (!permissionsLoading && viewState.type === 'list' && !hasInitializedTab.current) {
+      if (tabItems.length > 0) {
+        const currentTabExists = tabItems.find(item => item.id === activeTab)
+        if (!activeTab || !currentTabExists) {
+          setActiveTab(tabItems[0].id)
+          hasInitializedTab.current = true
+        } else {
+          hasInitializedTab.current = true
+        }
+      }
+    }
+  }, [permissionsLoading, viewState.type, tabItems, activeTab])
 
   const fetchLeadLabourDetails = async (id: string) => {
     if (!apiBaseUrl) return
@@ -323,16 +350,6 @@ export function StaffManagementPage({
     }
   }
 
-  // Filter tabs based on permissions
-  const allTabItems = [
-    { id: 'staff', label: 'Staff', icon: UserCog, show: hasStaffPermissions },
-    { id: 'lead-labour', label: 'Lead Labor', icon: HardHat, show: hasLeadLabourPermissions },
-    { id: 'labor', label: 'Labor', icon: Wrench, show: hasLaborPermissions },
-    { id: 'supplier', label: 'Supplier', icon: Building2, show: hasSupplierPermissions },
-    // { id: 'user', label: 'User', icon: User, show: false },
-  ]
-
-  const tabItems = allTabItems.filter(item => item.show)
   const gridCols = tabItems.length <= 2 ? 'grid-cols-2' : 
                    tabItems.length <= 3 ? 'grid-cols-3' : 
                    tabItems.length <= 4 ? 'grid-cols-4' : 
@@ -477,7 +494,7 @@ export function StaffManagementPage({
 
       <Card className="bg-white shadow-md border-0">
         <CardContent className="p-0">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs value={activeTab || (tabItems.length > 0 ? tabItems[0].id : '')} onValueChange={setActiveTab} className="w-full">
             <div className="border-b border-gray-200 px-6 pt-6">
               <TabsList className={`grid w-full ${gridCols} bg-gray-50`}>
                 {tabItems.map((item) => {
@@ -497,9 +514,18 @@ export function StaffManagementPage({
             </div>
             
             <div className="p-6">
-              <TabsContent value={activeTab} className="mt-0">
-                {renderTabContent()}
-              </TabsContent>
+              {activeTab && (
+                <TabsContent value={activeTab} className="mt-0">
+                  {renderTabContent()}
+                </TabsContent>
+              )}
+              {!activeTab && tabItems.length === 0 && (
+                <div className="text-center py-12">
+                  <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-[#2b2b2b] mb-2">No Permissions</h3>
+                  <p className="text-sm text-gray-600">You don't have permissions to view any staff categories.</p>
+                </div>
+              )}
             </div>
           </Tabs>
         </CardContent>

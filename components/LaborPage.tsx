@@ -290,8 +290,9 @@ const getAvailabilityBadge = (availability: string) => {
           setIsCreateDialogOpen(false);
           resetForm();
           setValidationErrors({});
-          // Refresh the labor list
+          // Refresh the labor list and stats
           fetchLaborData(currentPage, itemsPerPage);
+          fetchLaborStats();
         } else {
           toast.error(`Failed to create labor worker: ${responseData.message || 'Unknown error'}`);
         }
@@ -405,8 +406,9 @@ const getAvailabilityBadge = (availability: string) => {
           setEditingLabor(null);
           resetForm();
           setValidationErrors({});
-          // Refresh the labor list
+          // Refresh the labor list and stats
           fetchLaborData(currentPage, itemsPerPage);
+          fetchLaborStats();
         } else {
           toast.error(`Failed to update labor worker: ${responseData.message || 'Unknown error'}`);
         }
@@ -445,8 +447,9 @@ const getAvailabilityBadge = (availability: string) => {
         const responseData = await response.json();
         if (responseData.success) {
           toast.success('Labor worker deleted successfully');
-          // Refresh the data
+          // Refresh the data and stats
           fetchLaborData(currentPage, itemsPerPage);
+          fetchLaborStats();
         } else {
           toast.error(responseData.message || 'Failed to delete labor worker');
         }
@@ -814,21 +817,22 @@ useEffect(() => {
 }, [filterAvailability, currentPage, itemsPerPage]);
 
 // Fetch labor statistics
-useEffect(() => {
-  const fetchStats = async () => {
-    try {
-      setIsStatsLoading(true);
-      const response = await apiClient.getManagementStats();
-      if (response.success && response.data && response.data.labor) {
-        setLaborStats(response.data.labor);
-      }
-    } catch (error) {
-      console.error('Error fetching labor stats:', error);
-    } finally {
-      setIsStatsLoading(false);
+const fetchLaborStats = async () => {
+  try {
+    setIsStatsLoading(true);
+    const response = await apiClient.getManagementStats();
+    if (response.success && response.data && response.data.labor) {
+      setLaborStats(response.data.labor);
     }
-  };
-  fetchStats();
+  } catch (error) {
+    console.error('Error fetching labor stats:', error);
+  } finally {
+    setIsStatsLoading(false);
+  }
+};
+
+useEffect(() => {
+  fetchLaborStats();
 }, []);
 
 

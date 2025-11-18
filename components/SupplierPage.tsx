@@ -30,6 +30,7 @@ import {
   Shield
 } from 'lucide-react'
 import { apiClient } from '@/utils/api'
+import { usePermissions } from '../contexts/PermissionContext'
 
 interface Supplier {
   id: string
@@ -72,6 +73,7 @@ interface SupplierPageProps {
 
 
 export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPageProps) {
+  const { hasPermission } = usePermissions()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
@@ -245,8 +247,9 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
           setIsCreateDialogOpen(false);
           resetForm();
           setValidationErrors({});
-          // Refresh the supplier list
+          // Refresh the supplier list and stats
           fetchSuppliersData(currentPage, itemsPerPage);
+          fetchSupplierStats();
         } else {
           toast.error(responseData.message || 'Failed to create supplier');
         }
@@ -448,8 +451,9 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
           setEditingSupplier(null);
           resetForm();
           setValidationErrors({});
-          // Refresh the supplier list
+          // Refresh the supplier list and stats
           fetchSuppliersData(currentPage, itemsPerPage);
+          fetchSupplierStats();
         } else {
           toast.error(responseData.message || 'Failed to update supplier');
         }
@@ -505,8 +509,9 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
         const responseData = await response.json();
         if (responseData.success) {
           toast.success('Supplier deleted successfully!');
-          // Refresh the supplier list
+          // Refresh the supplier list and stats
           fetchSuppliersData(currentPage, itemsPerPage);
+          fetchSupplierStats();
         } else {
           toast.error(responseData.message || 'Failed to delete supplier');
         }
@@ -777,21 +782,22 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
   }, [filterStatus, currentPage, itemsPerPage]);
 
 // Fetch supplier statistics
-useEffect(() => {
-  const fetchStats = async () => {
-    try {
-      setIsStatsLoading(true);
-      const response = await apiClient.getManagementStats();
-      if (response.success && response.data && response.data.suppliers) {
-        setSupplierStats(response.data.suppliers);
-      }
-    } catch (error) {
-      console.error('Error fetching supplier stats:', error);
-    } finally {
-      setIsStatsLoading(false);
+const fetchSupplierStats = async () => {
+  try {
+    setIsStatsLoading(true);
+    const response = await apiClient.getManagementStats();
+    if (response.success && response.data && response.data.suppliers) {
+      setSupplierStats(response.data.suppliers);
     }
-  };
-  fetchStats();
+  } catch (error) {
+    console.error('Error fetching supplier stats:', error);
+  } finally {
+    setIsStatsLoading(false);
+  }
+};
+
+useEffect(() => {
+  fetchSupplierStats();
 }, []);
 
 
@@ -1031,13 +1037,14 @@ useEffect(() => {
             <Download className="h-4 w-4" />
             Export
           </Button>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2">
-                <Plus className="h-4 w-4" />
-                Add Supplier
-              </Button>
-            </DialogTrigger>
+          {hasPermission('suppliers', 'create') && (
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Supplier
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-4xl max-h-[90vh]">
               <DialogHeader>
                 <DialogTitle>Add New Supplier</DialogTitle>
@@ -1053,6 +1060,7 @@ useEffect(() => {
               </div>
             </DialogContent>
           </Dialog>
+          )}
         </div>
       </div>
 
@@ -1231,8 +1239,8 @@ useEffect(() => {
                         itemName={supplier.companyName}
                         itemType="Supplier"
                         showView={!!onViewDetails}
-                        showEdit={true}
-                        showDelete={true}
+                        showEdit={hasPermission('suppliers', 'edit')}
+                        showDelete={hasPermission('suppliers', 'delete')}
                       />
                     </TableCell>
                   </TableRow>
