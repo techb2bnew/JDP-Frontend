@@ -955,10 +955,19 @@ export function AddEditOrderPage() {
                     value={orderFormData.delivery_address}
                     onChange={(e) => setOrderFormData(prev => ({ ...prev, delivery_address: e.target.value }))}
                     placeholder="Delivery address..."
-                    rows={2}
+                    rows={1}
                   />
                 </div>
-
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Notes</Label>
+                  <Textarea
+                    id="notes"
+                    value={orderFormData.notes}
+                    onChange={(e) => setOrderFormData(prev => ({ ...prev, notes: e.target.value }))}
+                    placeholder="Customer notes..."
+                    rows={1}
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="delivery-city-zip">Delivery City/Zip</Label>
                   <Input
@@ -979,16 +988,7 @@ export function AddEditOrderPage() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea
-                    id="notes"
-                    value={orderFormData.notes}
-                    onChange={(e) => setOrderFormData(prev => ({ ...prev, notes: e.target.value }))}
-                    placeholder="Customer notes..."
-                    rows={2}
-                  />
-                </div>
+                
               </div>
 
               {/* Product Selection */}

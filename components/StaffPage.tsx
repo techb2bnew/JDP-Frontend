@@ -947,9 +947,9 @@ useEffect(() => {
           <Table>
             <TableHeader>
               <TableRow className="bg-[#162f3d] hover:bg-[#162f3d]">
-                <TableHead className="text-white font-medium">
+                {/* <TableHead className="text-white font-medium">
                   <input type="checkbox" className="rounded border-white/30" />
-                </TableHead>
+                </TableHead> */}
                 <TableHead className="text-white font-medium">ID</TableHead>
                 <TableHead className="text-white font-medium">Name</TableHead>
                 <TableHead className="text-white font-medium">Phone</TableHead>
@@ -989,9 +989,9 @@ useEffect(() => {
               ) : (
                 paginatedStaff.map((member, index) => (
                 <TableRow key={member.id} className={index % 2 === 1 ? "bg-[#eff4fa]" : ""}>
-                  <TableCell>
+                  {/* <TableCell>
                     <input type="checkbox" className="rounded border-gray-300" />
-                  </TableCell>
+                  </TableCell> */}
                   <TableCell className="text-sm text-[#2b2b2b]/80">#{member.id}</TableCell>
                   <TableCell className="text-sm text-[#2b2b2b]/80 font-medium">{member.name}</TableCell>
                   <TableCell className="text-sm text-[#2b2b2b]/80">{member.phone}</TableCell>

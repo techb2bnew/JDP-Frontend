@@ -11,6 +11,20 @@ import { toast } from 'sonner'
 import { AutoScrollSelect } from './ui/AutoScrollSelect'
 import { AutoScrollMultiSelect } from './ui/AutoScrollMultiSelect'
 import { apiClient } from '../utils/api'
+import Autocomplete from 'react-google-autocomplete'
+
+// Extend Window interface for Google Maps
+declare global {
+  interface Window {
+    google?: {
+      maps?: {
+        places?: any
+        geocoder?: any
+      }
+    }
+  }
+}
+
 import { 
   ArrowLeft, 
   ArrowRight,
@@ -78,6 +92,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
   const [selectedLaborNames, setSelectedLaborNames] = useState<string[]>([])
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [isCreatingJob, setIsCreatingJob] = useState(false)
+
   const [formData, setFormData] = useState({
     // Step 1: Job Type
     type: '' as 'service-based' | 'contract-based' | '',
@@ -328,6 +343,100 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
       assignedLabor: selectedIds
     })
     setSelectedLaborNames(selectedItems.map(item => item.name))
+  }
+
+  // Load Google Maps script with Places API
+  // react-google-autocomplete handles Google Maps script loading internally
+
+  // Handle address selection from autocomplete
+  const handlePlaceSelect = (place: any) => {
+    if (!place) return
+
+    try {
+      // Parse address components
+      const addressComponents = place.address_components || []
+      let streetNumber = ''
+      let route = ''
+      let city = ''
+      let state = ''
+      let zipCode = ''
+      let sublocality = '' // For areas that don't have locality
+
+      addressComponents.forEach((component: any) => {
+        const types = component.types
+        if (types.includes('street_number')) {
+          streetNumber = component.long_name
+        } else if (types.includes('route')) {
+          route = component.long_name
+        } else if (types.includes('locality')) {
+          city = component.long_name
+        } else if (types.includes('sublocality') || types.includes('sublocality_level_1')) {
+          sublocality = component.long_name
+        } else if (types.includes('administrative_area_level_1')) {
+          state = component.short_name
+        } else if (types.includes('postal_code')) {
+          zipCode = component.long_name
+        }
+      })
+
+      // Use sublocality if city is not available
+      if (!city && sublocality) {
+        city = sublocality
+      }
+
+      // Build address - use street number + route, or fallback to formatted address
+      let fullAddress = `${streetNumber} ${route}`.trim()
+      if (!fullAddress) {
+        // Try to extract from formatted address
+        const formattedAddress = place.formatted_address || place.name || ''
+        const parts = formattedAddress.split(',')
+        fullAddress = parts[0] || ''
+      }
+
+      // Build cityZip - prioritize city, state, zip
+      let cityZip = ''
+      if (city && state && zipCode) {
+        cityZip = `${city}, ${state} ${zipCode}`
+      } else if (city && state) {
+        cityZip = `${city}, ${state}`
+      } else if (city && zipCode) {
+        cityZip = `${city} ${zipCode}`
+      } else if (state && zipCode) {
+        cityZip = `${state} ${zipCode}`
+      } else if (city) {
+        cityZip = city
+      } else if (zipCode) {
+        cityZip = zipCode
+      } else if (state) {
+        cityZip = state
+      }
+
+      const newFormData = {
+        ...formData,
+        address: fullAddress,
+        cityZip: cityZip
+      }
+
+      if (formData.sameAsAddress) {
+        newFormData.billToAddress = newFormData.address
+        newFormData.billToCityZip = newFormData.cityZip
+      }
+
+      setFormData(newFormData)
+      clearValidationError('address')
+      clearValidationError('cityZip')
+    } catch (error) {
+      console.error('Error parsing address:', error)
+      // Fallback: just set the formatted address
+      const newFormData = { 
+        ...formData, 
+        address: place.formatted_address || place.name || '' 
+      }
+      if (formData.sameAsAddress) {
+        newFormData.billToAddress = newFormData.address
+      }
+      setFormData(newFormData)
+    }
   }
 
   // Effect to restore selected names from formData when component mounts or formData changes
@@ -618,20 +727,27 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="address">Address *</Label>
-              <Input
-                id="address"
-                value={formData.address}
-                onChange={(e) => {
-                  const newFormData = {...formData, address: e.target.value}
+              <Autocomplete
+                apiKey="AIzaSyBXNyT9zcGdvhAUCUEYTm6e_qPw26AOPgI"
+                onPlaceSelected={(place: any) => {
+                  handlePlaceSelect(place)
+                }}
+                options={{
+                  types: ['address'],
+                  componentRestrictions: { country: 'us' },
+                }}
+                className={`flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${validationErrors.address ? 'border-red-500' : ''}`}
+                placeholder="Start typing address..."
+                defaultValue={formData.address}
+                onChange={(e: any) => {
+                  const value = e.target.value
+                  const newFormData = {...formData, address: value}
                   if (formData.sameAsAddress) {
-                    newFormData.billToAddress = e.target.value
+                    newFormData.billToAddress = value
                   }
                   setFormData(newFormData)
                   clearValidationError('address')
                 }}
-                placeholder="Enter street address"
-                className={validationErrors.address ? 'border-red-500' : ''}
-                required
               />
               {validationErrors.address && (
                 <p className="text-red-500 text-sm">{validationErrors.address}</p>

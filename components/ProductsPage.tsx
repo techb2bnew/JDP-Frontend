@@ -1220,12 +1220,18 @@ const handleAction = (action: ProductAction, product?: Product) => {
             size="icon"
             className='w-[70px]'
             onClick={() => {
-              setSortBy('name');
-              setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+              if (sortBy === 'name') {
+                // Toggle order if already sorting by name
+                setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+              } else {
+                // Set to name sorting with ascending order
+                setSortBy('name');
+                setSortOrder('asc');
+              }
             }}
           >
             <ArrowUpAZ className="w-4 h-4" />
-            {sortOrder === 'asc' ? 'A-Z' : 'Z-A'}
+            {sortBy === 'name' ? (sortOrder === 'asc' ? 'A-Z' : 'Z-A') : 'A-Z'}
           </Button>
             {/* Branch Filter */}
             {/* <div className="flex gap-2">
@@ -1281,7 +1287,20 @@ const handleAction = (action: ProductAction, product?: Product) => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  products.map((product) => (
+                  [...products]
+                    .sort((a, b) => {
+                      if (sortBy === 'name') {
+                        const nameA = (a.name || '').toLowerCase()
+                        const nameB = (b.name || '').toLowerCase()
+                        if (sortOrder === 'asc') {
+                          return nameA.localeCompare(nameB)
+                        } else {
+                          return nameB.localeCompare(nameA)
+                        }
+                      }
+                      return 0
+                    })
+                    .map((product) => (
                   <TableRow key={product.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">

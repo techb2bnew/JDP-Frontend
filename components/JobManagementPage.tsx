@@ -773,7 +773,7 @@ useEffect(() => {
               </SelectContent>
             </Select>
 
-            <Select value={filterLabor} onValueChange={setFilterLabor}>
+            {/* <Select value={filterLabor} onValueChange={setFilterLabor}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Assigned Labor" />
               </SelectTrigger>
@@ -783,7 +783,7 @@ useEffect(() => {
                   <SelectItem key={labor} value={labor}>{labor}</SelectItem>
                 ))}
               </SelectContent>
-            </Select>
+            </Select> */}
 
             {/* <Select value={filterPriority} onValueChange={setFilterPriority}>
               <SelectTrigger className="w-48">

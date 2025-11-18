@@ -1566,9 +1566,9 @@ useEffect(() => {
           <Table>
             <TableHeader>
               <TableRow className="bg-[#162f3d] hover:bg-[#162f3d]">
-                <TableHead className="text-white font-medium">
+                {/* <TableHead className="text-white font-medium">
                   <input type="checkbox" className="rounded border-white/30" />
-                </TableHead>
+                </TableHead> */}
                 <TableHead className="text-white font-medium">ID</TableHead>
                 <TableHead className="text-white font-medium">Name</TableHead>
                 <TableHead className="text-white font-medium">Contact</TableHead>
@@ -1607,9 +1607,9 @@ useEffect(() => {
               ) : (
                 paginatedLeadLabours.map((labour, index) => (
                   <TableRow key={labour.id} className={index % 2 === 1 ? "bg-[#eff4fa]" : ""}>
-                    <TableCell>
+                    {/* <TableCell>
                       <input type="checkbox" className="rounded border-gray-300" />
-                    </TableCell>
+                    </TableCell> */}
                     <TableCell className="text-sm text-[#2b2b2b]/80">{labour.id}</TableCell>
                     <TableCell>
                       <div>

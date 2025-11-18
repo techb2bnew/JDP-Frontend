@@ -535,7 +535,7 @@ const handleNotificationClick = () => {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onProfileClick} className="cursor-pointer">
-                  <User className="mr-2 h-4 w-4" />
+                  <User className="  h-4 w-4" />
                   <span>View Profile</span>
                 </DropdownMenuItem>
                 {/* <DropdownMenuItem className="cursor-pointer">
