@@ -107,10 +107,57 @@ export function JobManagementPage() {
     try {
       setLoading(true)
       const response = await apiClient.getJobs(page, itemsPerPage)
-      setJobs(response.data)
-      console.log('Jobs????:', response.data)
-      setTotalPages(response.totalPages)
-      setTotalJobs(response.total)
+      
+      // Extract jobs from response - handle both direct array and nested structure
+      const jobs = response.data?.jobs || response.data || []
+      
+      // Transform jobs to match component format
+      const transformedJobs = jobs.map((job: any) => ({
+        id: job.id?.toString() || `JOB-${Date.now()}`,
+        title: job.job_title || '',
+        type: job.job_type || '',
+        description: job.description || '',
+        priority: job.priority || '',
+        status: job.status || 'pending',
+        address: job.address || '',
+        cityZip: job.city_zip || '',
+        phone: job.phone || '',
+        email: job.email || '',
+        billToAddress: job.bill_to_address || '',
+        billToCityZip: job.bill_to_city_zip || '',
+        billToPhone: job.bill_to_phone || '',
+        billToEmail: job.bill_to_email || '',
+        dueDate: job.due_date || '',
+        estimatedHours: job.estimated_hours || 0,
+        estimatedCost: job.estimated_cost || 0,
+        createdDate: job.created_at ? new Date(job.created_at).toISOString().split('T')[0] : '',
+        updatedDate: job.updated_at ? new Date(job.updated_at).toISOString().split('T')[0] : '',
+        customer: job.customer?.customer_name || 'Unknown Customer',
+        customerName: job.customer?.customer_name || job.customer?.company_name,
+        contractor: job.contractor?.full_name || 'Unassigned',
+        contractorName: job.contractor?.full_name || job.contractor?.company_name,
+        assignedLeadLabor: job.assigned_lead_labor?.map((l: any) => ({
+          id: l.id,
+          name: l.user?.full_name || '',
+          email: l.user?.email || '',
+          phone: l.user?.phone || '',
+        })) || [],
+        assignedLabor: job.assigned_labor?.map((l: any) => ({
+          id: l.id,
+          name: l.user?.full_name || '',
+          email: l.user?.email || '',
+          phone: l.user?.phone || '',
+          hourlyRate: l.hourly_rate,
+          totalCost: l.total_cost,
+        })) || [],
+        assignedLaborDetails: job.assigned_labor || [],
+        assignedLeadLaborDetails: job.assigned_lead_labor || [],
+      }))
+      
+      setJobs(transformedJobs)
+      console.log('Jobs????:', transformedJobs)
+      setTotalPages(response.totalPages || response.data?.pagination?.totalPages || 1)
+      setTotalJobs(response.total || response.data?.pagination?.total || transformedJobs.length)
       setCurrentPage(page)
     } catch (error) {
       console.error('Error fetching jobs:', error)
@@ -441,6 +488,13 @@ useEffect(() => {
           <Badge className="bg-yellow-50 text-yellow-600 border-yellow-200 hover:bg-yellow-50">
             <Clock className="w-3 h-3 mr-1" />
             Pending
+          </Badge>
+        )
+      case 'active':
+        return (
+          <Badge className="bg-green-50 text-green-600 border-green-200 hover:bg-green-50">
+            <CheckSquare className="w-3 h-3 mr-1" />
+            Active
           </Badge>
         )
       case 'in-progress':
