@@ -466,7 +466,7 @@ export function LeadLabourDetailsPage({ leadLabourId, onBack, leadLabourData, is
               return (
                 <div
                   key={index}
-                  className={`flex items-start gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50 ${item.colSpan ? 'md:col-span-2' : ''}`}
+                  className={`flex items-start gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50 ${item.colSpan ? 'md:col-span-1' : ''}`}
                 >
                   <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm">
                     <Icon className="h-4 w-4 text-[#00A1FF]" />

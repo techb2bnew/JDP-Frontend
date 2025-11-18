@@ -2947,22 +2947,34 @@ export function ContractorListingPage() {
                       priority: subJob.priority,
                       status: subJob.status,
                       progress: subJob.progress || 0,
-                      // Include labor timesheet data
-                      labor_timesheets: subJob.labor_timesheets || [],
-                      assigned_labor_ids: subJob.assigned_labor_ids,
-                      assigned_lead_labor_ids: subJob.assigned_lead_labor_ids,
+                      // Include labor timesheet data - use enhanced data if available
+                      labor_timesheets: jobData.labor_timesheets || subJob.labor_timesheets || [],
+                      assigned_labor_ids: jobData.assigned_labor_ids || subJob.assigned_labor_ids,
+                      assigned_lead_labor_ids: jobData.assigned_lead_labor_ids || subJob.assigned_lead_labor_ids,
                       // Include assigned labor details - use enhanced data if available
                       assignedLaborDetails: jobData.assignedLaborDetails || [],
-                      assignedLeadLaborDetails: jobData.assignedLeadLaborDetails || []
+                      assignedLeadLaborDetails: jobData.assignedLeadLaborDetails || [],
+                      // Include materials/bluesheets data - use enhanced data if available
+                      assignedMaterialsDetails: jobData.assignedMaterialsDetails || [],
+                      bluesheets: jobData.bluesheets || []
                     }
                   
                     const allJobs = [jobWithCustomerData]
                     console.log('All jobs:', allJobs)
                     
                     // Create a proper setJobs function that updates the contractor data
-                    const handleSetJobs = (updatedJobs: any[]) => {
+                    const handleSetJobs = async (updatedJobs: any[]) => {
                       if (updatedJobs.length > 0) {
                         const updatedJob = updatedJobs[0]
+                        
+                        // Update enhancedJobData with fresh data from API to ensure materials/labor are included
+                        try {
+                          const freshJobData = await apiClient.getJobById(updatedJob.id)
+                          setEnhancedJobData(freshJobData)
+                        } catch (error) {
+                          console.error('Error refreshing job data:', error)
+                        }
+                        
                         // Update the contractor's jobs array with the updated job data
                         setContractors(prevContractors => 
                           prevContractors.map(contractor => {
@@ -3031,22 +3043,34 @@ export function ContractorListingPage() {
                       priority: selectedJobData.priority,
                       status: selectedJobData.status,
                       progress: selectedJobData.progress || 0,
-                      // Include labor timesheet data
-                      labor_timesheets: selectedJobData.labor_timesheets || [],
-                      assigned_labor_ids: selectedJobData.assigned_labor_ids,
-                      assigned_lead_labor_ids: selectedJobData.assigned_lead_labor_ids,
+                      // Include labor timesheet data - use enhanced data if available
+                      labor_timesheets: jobData.labor_timesheets || selectedJobData.labor_timesheets || [],
+                      assigned_labor_ids: jobData.assigned_labor_ids || selectedJobData.assigned_labor_ids,
+                      assigned_lead_labor_ids: jobData.assigned_lead_labor_ids || selectedJobData.assigned_lead_labor_ids,
                       // Include assigned labor details - use enhanced data if available
                       assignedLaborDetails: jobData.assignedLaborDetails || [],
-                      assignedLeadLaborDetails: jobData.assignedLeadLaborDetails || []
+                      assignedLeadLaborDetails: jobData.assignedLeadLaborDetails || [],
+                      // Include materials/bluesheets data - use enhanced data if available
+                      assignedMaterialsDetails: jobData.assignedMaterialsDetails || [],
+                      bluesheets: jobData.bluesheets || []
                     }
                   
                     const allJobs = [jobWithCustomerData]
                     console.log('All jobs:', allJobs)
                     
                     // Create a proper setJobs function that updates the contractor data
-                    const handleSetJobs = (updatedJobs: any[]) => {
+                    const handleSetJobs = async (updatedJobs: any[]) => {
                       if (updatedJobs.length > 0) {
                         const updatedJob = updatedJobs[0]
+                        
+                        // Update enhancedJobData with fresh data from API to ensure materials/labor are included
+                        try {
+                          const freshJobData = await apiClient.getJobById(updatedJob.id)
+                          setEnhancedJobData(freshJobData)
+                        } catch (error) {
+                          console.error('Error refreshing job data:', error)
+                        }
+                        
                         // Update the contractor's jobs array with the updated job data
                         setContractors(prevContractors => 
                           prevContractors.map(contractor => {

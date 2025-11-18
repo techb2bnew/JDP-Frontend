@@ -391,7 +391,7 @@ export function LaborDetailsPage({ laborId, onBack }: LaborDetailsPageProps) {
     { label: 'Email Address', value: laborData.email || 'Not provided', icon: Mail },
     { label: 'Phone Number', value: laborData.phone || 'Not provided', icon: Phone },
     { label: 'Date of Birth', value: formatDate(laborData.dob), icon: Calendar },
-    { label: 'Address', value: laborData.address || 'Not provided', icon: MapPin, colSpan: 2 }
+    { label: 'Address', value: laborData.address || 'Not provided', icon: MapPin, }
   ] as Array<{ label: string; value: string; icon: typeof Mail; colSpan?: number }>
 
   const workDetailsItems = [

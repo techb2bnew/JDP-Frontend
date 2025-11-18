@@ -360,7 +360,7 @@ export function SupplierDetailsPage({ supplierId, onBack, supplierData }: Suppli
                 <p className="text-sm font-medium text-[#2b2b2b]">{userData.phone || data.primary_phone || 'Not provided'}</p>
               </div>
             </div>
-            <div className="flex items-start gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50">
+            {/* <div className="flex items-start gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50">
               <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm">
                 <Phone className="h-4 w-4 text-[#00A1FF]" />
               </div>
@@ -368,7 +368,7 @@ export function SupplierDetailsPage({ supplierId, onBack, supplierData }: Suppli
                 <p className="text-xs text-gray-500">Business Contact</p>
                 <p className="text-sm font-medium text-[#2b2b2b]">{data.business_phone || data.contact_phone || 'Not provided'}</p>
               </div>
-            </div>
+            </div> */}
             <div className="flex items-start gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50">
               <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm">
                 <MapPin className="h-4 w-4 text-[#00A1FF]" />

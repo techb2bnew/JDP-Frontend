@@ -258,6 +258,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
   const [refreshMaterials, setRefreshMaterials] = useState(false);
   const [isLoadingMaterials, setIsLoadingMaterials] = useState(false);
+  const isRefreshingMaterialsRef = useRef(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showAddInvoiceModal, setShowAddInvoiceModal] = useState(false);
   const [showAddMaterialModal, setShowAddMaterialModal] = useState(false);
@@ -1653,6 +1654,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
   const refreshJobData = async () => {
     try {
+      // Set flag to prevent useEffect from running
+      isRefreshingMaterialsRef.current = true;
+      
       const updatedJobData = await apiClient.getJobById(jobId);
       const updatedJobs = jobs.map((j: any) => j.id === jobId ? updatedJobData : j);
       setJobs(updatedJobs);
@@ -1660,16 +1664,55 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       // Update the current job from the updated jobs array
       const currentJob = updatedJobs.find((j: any) => j.id === jobId);
       if (currentJob) {
-        // Update the job state if it exists in the component
-        // Note: This assumes you have a way to update the current job state
+        // Update bluesheets state immediately with fresh data
+        if (currentJob.bluesheets) {
+          setBluesheets(currentJob.bluesheets);
+        }
+        
+        // Fetch materials immediately with the fresh job data
+        const bluesheetMaterials: any[] = [];
+        if (currentJob.bluesheets && currentJob.bluesheets.length > 0) {
+          currentJob.bluesheets.forEach((bluesheet: any) => {
+            if (bluesheet.material_entries && bluesheet.material_entries.length > 0) {
+              bluesheet.material_entries.forEach((entry: any) => {
+                bluesheetMaterials.push({
+                  id: entry.id,
+                  material_name: entry.material_name,
+                  product_name: entry.product?.product_name || entry.product?.name,
+                  quantity: entry.quantity,
+                  unit: entry.unit,
+                  unit_cost: entry.unit_cost,
+                  unitCost: entry.unit_cost,
+                  price: entry.unit_cost,
+                  supplier: entry.product?.supplier?.company_name || entry.product?.supplier,
+                  supplier_sku: entry.product?.supplier_sku,
+                  jdp_sku: entry.product?.jdp_sku,
+                  sku: entry.product?.sku,
+                  stock_quantity: entry.quantity,
+                  bluesheet_id: bluesheet.id,
+                  bluesheet_date: bluesheet.date,
+                  bluesheet_notes: bluesheet.notes,
+                  product: entry.product,
+                  jdp_price: entry.product?.jdp_price,
+                  is_bluesheet_material: true
+                });
+              });
+            }
+          });
+        }
+        // Update materials state directly with fresh data
+        setMaterials(bluesheetMaterials);
       }
 
-      // Trigger materials refresh to show updated data
-      triggerRefreshMaterials();
+      // Reset flag after a short delay to allow state updates to complete
+      setTimeout(() => {
+        isRefreshingMaterialsRef.current = false;
+      }, 100);
 
     } catch (error) {
       console.error('Error refreshing job data:', error);
       toast.error('Failed to refresh job data');
+      isRefreshingMaterialsRef.current = false;
     }
   };
 
@@ -1719,8 +1762,16 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   };
 
   useEffect(() => {
-    fetchMaterials();
-  }, [job.id, refreshMaterials]);
+    // Skip fetch if we're in the middle of refreshing materials (to prevent blinking)
+    if (isRefreshingMaterialsRef.current) {
+      return;
+    }
+    
+    // Only fetch materials if job.bluesheets has actually changed
+    if (job.bluesheets) {
+      fetchMaterials();
+    }
+  }, [job.id, job.bluesheets]);
 
 
   const triggerRefreshMaterials = () => {

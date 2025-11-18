@@ -428,15 +428,14 @@ export function StaffDetailsPage({ staffId, staffDetails, isLoading, onBack }: S
       icon: Phone
     },
     {
-      label: 'Emergency Contact',
-      value: staff.emergencyContact || 'Not provided',
-      icon: Phone
+      label: 'DOB',
+      value: (staffDetails as any)?.date_of_birth || (staffDetails as any)?.dob || (staffDetails as any)?.dateOfBirth || 'Not provided',
+      icon: Calendar
     },
     {
       label: 'Address',
       value: staff.address || 'Not provided',
-      icon: MapPin,
-      colSpan: 2
+      icon: MapPin, 
     }
   ]
 
