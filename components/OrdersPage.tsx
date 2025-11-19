@@ -117,6 +117,14 @@ interface Customer {
   customerName: string
 }
 
+interface Contractor {
+  id?: string
+  contractor_name?: string
+  company_name?: string
+  email?: string
+  phone?: string
+}
+
 interface OrderFormData {
   id: string
   jobId: string
@@ -132,6 +140,7 @@ interface OrderFormData {
   tax_amount: number
   discount_amount: number
   customer: Customer
+  contractor?: Contractor
   orderItems: OrderItem[]
   job: Job
   notes: string
@@ -326,11 +335,20 @@ export function OrdersPage() {
           // Nested customer object
           customer: {
             id: apiOrder.customer?.id?.toString() || '',
+            customerName: apiOrder.customer?.customer_name || '',
             email: apiOrder.customer?.email || '',
             phone: apiOrder.customer?.phone || '',
-            companyName: apiOrder.company_name || '',
-            customerName: apiOrder.customer_name || '',
+            companyName: apiOrder.customer?.company_name || '',
           },
+
+          // Contractor object (if available)
+          contractor: apiOrder.contractor ? {
+            id: apiOrder.contractor?.id?.toString(),
+            contractor_name: apiOrder.contractor?.contractor_name,
+            company_name: apiOrder.contractor?.company_name,
+            email: apiOrder.contractor?.email,
+            phone: apiOrder.contractor?.phone,
+          } : undefined,
 
           // Order items
           orderItems: apiOrder.order_items?.map((item: any) => ({
@@ -1298,13 +1316,13 @@ export function OrdersPage() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
                       <User className="h-4 w-4 text-primary" />
-                      Customer Info
+                      Customer / Contractor Info
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2 text-sm">
-                    <div>
+                    <div className="flex items-center gap-1">
                       <span className="text-muted-foreground">Customer:</span>
-                      <div className="font-medium">{selectedOrder?.customer?.customerName}</div>
+                      <div className="font-medium">{selectedOrder?.customer?.customerName || selectedOrder?.contractor?.contractor_name}</div>
                     </div>
                     {/* {selectedOrder.contractorName && (
                       <div>
@@ -1314,11 +1332,11 @@ export function OrdersPage() {
                     )} */}
                     <div className="flex items-center gap-1">
                       <Mail className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-muted-foreground">{selectedOrder?.customer?.email}</span>
+                      <span className="text-muted-foreground">{selectedOrder?.customer?.email || selectedOrder?.contractor?.email}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Phone className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-muted-foreground">{selectedOrder?.customer?.phone}</span>
+                      <span className="text-muted-foreground">{selectedOrder?.customer?.phone || selectedOrder?.contractor?.phone}</span>
                     </div>
                   </CardContent>
                 </Card>

@@ -109,8 +109,8 @@ export function ForgotPasswordScreen({ onStepChange }: ForgotPasswordScreenProps
               <Input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email/ phone number"
+                onChange={(e) => setEmail(e.target.value.toLowerCase())}
+                placeholder="Enter your email address"
                 className="h-[50px] rounded-full border border-[#00a1ff] text-center"
               />
             </div>

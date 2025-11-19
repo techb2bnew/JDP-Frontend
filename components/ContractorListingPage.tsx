@@ -1355,12 +1355,6 @@ export function ContractorListingPage() {
       newExpanded.add(contractorId)
     }
     setExpandedContractors(newExpanded)
-    
-    if (!newExpanded.has(contractorId) && selectedContractor === contractorId) {
-      setSelectedContractor(null)
-      setSelectedJob(null)
-      setSelectedSubJob(null)
-    }
   }
 
   const toggleJob = (jobId: string) => {
@@ -1384,12 +1378,18 @@ export function ContractorListingPage() {
   }
 
   const selectContractor = (contractorId: string) => {
-    setSelectedContractor(contractorId)
     setSelectedJob(null)
     setSelectedSubJob(null)
+    setEnhancedJobData(null)
+    setSelectedContractor(contractorId)
     setShowContractorDetails(true)
+    // Ensure contractor is expanded when selected
     if (!expandedContractors.has(contractorId)) {
-      toggleContractor(contractorId)
+      setExpandedContractors(prev => {
+        const newSet = new Set(prev)
+        newSet.add(contractorId)
+        return newSet
+      })
     }
   }
 
@@ -2803,21 +2803,14 @@ export function ContractorListingPage() {
 
         {/* Contractor Details */}
         <div className=" ">
-          {showContractorDetails && selectedContractor && !selectedJob ? (
+          {selectedContractor && !selectedJob ? (
             <div>
               <ContractorDetailsPage 
                 contractorId={selectedContractor} 
                 onBack={handleBackFromContractorDetails}
               />
             </div>
-          ) : selectedJob ? (
-            <div>
-              
-            </div>
-          ) : (
-            <>
-            </>
-          )}
+          ) : null}
         </div>
 
         {selectedJobData && selectedContractorData ? (
