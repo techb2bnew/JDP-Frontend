@@ -301,6 +301,7 @@ export default function RolePermission() {
     'orders',
     'invoices',
     'customers',
+    'contractors',
     'suppliers',
     'reports',
     'staff',
@@ -779,7 +780,7 @@ export default function RolePermission() {
         if (response.ok) {
           const responseData = await response.json();
           if (responseData.success) {
-            toast.success('Role updated successfully!');
+            // toast.success('Role updated successfully!');
 
             // Check if this is the current user's role being updated
             const currentUser = JSON.parse(localStorage.getItem('jdp_auth') || '{}').user;

@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -69,6 +70,7 @@ interface Job {
 
 export function JobManagementPage() {
   const { hasPermission } = usePermissions()
+  const searchParams = useSearchParams()
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
   const [currentView, setCurrentView] = useState<'list' | 'details' | 'create' | 'timesheets' | 'invoices' | 'approvals'>('list')
@@ -185,6 +187,14 @@ export function JobManagementPage() {
     fetchJobs(1)
     fetchJobStats()
   }, [])
+
+  // Check for create query parameter and set view accordingly
+  useEffect(() => {
+    const createParam = searchParams.get('create')
+    if (createParam === 'true') {
+      setCurrentView('create')
+    }
+  }, [searchParams])
 
   // Handle page change
   const handlePageChange = (page: number) => {

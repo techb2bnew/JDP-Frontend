@@ -105,15 +105,15 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       module: "customers",
       requiredActions: ["view", "create", "edit", "delete"]
     },
-    {
-      id: "jobs",
-      name: "Job Management",
-      icon: Briefcase,
-      href: "/jobs",
-      description: "Create and manage job postings",
-      module: "jobs",
-      requiredActions: ["view", "create", "edit", "delete"]
-    },
+    // {
+    //   id: "jobs",
+    //   name: "Job Management",
+    //   icon: Briefcase,
+    //   href: "/jobs",
+    //   description: "Create and manage job postings",
+    //   module: "jobs",
+    //   requiredActions: ["view", "create", "edit", "delete"]
+    // },
     {
       id: "tracking",
       name: "Live Tracking",
@@ -129,7 +129,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       icon: UserCheck,
       href: "/contractors",
       description: "Directory of available contractors",
-      module: "suppliers",
+      module: "contractors",
       requiredActions: ["view", "create", "edit", "delete"]
     },
     {

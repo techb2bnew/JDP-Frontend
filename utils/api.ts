@@ -2217,6 +2217,46 @@ getTimesheetDashboardStats: async () => {
     return transformedData;
   },
 
+  // Get jobs by customer ID
+  getJobsByCustomer: async (customerId: string | number) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const response = await fetch(
+      `${apiBaseUrl}/job/getJobsByCustomer/${customerId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to fetch customer jobs");
+    }
+
+    const result = await response.json();
+
+    if (!result.success || !result.data) {
+      return {
+        success: false,
+        data: [],
+      };
+    }
+
+    return {
+      success: true,
+      data: result.data,
+    };
+  },
+
   // Contractors
   getContractors: async (page: number = 1, limit: number = 10) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;

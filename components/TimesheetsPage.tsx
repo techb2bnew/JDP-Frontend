@@ -244,6 +244,15 @@ const updateTimesheetStatus = async (item: TimesheetItem, status: 'Approved' | '
     // Reload listing data after successful API call
     await fetchAlltimesheets();
 
+    // Refresh dashboard stats after status update
+    try {
+      const statsResponse = await apiClient.getTimesheetDashboardStats();
+      console.log("Dashboard stats after update", statsResponse);
+      setDashboardStats(statsResponse?.data);
+    } catch (statsError) {
+      console.error('Error fetching dashboard stats after update:', statsError);
+    }
+
   } catch (error) {
     console.error(`Error updating timesheet to ${status}:`, error);
     alert(`Failed to update timesheet to ${status}.`);
@@ -669,16 +678,7 @@ const fetchTimesheetsByDateRange = async () => {
                             </Button>
                         )}
 
-                        {/* {item.status.toLowerCase() === 'draft' && (
-                          
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="border-red-500 text-red-500 hover:bg-red-50 hover:text-red-600"
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        )} */}
+                       
 
                         {item.status.toLowerCase() === 'draft' && (
                           <>

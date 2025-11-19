@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { toast } from 'sonner'
 import jsPDF from 'jspdf'
 import { globalApiCall } from '../utils/globalApiHandler'
+import { usePermissions } from '../contexts/PermissionContext'
 import { ArrowUpAZ, Edit, Trash2 } from 'lucide-react'
 import { 
   ChevronDown, 
@@ -895,6 +896,7 @@ const InvoiceTemplate = ({ subJob, job, contractor }: { subJob: SubJob, job: Job
 
 export function ContractorListingPage() {
   const router = useRouter()
+  const { hasPermission } = usePermissions()
   const [selectedContractor, setSelectedContractor] = useState<string | null>(null)
   const [selectedJob, setSelectedJob] = useState<string | null>(null)
   const [selectedSubJob, setSelectedSubJob] = useState<string | null>(null)
@@ -2643,6 +2645,8 @@ export function ContractorListingPage() {
           <input 
             type="text" 
             placeholder="Search contractors or jobs..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-transparent"
           />
         </div>
@@ -2650,7 +2654,7 @@ export function ContractorListingPage() {
         {/* Contractor Listings */}
         <ScrollArea className="flex-1 bg-white">
           <div className="p-2">
-            {contractors.map((contractor) => {
+            {filteredContractors.map((contractor) => {
               const contractorJobs = contractor.jobs || []
               const isExpanded = expandedContractors.has(contractor.id.toString())
               const isSelected = selectedContractor === contractor.id.toString() && !selectedJob
@@ -2784,19 +2788,21 @@ export function ContractorListingPage() {
       {/* Right Content - Job Details */}
       <div className="flex-1 bg-white">
         <div className="p-4 border-b border-gray-200">
-          <div className="flex justify-end">
-            <Button 
-              className="gap-2 text-white" 
-              onClick={() => setShowCreateContractModal(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Create Contract
-            </Button>
-          </div>
+          {hasPermission('contractors', 'create') && (
+            <div className="flex justify-end">
+              <Button 
+                className="gap-2 text-white" 
+                onClick={() => setShowCreateContractModal(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Create Contract
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Contractor Details */}
-        <div className="p-6 space-y-6">
+        <div className=" ">
           {showContractorDetails && selectedContractor && !selectedJob ? (
             <div>
               <ContractorDetailsPage 
@@ -2806,13 +2812,7 @@ export function ContractorListingPage() {
             </div>
           ) : selectedJob ? (
             <div>
-              {/* Job Details will be shown here */}
-              <div className="bg-white rounded-lg border p-6">
-                <h2 className="text-xl font-semibold mb-4">Job Details</h2>
-                <p className="text-gray-600">Job ID: {selectedJob}</p>
-                <p className="text-gray-600">Contractor ID: {selectedContractor}</p>
-                {/* Add more job details as needed */}
-              </div>
+              
             </div>
           ) : (
             <>
@@ -3106,12 +3106,8 @@ export function ContractorListingPage() {
 
           </div>
         ) : (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <Building className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Job</h3>
-              <p className="text-sm text-gray-500">Choose a contractor and job from the sidebar to view detailed information</p>
-            </div>
+          <div className="">
+           
           </div>
         )}
       </div>

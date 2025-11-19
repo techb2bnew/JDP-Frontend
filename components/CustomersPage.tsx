@@ -35,7 +35,8 @@ import {
   Minus,
   CheckCircle,
   Activity,
-  Plus
+  Plus,
+  DollarSign
 } from 'lucide-react';
 import {
   Dialog,
@@ -115,12 +116,28 @@ export function CustomersPage() {
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set())
   const [expandedSubJobs, setExpandedSubJobs] = useState<Set<string>>(new Set())
   const [customersWithJobs, setCustomersWithJobs] = useState<any[]>([])
+  const [allCustomersWithJobs, setAllCustomersWithJobs] = useState<any[]>([]) // Store original list for filtering
 
   // Fetch customers data and stats on component mount and when page changes
   useEffect(() => {
     fetchCustomersData(currentPage, itemsPerPage);
     fetchCustomerStats();
   }, [currentPage, itemsPerPage]);
+
+  // Auto-select first customer when customers are loaded
+  useEffect(() => {
+    if (customersWithJobs.length > 0 && !selectedCustomer) {
+      const firstCustomer = customersWithJobs[0];
+      if (firstCustomer && firstCustomer.id) {
+        // Use a timeout to avoid dependency issues
+        const timer = setTimeout(() => {
+          selectCustomer(firstCustomer.id.toString());
+        }, 100);
+        return () => clearTimeout(timer);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customersWithJobs.length]);
 
   // Helper functions for customer listing (similar to ContractorListingPage)
   const toggleCustomer = (customerId: string) => {
@@ -163,18 +180,48 @@ export function CustomersPage() {
     setSelectedCustomer(customerId);
     setSelectedJob(null);
     setSelectedSubJob(null);
+    setEnhancedJobData(null);
+    // Jobs are already loaded in fetchCustomersWithJobs, no need to fetch again
   };
 
-  const selectJob = (jobId: string, customerId: string) => {
+  const selectJob = async (jobId: string, customerId: string) => {
     setSelectedJob(jobId);
     setSelectedCustomer(customerId);
     setSelectedSubJob(null);
+    
+    // Clear previous enhanced job data
+    setEnhancedJobData(null);
+    
+    // Fetch enhanced job data for the main job
+    try { 
+      const jobDetails = await apiClient.getJobById(jobId) 
+      
+      // Store the enhanced job data for use in JobDetailsPage
+      setEnhancedJobData(jobDetails)
+      console.log('Enhanced main job data set:', jobDetails)
+    } catch (error) {
+      console.error('Error fetching main job details:', error)
+    }
   };
 
-  const selectSubJob = (subJobId: string, jobId: string, customerId: string) => {
+  const selectSubJob = async (subJobId: string, jobId: string, customerId: string) => {
     setSelectedSubJob(subJobId);
     setSelectedJob(jobId);
     setSelectedCustomer(customerId);
+    
+    // Clear previous enhanced job data
+    setEnhancedJobData(null);
+    
+    // Fetch the latest job details from API exactly like JobManagementPage does
+    try { 
+      const jobDetails = await apiClient.getJobById(subJobId) 
+      
+      // Store the enhanced job data for use in JobDetailsPage
+      setEnhancedJobData(jobDetails)
+      console.log('Enhanced job data set:', jobDetails)
+    } catch (error) {
+      console.error('Error fetching job details:', error)
+    }
   };
 
   // Helper functions for status badges and icons (similar to ContractorListingPage)
@@ -377,51 +424,89 @@ export function CustomersPage() {
     }
   };
 
-  // Fetch customers with jobs (similar to contractors)
+  // Fetch customers with jobs using getJobsByCustomer API
   const fetchCustomersWithJobs = async () => {
     try {
       setIsLoadingCustomers(true);
       
-      const response = await globalApiCall(`${apiBaseUrl}/customer/getCustomers?include_jobs=true&page=${currentPage}&limit=${itemsPerPage}`, {
+      const response = await globalApiCall(`${apiBaseUrl}/job/getJobsByCustomer`, {
         method: 'GET'
       });
 
       const responseData = await response.json();
-      console.log('Customers with Jobs API Response:', responseData);
+      console.log('Jobs by Customer API Response:', responseData);
 
-      if (responseData.success && responseData.data) {
-        setCustomersWithJobs(responseData.data.customers || []);
-        setTotalCustomers(responseData.data.pagination?.total || 0);
+      if (responseData.success && responseData.data && Array.isArray(responseData.data)) {
+        // Group jobs by customer_id
+        const customerJobsMap = new Map();
+        
+        responseData.data.forEach((job: any) => {
+          const customerId = job.customer_id || job.customer?.id;
+          if (!customerId) return;
+          
+          if (!customerJobsMap.has(customerId)) {
+            // Create customer object from first job's customer data
+            customerJobsMap.set(customerId, {
+              id: customerId,
+              customer_name: job.customer?.customer_name || '',
+              name: job.customer?.customer_name || '',
+              email: job.customer?.email || '',
+              phone: job.customer?.phone || '',
+              company_name: job.customer?.company_name || '',
+              address: job.customer?.address || '',
+              created_at: job.customer?.created_at || job.created_at || '',
+              jobs: []
+            });
+          }
+          
+          // Add job to customer's jobs array
+          const customer = customerJobsMap.get(customerId);
+          customer.jobs.push(job);
+        });
+        
+        // Convert map to array
+        const customersWithJobsArray = Array.from(customerJobsMap.values());
+        
+        // Calculate total jobs for each customer
+        customersWithJobsArray.forEach((customer: any) => {
+          customer.total_jobs = customer.jobs.length;
+        });
+        
+        setCustomersWithJobs(customersWithJobsArray);
+        setAllCustomersWithJobs(customersWithJobsArray); // Store original list
+        setTotalCustomers(customersWithJobsArray.length);
         
         // Also set for table view compatibility
-        const transformedCustomers = (responseData.data?.customers || []).map((apiCustomer: any) => ({
+        const transformedCustomers = customersWithJobsArray.map((apiCustomer: any) => ({
           id: apiCustomer.id?.toString() || `CUST-${Date.now()}`,
-          name: apiCustomer.customer_name || '',
+          name: apiCustomer.customer_name || apiCustomer.name || '',
           email: apiCustomer.email || '',
           phone: apiCustomer.phone || '',
           location: apiCustomer.address || '',
-          orders: apiCustomer.total_orders || 0,
-          totalSpent: apiCustomer.total_spent || 0,
-          joinDate: apiCustomer.created_at ? new Date(apiCustomer.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-          status: apiCustomer.status || 'active',
+          orders: 0,
+          totalSpent: 0,
+          joinDate: new Date().toISOString().split('T')[0],
+          status: 'active',
           company: apiCustomer.company_name || '',
-          contactPerson: apiCustomer.contact_person || '',
+          contactPerson: '',
           avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face',
           jobs: apiCustomer.jobs || [],
-          total_jobs: apiCustomer.jobs?.length || 0
+          total_jobs: apiCustomer.total_jobs || 0
         }));
         setCustomersData(transformedCustomers);
         setFilteredCustomers(transformedCustomers);
       } else {
-        console.error('Invalid customers API response structure:', responseData);
+        console.error('Invalid jobs by customer API response structure:', responseData);
         setCustomersWithJobs([]);
         setCustomersData([]);
+        setTotalCustomers(0);
       }
     } catch (error) {
-      console.error('Error fetching customers with jobs:', error);
+      console.error('Error fetching jobs by customer:', error);
       if (!(error instanceof Error && error.message?.includes('Session expired'))) {
         setCustomersWithJobs([]);
         setCustomersData([]);
+        setTotalCustomers(0);
       }
     } finally {
       setIsLoadingCustomers(false);
@@ -433,52 +518,22 @@ export function CustomersPage() {
     await fetchCustomersWithJobs();
   };
 
-  const fetchBySearchCustomers = async () => {
-  if (!searchTerm.trim()) return;
-
-  setIsLoadingCustomers(true);
-
-  try {
-    const response = await apiClient.searchCutomerByQuery(searchTerm.trim(), 1, 10);
-    const customersData = response.data;
-    const customersList = customersData?.customers || [];
-
-    const transformedData = customersList.map((customer: any) => ({
-      id: customer.id?.toString() || `CUST-${Date.now()}`,
-      name: customer.customer_name || '',
-      email: customer.email || '',
-      phone: customer.phone || '',
-      location: customer.address || '',
-      orders: customer.total_orders || 0,
-      totalSpent: customer.total_spent || 0,
-      joinDate: customer.created_at ? new Date(customer.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-      status: customer.status || 'active',
-      company: customer.company_name || '',
-      contactPerson: customer.contact_person || '',
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face'
-    }));
-
-    setFilteredCustomers(transformedData);
-    setTotalCustomers(customersData.pagination.total || transformedData.length);
-  } catch (error) {
-    console.error('Customer search error:', error);
-    setFilteredCustomers([]);
-  } finally {
-    setIsLoadingCustomers(false);
-  }
-};
-
-useEffect(() => {
-  const debounceTimeout = setTimeout(() => {
+  // Client-side filtering by customer name
+  useEffect(() => {
     if (!searchTerm.trim()) {
-      fetchCustomersData(currentPage, itemsPerPage); 
+      // No search term, show all customers
+      setCustomersWithJobs(allCustomersWithJobs);
     } else {
-      fetchBySearchCustomers();
+      // Filter customers by name (case-insensitive)
+      const filtered = allCustomersWithJobs.filter((customer: any) => {
+        const customerName = (customer.customer_name || customer.name || '').toLowerCase();
+        const searchLower = searchTerm.toLowerCase();
+        return customerName.includes(searchLower);
+      });
+      
+      setCustomersWithJobs(filtered);
     }
-  }, 500);
-
-  return () => clearTimeout(debounceTimeout);
-}, [searchTerm, currentPage, itemsPerPage]);
+  }, [searchTerm, allCustomersWithJobs]);
 
 
   const handleUpdateCustomer = async () => {
@@ -793,7 +848,7 @@ useEffect(() => {
         </div>
 
         {/* Customer Listings */}
-        <ScrollArea className="flex-1 bg-white">
+        <ScrollArea className="flex-1 bg-white overflow-y-auto h-full">
           <div className="p-2">
             {isLoadingCustomers ? (
               <div className="flex items-center justify-center py-8">
@@ -1172,77 +1227,134 @@ useEffect(() => {
               </div>
             )}
           </div>
-        ) : (
+        ) : selectedCustomerData ? (
           <div className="p-6">
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <Card className='bg-blue-100 border border-blue-300'>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    <div className="flex gap-2 items-center text-blue-500">
-                      <Users />
-                      Total Customers
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {isLoadingStats ? (
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-                    ) : (
-                      customerStats.total
-                    )}
-                  </div>
-                  <p className='text-blue-500'>All registered customers</p>
-                </CardContent>
-              </Card>
-
-              <Card className='bg-green-50 border border-green-300'>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    <div className="flex gap-2 items-center text-green-500">
-                      <UserCheck />
-                      Active Customers
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {isLoadingStats ? (
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div>
-                    ) : (
-                      customerStats.active
-                    )}
-                  </div> 
-                </CardContent>
-              </Card>
-              <Card className='bg-red-50 border border-red-300'>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    <div className="flex gap-2 items-center text-red-500">
-                      <UserRoundX />
-                      Inactive Customers
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-red-500">
-                    {isLoadingStats ? (
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-500 "></div>
-                    ) : (
-                      customerStats.inactive
-                    )}
-                  </div> 
-                </CardContent>
-              </Card>
+            {/* Customer Details Header */}
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">{selectedCustomerData.customer_name || selectedCustomerData.name}</h1>
+                <p className="text-lg text-gray-600">Customer Details</p>
+              </div>
+              <Badge 
+                variant="default"
+                className="px-3 py-1 bg-green-100 text-green-800 border-green-200"
+              >
+                Active
+              </Badge>
             </div>
 
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <Building className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Job</h3>
-                <p className="text-sm text-gray-500">Choose a customer and job from the sidebar to view detailed information</p>
-              </div>
+            {/* Contact Information Card */}
+            <Card className="mb-8">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <User className="w-5 h-5 text-primary" />
+                  <h3 className="text-lg font-semibold text-gray-900">Contact Information</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Left Column */}
+                  <div>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <Mail className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <span className="text-sm text-gray-600">Email</span>
+                          <p className="text-gray-900">{selectedCustomerData.email || 'N/A'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <MapPin className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <span className="text-sm text-gray-600">Address</span>
+                          <p className="text-gray-900">{selectedCustomerData.address || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column */}
+                  <div>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <Phone className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <span className="text-sm text-gray-600">Phone</span>
+                          <p className="text-gray-900">{selectedCustomerData.phone || 'N/A'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <CalendarDays className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <span className="text-sm text-gray-600">Join Date</span>
+                          <p className="text-gray-900">
+                            {selectedCustomerData.created_at 
+                              ? formatDate(selectedCustomerData.created_at)
+                              : selectedCustomerData.jobs?.[0]?.customer?.created_at 
+                              ? formatDate(selectedCustomerData.jobs[0].customer.created_at)
+                              : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Job Statistics Cards */}
+            {(() => {
+              const jobs = selectedCustomerData.jobs || [];
+              const totalJobs = jobs.length;
+              const completedJobs = jobs.filter((job: any) => job.status === 'completed' || job.status === 'complete').length;
+              const ongoingJobs = jobs.filter((job: any) => job.status === 'in_progress' || job.status === 'ongoing' || job.status === 'in-progress').length;
+              const totalRevenue = jobs.reduce((sum: number, job: any) => {
+                return sum + (job.totalEstimatedCost || job.estimated_cost || 0);
+              }, 0);
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  {/* Total Jobs */}
+                  <Card>
+                    <CardContent className="p-6 text-center">
+                      <Briefcase className="w-8 h-8 text-primary mx-auto mb-3" />
+                      <div className="text-2xl font-bold text-gray-900 mb-1">{totalJobs}</div>
+                      <div className="text-sm text-gray-600">Total Jobs</div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Completed */}
+                  <Card>
+                    <CardContent className="p-6 text-center">
+                      <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-3" />
+                      <div className="text-2xl font-bold text-gray-900 mb-1">{completedJobs}</div>
+                      <div className="text-sm text-gray-600">Completed</div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Ongoing */}
+                  <Card>
+                    <CardContent className="p-6 text-center">
+                      <Activity className="w-8 h-8 text-blue-500 mx-auto mb-3" />
+                      <div className="text-2xl font-bold text-gray-900 mb-1">{ongoingJobs}</div>
+                      <div className="text-sm text-gray-600">Ongoing</div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Total Revenue */}
+                  <Card>
+                    <CardContent className="p-6 text-center">
+                      <DollarSign className="w-8 h-8 text-green-600 mx-auto mb-3" />
+                      <div className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(totalRevenue)}</div>
+                      <div className="text-sm text-gray-600">Total Revenue</div>
+                    </CardContent>
+                  </Card>
+                </div>
+              );
+            })()}
+          </div>
+        ) : (
+          <div className="p-6">
+            <div className="text-center py-12">
+              <p className="text-gray-500">Select a customer to view details</p>
             </div>
           </div>
         )}

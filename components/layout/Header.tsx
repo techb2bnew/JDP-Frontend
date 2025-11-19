@@ -20,6 +20,9 @@ import { useTheme } from "../../contexts/ThemeContext"
 import { toast } from "sonner"
 import { usePermissions } from '../../contexts/PermissionContext'
 import { supabase } from '../../lib/supabase'
+import { NewInvoiceDialog } from '../invoices/NewInvoiceDialog'
+import { apiClient } from '../../utils/api'
+import { Invoice } from '../../types/invoice'
 
 import {
   Plus,
@@ -64,6 +67,8 @@ export function Header({
   const [loading, setLoading] = useState(false)
   const hasFetchedNotifications = useRef(false)
   const [realTimeUnreadCount, setRealTimeUnreadCount] = useState<number | null>(null)
+  const [showNewInvoiceDialog, setShowNewInvoiceDialog] = useState(false)
+  const [localJobs, setLocalJobs] = useState<any[]>([])
 
  
   const getUserData = () => {
@@ -333,6 +338,26 @@ const handleNotificationClick = () => {
     ? realTimeUnreadCount 
     : notifications.filter(n => n.unread).length
 
+  // Fetch jobs for invoice dialog
+  useEffect(() => {
+    const fetchJobs = async () => {
+      try {
+        const res = await apiClient.getJobs();
+        setLocalJobs(res.data || []);
+      } catch (err) {
+        console.error("Error fetching jobs:", err);
+      }
+    };
+
+    fetchJobs();
+  }, []);
+
+  // Handle invoice save
+  const handleSaveInvoice = (newInvoiceData: Partial<Invoice>) => {
+    toast.success('Invoice created successfully!');
+    setShowNewInvoiceDialog(false);
+  }
+
 
   const getPageTitle = (path: string): string => {
     const titles: Record<string, string> = {
@@ -417,21 +442,22 @@ const handleNotificationClick = () => {
 
           <div className="flex items-center space-x-3">
               {hasPermission('jobs', 'create') && (
-            <Link href={'/jobs'}
+            <Link href={'/jobs?create=true'}
               className="flex items-center w-[120px] p-2 justify-center border rounded gap-2"
             >
               <Briefcase className="h-4 w-4" />
-              View Jobs
+              Add Jobs
             </Link>
-              )}
-              {/* {hasPermission('jobs', 'create') && (
-            <Button
-              className="bg-primary text-white hover:bg-[#0090e6] gap-2 text-[#fff]"
-            >
-              <Plus className="h-4 w-4" />
-              Create New Estimate
-            </Button>
-              )} */}
+              )} 
+            {hasPermission('invoices', 'create') && (
+              <Button
+                onClick={() => setShowNewInvoiceDialog(true)}
+                className="bg-primary text-white hover:bg-[#0090e6] gap-2 text-[#fff]"
+              >
+                <Plus className="h-4 w-4" />
+                Create New Estimate
+              </Button>
+            )} 
 
             {/* Theme Toggle */}
             {/* <Tooltip>
@@ -554,11 +580,23 @@ const handleNotificationClick = () => {
                     <span>Logout</span>
                   </div>
                 </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-      </header>
-    </TooltipProvider>
-  )
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+
+    {/* New Invoice Dialog */}
+    <NewInvoiceDialog
+      open={showNewInvoiceDialog}
+      onOpenChange={setShowNewInvoiceDialog}
+      onSave={handleSaveInvoice}
+      jobs={localJobs}
+      onInvoiceSaved={() => {
+        setShowNewInvoiceDialog(false);
+        toast.success('Invoice created successfully!');
+      }}
+    />
+  </header>
+</TooltipProvider>
+)
 }
