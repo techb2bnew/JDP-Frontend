@@ -51,6 +51,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from './ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { apiClient } from '@/utils/api'
+import Autocomplete from 'react-google-autocomplete'
 
 // Static customers data removed - now using API data from /customer/getCustomers
 
@@ -123,6 +124,154 @@ export function CustomersPage() {
     fetchCustomersData(currentPage, itemsPerPage);
     fetchCustomerStats();
   }, [currentPage, itemsPerPage]);
+
+  // Fix Google Autocomplete dropdown z-index and pointer events for modal
+  useEffect(() => {
+    if (!showAddCustomerModal) return;
+
+    const style = document.createElement('style');
+    style.id = 'google-autocomplete-styles';
+    style.textContent = `
+      .pac-container {
+        z-index: 999999 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+        margin-top: 4px !important;
+        position: absolute !important;
+      }
+      .pac-item {
+        padding: 8px 12px !important;
+        cursor: pointer !important;
+        pointer-events: auto !important;
+      }
+      .pac-item:hover {
+        background-color: #f3f4f6 !important;
+      }
+      .pac-item-selected {
+        background-color: #e5e7eb !important;
+      }
+      /* Disable DialogOverlay when pac-container is visible */
+      .pac-container:not([style*="display: none"]) ~ * [data-radix-dialog-overlay],
+      body:has(.pac-container:not([style*="display: none"])) [data-radix-dialog-overlay] {
+        pointer-events: none !important;
+      }
+      /* Re-enable DialogContent */
+      [data-radix-dialog-content] {
+        pointer-events: auto !important;
+      }
+    `;
+    // Remove existing style if present
+    const existingStyle = document.getElementById('google-autocomplete-styles');
+    if (existingStyle) {
+      document.head.removeChild(existingStyle);
+    }
+    document.head.appendChild(style);
+
+    // Prevent modal close when clicking on autocomplete dropdown
+    const handleOverlayClick = (e: Event) => {
+      const target = e.target as HTMLElement;
+      // Check if click is on pac-container or its children
+      if (target.closest('.pac-container')) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    };
+
+    // Monitor for pac-container visibility and disable overlay
+    const observer = new MutationObserver(() => {
+      const pacContainer = document.querySelector('.pac-container');
+      const overlay = document.querySelector('[data-radix-dialog-overlay]');
+      
+      if (pacContainer && overlay) {
+        const isVisible = pacContainer.getAttribute('style')?.includes('display: none') === false;
+        if (isVisible || window.getComputedStyle(pacContainer).display !== 'none') {
+          (overlay as HTMLElement).style.pointerEvents = 'none';
+          // Add click handler to prevent modal close
+          overlay.addEventListener('click', handleOverlayClick as EventListener, true);
+        } else {
+          (overlay as HTMLElement).style.pointerEvents = 'auto';
+          overlay.removeEventListener('click', handleOverlayClick as EventListener, true);
+        }
+      }
+    });
+
+    // Observe body for pac-container changes
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style', 'class']
+    });
+
+    // Also check on focus/blur of address input
+    const handleFocus = () => {
+      const overlay = document.querySelector('[data-radix-dialog-overlay]');
+      if (overlay) {
+        (overlay as HTMLElement).style.pointerEvents = 'none';
+      }
+    };
+
+    const handleBlur = () => {
+      // Longer delay to allow click on dropdown item to complete
+      setTimeout(() => {
+        const pacContainer = document.querySelector('.pac-container');
+        const overlay = document.querySelector('[data-radix-dialog-overlay]');
+        if (overlay && (!pacContainer || window.getComputedStyle(pacContainer).display === 'none')) {
+          (overlay as HTMLElement).style.pointerEvents = 'auto';
+        }
+      }, 500);
+    };
+
+    // Wait for input to be rendered, then attach event listeners
+    const attachListeners = () => {
+      const addressInput = document.querySelector('input[placeholder="Enter full address"]');
+      if (addressInput) {
+        addressInput.addEventListener('focus', handleFocus);
+        addressInput.addEventListener('blur', handleBlur);
+        return addressInput;
+      }
+      return null;
+    };
+
+    // Try immediately
+    let addressInput = attachListeners();
+    
+    // If not found, wait a bit and try again
+    if (!addressInput) {
+      const timer = setTimeout(() => {
+        addressInput = attachListeners();
+      }, 100);
+      
+      return () => {
+        clearTimeout(timer);
+        observer.disconnect();
+        const styleToRemove = document.getElementById('google-autocomplete-styles');
+        if (styleToRemove) {
+          document.head.removeChild(styleToRemove);
+        }
+        if (addressInput) {
+          addressInput.removeEventListener('focus', handleFocus);
+          addressInput.removeEventListener('blur', handleBlur);
+        }
+      };
+    }
+
+    return () => {
+      observer.disconnect();
+      const overlay = document.querySelector('[data-radix-dialog-overlay]');
+      if (overlay) {
+        overlay.removeEventListener('click', handleOverlayClick as EventListener, true);
+      }
+      const styleToRemove = document.getElementById('google-autocomplete-styles');
+      if (styleToRemove) {
+        document.head.removeChild(styleToRemove);
+      }
+      if (addressInput) {
+        addressInput.removeEventListener('focus', handleFocus);
+        addressInput.removeEventListener('blur', handleBlur);
+      }
+    };
+  }, [showAddCustomerModal]);
 
   // Auto-select first customer when customers are loaded
   useEffect(() => {
@@ -309,6 +458,9 @@ export function CustomersPage() {
       if (phoneDigits.length !== 10) {
         errors.phone = 'Phone number must be exactly 10 digits';
       }
+    }
+    if (!customerFormData.address.trim()) {
+      errors.address = 'Address is required';
     }
 
     setValidationErrors(errors);
@@ -874,8 +1026,8 @@ useEffect(() => {
                       <CollapsibleTrigger asChild>
                         <Button
                           variant="ghost"
-                          className={`w-full justify-start p-3 text-left h-auto hover:bg-primary/5 ${
-                            isSelected ? 'bg-primary/10 shadow-sm border border-primary/20' : ''
+                          className={`w-full justify-start p-3 text-left h-auto hover:bg-blue-50 ${
+                            isSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
                           }`}
                           onClick={() => selectCustomer(customer.id.toString())}
                         >
@@ -916,8 +1068,8 @@ useEffect(() => {
                                     <CollapsibleTrigger asChild>
                                       <Button
                                         variant="ghost"
-                                        className={`w-full justify-start p-2 text-left h-auto text-sm hover:bg-primary/5 ${
-                                          isJobSelected ? 'bg-primary/10 shadow-sm border border-primary/20' : ''
+                                        className={`w-full justify-start p-2 text-left h-auto text-sm hover:bg-blue-50 ${
+                                          isJobSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
                                         }`}
                                         onClick={() => selectJob(job.id.toString(), customer.id.toString())}
                                       >
@@ -936,7 +1088,7 @@ useEffect(() => {
                                                 {job.job_title || job.title}
                                               </div>
                                               <div className="text-xs text-gray-500">
-                                                {job.status} • {job.progress || 0}%
+                                                {job.status}  
                                               </div>
                                             </div>
                                           </div>
@@ -954,8 +1106,8 @@ useEffect(() => {
                                               <Minus className="h-3 w-3 text-primary/30 mt-1.5 mr-2" />
                                               <Button
                                                 variant="ghost"
-                                                className={`flex-1 justify-start p-1.5 text-left h-auto text-xs hover:bg-primary/5 ${
-                                                  isSubJobSelected ? 'bg-primary/10 shadow-sm border border-primary/20' : ''
+                                                className={`flex-1 justify-start p-1.5 text-left h-auto text-xs hover:bg-blue-50 ${
+                                                  isSubJobSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
                                                 }`}
                                                 onClick={() => selectSubJob(subJob.id.toString(), job.id.toString(), customer.id.toString())}
                                               >
@@ -965,9 +1117,7 @@ useEffect(() => {
                                                     <div className="text-xs text-gray-700 truncate">
                                                       {subJob.job_title || subJob.title}
                                                     </div>
-                                                    <div className="text-xs text-gray-500">
-                                                      {subJob.progress || 0}% • 0h
-                                                    </div>
+                                                   
                                                   </div>
                                                 </div>
                                               </Button>
@@ -1377,7 +1527,17 @@ useEffect(() => {
         }
         setShowAddCustomerModal(open);
       }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent 
+          className="max-w-2xl overflow-visible" 
+          style={{ zIndex: 100 }}
+          onInteractOutside={(e) => {
+            // Prevent modal close when clicking on autocomplete dropdown
+            const target = e.target as HTMLElement;
+            if (target.closest('.pac-container')) {
+              e.preventDefault();
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle>
               {currentAction === 'add' ? 'Add New Customer' :
@@ -1549,15 +1709,57 @@ useEffect(() => {
                 </div>
 
                 {/* Address */}
-                <div>
-                  <Label className="mb-2" htmlFor="address">Address</Label>
-                  <Textarea
-                    id="address"
-                    value={customerFormData.address}
-                    onChange={(e) => setCustomerFormData({ ...customerFormData, address: e.target.value })}
+                <div className="relative">
+                  <Label className="mb-2" htmlFor="address">Address *</Label>
+                  <Autocomplete
+                    apiKey="AIzaSyBXNyT9zcGdvhAUCUEYTm6e_qPw26AOPgI"
+                    onPlaceSelected={(place: any) => {
+                      console.log('Place selected:', place);
+                      if (place) {
+                        // Keep overlay disabled during selection to prevent modal close
+                        const overlay = document.querySelector('[data-radix-dialog-overlay]');
+                        if (overlay) {
+                          (overlay as HTMLElement).style.pointerEvents = 'none';
+                        }
+                        
+                        // Use formatted_address if available, otherwise use name
+                        const address = place.formatted_address || place.name || '';
+                        if (address) {
+                          setCustomerFormData({ ...customerFormData, address });
+                          if (validationErrors.address) {
+                            setValidationErrors({ ...validationErrors, address: '' });
+                          }
+                        }
+                        
+                        // Re-enable overlay after a short delay
+                        setTimeout(() => {
+                          const pacContainer = document.querySelector('.pac-container');
+                          if (overlay && (!pacContainer || window.getComputedStyle(pacContainer).display === 'none')) {
+                            (overlay as HTMLElement).style.pointerEvents = 'auto';
+                          }
+                        }, 300);
+                      }
+                    }}
+                    options={{
+                      types: ['address'],
+                      componentRestrictions: { country: 'us' }
+                    }}
+                    defaultValue={customerFormData.address}
+                    onChange={(e: any) => {
+                      const value = e.target.value;
+                      setCustomerFormData({ ...customerFormData, address: value });
+                      if (validationErrors.address) {
+                        setValidationErrors({ ...validationErrors, address: '' });
+                      }
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent mt-1 ${
+                      validationErrors.address ? 'border-red-500' : 'border-gray-300'
+                    }`}
                     placeholder="Enter full address"
-                    className="mt-1"
-                  ></Textarea>
+                  />
+                  {validationErrors.address && (
+                    <p className="mt-1 text-sm text-red-600">{validationErrors.address}</p>
+                  )}
                 </div>
 
                 {/* Company */}

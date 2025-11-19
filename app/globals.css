@@ -171,7 +171,9 @@ body{
   border: 1px solid var(--info-border) !important;
   color: var(--info-text) !important;
 }
-
+.pac-container.pac-logo, .pac-item{
+  z-index: 99999999999 !important;
+}
 /* Hide TimeRangePicker calendar and clock dropdowns */
 .react-timerange-picker__calendar,
 .react-timerange-picker__clock {

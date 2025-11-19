@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Input } from './ui/input'
@@ -85,6 +86,7 @@ interface JobCreationPageProps {
 
 
 export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) {
+  const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
   const [selectedCustomerName, setSelectedCustomerName] = useState('')
   const [selectedContractorName, setSelectedContractorName] = useState('')
@@ -288,7 +290,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
       // Call the API
       const response = await apiClient.createJob(jobPayload)
-      console.log('Job created successfully:', response)
+      // console.log('Job created successfully:', response)
 
       // Create the local job object for the callback
     const newJob: Job = {
@@ -320,7 +322,14 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     }
 
       toast.success('Job created successfully!')
-    onJobCreated(newJob)
+      onJobCreated(newJob)
+      
+      // Navigate based on job type
+      if (formData.type === 'service-based') {
+        router.push('/customers')
+      } else if (formData.type === 'contract-based') {
+        router.push('/contractors')
+      }
     } catch (error) {
       console.error('Error creating job:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to create job')

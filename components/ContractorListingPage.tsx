@@ -2668,8 +2668,8 @@ export function ContractorListingPage() {
                     <CollapsibleTrigger asChild>
                       <Button
                         variant="ghost"
-                        className={`w-full justify-start p-3 text-left h-auto hover:bg-primary/5 ${
-                          isSelected ? 'bg-primary/10 shadow-sm border border-primary/20' : ''
+                        className={`w-full justify-start p-3 text-left h-auto hover:bg-blue-50 ${
+                          isSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
                         }`}
                         onClick={() => selectContractor(contractor.id.toString())}
                       >
@@ -2710,8 +2710,8 @@ export function ContractorListingPage() {
                                   <CollapsibleTrigger asChild>
                                     <Button
                                       variant="ghost"
-                                      className={`w-full justify-start p-2 text-left h-auto text-sm hover:bg-primary/5 ${
-                                        isJobSelected ? 'bg-primary/10 shadow-sm border border-primary/20' : ''
+                                      className={`w-full justify-start p-2 text-left h-auto text-sm hover:bg-blue-50 ${
+                                        isJobSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
                                       }`}
                                       onClick={() => selectJob(job.id.toString(), contractor.id.toString())}
                                     >
@@ -2748,8 +2748,8 @@ export function ContractorListingPage() {
                                             <Minus className="h-3 w-3 text-primary/30 mt-1.5 mr-2" />
                                             <Button
                                               variant="ghost"
-                                              className={`flex-1 justify-start p-1.5 text-left h-auto text-xs hover:bg-primary/5 ${
-                                                isSubJobSelected ? 'bg-primary/10 shadow-sm border border-primary/20' : ''
+                                              className={`flex-1 justify-start p-1.5 text-left h-auto text-xs hover:bg-blue-50 ${
+                                                isSubJobSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
                                               }`}
                                               onClick={() => selectSubJob(subJob.id.toString(), job.id.toString(), contractor.id.toString())}
                                             >

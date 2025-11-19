@@ -3632,7 +3632,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               <Send className="h-4 w-4" />
               Send Invoice
             </Button> */}
-            <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => {
+            {/* <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => {
               setEditedJob({
                 ...job,
                 assignedLeadLabor: job.assignedLeadLaborDetails || [],
@@ -3641,11 +3641,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               setIsEditing(true);
             }}
             >
-              {/* <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => setIsEditing(true)}> */}
-
+              
               <Edit className="h-4 w-4" />
               Edit Job
-            </Button>
+            </Button> */}
           </div>
         </div>
 
