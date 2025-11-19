@@ -264,35 +264,14 @@ export function AddEditOrderPage() {
   const handleJobSelection = (job: any) => {
     setSelectedJob(job)
       console.log('asssss>>>', job)
-    // Auto-populate Lead Labor from assigned_lead_labor (first item in array)
-    if (job.assigned_lead_labor && job.assigned_lead_labor.length > 0) {
-      const leadLabor = job.assigned_lead_labor[0]
-      setSelectedLeadLabor(leadLabor)
-      
-      // Get lead labor name - prioritize user.full_name, then name, then labor_code
-      let leadLaborName = ''
-      if (leadLabor.user && leadLabor.user.full_name) {
-        leadLaborName = leadLabor.user.full_name
-      } else if (leadLabor.name) {
-        leadLaborName = leadLabor.name
-      } else if (leadLabor.labor_code) {
-        leadLaborName = leadLabor.labor_code
-      }
-      
-      setLeadLaborSearch(leadLaborName)
-      setOrderFormData(prev => ({
-        ...prev,
-        lead_labour_id: leadLabor.id?.toString() || ''
-      }))
-    } else {
-      // Clear lead labor if not assigned
-      setSelectedLeadLabor(null)
-      setLeadLaborSearch('')
-      setOrderFormData(prev => ({
-        ...prev,
-        lead_labour_id: ''
-      }))
-    }
+    
+    // Clear lead labor - user will select manually
+    setSelectedLeadLabor(null)
+    setLeadLaborSearch('')
+    setOrderFormData(prev => ({
+      ...prev,
+      lead_labour_id: ''
+    }))
     
     // Auto-populate Customer or Contractor based on job_type
     if (job.job_type === 'service_based' && job.customer) {
@@ -363,29 +342,13 @@ export function AddEditOrderPage() {
       }))
     }
     
-    // Auto-populate Supplier - check in job.orders[0].supplier if not directly in job.supplier
-    let supplier = job.supplier
-    if (!supplier && job.orders && job.orders.length > 0 && job.orders[0].supplier) {
-      supplier = job.orders[0].supplier
-    }
-    
-    if (supplier) {
-      setSelectedSupplier(supplier)
-      const supplierName = supplier.company_name || supplier.fullName || supplier.name || supplier.contact_person || ''
-      setSupplierSearch(supplierName)
-      setOrderFormData(prev => ({
-        ...prev,
-        supplier_id: supplier.id?.toString() || ''
-      }))
-    } else {
-      // Clear supplier if not available
-      setSelectedSupplier(null)
-      setSupplierSearch('')
-      setOrderFormData(prev => ({
-        ...prev,
-        supplier_id: ''
-      }))
-    }
+    // Clear supplier - user will select manually
+    setSelectedSupplier(null)
+    setSupplierSearch('')
+    setOrderFormData(prev => ({
+      ...prev,
+      supplier_id: ''
+    }))
     
     setShowJobResults(false)
     setJobSearch(job.job_title || job.title || '')
