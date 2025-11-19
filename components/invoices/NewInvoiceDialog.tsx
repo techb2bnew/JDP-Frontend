@@ -1433,7 +1433,7 @@ useEffect(() => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent key={viewInvoiceData?.id || 'new-invoice'} className="max-w-[1000px] w-[1000px] max-h-[90vh] overflow-auto">
+      <DialogContent key={viewInvoiceData?.id || 'new-invoice'} className="sm:max-w-[80%] max-w-[80%] w-[80%] max-h-[90vh] overflow-auto">
         <DialogHeader>
           <DialogTitle>Create New Invoice</DialogTitle>
           <DialogDescription>

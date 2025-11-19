@@ -30,7 +30,8 @@ import {
   Search,
   Upload,
   Download,
-  File
+  File,
+  MoreVertical
 } from 'lucide-react'
 import {
   Dialog,
@@ -50,6 +51,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { AutoScrollMultiSelect } from './ui/AutoScrollMultiSelect'
 import { useDispatch } from 'react-redux'
 import { addProduct, deleteProduct, deleteInvoice } from '@/redux/slices/jobsSlice'
@@ -4897,54 +4905,58 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                             {invoice.status || 'draft'}
                           </Badge>
                         </div>
-                        <div className="flex gap-2">
-                          {invoice.status === 'draft' && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
                             <Button
-                              variant="outline"
+                              variant="ghost"
                               size="sm"
-                              onClick={() => handleEditInvoice(invoice)}
-                              className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-300"
+                              className="h-8 w-8 p-0"
                             >
-                              <Edit className="h-4 w-4 mr-1" />
-                              Edit
+                              <MoreVertical className="h-4 w-4" />
                             </Button>
-                          )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewInvoice(invoice)}
-                            className="text-primary hover:text-primary hover:bg-primary/10 border-primary/30"
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            View
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handlePrintInvoice(invoice)}
-                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-300"
-                          >
-                            <Printer className="h-4 w-4 mr-1" />
-                            Print
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDuplicateInvoice(invoice)}
-                            className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-300"
-                          >
-                            <FileText className="h-4 w-4 mr-1" />
-                            Duplicate
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteInvoice(invoice.id)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            {invoice.status === 'draft' && (
+                              <DropdownMenuItem
+                                onClick={() => handleEditInvoice(invoice)}
+                                className="cursor-pointer"
+                              >
+                                <Edit className="h-4 w-4 mr-2 text-orange-600" />
+                                <span>Edit</span>
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem
+                              onClick={() => handleViewInvoice(invoice)}
+                              className="cursor-pointer"
+                            >
+                              <Eye className="h-4 w-4 mr-2 text-primary" />
+                              <span>View</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handlePrintInvoice(invoice)}
+                              className="cursor-pointer"
+                            >
+                              <Printer className="h-4 w-4 mr-2 text-blue-600" />
+                              <span>Print</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleDuplicateInvoice(invoice)}
+                              className="cursor-pointer"
+                            >
+                              <FileText className="h-4 w-4 mr-2 text-green-600" />
+                              <span>Duplicate</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteInvoice(invoice.id)}
+                              className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
+                              variant="destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              <span>Delete</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   </div>

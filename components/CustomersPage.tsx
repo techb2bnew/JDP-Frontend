@@ -993,7 +993,7 @@ useEffect(() => {
       </div>
 
       {/* Right Content - Job Details */}
-      <div className="flex-1 bg-white">
+      <div className="flex-1 bg-white" style={{width: '80%', margin: '0 auto'}}>
         <div className="p-4 border-b border-gray-200">
           <div className="flex justify-between items-center">
             <div>
