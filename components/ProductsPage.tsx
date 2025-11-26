@@ -246,7 +246,9 @@ const fetchBySearch = async () => {
       maxStockLevel: 100,
       supplier: apiProduct.suppliers?.contact_person  || apiProduct.suppliers?.company_name || 'Unknown Supplier',
       estimated_price: apiProduct.estimated_price || 0,
-      unit_cost: apiProduct.unit_cost || 0
+      unit_cost: apiProduct.unit_cost || 0,
+      supplier_id: apiProduct.supplier_id || '',
+      supplier_cost_price: apiProduct.supplier_cost_price || 0
     }));
 
     let filtered = transformedProducts;
@@ -316,7 +318,9 @@ useEffect(() => {
   maxStockLevel: 100,
   supplier: apiProduct.suppliers?.contact_person || apiProduct.suppliers?.company_name || 'Unknown Supplier',
   estimated_price: apiProduct.estimated_price || 0,
-  unit_cost: apiProduct.unit_cost || 0
+  unit_cost: apiProduct.unit_cost || 0,
+  supplier_id: apiProduct.supplier_id || '',
+  supplier_cost_price: apiProduct.supplier_cost_price || 0
 }));
 
 setProducts(transformedProducts);
@@ -682,6 +686,7 @@ const handleAction = (action: ProductAction, product?: Product) => {
     'ID',
     'Name',
     'Category',
+    'Supplier ID',
     'Supplier',
     'Supplier SKU',
     'JDP SKU', 
@@ -692,21 +697,24 @@ const handleAction = (action: ProductAction, product?: Product) => {
     'Status', 
     'Description',
     'Created Date',
-    'Unit Cost',
+    'Unit Cost', 
     'Estimated Price',
     'Last Updated'
   ];
 
   // Prepare CSV rows
   const rows = products.map(product => {
+    console.log('Product:', product);
     const markupPercentage = (product as any).markup_percentage || 0;
     const markupAmount = (product as any).markup_amount || 0;
-    const jdpPrice = (product as any).jdp_price || 0;
+    const jdpPrice = (product as any).jdp_price || 0; 
+    const supplierId = (product as any).supplier_id || '';
     
     return [
       product.id || '',
       product.name || '',
       product.category || '',
+      supplierId,
       product.supplier || 'Unknown Supplier',
       product.sku || '',
       product.jdpSku || '',  
@@ -717,7 +725,7 @@ const handleAction = (action: ProductAction, product?: Product) => {
       product.status || '', 
       product.description || '',
       product.createdDate || '',
-      (product as any).unit_cost || 0,
+      (product as any).unit_cost || 0, 
       (product as any).estimated_price || 0,
       product.lastUpdated || ''
     ];
@@ -747,10 +755,236 @@ const handleAction = (action: ProductAction, product?: Product) => {
   document.body.removeChild(link);
 };
 
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importPreview, setImportPreview] = useState<any[]>([]);
+
   const handleImport = () => {
-    console.log('Importing products...')
-    // Implementation for import functionality
-  }
+    setShowImportDialog(true);
+  };
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && file.type === 'text/csv') {
+      setImportFile(file);
+      parseCSV(file);
+    } else {
+      const { toast } = await import('sonner');
+      toast.error('Please select a valid CSV file');
+    }
+  };
+
+  const parseCSV = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const text = e.target?.result as string;
+      const lines = text.split('\n').filter(line => line.trim());
+      
+      if (lines.length === 0) {
+        const { toast } = await import('sonner');
+        toast.error('CSV file is empty');
+        return;
+      }
+
+      // Parse CSV with proper handling of quoted values
+      const parseCSVLine = (line: string): string[] => {
+        const result: string[] = [];
+        let current = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        result.push(current.trim());
+        return result;
+      };
+
+      // Parse header row
+      const headers = parseCSVLine(lines[0]).map(h => h.replace(/^"|"$/g, '').trim());
+      
+      console.log('CSV Headers:', headers);
+      
+      // Parse data rows
+      const data = lines.slice(1).map((line, index) => {
+        const values = parseCSVLine(line).map(v => v.replace(/^"|"$/g, '').trim());
+        const row: any = {};
+        headers.forEach((header, i) => {
+          row[header] = values[i] || '';
+        });
+        
+        // Debug first row
+        if (index === 0) {
+          console.log('First CSV Row Data:', row);
+        }
+        
+        return row;
+      }).filter(row => Object.keys(row).some(key => row[key])); // Filter out completely empty rows
+
+      console.log('Parsed CSV Data:', data);
+      setImportPreview(data);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleBulkImport = async () => {
+    if (!importFile || importPreview.length === 0) {
+      const { toast } = await import('sonner');
+      toast.error('Please select a CSV file with data');
+      return;
+    }
+
+    try {
+      setIsImporting(true);
+
+      // Get system IP address
+      const getSystemIP = async () => {
+        try {
+          const response = await fetch('https://api.ipify.org?format=json');
+          const data = await response.json();
+          return data.ip;
+        } catch (error) {
+          console.error('Error fetching IP:', error);
+          return 'unknown';
+        }
+      };
+
+      const systemIP = await getSystemIP();
+
+      // Transform CSV data to match API payload structure
+      // Map CSV column names to API payload keys based on the Excel screenshot
+      const products = importPreview.map((row: any) => {
+        // Normalize column names (handle different variations)
+        const getValue = (keys: string[]) => {
+          // First try exact match
+          for (const key of keys) {
+            if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
+              return String(row[key]).trim();
+            }
+          }
+          
+          // Then try case-insensitive match
+          const rowKeys = Object.keys(row);
+          for (const key of keys) {
+            const foundKey = rowKeys.find(rk => rk.toLowerCase() === key.toLowerCase());
+            if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null && row[foundKey] !== '') {
+              return String(row[foundKey]).trim();
+            }
+          }
+          
+          // Try partial match (contains)
+          for (const key of keys) {
+            const foundKey = rowKeys.find(rk => rk.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(rk.toLowerCase()));
+            if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null && row[foundKey] !== '') {
+              return String(row[foundKey]).trim();
+            }
+          }
+          
+          return '';
+        };
+
+        const getNumericValue = (keys: string[], defaultValue = 0) => {
+          const value = getValue(keys);
+          if (value === '' || value === null || value === undefined) return defaultValue;
+          const parsed = parseFloat(String(value).replace(/[^0-9.-]/g, ''));
+          return isNaN(parsed) ? defaultValue : parsed;
+        };
+
+        const getIntValue = (keys: string[], defaultValue = 0) => {
+          const value = getValue(keys);
+          if (value === '' || value === null || value === undefined) return defaultValue;
+          const parsed = parseInt(String(value).replace(/[^0-9]/g, ''));
+          return isNaN(parsed) ? defaultValue : parsed;
+        }; 
+
+        // Map CSV columns based on Excel screenshot - try all possible variations
+        const productName = getValue(['Name', 'name', 'product_name', 'Product Name', 'Product']);
+        const category = getValue(['Category', 'category']);
+        const supplierName = getValue(['Supplier', 'supplier', 'Supplier Name']);
+        const supplierSku = getValue(['Supplier S', 'Supplier Sku', 'supplier_sku', 'supplierSku', 'Supplier SKU']);
+        const jdpSku = getValue(['JDP SKU', 'jdp_sku', 'jdpSku', 'JDP SKU']);
+        const markupPercentage = getNumericValue(['Markup P', 'Markup Percentage', 'markup_percentage', 'markupPercentage', 'Markup %']);
+        const markupAmount = getNumericValue(['Markup A', 'Markup Amount', 'markup_amount', 'markupAmount']);
+        const jdpPrice = getNumericValue(['JDP Price', 'jdp_price', 'jdpPrice', 'Price']);
+        const stockQuantity = getIntValue(['Stock Qua', 'Stock Quantity', 'stock_quantity', 'stockQuantity', 'Stock']);
+        const status = getValue(['Status', 'status']) || 'active';
+        const description = getValue(['Descriptic', 'Description', 'description', 'Desc']);
+        const unitCost = getNumericValue(['Unit Cost', 'unit_cost', 'unitCost', 'Unit Cost']);
+         const estimatedPrice = getNumericValue(['Estimated', 'Estimated Price', 'estimated_price', 'estimatedPrice', 'Estimate']);
+
+        // Try to find supplier_id from supplier name
+        let supplierId = 0;
+        if (supplierName) {
+          const foundSupplier = suppliers.find(s => 
+            s.companyName?.toLowerCase() === supplierName.toLowerCase() ||
+            s.fullName?.toLowerCase() === supplierName.toLowerCase()
+          );
+          if (foundSupplier) {
+            supplierId = parseInt(foundSupplier.id);
+          }
+        }
+
+        // If supplier_id not found by name, try direct mapping
+        if (supplierId === 0) {
+          supplierId = getIntValue(['Supplier ID', 'supplier_id', 'supplierId', 'Supplier']);
+        }
+
+        return {
+          product_name: productName,
+          category: category,
+          supplier_id: supplierId,
+          description: description,
+          supplier_sku: supplierSku,
+          jdp_sku: jdpSku, 
+          markup_percentage: markupPercentage,
+          markup_amount: markupAmount,
+          jdp_price: jdpPrice,
+          stock_quantity: stockQuantity || 1, 
+          status: status.toLowerCase() || 'active',
+          system_ip: systemIP,
+          unit_cost: unitCost,
+          estimated_price: estimatedPrice
+        };
+      }); 
+
+      // Call bulk import API
+      const response = await globalApiCall(`${apiBaseUrl}/productImport`, {
+        method: 'POST',
+        body: JSON.stringify({ products })
+      });
+
+      const responseData = await response.json();
+      console.log('Bulk import response:', responseData);
+
+      if (responseData.success) {
+        const { toast } = await import('sonner');
+        toast.success(`Successfully imported ${products.length} products!`);
+        setShowImportDialog(false);
+        setImportFile(null);
+        setImportPreview([]);
+        
+        // Refresh products list and stats
+        fetchProductsData(currentPage, itemsPerPage);
+        fetchProductStats();
+      } else {
+        throw new Error(responseData.message || 'Failed to import products');
+      }
+    } catch (error) {
+      console.error('Error importing products:', error);
+      const { toast } = await import('sonner');
+      toast.error(error instanceof Error ? error.message : 'Failed to import products');
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -854,7 +1088,9 @@ const handleAction = (action: ProductAction, product?: Product) => {
           maxStockLevel: 100, // Default value, can be updated if available in API
           supplier: apiProduct.suppliers?.contact_person || apiProduct.suppliers?.company_name || 'Unknown Supplier',
           estimated_price:apiProduct.estimated_price || 0,
-          unit_cost:apiProduct.unit_cost ||0
+          unit_cost:apiProduct.unit_cost ||0,
+          supplier_id: apiProduct.supplier_id || '',
+          supplier_cost_price: apiProduct.supplier_cost_price || 0
         }));
 
         setProducts(transformedProducts);
@@ -1041,10 +1277,61 @@ const handleAction = (action: ProductAction, product?: Product) => {
   {!isFormOpen ? (
     <>
       {hasPermission('products', 'create') && (
-        <Button variant="outline" onClick={handleImport}>
-          <Upload className="h-4 w-4 mr-2" />
-          Import Products
-        </Button>
+        <>
+          <Button variant="outline" onClick={handleImport}>
+            <Upload className="h-4 w-4 mr-2" />
+            Import Products
+          </Button>
+          
+          {/* Import Dialog */}
+          <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Upload className="h-5 w-5" />
+                  Import Products from CSV
+                </DialogTitle>
+                <DialogDescription>
+                  Upload a CSV file to bulk import products. The CSV should contain the same columns as the product form.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4 py-4">
+                <div>
+                  <Label htmlFor="csv-file">Select CSV File</Label>
+                  <Input
+                    id="csv-file"
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileSelect}
+                    className="mt-2"
+                  />
+                </div> 
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowImportDialog(false);
+                    setImportFile(null);
+                    setImportPreview([]);
+                  }}
+                  disabled={isImporting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleBulkImport}
+                  disabled={!importFile || importPreview.length === 0 || isImporting}
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  {isImporting ? 'Importing...' : `Import ${importPreview.length} Products`}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
       )}
       {hasPermission('products', 'view') && (
         <Button variant="outline" onClick={handleExport}>
@@ -1261,7 +1548,7 @@ const handleAction = (action: ProductAction, product?: Product) => {
                   <TableHead>Product</TableHead>
                   <TableHead>Supplier SKU</TableHead>
                   <TableHead>	JDP SKU</TableHead>
-                  <TableHead>Supplier Price</TableHead>
+                  <TableHead>Unit Cost</TableHead>
                   <TableHead>Markup</TableHead>
                   <TableHead>JDP Price</TableHead>
                   <TableHead>	Estimated Price</TableHead>
@@ -1483,12 +1770,12 @@ const handleAction = (action: ProductAction, product?: Product) => {
 
               {/* Pricing */}
               <div className="grid grid-cols-2 gap-6">
-                <div>
+                {/* <div>
                   <Label className="text-sm font-medium text-gray-700 mb-2 block">Supplier Cost Price</Label>
                   <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
                     {formatCurrency(viewProductData.supplier_cost_price || 0)}
                   </div>
-                </div>
+                </div> */}
                 <div>
                   <Label className="text-sm font-medium text-gray-700 mb-2 block">JDP Price</Label>
                   <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
@@ -1507,10 +1794,7 @@ const handleAction = (action: ProductAction, product?: Product) => {
                     {formatCurrency(viewProductData.markup_amount || 0)}
                   </div>
                 </div>
-              </div>
-
-              {/* Stock/Unit */}
-              <div className="grid grid-cols-2 gap-6">
+               
                 <div>
                   <Label className="text-sm font-medium text-gray-700 mb-2 block">Stock Quantity</Label>
                   <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">

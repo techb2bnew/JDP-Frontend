@@ -14,9 +14,12 @@ import {
   XCircle,
   Check,
   Calendar as CalendarIcon,
-  X
+  X,
+  Eye,
+  DollarSign,
+  Briefcase
 } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, parse, startOfWeek, addDays } from 'date-fns'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { useEffect, useState } from 'react'
 import { apiClient } from '@/utils/api'
@@ -121,6 +124,8 @@ const [totalTimesheets, setTotalTimesheets] = useState(0);
  const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
 const [filteredTimesheets, setFilteredTimesheets] = useState<any[]>([]);
+const [selectedTimesheet, setSelectedTimesheet] = useState<TimesheetItem | null>(null);
+const [showTimesheetDetail, setShowTimesheetDetail] = useState(false);
 
 
   const [dashboardStats, setDashboardStats] = useState({
@@ -267,6 +272,71 @@ const handleApproveTimesheet = async (item: TimesheetItem) => {
 
 const handleDraftTimesheet = async (item: TimesheetItem) => {
   await updateTimesheetStatus(item, 'Draft');
+};
+
+const handleViewTimesheet = (item: TimesheetItem) => {
+  setSelectedTimesheet(item);
+  setShowTimesheetDetail(true);
+};
+
+const handleBackToList = () => {
+  setShowTimesheetDetail(false);
+  setSelectedTimesheet(null);
+};
+
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2
+  }).format(amount);
+};
+
+const parseHours = (hoursStr: string): number => {
+  if (!hoursStr || hoursStr === '0h' || hoursStr === '0m' || hoursStr === '-') return 0;
+  const match = hoursStr.match(/(\d+\.?\d*)h/);
+  if (match) return parseFloat(match[1]);
+  return 0;
+};
+
+const formatWeekRange = (weekStr: string) => {
+  if (!weekStr) return '';
+  const match = weekStr.match(/(\w+ \d{1,2}) - (\w+ \d{1,2})/);
+  if (match) {
+    try {
+      const currentYear = new Date().getFullYear();
+      const startDate = parse(`${match[1]} ${currentYear}`, 'MMM d yyyy', new Date());
+      const endDate = parse(`${match[2]} ${currentYear}`, 'MMM d yyyy', new Date());
+      return `Week of ${format(startDate, 'EEE, MMM d, yyyy')} - ${format(endDate, 'EEE, MMM d, yyyy')}`;
+    } catch {
+      return weekStr;
+    }
+  }
+  return weekStr;
+};
+
+const getWeekDays = (weekStr: string) => {
+  if (!weekStr) return [];
+  const match = weekStr.match(/(\w+ \d{1,2}) - (\w+ \d{1,2})/);
+  if (match) {
+    try {
+      const currentYear = new Date().getFullYear();
+      const startDate = parse(`${match[1]} ${currentYear}`, 'MMM d yyyy', new Date());
+      const weekStart = startOfWeek(startDate, { weekStartsOn: 1 });
+      return Array.from({ length: 7 }, (_, i) => {
+        const day = addDays(weekStart, i);
+        return {
+          date: day,
+          dateStr: format(day, 'EEE, MMM d, yyyy'),
+          dayName: format(day, 'EEEE'),
+          dayShort: format(day, 'EEE')
+        };
+      });
+    } catch {
+      return [];
+    }
+  }
+  return [];
 };
 
 
@@ -474,6 +544,195 @@ const fetchTimesheetsByDateRange = async () => {
 
   console.log('TimesheetsPage render - filteredTimesheets:', filteredTimesheets.length, 'items');
   
+  // Render timesheet detail view if selected
+  if (showTimesheetDetail && selectedTimesheet) {
+    const totalHours = parseHours(selectedTimesheet.total);
+    const hourlyRate = 35; // Default hourly rate - can be fetched from API
+    const totalPay = totalHours * hourlyRate;
+    const weekDays = getWeekDays(selectedTimesheet.week);
+    const formattedWeek = formatWeekRange(selectedTimesheet.week);
+    
+    // Parse job code from job string
+    const jobCode = selectedTimesheet.jobCode || selectedTimesheet.job?.match(/\(([^)]+)\)/)?.[1] || 'N/A';
+    const jobTitle = selectedTimesheet.job?.replace(/\([^)]+\)/, '').trim() || selectedTimesheet.job || 'N/A';
+    
+    // Create daily breakdown data
+    const dailyBreakdown = weekDays.map((day, index) => {
+      const dayKeys: Array<keyof TimesheetItem> = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+      const dayKey = dayKeys[index];
+      const hours = parseHours((selectedTimesheet[dayKey] as string) || '0h');
+      const pay = hours * hourlyRate;
+      return {
+        date: day.dateStr,
+        day: day.dayName,
+        jobId: jobCode,
+        jobTitle: jobTitle,
+        hours: hours,
+        pay: pay
+      };
+    });
+
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="icon" onClick={handleBackToList}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h2 className="text-xl font-semibold text-foreground">Timesheets</h2>
+            <p className="text-sm text-muted-foreground">Track and manage employee timesheets for all jobs</p>
+          </div>
+        </div>
+ 
+
+        {/* Employee and Week Details */}
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <Clock className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">{selectedTimesheet.employee}</h3>
+                <p className="text-sm text-muted-foreground">{formattedWeek}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Hourly Rate</p>
+                  <p className="text-xl font-semibold">{formatCurrency(hourlyRate)}/hr</p>
+                </div>
+                <div className="p-3 bg-blue-100 rounded-lg">
+                  <DollarSign className="h-5 w-5 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Hours</p>
+                  <p className="text-xl font-semibold">{totalHours}h</p>
+                </div>
+                <div className="p-3 bg-blue-100 rounded-lg">
+                  <Clock className="h-5 w-5 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Pay</p>
+                  <p className="text-xl font-semibold">{formatCurrency(totalPay)}</p>
+                </div>
+                <div className="p-3 bg-green-100 rounded-lg">
+                  <DollarSign className="h-5 w-5 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Payment Status</p>
+                  <p className={`text-xl font-semibold ${selectedTimesheet.status.toLowerCase() === 'approved' ? 'text-green-600' : 'text-gray-600'}`}>
+                    {selectedTimesheet.status === 'Approved' ? 'Paid' : selectedTimesheet.status}
+                  </p>
+                  {selectedTimesheet.status.toLowerCase() === 'approved' && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {format(new Date(), 'EEE, MMM d, yyyy')}
+                    </p>
+                  )}
+                </div>
+                <div className="p-3 bg-green-100 rounded-lg">
+                  <CalendarIcon className="h-5 w-5 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Daily Job Breakdown */}
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-2 mb-6">
+              <Briefcase className="h-5 w-5 text-muted-foreground" />
+              <h3 className="text-lg font-semibold">Daily Job Breakdown</h3>
+            </div>
+            
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader className="bg-slate-800 text-slate-50">
+                  <TableRow>
+                    <TableHead className="text-white">Date</TableHead>
+                    <TableHead className="text-white">Day</TableHead>
+                    <TableHead className="text-white">Job ID</TableHead>
+                    <TableHead className="text-white">Job Title</TableHead>
+                    <TableHead className="text-white text-right">Hours Worked</TableHead>
+                    <TableHead className="text-white text-right">Pay Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {dailyBreakdown.length > 0 ? (
+                    dailyBreakdown.map((entry, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{entry.date}</TableCell>
+                        <TableCell>{entry.day}</TableCell>
+                        <TableCell>{entry.jobId}</TableCell>
+                        <TableCell>{entry.jobTitle}</TableCell>
+                        <TableCell className={`text-right font-medium ${entry.hours > 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                          {entry.hours > 0 ? `${entry.hours}h` : '0h'}
+                        </TableCell>
+                        <TableCell className={`text-right font-medium ${entry.pay > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
+                          {formatCurrency(entry.pay)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        No data found
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Week Total Summary */}
+            <div className="mt-6 pt-6 border-t flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Week Total</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {totalHours} hours × {formatCurrency(hourlyRate)}/hour
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-semibold text-blue-600">{formatCurrency(totalPay)}</p>
+                <p className="text-sm text-muted-foreground">Total Pay</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -628,79 +887,103 @@ const fetchTimesheetsByDateRange = async () => {
               <TableHeader className="bg-slate-800 text-slate-50">
                 <TableRow>
                   <TableHead className="text-white">Employee</TableHead>
-                  <TableHead className="text-white">Job</TableHead>
-                  <TableHead className="text-white">Week</TableHead>
+                  <TableHead className="text-white">Week Period</TableHead>
                   {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => <TableHead key={day} className="text-white text-center">{day}</TableHead>)}
-                  <TableHead className="text-white text-center">Total</TableHead>
-                  <TableHead className="text-white text-center">Billable</TableHead>
-                  <TableHead className="text-white">Status</TableHead>
+                  <TableHead className="text-white text-center">Total Hours</TableHead>
+                  <TableHead className="text-white text-center">Hourly Rate</TableHead>
+                  <TableHead className="text-white text-center">Total Pay</TableHead>
+                  <TableHead className="text-white">Payment Status</TableHead>
+                  <TableHead className="text-white">Payment Date</TableHead>
                   <TableHead className="text-white text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredTimesheets.length > 0 ? (
-                  filteredTimesheets.map((item: any, index: number) => (
-                    <TableRow key={`timesheet-${index}-${item.employee}-${item.job}-${item.week}`} className="odd:bg-white even:bg-slate-50">
-                      <TableCell className="font-medium">{item.employee}</TableCell>
-                      <TableCell>
-                        <div>{item.job}</div> 
-                      </TableCell>
-                      <TableCell>{item.week}</TableCell>
-                      {['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day: string) => {
-                        const hourValue = item[day];
-                        return (
-                          <TableCell key={day} className="text-center">
-                            {hourValue !== '0h' && hourValue !== '0m' ? hourValue : '-'}
-                          </TableCell>
-                        );
-                      })}
-                      <TableCell className="font-bold text-center">
-                        {item.total && item.total !== '0h' && item.total !== '0m' ? item.total : '0h'}
-                      </TableCell>
-                      <TableCell className="font-bold text-center">
-                        {item.billable && item.billable !== '0h' && item.billable !== '0m' ? item.billable : '0h'}
-                      </TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(item.status)}`}>
-                          {item.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {item.status.toLowerCase() === 'approved' && (
-                           <Button
-                              variant="outline"
-                              size="icon"
-                              className="border-red-500 text-red-500 hover:bg-red-50 hover:text-red-600"
-                              onClick={()=>handleDraftTimesheet(item)}
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                        )}
-
-                       
-
-                        {item.status.toLowerCase() === 'draft' && (
-                          <>
+                  filteredTimesheets.map((item: any, index: number) => {
+                    const totalHours = parseHours(item.total);
+                    const hourlyRate = 35; // Default - can be fetched from API
+                    const totalPay = totalHours * hourlyRate;
+                    const isPaid = item.status.toLowerCase() === 'approved';
+                    const paymentDate = isPaid ? format(new Date(), 'MMM d, yyyy') : '-';
+                    
+                    return (
+                      <TableRow key={`timesheet-${index}-${item.employee}-${item.job}-${item.week}`} className="odd:bg-white even:bg-slate-50">
+                        <TableCell className="font-medium">
+                          {item.employee}
+                          {/* {item.laborId && <span className="text-xs text-muted-foreground ml-1">(EMP-{String(item.laborId).padStart(3, '0')})</span>} */}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                            <span>{item.week}</span>
+                          </div>
+                        </TableCell>
+                        {['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day: string) => {
+                          const hourValue = item[day];
+                          const hasHours = hourValue && hourValue !== '0h' && hourValue !== '0m' && hourValue !== '-';
+                          return (
+                            <TableCell key={day} className="text-center">
+                              <span className={hasHours ? 'text-blue-600 font-medium' : ''}>
+                                {hasHours ? hourValue : 'L'}
+                              </span>
+                            </TableCell>
+                          );
+                        })}
+                        <TableCell className="font-bold text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <Clock className="h-4 w-4 text-muted-foreground" />
+                            <span>{item.total && item.total !== '0h' && item.total !== '0m' ? item.total : '0h'}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {formatCurrency(hourlyRate)}/hr
+                        </TableCell>
+                        <TableCell className="text-center font-medium">
+                          {formatCurrency(totalPay)}
+                        </TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            isPaid 
+                              ? 'bg-green-100 text-green-800 border border-green-300' 
+                              : 'bg-orange-100 text-orange-800 border border-orange-300'
+                          }`}>
+                            {isPaid ? 'Paid' : 'Pending'}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {paymentDate}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
                             <Button
                               variant="outline"
-                              size="icon"
-                              className="border-green-500 text-green-500 hover:bg-green-50 hover:text-green-600"
-                              onClick={() => handleApproveTimesheet(item)}
+                              size="sm"
+                              className="border-blue-500 text-blue-500 hover:bg-blue-50 hover:text-blue-600"
+                              onClick={() => handleViewTimesheet(item)}
                             >
-                              <Check className="w-4 h-4" />
+                              <Eye className="w-4 h-4 mr-1" />
+                              View
                             </Button>
                             
-                          </>
-                        )}
-                      </div>
-
-                      </TableCell>
-                    </TableRow>
-                  ))
+                            {!isPaid && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-green-500 text-green-500 hover:bg-green-50 hover:text-green-600"
+                                onClick={() => handleApproveTimesheet(item)}
+                              >
+                                <Check className="w-4 h-4 mr-1" />
+                                Mark as Paid
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={14} className="text-center py-6 text-muted-foreground">
+                    <TableCell colSpan={15} className="text-center py-6 text-muted-foreground">
                       No matching timesheets found.
                     </TableCell>
                   </TableRow>

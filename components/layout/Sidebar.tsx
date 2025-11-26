@@ -227,7 +227,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
   return (
     <>
       <aside className={cn(
-        "bg-sidebar border-r border-sidebar-border flex flex-col animate-fade-in shadow-sm transition-all duration-300",
+        "bg-sidebar sticky top-0 h-screen border-r border-sidebar-border flex flex-col animate-fade-in shadow-sm transition-all duration-300",
         isCollapsed ? "w-16" : "w-64"
       )}>
         <div className="p-5 border-b border-sidebar-border bg-gradient-to-r from-sidebar to-sidebar-accent/20 relative">

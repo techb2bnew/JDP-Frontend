@@ -737,7 +737,7 @@ export function BlueSheetApprovalDialog({
                                   <span className="font-medium">{item.material_name}</span>
                                   <p className="text-sm text-gray-500">Qty: {item.total_ordered} × {formatCurrency(item.unit_cost)}</p>
                                 </div>
-                                <span className="text-lg font-medium">{formatCurrency(item.total_cost || 0)}</span>
+                                <span className="text-lg font-medium">{formatCurrency(item.total_cost || (item.total_ordered || 0) * (item.unit_cost || 0))}</span>
                               </div>
                             ))}
                             {blueSheet.material_entries.length > 4 && (
@@ -894,7 +894,7 @@ export function BlueSheetApprovalDialog({
                                   </div>
                                   <div>
                                     <Label className="text-sm text-gray-600">Total</Label>
-                                    <p className="text-lg font-medium text-[#00A1FF] mt-2">{formatCurrency(item.total_cost || 0)}</p>
+                                    <p className="text-lg font-medium text-[#00A1FF] mt-2">{formatCurrency(item.total_cost || (item.total_ordered || 0) * (item.unit_cost || 0))}</p>
                                   </div>
                                 </div>
                                 
@@ -1063,7 +1063,7 @@ export function BlueSheetApprovalDialog({
                                   <div className="mt-3 space-y-2 text-base">
                                     <p><strong>Qty:</strong> {comparison.blueSheetItem.total_ordered}</p>
                                     <p><strong>Unit Price:</strong> {formatCurrency(comparison.blueSheetItem.unit_cost)}</p>
-                                    <p><strong>Total:</strong> {formatCurrency(comparison.blueSheetItem.total_cost || 0)}</p>
+                                    <p><strong>Total:</strong> {formatCurrency(comparison.blueSheetItem.total_cost || (comparison.blueSheetItem.total_ordered || 0) * (comparison.blueSheetItem.unit_cost || 0))}</p>
                                     <p><strong>Supplier:</strong> {comparison.blueSheetItem.product?.suppliers?.company_name || 'N/A'}</p>
                                   </div>
                                 ) : (

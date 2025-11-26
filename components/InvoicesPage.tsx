@@ -8,6 +8,16 @@ import { Input } from './ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs' // Tabs components import karein
 import { usePermissions } from '../contexts/PermissionContext'
 import {
@@ -171,6 +181,8 @@ export function InvoicesPage() {
   const [itemsPerPage] = useState(10);
   const [totalEstimates, setTotalEstimates] = useState(0);
   const [invoiceTypeFilter, setInvoiceTypeFilter] = useState('');
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<string | number | null>(null);
 
   const dispatch = useDispatch();
   const router = useRouter();
@@ -599,16 +611,24 @@ export function InvoicesPage() {
     }
   };
 
-  const handleDeleteInvoice = async (invoiceId: string | number) => {
+  const handleDeleteInvoice = (invoiceId: string | number) => {
+    setInvoiceToDelete(invoiceId);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDeleteInvoice = async () => {
+    if (!invoiceToDelete) return;
     try {
-      const confirmDelete = window.confirm("Are you sure you want to delete this estimate?");
-      if (!confirmDelete) return;
       setIsDeleting(true);
-      await apiClient.deleteEstimate(String(invoiceId));
-      console.log(invoiceId, "IDD")
-      dispatch(deleteInvoice(String(invoiceId)));
+      await apiClient.deleteEstimate(String(invoiceToDelete));
+      console.log(invoiceToDelete, "IDD")
+      dispatch(deleteInvoice(String(invoiceToDelete)));
       toast.success("Estimate deleted successfully!");
-      setRefreshInvoices(prev => !prev);
+      setShowDeleteDialog(false);
+      setInvoiceToDelete(null);
+      
+      // Refresh listing after delete (this will also fetch stats)
+      await fetchEstimates();
     } catch (error) {
       console.error("Error deleting estimate:", error);
       toast.error("Failed to delete estimate");
@@ -654,8 +674,10 @@ export function InvoicesPage() {
       const response = await apiClient.getAllEstimates(currentPage, itemsPerPage);
       console.log('API Response:', response);
       setEstimates(response.data.estimates || []);
-      setTotalEstimates(response.data.total || 0);
-      console.log("API Estimates:", response.data.estimates);
+      setTotalEstimates(response.data.total || 0); 
+      
+      // Also fetch stats when listing is fetched
+      await fetchEstimateStats();
     } catch (error) {
       console.error('Failed to fetch estimates:', error);
     } finally {
@@ -664,22 +686,23 @@ export function InvoicesPage() {
   };
 
 
+  const fetchEstimateStats = async () => {
+    setIsLoadingDashboard(true);
+    try {
+      const response = await apiClient.getEstimateStats();
+      console.log('estimatestas:', response);
+      const dashboardCards = response.data.dashboard_cards;
+      const detailedStats = response.data.detailed_stats;
+      setDashboardCards(dashboardCards);
+      setDetailedStats(detailedStats);
+    } catch (error) {
+      console.error('Failed to fetch estimate stats:', error);
+    } finally {
+      setIsLoadingDashboard(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchEstimateStats = async () => {
-      setIsLoadingDashboard(true);
-      try {
-        const response = await apiClient.getEstimateStats();
-        console.log('estimatestas:', response);
-        const dashboardCards = response.data.dashboard_cards;
-        const detailedStats = response.data.detailed_stats;
-        setDashboardCards(dashboardCards);
-        setDetailedStats(detailedStats);
-      } catch (error) {
-        console.error('Failed to fetch estimate stats:', error);
-      } finally {
-        setIsLoadingDashboard(false);
-      }
-    };
     fetchEstimateStats();
   }, []);
 
@@ -1252,6 +1275,40 @@ export function InvoicesPage() {
           width: '22cm',
         }}
       ></div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="animate-scale-in bg-white max-w-md">
+          <AlertDialogHeader className="text-center">
+           
+            <AlertDialogTitle className="text-xl">
+              Delete Estimate
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              Are you sure you want to delete this estimate? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel
+              onClick={() => {
+                setShowDeleteDialog(false);
+                setInvoiceToDelete(null);
+              }}
+              className="button-bounce"
+              disabled={isDeleting}
+            >
+              No
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteInvoice}
+              className="bg-red-600 hover:bg-red-700 text-white button-bounce"
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Deleting...' : 'Yes'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
 
   )
