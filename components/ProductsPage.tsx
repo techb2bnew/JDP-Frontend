@@ -53,7 +53,7 @@ import {
   ArrowUpAZ
 } from 'lucide-react'
 import { Product, Branch } from '../types/product'
-import { globalApiCall } from '../utils/globalApiHandler'
+import { globalApiCall, getAuthToken, handleTokenRevocation } from '../utils/globalApiHandler'
 import { AutoSuggestInput } from './ui/auto-suggest-input'
 import { apiClient } from '@/utils/api'
 
@@ -136,6 +136,7 @@ const [formMode, setFormMode] = useState<ProductAction>('add') // 'add' | 'edit'
   const [units, setUnits] = useState<string[]>(['piece', 'roll', 'box', 'pack', 'kg', 'meter', 'liter', 'set']);
   const [estimatedPrices, setEstimatedPrices] = useState({});
   const [configurationData, setConfigurationData] = useState<any>(null);
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
 
   const [formData, setFormData] = useState<ProductFormData>({
@@ -216,6 +217,11 @@ const [formMode, setFormMode] = useState<ProductAction>('add') // 'add' | 'edit'
     loadConfiguration(); // Load configuration data
   }, [currentPage, itemsPerPage]);
 
+  // Clear selected products when products list changes (pagination, filters, etc.)
+  useEffect(() => {
+    setSelectedProducts([]);
+  }, [products, currentPage, selectedCategory, selectedStatus, searchTerm]);
+
 
 const fetchBySearch = async () => {
   if (!searchTerm.trim()) return;
@@ -244,7 +250,7 @@ const fetchBySearch = async () => {
       lastUpdated: apiProduct.updated_at ? new Date(apiProduct.updated_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       minStockLevel: 0,
       maxStockLevel: 100,
-      supplier: apiProduct.suppliers?.contact_person  || apiProduct.suppliers?.company_name || 'Unknown Supplier',
+      supplier: apiProduct.suppliers?.contact_person  || apiProduct.suppliers?.company_name || '',
       estimated_price: apiProduct.estimated_price || 0,
       unit_cost: apiProduct.unit_cost || 0,
       supplier_id: apiProduct.supplier_id || '',
@@ -316,7 +322,7 @@ useEffect(() => {
   lastUpdated: apiProduct.updated_at ? new Date(apiProduct.updated_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
   minStockLevel: 0,
   maxStockLevel: 100,
-  supplier: apiProduct.suppliers?.contact_person || apiProduct.suppliers?.company_name || 'Unknown Supplier',
+  supplier: apiProduct.suppliers?.contact_person || apiProduct.suppliers?.company_name || '',
   estimated_price: apiProduct.estimated_price || 0,
   unit_cost: apiProduct.unit_cost || 0,
   supplier_id: apiProduct.supplier_id || '',
@@ -680,7 +686,17 @@ const handleAction = (action: ProductAction, product?: Product) => {
   resetForm();
 };
 
- const handleExport = () => {
+ const handleExport = async () => {
+  // Check if any product is selected
+  if (selectedProducts.length === 0) {
+    const { toast } = await import('sonner');
+    toast.error('Please select at least one product to export');
+    return;
+  }
+
+  // Filter products to only include selected ones
+  const selectedProductsData = products.filter(product => selectedProducts.includes(product.id));
+
   // Prepare CSV headers
   const headers = [
     'ID',
@@ -703,7 +719,7 @@ const handleAction = (action: ProductAction, product?: Product) => {
   ];
 
   // Prepare CSV rows
-  const rows = products.map(product => {
+  const rows = selectedProductsData.map(product => {
     console.log('Product:', product);
     const markupPercentage = (product as any).markup_percentage || 0;
     const markupAmount = (product as any).markup_amount || 0;
@@ -715,7 +731,7 @@ const handleAction = (action: ProductAction, product?: Product) => {
       product.name || '',
       product.category || '',
       supplierId,
-      product.supplier || 'Unknown Supplier',
+      product.supplier || '',
       product.sku || '',
       product.jdpSku || '',  
       `${markupPercentage}%`,
@@ -836,137 +852,52 @@ const handleAction = (action: ProductAction, product?: Product) => {
   };
 
   const handleBulkImport = async () => {
-    if (!importFile || importPreview.length === 0) {
+    if (!importFile) {
       const { toast } = await import('sonner');
-      toast.error('Please select a CSV file with data');
+      toast.error('Please select a CSV file');
       return;
     }
 
     try {
       setIsImporting(true);
 
-      // Get system IP address
-      const getSystemIP = async () => {
-        try {
-          const response = await fetch('https://api.ipify.org?format=json');
-          const data = await response.json();
-          return data.ip;
-        } catch (error) {
-          console.error('Error fetching IP:', error);
-          return 'unknown';
-        }
-      };
+      // Get auth token
+      const token = getAuthToken();
+      if (!token) {
+        const { toast } = await import('sonner');
+        toast.error('Authentication token not found');
+        return;
+      }
 
-      const systemIP = await getSystemIP();
+      // Create FormData and append CSV file
+      const formData = new FormData();
+      formData.append('file', importFile);
 
-      // Transform CSV data to match API payload structure
-      // Map CSV column names to API payload keys based on the Excel screenshot
-      const products = importPreview.map((row: any) => {
-        // Normalize column names (handle different variations)
-        const getValue = (keys: string[]) => {
-          // First try exact match
-          for (const key of keys) {
-            if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
-              return String(row[key]).trim();
-            }
-          }
-          
-          // Then try case-insensitive match
-          const rowKeys = Object.keys(row);
-          for (const key of keys) {
-            const foundKey = rowKeys.find(rk => rk.toLowerCase() === key.toLowerCase());
-            if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null && row[foundKey] !== '') {
-              return String(row[foundKey]).trim();
-            }
-          }
-          
-          // Try partial match (contains)
-          for (const key of keys) {
-            const foundKey = rowKeys.find(rk => rk.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(rk.toLowerCase()));
-            if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null && row[foundKey] !== '') {
-              return String(row[foundKey]).trim();
-            }
-          }
-          
-          return '';
-        };
-
-        const getNumericValue = (keys: string[], defaultValue = 0) => {
-          const value = getValue(keys);
-          if (value === '' || value === null || value === undefined) return defaultValue;
-          const parsed = parseFloat(String(value).replace(/[^0-9.-]/g, ''));
-          return isNaN(parsed) ? defaultValue : parsed;
-        };
-
-        const getIntValue = (keys: string[], defaultValue = 0) => {
-          const value = getValue(keys);
-          if (value === '' || value === null || value === undefined) return defaultValue;
-          const parsed = parseInt(String(value).replace(/[^0-9]/g, ''));
-          return isNaN(parsed) ? defaultValue : parsed;
-        }; 
-
-        // Map CSV columns based on Excel screenshot - try all possible variations
-        const productName = getValue(['Name', 'name', 'product_name', 'Product Name', 'Product']);
-        const category = getValue(['Category', 'category']);
-        const supplierName = getValue(['Supplier', 'supplier', 'Supplier Name']);
-        const supplierSku = getValue(['Supplier S', 'Supplier Sku', 'supplier_sku', 'supplierSku', 'Supplier SKU']);
-        const jdpSku = getValue(['JDP SKU', 'jdp_sku', 'jdpSku', 'JDP SKU']);
-        const markupPercentage = getNumericValue(['Markup P', 'Markup Percentage', 'markup_percentage', 'markupPercentage', 'Markup %']);
-        const markupAmount = getNumericValue(['Markup A', 'Markup Amount', 'markup_amount', 'markupAmount']);
-        const jdpPrice = getNumericValue(['JDP Price', 'jdp_price', 'jdpPrice', 'Price']);
-        const stockQuantity = getIntValue(['Stock Qua', 'Stock Quantity', 'stock_quantity', 'stockQuantity', 'Stock']);
-        const status = getValue(['Status', 'status']) || 'active';
-        const description = getValue(['Descriptic', 'Description', 'description', 'Desc']);
-        const unitCost = getNumericValue(['Unit Cost', 'unit_cost', 'unitCost', 'Unit Cost']);
-         const estimatedPrice = getNumericValue(['Estimated', 'Estimated Price', 'estimated_price', 'estimatedPrice', 'Estimate']);
-
-        // Try to find supplier_id from supplier name
-        let supplierId = 0;
-        if (supplierName) {
-          const foundSupplier = suppliers.find(s => 
-            s.companyName?.toLowerCase() === supplierName.toLowerCase() ||
-            s.fullName?.toLowerCase() === supplierName.toLowerCase()
-          );
-          if (foundSupplier) {
-            supplierId = parseInt(foundSupplier.id);
-          }
-        }
-
-        // If supplier_id not found by name, try direct mapping
-        if (supplierId === 0) {
-          supplierId = getIntValue(['Supplier ID', 'supplier_id', 'supplierId', 'Supplier']);
-        }
-
-        return {
-          product_name: productName,
-          category: category,
-          supplier_id: supplierId,
-          description: description,
-          supplier_sku: supplierSku,
-          jdp_sku: jdpSku, 
-          markup_percentage: markupPercentage,
-          markup_amount: markupAmount,
-          jdp_price: jdpPrice,
-          stock_quantity: stockQuantity || 1, 
-          status: status.toLowerCase() || 'active',
-          system_ip: systemIP,
-          unit_cost: unitCost,
-          estimated_price: estimatedPrice
-        };
-      }); 
-
-      // Call bulk import API
-      const response = await globalApiCall(`${apiBaseUrl}/productImport`, {
+      // Call bulk import API with FormData
+      const response = await fetch(`${apiBaseUrl}/products/import`, {
         method: 'POST',
-        body: JSON.stringify({ products })
+        headers: {
+          'Authorization': `Bearer ${token}`
+          // Don't set Content-Type - browser will set it with boundary for FormData
+        },
+        body: formData
       });
 
       const responseData = await response.json();
       console.log('Bulk import response:', responseData);
 
+      if (!response.ok) {
+        // Handle token revocation
+        if (response.status === 401) {
+          await handleTokenRevocation();
+          throw new Error('Session expired. Please login again.');
+        }
+        throw new Error(responseData.message || 'Failed to import products');
+      }
+
       if (responseData.success) {
         const { toast } = await import('sonner');
-        toast.success(`Successfully imported ${products.length} products!`);
+        toast.success(responseData.message || 'Successfully imported products!');
         setShowImportDialog(false);
         setImportFile(null);
         setImportPreview([]);
@@ -1086,7 +1017,7 @@ const handleAction = (action: ProductAction, product?: Product) => {
           lastUpdated: apiProduct.updated_at ? new Date(apiProduct.updated_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
           minStockLevel: 0, // Default value, can be updated if available in API
           maxStockLevel: 100, // Default value, can be updated if available in API
-          supplier: apiProduct.suppliers?.contact_person || apiProduct.suppliers?.company_name || 'Unknown Supplier',
+          supplier: apiProduct.suppliers?.contact_person || apiProduct.suppliers?.company_name || '',
           estimated_price:apiProduct.estimated_price || 0,
           unit_cost:apiProduct.unit_cost ||0,
           supplier_id: apiProduct.supplier_id || '',
@@ -1545,6 +1476,18 @@ const handleAction = (action: ProductAction, product?: Product) => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={products.length > 0 && selectedProducts.length === products.length}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedProducts(products.map(p => p.id));
+                        } else {
+                          setSelectedProducts([]);
+                        }
+                      }}
+                    />
+                  </TableHead>
                   <TableHead>Product</TableHead>
                   <TableHead>Supplier SKU</TableHead>
                   <TableHead>	JDP SKU</TableHead>
@@ -1560,7 +1503,7 @@ const handleAction = (action: ProductAction, product?: Product) => {
               <TableBody>
                 {isLoadingProducts ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8">
+                    <TableCell colSpan={10} className="text-center py-8">
                       <div className="flex items-center justify-center">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                         <span className="ml-2">Loading products...</span>
@@ -1569,7 +1512,7 @@ const handleAction = (action: ProductAction, product?: Product) => {
                   </TableRow>
                 ) : products.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       No products found
                     </TableCell>
                   </TableRow>
@@ -1589,6 +1532,18 @@ const handleAction = (action: ProductAction, product?: Product) => {
                     })
                     .map((product) => (
                   <TableRow key={product.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedProducts.includes(product.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedProducts(prev => [...prev, product.id]);
+                          } else {
+                            setSelectedProducts(prev => prev.filter(id => id !== product.id));
+                          }
+                        }}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         {/* <img
