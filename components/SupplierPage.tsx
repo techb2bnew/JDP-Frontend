@@ -8,10 +8,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from './ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Textarea } from './ui/textarea'
+import { Checkbox } from './ui/checkbox'
 import { ActionButtonsPopup } from './ActionButtonsPopup'
 import { toast } from 'sonner'
 import { SupplierDetailsPage } from './SupplierDetailsPage'
-import { globalApiCall } from '../utils/globalApiHandler'
+import { globalApiCall, getAuthToken, handleTokenRevocation } from '../utils/globalApiHandler'
 import {
   Plus,
   Search,
@@ -90,6 +91,10 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
   const [isLoadingDetails, setIsLoadingDetails] = useState(false)
   const [isLoadingEdit, setIsLoadingEdit] = useState(false)
   const [filteredSuppliers, setFilteredSuppliers] = useState<any[]>([])
+  const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([])
+  const [showImportDialog, setShowImportDialog] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
   const [roles, setRoles] = useState<any[]>([])
   const [supplierStats, setSupplierStats] = useState({
@@ -549,6 +554,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
 
   function convertSuppliersToCSV(data: Supplier[]) {
     const headers = [
+      'ID',
       'Supplier ID',
       'Full Name',
       'Company Name',
@@ -564,6 +570,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
     ].join(',');
 
     const rows = data.map(supplier => [
+      supplier.id,
       supplier.supplierId,
       supplier.fullName,
       supplier.companyName,
@@ -580,6 +587,75 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
 
     return [headers, ...rows].join('\n');
   }
+
+  const handleBulkImport = async () => {
+    if (!importFile) {
+      toast.error('Please select a CSV file');
+      return;
+    }
+
+    try {
+      setIsImporting(true);
+
+      // Get auth token
+      const token = getAuthToken();
+      if (!token) {
+        toast.error('Authentication token not found');
+        return;
+      }
+
+      // Create FormData and append CSV file
+      const formData = new FormData();
+      formData.append('file', importFile);
+
+      // Call bulk import API with FormData
+      const response = await fetch(`${apiBaseUrl}/suppliers/import`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+          // Don't set Content-Type - browser will set it with boundary for FormData
+        },
+        body: formData
+      });
+
+      const responseData = await response.json();
+      console.log('Bulk import response:', responseData);
+
+      if (!response.ok) {
+        // Handle token revocation
+        if (response.status === 401) {
+          await handleTokenRevocation();
+          throw new Error('Session expired. Please login again.');
+        }
+        throw new Error(responseData.message || 'Failed to import suppliers');
+      }
+
+      if (responseData.success) {
+        toast.success(responseData.message || 'Successfully imported suppliers!');
+        setShowImportDialog(false);
+        setImportFile(null);
+        
+        // Refresh suppliers list
+        fetchSuppliersData(currentPage, itemsPerPage);
+      } else {
+        throw new Error(responseData.message || 'Failed to import suppliers');
+      }
+    } catch (error) {
+      console.error('Error importing suppliers:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to import suppliers');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && (file.type === 'text/csv' || file.name.endsWith('.csv'))) {
+      setImportFile(file);
+    } else {
+      toast.error('Please select a valid CSV file');
+    }
+  };
 
   function downloadCSV(data: Supplier[], filename: string) {
     const csv = convertSuppliersToCSV(data);
@@ -600,6 +676,11 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
     fetchRoles();
     // Don't fetch data here - let the search/pagination useEffect handle initial fetch
   }, []);
+
+  // Clear selected suppliers when pagination, filters, or search changes
+  useEffect(() => {
+    setSelectedSuppliers([]);
+  }, [currentPage, filterStatus, searchTerm]);
 
   const fetchRoles = async () => {
     try {
@@ -1026,12 +1107,56 @@ useEffect(() => {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="gap-2">
-            <Upload className="h-4 w-4" />
-            Import
-          </Button>
+          <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2" onClick={() => setShowImportDialog(true)}>
+                <Upload className="h-4 w-4" />
+                Import
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                <DialogTitle>Import Suppliers</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="import-file">Select CSV File</Label>
+                  <Input
+                    id="import-file"
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileSelect}
+                    className="mt-2"
+                  />
+                  {importFile && (
+                    <p className="text-sm text-gray-600 mt-2">Selected: {importFile.name}</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <Button variant="outline" onClick={() => {
+                  setShowImportDialog(false);
+                  setImportFile(null);
+                }}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleBulkImport} 
+                  disabled={!importFile || isImporting}
+                  className="bg-primary text-white hover:bg-primary/90"
+                >
+                  {isImporting ? 'Importing...' : 'Import'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Button variant="outline" className="gap-2" onClick={() => {
-            downloadCSV(filteredSuppliers, `suppliers-export-${new Date().toISOString().split('T')[0]}.csv`);
+            if (selectedSuppliers.length === 0) {
+              toast.error('Please select at least one supplier to export');
+              return;
+            }
+            const selectedSupplierData = filteredSuppliers.filter(supplier => selectedSuppliers.includes(String(supplier.id)));
+            downloadCSV(selectedSupplierData, `suppliers-export-${new Date().toISOString().split('T')[0]}.csv`);
             toast.success('CSV export started');
           }}>
             <Download className="h-4 w-4" />
@@ -1173,9 +1298,29 @@ useEffect(() => {
           <Table>
             <TableHeader>
               <TableRow className="bg-[#162f3d] hover:bg-[#162f3d]">
-                {/* <TableHead className="text-white font-medium">
-                  <input type="checkbox" className="rounded border-white/30" />
-                </TableHead> */}
+                <TableHead className="text-white font-medium w-12">
+                  <Checkbox
+                    checked={paginatedSuppliers.length > 0 && paginatedSuppliers.every(s => selectedSuppliers.includes(String(s.id)))}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        const paginatedIds = paginatedSuppliers.map(s => String(s.id));
+                        setSelectedSuppliers(prev => {
+                          const newSelection = [...prev];
+                          paginatedIds.forEach(id => {
+                            if (!newSelection.includes(id)) {
+                              newSelection.push(id);
+                            }
+                          });
+                          return newSelection;
+                        });
+                      } else {
+                        const paginatedIds = paginatedSuppliers.map(s => String(s.id));
+                        setSelectedSuppliers(prev => prev.filter(id => !paginatedIds.includes(id)));
+                      }
+                    }}
+                    className="border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-[#162f3d]"
+                  />
+                </TableHead>
                 <TableHead className="text-white font-medium">ID</TableHead>
                 <TableHead className="text-white font-medium">Name</TableHead>
                 <TableHead className="text-white font-medium">Company</TableHead>
@@ -1204,9 +1349,18 @@ useEffect(() => {
               ) : (
                 paginatedSuppliers.map((supplier, index) => (
                   <TableRow key={supplier.id} className={index % 2 === 1 ? "bg-[#eff4fa]" : ""}>
-                    {/* <TableCell>
-                      <input type="checkbox" className="rounded border-gray-300" />
-                    </TableCell> */}
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedSuppliers.includes(String(supplier.id))}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedSuppliers(prev => [...prev, String(supplier.id)]);
+                          } else {
+                            setSelectedSuppliers(prev => prev.filter(id => id !== String(supplier.id)));
+                          }
+                        }}
+                      />
+                    </TableCell>
                     <TableCell className="text-sm text-[#2b2b2b]/80">#{supplier.supplierId}</TableCell>
                     <TableCell>
                       <div>

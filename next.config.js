@@ -32,6 +32,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'images.unsplash.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'jdp-backend.s3.us-east-2.amazonaws.com',
+      },
     ],
     formats: ['image/webp', 'image/avif'],
   },

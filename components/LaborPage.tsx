@@ -13,6 +13,7 @@ import { ActionButtonsPopup } from './ActionButtonsPopup'
 import { usePermissions } from '../contexts/PermissionContext'
 import { AutoSuggestInput } from './ui/auto-suggest-input'
 import { toast } from 'sonner'
+import { getAuthToken, handleTokenRevocation } from '../utils/globalApiHandler'
 import { 
   Plus, 
   Search, 
@@ -126,6 +127,7 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
   const [totalLabor, setTotalLabor] = useState(0)
   const [filteredLabors, setFilteredLabors] = useState<any[]>([]);
+  const [selectedLabors, setSelectedLabors] = useState<string[]>([])
   const [laborStats, setLaborStats] = useState({
     total_labor: 0,
     active_labor: 0,
@@ -133,8 +135,9 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
     total_jobs: 0
   })
   const [isStatsLoading, setIsStatsLoading] = useState(false)
-
-
+  const [showImportDialog, setShowImportDialog] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
 
   const [formData, setFormData] = useState<LaborFormData>({
     role: '',
@@ -519,6 +522,7 @@ const getAvailabilityBadge = (availability: string) => {
 
   function convertToCSV(data: Labor[]) {
   const headers = [
+    'ID',
     'Labor ID',
     'Name',
     'Email',
@@ -537,6 +541,7 @@ const getAvailabilityBadge = (availability: string) => {
   ].join(',');
 
   const rows = data.map(labor => [
+    labor.id,
     labor.laborId,
     labor.name,
     labor.email,
@@ -557,6 +562,75 @@ const getAvailabilityBadge = (availability: string) => {
   return [headers, ...rows].join('\n');
 }
 
+  const handleBulkImport = async () => {
+    if (!importFile) {
+      toast.error('Please select a CSV file');
+      return;
+    }
+
+    try {
+      setIsImporting(true);
+
+      // Get auth token
+      const token = getAuthToken();
+      if (!token) {
+        toast.error('Authentication token not found');
+        return;
+      }
+
+      // Create FormData and append CSV file
+      const formData = new FormData();
+      formData.append('file', importFile);
+
+      // Call bulk import API with FormData
+      const response = await fetch(`${apiBaseUrl}/labor/import`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+          // Don't set Content-Type - browser will set it with boundary for FormData
+        },
+        body: formData
+      });
+
+      const responseData = await response.json();
+      console.log('Bulk import response:', responseData);
+
+      if (!response.ok) {
+        // Handle token revocation
+        if (response.status === 401) {
+          await handleTokenRevocation();
+          throw new Error('Session expired. Please login again.');
+        }
+        throw new Error(responseData.message || 'Failed to import labor');
+      }
+
+      if (responseData.success) {
+        toast.success(responseData.message || 'Successfully imported labor!');
+        setShowImportDialog(false);
+        setImportFile(null);
+        
+        // Refresh labor list
+        fetchLaborData(currentPage, itemsPerPage);
+      } else {
+        throw new Error(responseData.message || 'Failed to import labor');
+      }
+    } catch (error) {
+      console.error('Error importing labor:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to import labor');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && (file.type === 'text/csv' || file.name.endsWith('.csv'))) {
+      setImportFile(file);
+    } else {
+      toast.error('Please select a valid CSV file');
+    }
+  };
+
 function downloadCSV(data: Labor[], filename: string) {
   const csv = convertToCSV(data);
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -576,6 +650,11 @@ useEffect(() => {
   fetchLeadLabourData();
   // Don't fetch data here - let the search/pagination useEffect handle initial fetch
 }, []);
+
+// Clear selected labors when pagination, filters, or search changes
+useEffect(() => {
+  setSelectedLabors([]);
+}, [currentPage, filterTrade, filterAvailability, searchTerm]);
 const fetchRoles = async () => {
   try {
     const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
@@ -1189,11 +1268,57 @@ const fetchLaborById = async (id: string) => {
         </div>
         
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="gap-2">
-            <Upload className="h-4 w-4" />
-            Import
-          </Button>
-          <Button variant="outline" className="gap-2" onClick={() => downloadCSV(filteredLabors, `labor-export-${new Date().toISOString().split('T')[0]}.csv`)}>
+          <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2" onClick={() => setShowImportDialog(true)}>
+                <Upload className="h-4 w-4" />
+                Import
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                <DialogTitle>Import Labor</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="import-file">Select CSV File</Label>
+                  <Input
+                    id="import-file"
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileSelect}
+                    className="mt-2"
+                  />
+                  {importFile && (
+                    <p className="text-sm text-gray-600 mt-2">Selected: {importFile.name}</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <Button variant="outline" onClick={() => {
+                  setShowImportDialog(false);
+                  setImportFile(null);
+                }}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleBulkImport} 
+                  disabled={!importFile || isImporting}
+                  className="bg-primary text-white hover:bg-primary/90"
+                >
+                  {isImporting ? 'Importing...' : 'Import'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Button variant="outline" className="gap-2" onClick={() => {
+            if (selectedLabors.length === 0) {
+              toast.error('Please select at least one labor to export');
+              return;
+            }
+            const selectedLaborData = filteredLabors.filter(labor => selectedLabors.includes(String(labor.id)));
+            downloadCSV(selectedLaborData, `labor-export-${new Date().toISOString().split('T')[0]}.csv`);
+          }}>
             <Download className="h-4 w-4" />
             Export
           </Button>
@@ -1349,9 +1474,29 @@ const fetchLaborById = async (id: string) => {
           <Table>
             <TableHeader>
               <TableRow className="bg-[#162f3d] hover:bg-[#162f3d]">
-                {/* <TableHead className="text-white font-medium">
-                  <input type="checkbox" className="rounded border-white/30" />
-                </TableHead> */}
+                <TableHead className="text-white font-medium w-12">
+                  <Checkbox
+                    checked={paginatedLaborers.length > 0 && paginatedLaborers.every(l => selectedLabors.includes(String(l.id)))}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        const paginatedIds = paginatedLaborers.map(l => String(l.id));
+                        setSelectedLabors(prev => {
+                          const newSelection = [...prev];
+                          paginatedIds.forEach(id => {
+                            if (!newSelection.includes(id)) {
+                              newSelection.push(id);
+                            }
+                          });
+                          return newSelection;
+                        });
+                      } else {
+                        const paginatedIds = paginatedLaborers.map(l => String(l.id));
+                        setSelectedLabors(prev => prev.filter(id => !paginatedIds.includes(id)));
+                      }
+                    }}
+                    className="border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-[#162f3d]"
+                  />
+                </TableHead>
                 <TableHead className="text-white font-medium">ID</TableHead>
                 <TableHead className="text-white font-medium">Name</TableHead>
                 <TableHead className="text-white font-medium">Contact</TableHead>
@@ -1390,9 +1535,18 @@ const fetchLaborById = async (id: string) => {
               ) : (
                 paginatedLaborers.map((labor, index) => (
                   <TableRow key={labor.id} className={index % 2 === 1 ? "bg-[#eff4fa]" : ""}>
-                    {/* <TableCell>
-                      <input type="checkbox" className="rounded border-gray-300" />
-                    </TableCell> */}
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedLabors.includes(String(labor.id))}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedLabors(prev => [...prev, String(labor.id)]);
+                          } else {
+                            setSelectedLabors(prev => prev.filter(id => id !== String(labor.id)));
+                          }
+                        }}
+                      />
+                    </TableCell>
                     <TableCell className="text-sm text-[#2b2b2b]/80">#{labor.laborId}</TableCell>
                     <TableCell>
                       <div>

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { ActionButtonsPopup } from './ActionButtonsPopup'
 import { StaffDetailsPage } from './StaffDetailsPage'
 import { AutoSuggestInput } from './ui/auto-suggest-input'
+import { Checkbox } from './ui/checkbox'
 import { toast } from 'sonner'
 import { apiClient } from '../utils/api'
 import { usePermissions } from '../contexts/PermissionContext'
@@ -19,7 +20,7 @@ import {
   Upload,
   Download
 } from 'lucide-react'
-import { globalApiCall } from '../utils/globalApiHandler'
+import { globalApiCall, getAuthToken, handleTokenRevocation } from '../utils/globalApiHandler'
 
 interface Staff {
   id: string
@@ -145,6 +146,10 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
   const [departments, setDepartments] = useState<string[]>([])
   const [positions, setPositions] = useState<string[]>([])
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({})
+  const [selectedStaff, setSelectedStaff] = useState<string[]>([])
+  const [showImportDialog, setShowImportDialog] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
   
   // API base URL
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
@@ -707,10 +712,88 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
     })
   }
 
-  const handleExportStaff = () => {
+  const handleBulkImport = async () => {
+    if (!importFile) {
+      toast.error('Please select a CSV file');
+      return;
+    }
+
+    try {
+      setIsImporting(true);
+
+      // Get auth token
+      const token = getAuthToken();
+      if (!token) {
+        toast.error('Authentication token not found');
+        return;
+      }
+
+      // Create FormData and append CSV file
+      const formData = new FormData();
+      formData.append('file', importFile);
+
+      // Call bulk import API with FormData
+      const response = await fetch(`${apiBaseUrl}/staff/import`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+          // Don't set Content-Type - browser will set it with boundary for FormData
+        },
+        body: formData
+      });
+
+      const responseData = await response.json();
+      console.log('Bulk import response:', responseData);
+
+      if (!response.ok) {
+        // Handle token revocation
+        if (response.status === 401) {
+          await handleTokenRevocation();
+          throw new Error('Session expired. Please login again.');
+        }
+        throw new Error(responseData.message || 'Failed to import staff');
+      }
+
+      if (responseData.success) {
+        toast.success(responseData.message || 'Successfully imported staff!');
+        setShowImportDialog(false);
+        setImportFile(null);
+        
+        // Refresh staff list
+        fetchStaffData(currentPage, itemsPerPage);
+      } else {
+        throw new Error(responseData.message || 'Failed to import staff');
+      }
+    } catch (error) {
+      console.error('Error importing staff:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to import staff');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && (file.type === 'text/csv' || file.name.endsWith('.csv'))) {
+      setImportFile(file);
+    } else {
+      toast.error('Please select a valid CSV file');
+    }
+  };
+
+  const handleExportStaff = async () => {
+  // Check if any staff is selected
+  if (selectedStaff.length === 0) {
+    toast.error('Please select at least one staff member to export');
+    return;
+  }
+
+  // Filter staff to only include selected ones
+  const selectedStaffData = staff.filter(member => selectedStaff.includes(member.id));
+
   // Prepare CSV headers
   const headers = [
-    'Staff ID',
+    'ID',
     'Name',
     'Email',
     'Phone',
@@ -722,7 +805,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
   ];
 
   // Prepare CSV rows
-  const rows = staff.map(member => [
+  const rows = selectedStaffData.map(member => [
     member.id,
     member.name,
     member.email,
@@ -737,7 +820,11 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
   // Convert to CSV string
   let csvContent = headers.join(',') + '\n';
   rows.forEach(row => {
-    csvContent += row.map(field => `"${field}"`).join(',') + '\n';
+    csvContent += row.map(field => {
+      const value = field === null || field === undefined ? '' : String(field);
+      const escapedValue = value.replace(/"/g, '""');
+      return `"${escapedValue}"`;
+    }).join(',') + '\n';
   });
 
   // Create download link
@@ -745,7 +832,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.setAttribute('href', url);
-  link.setAttribute('download', 'staff_export.csv');
+  link.setAttribute('download', `staff_export_${new Date().toISOString().split('T')[0]}.csv`);
   link.style.visibility = 'hidden';
   document.body.appendChild(link);
   link.click();
@@ -802,6 +889,11 @@ useEffect(() => {
 
   return () => clearTimeout(debounceTimeout);
 }, [searchTerm, currentPage, itemsPerPage, filterStatus]);
+
+// Clear selected staff when pagination, filters, or search changes
+useEffect(() => {
+  setSelectedStaff([]);
+}, [currentPage, filterDepartment, filterStatus, searchTerm]);
 
 useEffect(() => {
   const fetchStaffByStatus = async () => {
@@ -878,10 +970,49 @@ useEffect(() => {
         </div>
         
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="gap-2">
-            <Upload className="h-4 w-4" />
-            Import
-          </Button>
+          <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2" onClick={() => setShowImportDialog(true)}>
+                <Upload className="h-4 w-4" />
+                Import
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                <DialogTitle>Import Staff</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="import-file">Select CSV File</Label>
+                  <Input
+                    id="import-file"
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileSelect}
+                    className="mt-2"
+                  />
+                  {importFile && (
+                    <p className="text-sm text-gray-600 mt-2">Selected: {importFile.name}</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <Button variant="outline" onClick={() => {
+                  setShowImportDialog(false);
+                  setImportFile(null);
+                }}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleBulkImport} 
+                  disabled={!importFile || isImporting}
+                  className="bg-primary text-white hover:bg-primary/90"
+                >
+                  {isImporting ? 'Importing...' : 'Import'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Button variant="outline" className="gap-2" onClick={handleExportStaff}>
             <Download className="h-4 w-4" />
             Export
@@ -947,9 +1078,29 @@ useEffect(() => {
           <Table>
             <TableHeader>
               <TableRow className="bg-[#162f3d] hover:bg-[#162f3d]">
-                {/* <TableHead className="text-white font-medium">
-                  <input type="checkbox" className="rounded border-white/30" />
-                </TableHead> */}
+                <TableHead className="text-white font-medium w-12">
+                  <Checkbox
+                    checked={paginatedStaff.length > 0 && paginatedStaff.every(m => selectedStaff.includes(m.id))}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        const paginatedIds = paginatedStaff.map(m => m.id);
+                        setSelectedStaff(prev => {
+                          const newSelection = [...prev];
+                          paginatedIds.forEach(id => {
+                            if (!newSelection.includes(id)) {
+                              newSelection.push(id);
+                            }
+                          });
+                          return newSelection;
+                        });
+                      } else {
+                        const paginatedIds = paginatedStaff.map(m => m.id);
+                        setSelectedStaff(prev => prev.filter(id => !paginatedIds.includes(id)));
+                      }
+                    }}
+                    className="border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-[#162f3d]"
+                  />
+                </TableHead>
                 <TableHead className="text-white font-medium">ID</TableHead>
                 <TableHead className="text-white font-medium">Name</TableHead>
                 <TableHead className="text-white font-medium">Phone</TableHead>
@@ -966,7 +1117,7 @@ useEffect(() => {
             <TableBody>
               {isLoadingStaff ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8">
+                  <TableCell colSpan={12} className="text-center py-8">
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                       <span className="ml-2 text-gray-600">Loading staff data...</span>
@@ -975,7 +1126,7 @@ useEffect(() => {
                 </TableRow>
               ) : paginatedStaff.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8">
+                  <TableCell colSpan={12} className="text-center py-8">
                     <div className="flex flex-col items-center justify-center text-gray-500">
                       <div className="text-lg font-medium mb-2">No data available</div>
                       <div className="text-sm">
@@ -989,9 +1140,18 @@ useEffect(() => {
               ) : (
                 paginatedStaff.map((member, index) => (
                 <TableRow key={member.id} className={index % 2 === 1 ? "bg-[#eff4fa]" : ""}>
-                  {/* <TableCell>
-                    <input type="checkbox" className="rounded border-gray-300" />
-                  </TableCell> */}
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedStaff.includes(member.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedStaff(prev => [...prev, member.id]);
+                        } else {
+                          setSelectedStaff(prev => prev.filter(id => id !== member.id));
+                        }
+                      }}
+                    />
+                  </TableCell>
                   <TableCell className="text-sm text-[#2b2b2b]/80">#{member.id}</TableCell>
                   <TableCell className="text-sm text-[#2b2b2b]/80 font-medium">{member.name}</TableCell>
                   <TableCell className="text-sm text-[#2b2b2b]/80">{member.phone}</TableCell>
