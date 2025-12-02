@@ -392,6 +392,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
 
   const handleEdit = (leadLabour: LeadLabour) => {
     setEditingLeadLabour(leadLabour)
+    console.log(leadLabour.documents);
     setFormData({
       role: leadLabour.role || '', // Use the role from leadLabour
       name: leadLabour.name,
@@ -725,24 +726,22 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
           </div>
         )}
 
-        {editingLeadLabour && editingLeadLabour.documents?.[type] && !formData.documents[type] && (
+        {editingLeadLabour && editingLeadLabour.documents?.[type] && 
+         (!formData.documents[type] || (formData.documents[type] && !(formData.documents[type] instanceof File))) && (
           <div className="mt-2">
-            <p className="text-sm text-blue-600 mb-2">📄 Current: {editingLeadLabour.documents[type]!.name}</p>
-            {editingLeadLabour.documents[type]!.name && /\.(jpg|jpeg|png|gif)$/i.test(editingLeadLabour.documents[type]!.name) && (
-              <Image
-                src={editingLeadLabour.documents[type]!.url}
-                alt="Current Preview"
-                className="w-full h-32 object-cover rounded-lg border"
-                width={168}
-                height={63}
-
-
-              />
-              // <img 
-              //   src={editingLeadLabour.documents[type]!.url} 
-              //   alt="Current Preview" 
-              //   className="w-full h-32 object-cover rounded-lg border"
-              // />
+            
+            {editingLeadLabour.documents[type]!.name && !/\.(jpg|jpeg|png|gif)$/i.test(editingLeadLabour.documents[type]!.name) && (
+              <div className="p-4 bg-gray-50 rounded-lg border flex items-center gap-2">
+                <FileText className="h-6 w-6 text-gray-400" />
+                <a 
+                  href={editingLeadLabour.documents[type]!.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-600 hover:underline"
+                >
+                  {editingLeadLabour.documents[type]!.name}
+                </a>
+              </div>
             )}
           </div>
         )}
@@ -1171,6 +1170,13 @@ useEffect(() => {
                       label: 'ID Proof',
                       file_name: item.id_proof_url.split('/').pop() || 'ID Proof',
                       url: item.id_proof_url
+                    }
+                  : null,
+                item.photo_url
+                  ? {
+                      label: 'Photo',
+                      file_name: item.photo_url.split('/').pop() || 'Photo',
+                      url: item.photo_url
                     }
                   : null,
                 item.resume_url

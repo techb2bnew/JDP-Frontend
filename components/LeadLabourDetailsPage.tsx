@@ -218,17 +218,17 @@ const buildDocuments = (data: any, fallbackSource?: any): LeadLabourDocument[] =
   }
 
   const items: LeadLabourDocument[] = []
-  if (source.idProof || source.id_proof || source.idProofUrl) {
-    const value = source.idProof || source.id_proof || { name: 'ID Proof', url: source.idProofUrl }
-    items.push({ label: 'ID Proof', fileName: value.name || 'ID Proof', url: value.url })
+  if (source.idProof || source.id_proof || source.idProofUrl || source.id_proof_url) {
+    const value = source.idProof || source.id_proof || { name: 'ID Proof', url: source.idProofUrl || source.id_proof_url }
+    items.push({ label: 'ID Proof', fileName: value.name || value.file_name || 'ID Proof', url: value.url || source.id_proof_url })
   }
-  if (source.resume || source.resumeUrl) {
-    const value = source.resume || { name: 'Resume', url: source.resumeUrl }
-    items.push({ label: 'Resume', fileName: value.name || 'Resume', url: value.url })
+  if (source.photo || source.photoUrl || source.photo_url) {
+    const value = source.photo || { name: 'Photo', url: source.photoUrl || source.photo_url }
+    items.push({ label: 'Photo', fileName: value.name || value.file_name || 'Photo', url: value.url || source.photo_url })
   }
-  if (source.photo || source.photoUrl) {
-    const value = source.photo || { name: 'Photo', url: source.photoUrl }
-    items.push({ label: 'Photo', fileName: value.name || 'Photo', url: value.url })
+  if (source.resume || source.resumeUrl || source.resume_url) {
+    const value = source.resume || { name: 'Resume', url: source.resumeUrl || source.resume_url }
+    items.push({ label: 'Resume', fileName: value.name || value.file_name || 'Resume', url: value.url || source.resume_url })
   }
   return items.length > 0 ? items : fallbackDocuments
 }
@@ -236,7 +236,11 @@ const buildDocuments = (data: any, fallbackSource?: any): LeadLabourDocument[] =
 const buildLeadLabourDetails = (rawData: any, fallback: LeadLabourDetails): LeadLabourDetails => {
   if (!rawData) return fallback
 
-  const documents = buildDocuments(rawData.documentsList, rawData.documents || rawData.attachments)
+  // Check for documents in multiple places: documentsList, documents array, or direct URL fields
+  const documents = buildDocuments(
+    rawData.documentsList || rawData.documents || rawData.attachments,
+    rawData // Also pass rawData as fallback to check for id_proof_url, photo_url, resume_url directly
+  )
 
   const assignedJobsRaw = rawData.assigned_jobs
   const assignedJobEntries: LeadLabourJobHistory[] = Array.isArray(assignedJobsRaw?.jobs)

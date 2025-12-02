@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog'
-import { 
+import {
   Bell,
   BellRing,
   Search,
@@ -88,6 +88,9 @@ export function NotificationsPage() {
       custom_link?: string
       send_to_all: boolean
       recipient_roles: string[]
+      job_id?: number | string
+      labor_ids?: string
+      lead_labor_ids?: string
     }) => Promise<any>
   }
   const [searchTerm, setSearchTerm] = useState('')
@@ -109,6 +112,13 @@ export function NotificationsPage() {
   const [itemsPerPage] = useState(20) // Match API limit
   const [roles, setRoles] = useState<Role[]>([])
   const [isLoadingRoles, setIsLoadingRoles] = useState(false)
+
+  // Job search & selection for targeted notifications
+  const [jobSearchTerm, setJobSearchTerm] = useState('')
+  const [jobResults, setJobResults] = useState<any[]>([])
+  const [isLoadingJobs, setIsLoadingJobs] = useState(false)
+  const [selectedJob, setSelectedJob] = useState<any | null>(null)
+  const [showJobDropdown, setShowJobDropdown] = useState(false)
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || ''
 
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -192,9 +202,9 @@ export function NotificationsPage() {
       'timesheets': { label: 'Timesheets', color: 'bg-orange-50 text-orange-600 border-orange-200' },
       'system': { label: 'System', color: 'bg-gray-50 text-gray-600 border-gray-200' }
     }
-    
+
     const categoryInfo = categoryMap[category as keyof typeof categoryMap] || categoryMap.system
-    
+
     return (
       <Badge className={`${categoryInfo.color} hover:${categoryInfo.color}`}>
         {categoryInfo.label}
@@ -205,33 +215,33 @@ export function NotificationsPage() {
   const formatTimestamp = (timestamp: string) => {
     try {
       if (!timestamp) return '—'
-      
+
       // Parse the UTC timestamp and convert to local time
       // If timestamp doesn't have 'Z' or timezone, treat it as UTC
       const utcTimestamp = timestamp.endsWith('Z') ? timestamp : timestamp + 'Z'
       const date = new Date(utcTimestamp)
-      
+
       // Check if date is valid
       if (isNaN(date.getTime())) {
         return timestamp
       }
-      
+
       // Get current local time
       const now = new Date()
-      
+
       // Calculate difference in milliseconds (both dates are in local time after parsing)
       const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
-      
+
       if (diffInMinutes < 1) return 'Just now'
       if (diffInMinutes < 60) return `${diffInMinutes}m ago`
-      
+
       const diffInHours = Math.floor(diffInMinutes / 60)
       if (diffInHours < 24) return `${diffInHours}h ago`
-      
+
       const diffInDays = Math.floor(diffInHours / 24)
       if (diffInDays === 1) return 'Yesterday'
       if (diffInDays < 7) return `${diffInDays} days ago`
-      
+
       // Format as local date
       return date.toLocaleDateString('en-US', {
         month: 'short',
@@ -244,7 +254,7 @@ export function NotificationsPage() {
   }
 
 
-const fetchRoles = useCallback(async () => {
+  const fetchRoles = useCallback(async () => {
     setIsLoadingRoles(true)
     try {
       const token = localStorage.getItem('jdp_auth')
@@ -287,12 +297,68 @@ const fetchRoles = useCallback(async () => {
     fetchRoles()
   }, [fetchRoles])
 
+  const fetchJobsForNotification = useCallback(
+    async (query: string) => {
+      try {
+        setIsLoadingJobs(true)
+        // Always use search API, even with empty query
+        const response = await apiClient.searchJobsByQuery(query || '', 1, 10)
+
+        const jobs = response.data?.jobs || response.data || []
+
+        const transformedJobs = jobs.map((job: any) => ({
+          id: job.id?.toString() || '',
+          title: job.job_title || job.title || '',
+          customerName:
+            job.customerName ||
+            job.customer?.customer_name ||
+            job.customer?.name ||
+            '',
+          address: job.address || job.location || '',
+          assignedLeadLabor:
+            job.assigned_lead_labor?.map((l: any) => ({
+              id: l.id,
+              name: l.user?.full_name || l.full_name || '',
+            })) || [],
+          assignedLabor:
+            job.assigned_labor?.map((l: any) => ({
+              id: l.id,
+              name: l.user?.full_name || l.full_name || '',
+            })) || [],
+          // Preserve original IDs strings as fallback
+          assigned_labor_ids: job.assigned_labor_ids,
+          assigned_lead_labor_ids: job.assigned_lead_labor_ids,
+        }))
+
+        setJobResults(transformedJobs)
+      } catch (error) {
+        console.error('Error fetching jobs for notifications:', error)
+        setJobResults([])
+      } finally {
+        setIsLoadingJobs(false)
+      }
+    },
+    []
+  )
+
+  // Debounced job search
+  useEffect(() => {
+    if (!showJobDropdown) return
+
+    const trimmed = jobSearchTerm.trim()
+    const timeout = setTimeout(() => {
+      fetchJobsForNotification(trimmed)
+    }, 400)
+
+    return () => clearTimeout(timeout)
+  }, [jobSearchTerm, showJobDropdown, fetchJobsForNotification])
+
   // Helper function to transform API response
   const transformNotifications = (items: any[]): Notification[] => {
     return items.map((apiNotification: any) => {
       // Access nested notification data if it exists
       const notificationData = apiNotification.notification || {}
-      
+
       return {
         id: apiNotification.notification_id?.toString() || apiNotification.id?.toString() || Date.now().toString(),
         type: (notificationData.type || apiNotification.type || 'system') as Notification['type'],
@@ -360,7 +426,7 @@ const fetchRoles = useCallback(async () => {
       if (responseData.success && responseData.data?.items) {
         const transformedNotifications = transformNotifications(responseData.data.items)
         setNotifications(transformedNotifications)
-        
+
         // Update pagination state
         if (responseData.data?.pagination) {
           setPagination(responseData.data.pagination)
@@ -405,11 +471,11 @@ const fetchRoles = useCallback(async () => {
         page: page.toString(),
         limit: itemsPerPage.toString()
       })
-      
+
       if (searchQuery.trim()) {
         queryParams.append('search', searchQuery.trim())
       }
-      
+
       if (status && status !== 'all') {
         queryParams.append('status', status)
       }
@@ -429,7 +495,7 @@ const fetchRoles = useCallback(async () => {
       if (responseData.success && responseData.data?.items) {
         const transformedNotifications = transformNotifications(responseData.data.items)
         setNotifications(transformedNotifications)
-        
+
         // Update pagination state
         if (responseData.data?.pagination) {
           setPagination(responseData.data.pagination)
@@ -533,132 +599,132 @@ const fetchRoles = useCallback(async () => {
 
 
   useEffect(() => {
-  if (typeof window === 'undefined') return;
-  initFirebaseMessaging();
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/firebase-messaging-sw.js')
-      .then(reg => {
-        console.log('Service Worker registered for FCM:', reg.scope);
-      })
-      .catch(err => {
-        console.warn('SW registration failed:', err);
-      });
-  }
-  const unsubscribe = onForegroundMessage((payload: any) => {
-    console.log('🔔 FCM notification received:', payload);
-    
-    // Extract title and body
-    const title = payload.notification?.title || payload.data?.title || 'New Notification';
-    const body = payload.notification?.body || payload.data?.message || payload.data?.body || '';
-    
-    // Show native browser notification
-    try {
-      if ('Notification' in window && Notification.permission === 'granted') {
-        const notification = new Notification(title, {
-          body: body,
-          icon: payload.notification?.icon || '/favicon.ico',
-          badge: '/favicon.ico',
-          tag: payload.messageId || Date.now().toString(),
-          requireInteraction: false,
-          silent: false, // Make sure notification makes sound
-          data: payload.data || {}
+    if (typeof window === 'undefined') return;
+    initFirebaseMessaging();
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/firebase-messaging-sw.js')
+        .then(reg => {
+          console.log('Service Worker registered for FCM:', reg.scope);
+        })
+        .catch(err => {
+          console.warn('SW registration failed:', err);
         });
-        
-        // Auto close after 15 seconds (increased for better visibility)
-        setTimeout(() => {
-          notification.close();
-        }, 15000);
-        
-        // Handle notification click
-        notification.onclick = (event) => {
-          event.preventDefault();
-          window.focus();
-          // If there's a custom link, open it
-          if (payload.data?.custom_link || payload.fcmOptions?.link) {
-            window.open(payload.data?.custom_link || payload.fcmOptions?.link, '_blank');
-          }
-          notification.close();
-        };
-        
-        notification.onerror = (error) => {
-          console.error('Notification error:', error);
-        };
-        
-        notification.onshow = () => {
-          console.log('✅ Browser notification displayed successfully');
-        };
-        
-        notification.onclose = () => {
-          console.log('Notification closed');
-        };
-      } else if ('Notification' in window && Notification.permission !== 'denied') {
-        // Request permission if not already denied
-        Notification.requestPermission().then((perm) => {
-          if (perm === 'granted') {
-            const notification = new Notification(title, {
-              body: body,
-              icon: payload.notification?.icon || '/favicon.ico',
-              badge: '/favicon.ico',
-              tag: payload.messageId || Date.now().toString(),
-              requireInteraction: false,
-              silent: false,
-              data: payload.data || {}
-            });
-            
-            setTimeout(() => {
-              notification.close();
-            }, 15000);
-            
-            notification.onclick = (event) => {
-              event.preventDefault();
-              window.focus();
-              if (payload.data?.custom_link || payload.fcmOptions?.link) {
-                window.open(payload.data?.custom_link || payload.fcmOptions?.link, '_blank');
-              }
-              notification.close();
-            };
-            
-            notification.onshow = () => {
-              console.log('✅ Browser notification displayed after permission grant');
-            };
-          }
-        });
+    }
+    const unsubscribe = onForegroundMessage((payload: any) => {
+      console.log('🔔 FCM notification received:', payload);
+
+      // Extract title and body
+      const title = payload.notification?.title || payload.data?.title || 'New Notification';
+      const body = payload.notification?.body || payload.data?.message || payload.data?.body || '';
+
+      // Show native browser notification
+      try {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          const notification = new Notification(title, {
+            body: body,
+            icon: payload.notification?.icon || '/favicon.ico',
+            badge: '/favicon.ico',
+            tag: payload.messageId || Date.now().toString(),
+            requireInteraction: false,
+            silent: false, // Make sure notification makes sound
+            data: payload.data || {}
+          });
+
+          // Auto close after 15 seconds (increased for better visibility)
+          setTimeout(() => {
+            notification.close();
+          }, 15000);
+
+          // Handle notification click
+          notification.onclick = (event) => {
+            event.preventDefault();
+            window.focus();
+            // If there's a custom link, open it
+            if (payload.data?.custom_link || payload.fcmOptions?.link) {
+              window.open(payload.data?.custom_link || payload.fcmOptions?.link, '_blank');
+            }
+            notification.close();
+          };
+
+          notification.onerror = (error) => {
+            console.error('Notification error:', error);
+          };
+
+          notification.onshow = () => {
+            console.log('✅ Browser notification displayed successfully');
+          };
+
+          notification.onclose = () => {
+            console.log('Notification closed');
+          };
+        } else if ('Notification' in window && Notification.permission !== 'denied') {
+          // Request permission if not already denied
+          Notification.requestPermission().then((perm) => {
+            if (perm === 'granted') {
+              const notification = new Notification(title, {
+                body: body,
+                icon: payload.notification?.icon || '/favicon.ico',
+                badge: '/favicon.ico',
+                tag: payload.messageId || Date.now().toString(),
+                requireInteraction: false,
+                silent: false,
+                data: payload.data || {}
+              });
+
+              setTimeout(() => {
+                notification.close();
+              }, 15000);
+
+              notification.onclick = (event) => {
+                event.preventDefault();
+                window.focus();
+                if (payload.data?.custom_link || payload.fcmOptions?.link) {
+                  window.open(payload.data?.custom_link || payload.fcmOptions?.link, '_blank');
+                }
+                notification.close();
+              };
+
+              notification.onshow = () => {
+                console.log('✅ Browser notification displayed after permission grant');
+              };
+            }
+          });
+        }
+      } catch (e) {
+        console.error('Error creating notification:', e);
       }
-    } catch (e) {
-      console.error('Error creating notification:', e);
-    }
 
-    const data = payload.data || {};
-    const incoming: Notification = {
-      id: data.id ? data.id.toString() : Date.now().toString(),
-      type: (data.type as any) || 'system',
-      title: title,
-      message: body,
-      timestamp: new Date().toISOString(),
-      isRead: false,
-      priority: (data.priority as any) || 'medium',
-      relatedId: data.relatedId || data.link || undefined,
-      userRole: (data.userRole as any) || 'admin',
-      category: (data.category as any) || 'system'
+      const data = payload.data || {};
+      const incoming: Notification = {
+        id: data.id ? data.id.toString() : Date.now().toString(),
+        type: (data.type as any) || 'system',
+        title: title,
+        message: body,
+        timestamp: new Date().toISOString(),
+        isRead: false,
+        priority: (data.priority as any) || 'medium',
+        relatedId: data.relatedId || data.link || undefined,
+        userRole: (data.userRole as any) || 'admin',
+        category: (data.category as any) || 'system'
+      };
+
+      setNotifications(prev => [incoming, ...prev]);
+
+      // Show toast with notification details
+      try {
+        // toast.success(title, {
+        //   description: body,
+        //   duration: 5000,
+        // });
+      } catch (e) {
+        console.warn('Failed to show toast notification', e);
+      }
+    });
+
+    return () => {
+      try { unsubscribe && unsubscribe() } catch (e) { }
     };
-
-    setNotifications(prev => [incoming, ...prev]);
-
-    // Show toast with notification details
-    try {
-      // toast.success(title, {
-      //   description: body,
-      //   duration: 5000,
-      // });
-    } catch (e) {
-      console.warn('Failed to show toast notification', e);
-    }
-  });
-
-  return () => {
-    try { unsubscribe && unsubscribe() } catch (e) {}
-  };
-}, []);
+  }, []);
 
 
 
@@ -667,7 +733,7 @@ const fetchRoles = useCallback(async () => {
     try {
       // Find the notification to get recipient_id
       const notification = notifications.find(n => n.id === notificationId)
-      
+
       if (!notification || !notification.recipient_id) {
         toast.error('Notification not found or recipient ID missing')
         return
@@ -696,21 +762,21 @@ const fetchRoles = useCallback(async () => {
       }
 
       const responseData = await response.json()
-      
+
       if (responseData.success) {
         // Update local state
-        setNotifications(notifications.map(n => 
-          n.id === notificationId 
+        setNotifications(notifications.map(n =>
+          n.id === notificationId
             ? { ...n, isRead: true, read_at: new Date().toISOString() }
             : n
         ))
-        
+
         // Update pagination unread count
         setPagination(prev => ({
           ...prev,
           unread_count: Math.max(0, prev.unread_count - 1)
         }))
-        
+
         toast.success('Notification marked as read')
       } else {
         throw new Error(responseData.message || 'Failed to mark notification as read')
@@ -724,12 +790,12 @@ const fetchRoles = useCallback(async () => {
   const handleMarkAsUnread = (notificationId: string) => {
     // For now, just update local state
     // If there's an API for unread, we can add it later
-    setNotifications(notifications.map(notification => 
-      notification.id === notificationId 
+    setNotifications(notifications.map(notification =>
+      notification.id === notificationId
         ? { ...notification, isRead: false, read_at: null }
         : notification
     ))
-    
+
     // Update pagination unread count
     setPagination(prev => ({
       ...prev,
@@ -748,7 +814,7 @@ const fetchRoles = useCallback(async () => {
     try {
       // Find the notification to get recipient_id
       const notification = notifications.find(n => n.id === notificationToDelete)
-      
+
       if (!notification || !notification.recipient_id) {
         toast.error('Notification not found or recipient ID missing')
         setDeleteDialogOpen(false)
@@ -766,7 +832,7 @@ const fetchRoles = useCallback(async () => {
 
       const parsedAuth = JSON.parse(authData)
       const token = parsedAuth?.token
-      const headers: Record<string, string> = { 
+      const headers: Record<string, string> = {
       }
       if (token) {
         headers['Authorization'] = `Bearer ${token}`
@@ -782,17 +848,17 @@ const fetchRoles = useCallback(async () => {
       }
 
       const responseData = await response.json()
-      
+
       if (responseData.success) {
         // Remove notification from local state
         setNotifications(notifications.filter(n => n.id !== notificationToDelete))
-        
+
         // Update pagination total count
         setPagination(prev => ({
           ...prev,
           total_count: Math.max(0, prev.total_count - 1)
         }))
-        
+
         toast.success('Notification deleted successfully')
         setDeleteDialogOpen(false)
         setNotificationToDelete(null)
@@ -845,20 +911,20 @@ const fetchRoles = useCallback(async () => {
       }
 
       const responseData = await response.json()
-      
+
       if (responseData.success) {
         // Update local state
         setNotifications(notifications.map(notification => ({
           ...notification,
           isRead: true
         })))
-        
+
         // Update pagination unread count
         setPagination(prev => ({
           ...prev,
           unread_count: 0
         }))
-        
+
         toast.success('All notifications marked as read')
       } else {
         throw new Error(responseData.message || 'Failed to mark all notifications as read')
@@ -888,80 +954,136 @@ const fetchRoles = useCallback(async () => {
     })
   }
 
-const handleSendNotification = async () => {
-  const errors: { title?: string; message?: string; roles?: string } = {}
+  const handleSendNotification = async () => {
+    const errors: { title?: string; message?: string; roles?: string } = {}
 
-  if (!notificationForm.title.trim()) {
-    errors.title = 'Notification title is required'
-  }
-
-  if (!notificationForm.message.trim()) {
-    errors.message = 'Notification message is required'
-  }
-
-  if (notificationForm.recipientType === 'roles' && notificationForm.selectedRoles.length === 0) {
-    errors.roles = 'Select at least one role'
-  }
-
-  setFormErrors(errors)
-
-  if (Object.keys(errors).length > 0) return
-
-  setIsSending(true)
-
-  try {
-    const recipientRoles = notificationForm.recipientType === 'roles'
-      ? roles
-          .filter(role => notificationForm.selectedRoles.includes(role.id))
-          .map(role => role.roleName)
-      : []
-
-    const payload = {
-      notification_title: notificationForm.title.trim(),
-      message: notificationForm.message.trim(),
-      custom_link: notificationForm.link.trim() || undefined,
-      send_to_all: notificationForm.recipientType === 'all',
-      recipient_roles: recipientRoles
+    if (!notificationForm.title.trim()) {
+      errors.title = 'Notification title is required'
     }
-    await notificationsApiClient.sendNotification(payload)
 
-    toast.success('Notification sent successfully')
-    
-    // Refresh notifications list from API
-    await fetchUserNotifications(currentPage)
+    if (!notificationForm.message.trim()) {
+      errors.message = 'Notification message is required'
+    }
 
-    setNotificationForm({
-      title: '',
-      message: '',
-      link: '',
-      recipientType: 'all',
-      selectedRoles: []
-    })
-    setFormErrors({})
-    setCurrentPage(1)
-    setMainTab('list')
-  } catch (error) {
-    console.error('Failed to send notification:', error)
-    toast.error('Failed to send notification')
-  } finally {
-    setIsSending(false)
+    if (notificationForm.recipientType === 'roles' && notificationForm.selectedRoles.length === 0) {
+      errors.roles = 'Select at least one role'
+    }
+
+    setFormErrors(errors)
+
+    if (Object.keys(errors).length > 0) return
+
+    setIsSending(true)
+
+    try {
+      const recipientRoles = notificationForm.recipientType === 'roles'
+        ? roles
+            .filter(role => notificationForm.selectedRoles.includes(role.id))
+            .map(role => role.roleName)
+        : []
+
+      // Build job-based recipient IDs (labor & lead labor) from selected job
+      let jobId: number | string | undefined
+      let laborIds: (number | string)[] | undefined
+      let leadLaborIds: (number | string)[] | undefined
+
+      if (selectedJob) {
+        jobId = selectedJob.id
+        
+        // Try to get IDs from arrays first
+        const labor = (selectedJob.assignedLabor || []).map((l: any) => l.id).filter(Boolean)
+        const leadLabor = (selectedJob.assignedLeadLabor || []).map((l: any) => l.id).filter(Boolean)
+
+        // If arrays have data, use them
+        if (labor.length > 0) {
+          laborIds = labor
+        } else if (selectedJob.assigned_labor_ids) {
+          // Fallback: parse from string if array is empty
+          try {
+            const parsed = typeof selectedJob.assigned_labor_ids === 'string' 
+              ? JSON.parse(selectedJob.assigned_labor_ids) 
+              : selectedJob.assigned_labor_ids
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              laborIds = parsed
+            }
+          } catch (e) {
+            console.error('Error parsing assigned_labor_ids:', e)
+          }
+        }
+
+        if (leadLabor.length > 0) {
+          leadLaborIds = leadLabor
+        } else if (selectedJob.assigned_lead_labor_ids) {
+          // Fallback: parse from string if array is empty
+          try {
+            const parsed = typeof selectedJob.assigned_lead_labor_ids === 'string'
+              ? JSON.parse(selectedJob.assigned_lead_labor_ids)
+              : selectedJob.assigned_lead_labor_ids
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              leadLaborIds = parsed
+            }
+          } catch (e) {
+            console.error('Error parsing assigned_lead_labor_ids:', e)
+          }
+        }
+      }
+
+      const payload: any = {
+        notification_title: notificationForm.title.trim(),
+        message: notificationForm.message.trim(),
+        custom_link: notificationForm.link.trim() || undefined,
+        send_to_all: notificationForm.recipientType === 'all',
+        recipient_roles: recipientRoles
+      }
+
+      if (jobId) {
+        payload.job_id = jobId
+      }
+      if (laborIds && laborIds.length > 0) {
+        payload.labor_ids = JSON.stringify(laborIds)
+      }
+      if (leadLaborIds && leadLaborIds.length > 0) {
+        payload.lead_labor_ids = JSON.stringify(leadLaborIds)
+      }
+      await notificationsApiClient.sendNotification(payload)
+
+      toast.success('Notification sent successfully')
+
+      // Refresh notifications list from API
+      await fetchUserNotifications(currentPage)
+
+      setNotificationForm({
+        title: '',
+        message: '',
+        link: '',
+        recipientType: 'all',
+        selectedRoles: []
+      })
+      setFormErrors({})
+      setCurrentPage(1)
+      setMainTab('list')
+    } catch (error) {
+      console.error('Failed to send notification:', error)
+      toast.error('Failed to send notification')
+    } finally {
+      setIsSending(false)
+    }
   }
-}
 
 
 
   const filteredNotifications = notifications.filter(notification => {
     const matchesSearch = notification.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         notification.message.toLowerCase().includes(searchTerm.toLowerCase())
-    
+      notification.message.toLowerCase().includes(searchTerm.toLowerCase())
+
     const matchesType = filterType === 'all' || notification.type === filterType
     const matchesPriority = filterPriority === 'all' || notification.priority === filterPriority
-    const matchesStatus = filterStatus === 'all' || 
-                         (filterStatus === 'read' && notification.isRead) ||
-                         (filterStatus === 'unread' && !notification.isRead)
-    
+    const matchesStatus = filterStatus === 'all' ||
+      (filterStatus === 'read' && notification.isRead) ||
+      (filterStatus === 'unread' && !notification.isRead)
+
     const matchesCategory = filterCategory === 'all' || notification.category === filterCategory
-    
+
     return matchesSearch && matchesType && matchesPriority && matchesStatus && matchesCategory
   })
 
@@ -992,15 +1114,15 @@ const handleSendNotification = async () => {
             Manage your notifications and stay updated on important activities
           </p>
         </div>
-        
+
         <div className="flex items-center gap-3">
           <Badge className="bg-[#E6F6FF] text-[#00A1FF] border-[#00A1FF]/20 hover:bg-[#E6F6FF]">
             {unreadCount} unread
           </Badge>
           {hasPermission('notification', 'edit') && (
-            <Button 
+            <Button
               onClick={handleMarkAllAsRead}
-              variant="outline" 
+              variant="outline"
               className="gap-2"
               disabled={unreadCount === 0}
             >
@@ -1120,38 +1242,103 @@ const handleSendNotification = async () => {
                             : undefined
                         }))
                       }}
-                    /> 
+                    />
                     Send to specific roles
                   </label>
                 </div>
 
-              {notificationForm.recipientType === 'roles' && (
-        <div className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2">
-            {isLoadingRoles ? (
-              <p>Loading roles...</p>
-            ) : roles.length === 0 ? (
-              <p>No roles available</p>
-            ) : (
-              roles.map(role => (
-                <label
-                  key={role.id}
-                  className="flex items-center gap-3 rounded-lg border border-gray-200 bg-[#F9FAFB] p-3 text-sm text-[#2b2b2b]"
-                >
-                  <Checkbox
-                    checked={notificationForm.selectedRoles.includes(role.id)}
-                    onCheckedChange={() => handleToggleRecipientRole(role.id)}
-                  />
-                  {role.roleName}
+                {notificationForm.recipientType === 'roles' && (
+                  <div className="space-y-3">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {isLoadingRoles ? (
+                        <p>Loading roles...</p>
+                      ) : roles.length === 0 ? (
+                        <p>No roles available</p>
+                      ) : (
+                        roles.map(role => (
+                          <label
+                            key={role.id}
+                            className="flex items-center gap-3 rounded-lg border border-gray-200 bg-[#F9FAFB] p-3 text-sm text-[#2b2b2b]"
+                          >
+                            <Checkbox
+                              checked={notificationForm.selectedRoles.includes(role.id)}
+                              onCheckedChange={() => handleToggleRecipientRole(role.id)}
+                            />
+                            {role.roleName}
+                          </label>
+                        ))
+                      )}
+                    </div>
+                    {formErrors.roles && (
+                      <p className="text-sm text-red-500">{formErrors.roles}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Job Assignment (Optional) */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-[#2b2b2b]">
+                  Job Assignment (Optional)
                 </label>
-              ))
-            )}
-          </div>
-          {formErrors.roles && (
-            <p className="text-sm text-red-500">{formErrors.roles}</p>
-          )}
-        </div>
-      )}
+                <div className="relative">
+                  <Input
+                    placeholder="Search jobs..."
+                    value={jobSearchTerm}
+                    onChange={(e) => {
+                      setJobSearchTerm(e.target.value)
+                      setShowJobDropdown(true)
+                    }}
+                    onFocus={() => {
+                      setShowJobDropdown(true)
+                      if (jobResults.length === 0) {
+                        fetchJobsForNotification('')
+                      }
+                    }}
+                    className="pl-8"
+                  />
+                  <Search className="absolute left-2.5 top-[20px] h-4 w-4 -translate-y-1/2 text-gray-400" />
+
+                  {showJobDropdown && (
+                    <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                      {isLoadingJobs ? (
+                        <div className="p-3 text-sm text-gray-500">Searching jobs...</div>
+                      ) : jobResults.length === 0 ? (
+                        <div className="p-3 text-sm text-gray-500">No jobs found</div>
+                      ) : (
+                        jobResults.map((job) => (
+                          <button
+                            key={job.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedJob(job)
+                              setJobSearchTerm(`${job.title || 'Untitled Job'}${job.customerName ? ' - ' + job.customerName : ''}`)
+                              setShowJobDropdown(false)
+                            }}
+                            className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
+                          >
+                            <Briefcase className="mt-0.5 h-4 w-4 text-gray-500" />
+                            <div>
+                              <p className="font-medium text-[#2b2b2b]">
+                                {job.title || 'Untitled Job'}
+                              </p>
+                              {(job.customerName || job.address) && (
+                                <p className="text-xs text-gray-500">
+                                  {[job.customerName, job.address].filter(Boolean).join(' • ')}
+                                </p>
+                              )}
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                  {selectedJob && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Selected job ID: <span className="font-mono">{selectedJob.id}</span>
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center justify-end">
@@ -1177,7 +1364,7 @@ const handleSendNotification = async () => {
         </TabsContent>
 
         <TabsContent value="list" className="space-y-6 focus:outline-none">
-        
+
 
           <Card className="bg-white shadow-md border-0">
             <CardContent className="p-6">
@@ -1190,7 +1377,7 @@ const handleSendNotification = async () => {
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
                   />
-                </div> 
+                </div>
 
                 <Select value={filterStatus} onValueChange={(value) => {
                   setFilterStatus(value)
@@ -1205,7 +1392,7 @@ const handleSendNotification = async () => {
                     <SelectItem value="read">Read</SelectItem>
                   </SelectContent>
                 </Select>
- 
+
 
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Filter className="h-4 w-4" />
@@ -1257,7 +1444,7 @@ const handleSendNotification = async () => {
                               </h3>
                               <p className="mt-1 text-sm text-gray-600 leading-relaxed">{notification.message}</p>
                               <div className="mt-3 flex items-center gap-3 text-xs">
-                              
+
                                 {notification.relatedId && (
                                   <Badge variant="outline" className="text-xs">
                                     {notification.relatedId}
@@ -1268,8 +1455,8 @@ const handleSendNotification = async () => {
                             <div className="flex items-center gap-3">
                               <span className="text-sm text-gray-500">
                                 {formatTimestamp(
-                                  notification.isRead && notification.read_at 
-                                    ? notification.read_at 
+                                  notification.isRead && notification.read_at
+                                    ? notification.read_at
                                     : notification.created_at || notification.timestamp
                                 )}
                               </span>
@@ -1278,7 +1465,7 @@ const handleSendNotification = async () => {
                                   notification.isRead ? (
                                     <Button
                                       variant="ghost"
-                                      size="sm" 
+                                      size="sm"
                                       className="h-auto p-1"
                                     >
                                       <EyeOff className="h-4 w-4 text-gray-400" />

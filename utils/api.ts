@@ -831,6 +831,9 @@ export const apiClient = {
     custom_link?: string;
     send_to_all: boolean;
     recipient_roles: string[];
+    job_id?: number | string;
+    labor_ids?: string;
+    lead_labor_ids?: string;
   }) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
     const token = getAuthToken();
