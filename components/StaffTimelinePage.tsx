@@ -338,7 +338,7 @@ export function StaffTimelinePage() {
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="title">Title</Label>
+              <Label htmlFor="title">Title <span className="text-red-500">*</span></Label>
               <Input
                 id="title"
                 value={formData.title}
@@ -356,7 +356,7 @@ export function StaffTimelinePage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="date">Date</Label>
+              <Label htmlFor="date">Date <span className="text-red-500">*</span></Label>
               <Input
                 id="date"
                 type="date"
@@ -375,7 +375,7 @@ export function StaffTimelinePage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="start_time">Start Time</Label>
+                <Label htmlFor="start_time">Start Time <span className="text-red-500">*</span></Label>
                 <Input
                   id="start_time"
                   type="time"
@@ -393,7 +393,7 @@ export function StaffTimelinePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="end_time">End Time</Label>
+                <Label htmlFor="end_time">End Time <span className="text-red-500">*</span></Label>
                 <Input
                   id="end_time"
                   type="time"
