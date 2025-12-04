@@ -17,6 +17,9 @@
     "postinstall": "npm run type-check"
   },
   "dependencies": {
+    "@fullcalendar/daygrid": "6.1.19",
+    "@fullcalendar/interaction": "6.1.19",
+    "@fullcalendar/react": "6.1.19",
     "@next/bundle-analyzer": "^14.1.0",
     "@radix-ui/react-accordion": "^1.1.2",
     "@radix-ui/react-alert-dialog": "^1.0.5",
@@ -56,6 +59,7 @@
     "embla-carousel-react": "8.6.0",
     "firebase": "12.5.0",
     "framer-motion": "^11.0.3",
+    "fullcalendar": "6.1.19",
     "html2canvas": "1.4.1",
     "input-otp": "1.4.2",
     "jspdf": "3.0.1",

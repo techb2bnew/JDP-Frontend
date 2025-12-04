@@ -29,6 +29,7 @@ import { cn } from "../../lib/utils"
 import { LogoutConfirmationDialog } from "../LogoutConfirmationDialog"
 import { usePermissions } from "../../contexts/PermissionContext"
 import Image from "next/image"
+import { getUserData } from "../../utils/auth"
 interface SidebarProps {
   currentPath: string
   onLogout: () => void
@@ -40,6 +41,19 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
   const router = useRouter()
   const { hasAnyPermission } = usePermissions()
+  
+  // Check if user is staff
+  const isStaffUser = () => {
+    if (typeof window === 'undefined') return false
+    const userData = getUserData()
+    if (!userData?.user) return false
+    // Check if user role is 'staff' or user has staff permissions
+    const userRole = userData.user.role?.toLowerCase() || userData.user.role_type?.toLowerCase() || ''
+    const isStaffRole = userRole === 'staff' || userRole === 'staff_member' || userRole.includes('staff')
+    // Also check if user has staff module permissions
+    const hasStaffPermissions = hasAnyPermission('staff', ['view', 'create', 'edit', 'delete'])
+    return isStaffRole || hasStaffPermissions
+  }
 
   const navigation = [
     {
@@ -168,10 +182,25 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       module: "configuration",
       requiredActions: ["view", "create", "edit", "delete"]
     },
+    {
+      id: "staff-timeline",
+      name: "Staff Timeline",
+      icon: Clock,
+      href: "/staff-timeline",
+      description: "Manage your work timeline and hours",
+      module: "staff_timeline",
+      requiredActions: ["view", "create", "edit", "delete"],
+      staffOnly: true
+    },
   ]
 
   // Filter navigation items based on permissions
   const filteredNavigation = navigation.filter(item => {
+    // Staff Timeline - only show for staff users
+    if (item.id === 'staff-timeline') {
+      return isStaffUser()
+    }
+    
     // Special handling for Staff Management - check for labour or lead_labour permissions
     if (item.id === 'staff') {
       return hasAnyPermission('labour', item.requiredActions) || 

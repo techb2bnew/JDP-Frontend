@@ -3153,4 +3153,114 @@ getTimesheetDashboardStats: async () => {
 
     return response.json();
   },
+
+  // Staff Timesheet APIs
+  createStaffTimesheet: async (timesheetData: {
+    title: string;
+    staff_id: number;
+    date: string;
+    start_time: string;
+    end_time: string;
+    total_hours: number;
+  }) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+
+    const response = await fetch(`${apiBaseUrl}/staff-timesheet/createStaffTimesheet`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+      body: JSON.stringify(timesheetData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to create staff timesheet");
+    }
+
+    return response.json();
+  },
+
+  getStaffTimesheetById: async (timesheetId: number) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+
+    const response = await fetch(`${apiBaseUrl}/staff-timesheet/getStaffTimesheetById/${timesheetId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to fetch staff timesheet");
+    }
+
+    return response.json();
+  },
+
+  getAllStaffTimesheets: async (page: number = 1, limit: number = 10) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+
+    const response = await fetch(`${apiBaseUrl}/staff-timesheet/getAllStaffTimesheets?page=${page}&limit=${limit}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to fetch staff timesheets");
+    }
+
+    return response.json();
+  },
+
+  updateStaffTimesheet: async (timesheetId: number, timesheetData: {
+    title?: string;
+    date?: string;
+    start_time?: string;
+    end_time?: string;
+    total_hours?: number;
+  }) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+
+    const response = await fetch(`${apiBaseUrl}/staff-timesheet/updateStaffTimesheet/${timesheetId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+      body: JSON.stringify(timesheetData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to update staff timesheet");
+    }
+
+    return response.json();
+  },
+
+  deleteStaffTimesheet: async (timesheetId: number) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+
+    const response = await fetch(`${apiBaseUrl}/staff-timesheet/deleteStaffTimesheet/${timesheetId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to delete staff timesheet");
+    }
+
+    return response.json();
+  },
 };
