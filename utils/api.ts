@@ -1187,6 +1187,48 @@ getAllProducts: async () => {
     return response.json();
   },
 
+  // Get Weekly Timesheet View
+  getWeeklyTimesheetView: async (params: {
+    labor_id?: number | string;
+    lead_labor_id?: number | string;
+    start_date: string;
+    end_date: string;
+  }) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const queryParams = new URLSearchParams();
+    if (params.labor_id) {
+      queryParams.append('labor_id', params.labor_id.toString());
+    }
+    if (params.lead_labor_id) {
+      queryParams.append('lead_labor_id', params.lead_labor_id.toString());
+    }
+    queryParams.append('start_date', params.start_date);
+    queryParams.append('end_date', params.end_date);
+
+    const url = `${apiBaseUrl}/job/getWeeklyTimesheetView?${queryParams.toString()}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to fetch weekly timesheet view");
+    }
+
+    return response.json();
+  },
+
 // Search Products by Status
 searchProductsByStatus: async (status:any) => {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;

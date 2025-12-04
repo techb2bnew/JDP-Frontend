@@ -50,7 +50,8 @@ interface TimesheetItem {
   job_id?:number;
   labor_id?:any;
   lead_labor_id?:any;
-
+  hourly_rate?: number | null;
+  weekly_payment?: number | null;
 }
 
 
@@ -126,6 +127,8 @@ const [totalTimesheets, setTotalTimesheets] = useState(0);
 const [filteredTimesheets, setFilteredTimesheets] = useState<any[]>([]);
 const [selectedTimesheet, setSelectedTimesheet] = useState<TimesheetItem | null>(null);
 const [showTimesheetDetail, setShowTimesheetDetail] = useState(false);
+const [timesheetViewData, setTimesheetViewData] = useState<any>(null);
+const [isLoadingTimesheetView, setIsLoadingTimesheetView] = useState(false);
 
 
   const [dashboardStats, setDashboardStats] = useState({
@@ -194,7 +197,9 @@ const fetchAlltimesheets = async () => {
       total: item.total || '0h',
       billable: item.billable || '0h',
       status: item.status || 'Unknown',
-      actions: item.actions || [], 
+      actions: item.actions || [],
+      hourly_rate: item.hourly_rate || null,
+      weekly_payment: item.weekly_payment || null,
     }));
 
     console.log('Transformed timesheets:', transformedTimesheets); // Debug log
@@ -274,9 +279,51 @@ const handleDraftTimesheet = async (item: TimesheetItem) => {
   await updateTimesheetStatus(item, 'Draft');
 };
 
-const handleViewTimesheet = (item: TimesheetItem) => {
+const handleViewTimesheet = async (item: TimesheetItem) => {
   setSelectedTimesheet(item);
   setShowTimesheetDetail(true);
+  setIsLoadingTimesheetView(true);
+  setTimesheetViewData(null);
+
+  try {
+    // Get start_date and end_date from period
+    const startDate = timesheets?.period?.start_date || '';
+    const endDate = timesheets?.period?.end_date || '';
+
+    if (!startDate || !endDate) {
+      console.error('Start date or end date is missing');
+      setIsLoadingTimesheetView(false);
+      return;
+    }
+
+    // Determine which ID to use
+    const params: {
+      labor_id?: number | string;
+      lead_labor_id?: number | string;
+      start_date: string;
+      end_date: string;
+    } = {
+      start_date: startDate,
+      end_date: endDate,
+    };
+
+    if (item.labor_id) {
+      params.labor_id = item.labor_id;
+    } else if (item.lead_labor_id) {
+      params.lead_labor_id = item.lead_labor_id;
+    } else {
+      console.error('Neither labor_id nor lead_labor_id is available');
+      setIsLoadingTimesheetView(false);
+      return;
+    }
+
+    const response = await apiClient.getWeeklyTimesheetView(params);
+    setTimesheetViewData(response.data);
+  } catch (error) {
+    console.error('Error fetching timesheet view:', error);
+  } finally {
+    setIsLoadingTimesheetView(false);
+  }
 };
 
 const handleBackToList = () => {
@@ -546,31 +593,16 @@ const fetchTimesheetsByDateRange = async () => {
   
   // Render timesheet detail view if selected
   if (showTimesheetDetail && selectedTimesheet) {
-    const totalHours = parseHours(selectedTimesheet.total);
-    const hourlyRate = 35; // Default hourly rate - can be fetched from API
-    const totalPay = totalHours * hourlyRate;
-    const weekDays = getWeekDays(selectedTimesheet.week);
-    const formattedWeek = formatWeekRange(selectedTimesheet.week);
-    
-    // Parse job code from job string
-    const jobCode = selectedTimesheet.jobCode || selectedTimesheet.job?.match(/\(([^)]+)\)/)?.[1] || 'N/A';
-    const jobTitle = selectedTimesheet.job?.replace(/\([^)]+\)/, '').trim() || selectedTimesheet.job || 'N/A';
-    
-    // Create daily breakdown data
-    const dailyBreakdown = weekDays.map((day, index) => {
-      const dayKeys: Array<keyof TimesheetItem> = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-      const dayKey = dayKeys[index];
-      const hours = parseHours((selectedTimesheet[dayKey] as string) || '0h');
-      const pay = hours * hourlyRate;
-      return {
-        date: day.dateStr,
-        day: day.dayName,
-        jobId: jobCode,
-        jobTitle: jobTitle,
-        hours: hours,
-        pay: pay
-      };
-    });
+    // Use API data if available, otherwise use fallback
+    const employeeName = timesheetViewData?.employee_name || selectedTimesheet.employee;
+    const hourlyRate = timesheetViewData?.hourly_rate || selectedTimesheet.hourly_rate || 35;
+    const weekRange = timesheetViewData?.period?.week_range || selectedTimesheet.week;
+    const formattedWeek = formatWeekRange(weekRange);
+    const weekTotal = timesheetViewData?.week_total;
+    const totalHours = weekTotal?.total_hours || parseHours(selectedTimesheet.total);
+    const totalHoursDisplay = weekTotal?.total_hours_display || selectedTimesheet.total;
+    const totalPay = weekTotal?.total_pay || (totalHours * hourlyRate);
+    const dailyBreakdown = timesheetViewData?.daily_breakdown || [];
 
     return (
       <div className="space-y-6">
@@ -594,7 +626,7 @@ const fetchTimesheetsByDateRange = async () => {
                 <Clock className="h-6 w-6 text-blue-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold">{selectedTimesheet.employee}</h3>
+                <h3 className="text-lg font-semibold">{employeeName}</h3>
                 <p className="text-sm text-muted-foreground">{formattedWeek}</p>
               </div>
             </div>
@@ -622,7 +654,7 @@ const fetchTimesheetsByDateRange = async () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Total Hours</p>
-                  <p className="text-xl font-semibold">{totalHours}h</p>
+                  <p className="text-xl font-semibold">{totalHoursDisplay || `${totalHours}h`}</p>
                 </div>
                 <div className="p-3 bg-blue-100 rounded-lg">
                   <Clock className="h-5 w-5 text-blue-600" />
@@ -688,18 +720,33 @@ const fetchTimesheetsByDateRange = async () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {dailyBreakdown.length > 0 ? (
-                    dailyBreakdown.map((entry, index) => (
+                  {isLoadingTimesheetView ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8">
+                        <LoadingSpinner />
+                      </TableCell>
+                    </TableRow>
+                  ) : dailyBreakdown.length > 0 ? (
+                    dailyBreakdown.map((entry: {
+                      date?: string;
+                      formatted_date?: string;
+                      day?: string;
+                      job_id?: number | null;
+                      job_title?: string;
+                      hours_worked?: number;
+                      hours_worked_display?: string;
+                      pay_amount?: number;
+                    }, index: number) => (
                       <TableRow key={index}>
-                        <TableCell>{entry.date}</TableCell>
+                        <TableCell>{entry.formatted_date || entry.date}</TableCell>
                         <TableCell>{entry.day}</TableCell>
-                        <TableCell>{entry.jobId}</TableCell>
-                        <TableCell>{entry.jobTitle}</TableCell>
-                        <TableCell className={`text-right font-medium ${entry.hours > 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                          {entry.hours > 0 ? `${entry.hours}h` : '0h'}
+                        <TableCell>{entry.job_id ? `Job-${entry.job_id}` : '-'}</TableCell>
+                        <TableCell>{entry.job_title || 'Leave'}</TableCell>
+                        <TableCell className={`text-right font-medium ${(entry.hours_worked ?? 0) > 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                          {entry.hours_worked_display || ((entry.hours_worked ?? 0) > 0 ? `${entry.hours_worked}h` : '0h')}
                         </TableCell>
-                        <TableCell className={`text-right font-medium ${entry.pay > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
-                          {formatCurrency(entry.pay)}
+                        <TableCell className={`text-right font-medium ${(entry.pay_amount ?? 0) > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
+                          {formatCurrency(entry.pay_amount || 0)}
                         </TableCell>
                       </TableRow>
                     ))
@@ -715,18 +762,20 @@ const fetchTimesheetsByDateRange = async () => {
             </div>
 
             {/* Week Total Summary */}
-            <div className="mt-6 pt-6 border-t flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Week Total</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {totalHours} hours × {formatCurrency(hourlyRate)}/hour
-                </p>
+            {weekTotal && (
+              <div className="mt-6 pt-6 border-t flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Week Total</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {weekTotal.total_hours_display || `${totalHours}h`} × {formatCurrency(weekTotal.hourly_rate || hourlyRate)}/hour
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-semibold text-blue-600">{formatCurrency(weekTotal.total_pay || totalPay)}</p>
+                  <p className="text-sm text-muted-foreground">Total Pay</p>
+                </div>
               </div>
-              <div className="text-right">
-                <p className="text-2xl font-semibold text-blue-600">{formatCurrency(totalPay)}</p>
-                <p className="text-sm text-muted-foreground">Total Pay</p>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -901,8 +950,8 @@ const fetchTimesheetsByDateRange = async () => {
                 {filteredTimesheets.length > 0 ? (
                   filteredTimesheets.map((item: any, index: number) => {
                     const totalHours = parseHours(item.total);
-                    const hourlyRate = 35; // Default - can be fetched from API
-                    const totalPay = totalHours * hourlyRate;
+                    const hourlyRate = item.hourly_rate || 35; // Use API value or default
+                    const totalPay = item.weekly_payment || (totalHours * hourlyRate);
                     const isPaid = item.status.toLowerCase() === 'approved';
                     const paymentDate = isPaid ? format(new Date(), 'MMM d, yyyy') : '-';
                     
@@ -936,7 +985,7 @@ const fetchTimesheetsByDateRange = async () => {
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
-                          {formatCurrency(hourlyRate)}/hr
+                          {formatCurrency(item.hourly_rate || 35)}/hr
                         </TableCell>
                         <TableCell className="text-center font-medium">
                           {formatCurrency(totalPay)}
