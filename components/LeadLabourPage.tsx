@@ -392,9 +392,34 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
 
   const handleEdit = (leadLabour: LeadLabour) => {
     setEditingLeadLabour(leadLabour)
-    console.log(leadLabour.documents);
+    console.log('sadas', leadLabour);
+    
+    // Find matching role from roles array
+    // The Select component expects role.roleName, so we need to match leadLabour.role with role.roleName
+    // Handle cases like "lead_labor" from API matching "Lead Labor" in roles array
+    let matchedRole = ''
+    if (leadLabour.role) {
+      // Normalize function to compare strings (remove spaces, underscores, convert to lowercase)
+      const normalize = (str: string) => str?.toLowerCase().replace(/[\s_-]/g, '') || ''
+      
+      const apiRoleNormalized = normalize(leadLabour.role) 
+      
+      const foundRole = roles.find(role => {
+        // Exact match
+        if (role.roleName === leadLabour.role) return true
+        // Case-insensitive match
+        if (role.roleName?.toLowerCase() === leadLabour.role?.toLowerCase()) return true
+        // Normalized match (handles underscores, spaces, case)
+        if (normalize(role.roleName || '') === apiRoleNormalized) return true
+        return false
+      })
+      
+      matchedRole = foundRole?.roleName || leadLabour.role
+      console.log('Matched role:', matchedRole, 'Found:', !!foundRole)
+    }
+    
     setFormData({
-      role: leadLabour.role || '', // Use the role from leadLabour
+      role: matchedRole, // Use matched roleName from roles array
       name: leadLabour.name,
       email: leadLabour.email,
       phone: leadLabour.phone,
