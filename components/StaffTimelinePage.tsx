@@ -412,7 +412,7 @@ export function StaffTimelinePage() {
           <p className="text-muted-foreground mt-1">Manage your work timeline and hours</p>
         </div>
         {canCreate && (
-          <Button onClick={() => {
+          <Button className='text-white' onClick={() => {
             setEditingTimesheet(null)
             setFormData({ job_id: null, date: '', start_time: '', end_time: '' })
             setSelectedJob(null)
@@ -622,7 +622,7 @@ export function StaffTimelinePage() {
 
           <DialogFooter className="flex gap-2">
             {editingTimesheet && canDelete && (
-              <Button
+              <Button className='text-white'
                 variant="destructive"
                 onClick={async () => {
                   if (confirm('Are you sure you want to delete this timesheet?')) {
@@ -657,7 +657,7 @@ export function StaffTimelinePage() {
                   Cancel
                 </Button>
             {(canCreate || (editingTimesheet && canEdit)) && (
-              <Button onClick={handleSubmit} disabled={isLoading}>
+              <Button className='text-white' onClick={handleSubmit} disabled={isLoading}>
                 {isLoading ? 'Saving...' : editingTimesheet ? 'Update' : 'Create'}
               </Button>
             )}
