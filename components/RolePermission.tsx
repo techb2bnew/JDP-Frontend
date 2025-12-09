@@ -305,6 +305,7 @@ export default function RolePermission() {
     'suppliers',
     'reports',
     'staff',
+    'staff_timeline',
     'labour',
     'lead_labour',
     'notification',
@@ -326,6 +327,7 @@ export default function RolePermission() {
     'reports': ['view', 'create', 'edit', 'delete'],
     'inventory_price': ['view', 'create', 'edit', 'delete'],
     'bluesheet': ['view', 'create', 'edit', 'delete'],
+    'staff_timeline': ['view', 'create', 'edit', 'delete'],
     'role_permission': ['view', 'create', 'edit', 'delete']
   };
 

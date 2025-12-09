@@ -14,6 +14,7 @@ import { LoadingSpinner } from './common/LoadingSpinner'
 import { Plus, Edit, Trash2, Search, Briefcase, X } from 'lucide-react'
 import { getUserData } from '@/utils/auth'
 import { Badge } from './ui/badge'
+import { usePermissions } from '../contexts/PermissionContext'
 
 interface StaffTimesheet {
   id: number
@@ -28,6 +29,7 @@ interface StaffTimesheet {
 }
 
 export function StaffTimelinePage() {
+  const { hasPermission, isLoading: permissionsLoading } = usePermissions()
   const [isLoading, setIsLoading] = useState(true)
   const [timesheets, setTimesheets] = useState<StaffTimesheet[]>([])
   const [showModal, setShowModal] = useState(false)
@@ -41,6 +43,12 @@ export function StaffTimelinePage() {
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({})
   const calendarRef = useRef<FullCalendar>(null)
   const [staffId, setStaffId] = useState<number | null>(null)
+  
+  // Permission checks
+  const canView = hasPermission('staff_timeline', 'view')
+  const canCreate = hasPermission('staff_timeline', 'create')
+  const canEdit = hasPermission('staff_timeline', 'edit')
+  const canDelete = hasPermission('staff_timeline', 'delete')
   
   // Job search state
   const [jobSearchTerm, setJobSearchTerm] = useState('')
@@ -319,6 +327,7 @@ export function StaffTimelinePage() {
   }
 
   const handleDateClick = (arg: any) => {
+    if (!canCreate) return
     setEditingTimesheet(null)
     setFormData({
       job_id: null,
@@ -368,14 +377,29 @@ export function StaffTimelinePage() {
   }
 
   const handleEventClick = (clickInfo: any) => {
+    if (!canEdit && !canView) return
     const timesheet = clickInfo.event.extendedProps.timesheet
-    handleEdit(timesheet)
+    if (canEdit) {
+      handleEdit(timesheet)
+    }
   }
 
-  if (isLoading && timesheets.length === 0) {
+  if (permissionsLoading || (isLoading && timesheets.length === 0)) {
     return (
       <div className="flex items-center justify-center h-screen">
         <LoadingSpinner />
+      </div>
+    )
+  }
+
+  // Check view permission
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
+          <p className="text-gray-600">You don't have permission to view this page.</p>
+        </div>
       </div>
     )
   }
@@ -387,18 +411,20 @@ export function StaffTimelinePage() {
           <h1 className="text-3xl font-bold">Staff Timeline</h1>
           <p className="text-muted-foreground mt-1">Manage your work timeline and hours</p>
         </div>
-        <Button onClick={() => {
-          setEditingTimesheet(null)
-          setFormData({ job_id: null, date: '', start_time: '', end_time: '' })
-          setSelectedJob(null)
-          setJobSearchTerm('')
-          setShowJobDropdown(false)
-          setFormErrors({})
-          setShowModal(true)
-        }}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Timeline
-        </Button>
+        {canCreate && (
+          <Button onClick={() => {
+            setEditingTimesheet(null)
+            setFormData({ job_id: null, date: '', start_time: '', end_time: '' })
+            setSelectedJob(null)
+            setJobSearchTerm('')
+            setShowJobDropdown(false)
+            setFormErrors({})
+            setShowModal(true)
+          }}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Timeline
+          </Button>
+        )}
       </div>
 
       <div className="bg-white rounded-lg shadow p-4">
@@ -595,7 +621,7 @@ export function StaffTimelinePage() {
           </div>
 
           <DialogFooter className="flex gap-2">
-            {editingTimesheet && (
+            {editingTimesheet && canDelete && (
               <Button
                 variant="destructive"
                 onClick={async () => {
@@ -630,9 +656,11 @@ export function StaffTimelinePage() {
                 >
                   Cancel
                 </Button>
-            <Button onClick={handleSubmit} disabled={isLoading}>
-              {isLoading ? 'Saving...' : editingTimesheet ? 'Update' : 'Create'}
-            </Button>
+            {(canCreate || (editingTimesheet && canEdit)) && (
+              <Button onClick={handleSubmit} disabled={isLoading}>
+                {isLoading ? 'Saving...' : editingTimesheet ? 'Update' : 'Create'}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

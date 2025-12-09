@@ -196,9 +196,9 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
 
   // Filter navigation items based on permissions
   const filteredNavigation = navigation.filter(item => {
-    // Staff Timeline - only show for staff users
+    // Staff Timeline - only show for staff users with view permission
     if (item.id === 'staff-timeline') {
-      return isStaffUser()
+      return isStaffUser() && hasAnyPermission('staff_timeline', ['view'])
     }
     
     // Special handling for Staff Management - check for labour or lead_labour permissions
