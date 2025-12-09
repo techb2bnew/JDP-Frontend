@@ -11,12 +11,15 @@ import { Label } from './ui/label'
 import { apiClient } from '@/utils/api'
 import { toast } from 'sonner'
 import { LoadingSpinner } from './common/LoadingSpinner'
-import { Plus, Edit, Trash2 } from 'lucide-react'
+import { Plus, Edit, Trash2, Search, Briefcase, X } from 'lucide-react'
 import { getUserData } from '@/utils/auth'
+import { Badge } from './ui/badge'
 
 interface StaffTimesheet {
   id: number
-  title: string
+  title?: string
+  job_id?: number
+  job_title?: string
   staff_id: number
   date: string
   start_time: string
@@ -30,7 +33,7 @@ export function StaffTimelinePage() {
   const [showModal, setShowModal] = useState(false)
   const [editingTimesheet, setEditingTimesheet] = useState<StaffTimesheet | null>(null)
   const [formData, setFormData] = useState({
-    title: '',
+    job_id: null as number | null,
     date: '',
     start_time: '',
     end_time: ''
@@ -38,6 +41,14 @@ export function StaffTimelinePage() {
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({})
   const calendarRef = useRef<FullCalendar>(null)
   const [staffId, setStaffId] = useState<number | null>(null)
+  
+  // Job search state
+  const [jobSearchTerm, setJobSearchTerm] = useState('')
+  const [jobResults, setJobResults] = useState<any[]>([])
+  const [selectedJob, setSelectedJob] = useState<any | null>(null)
+  const [showJobDropdown, setShowJobDropdown] = useState(false)
+  const [isLoadingJobs, setIsLoadingJobs] = useState(false)
+  const jobDropdownRef = useRef<HTMLDivElement>(null)
 
   // Load FullCalendar CSS
   useEffect(() => {
@@ -72,7 +83,15 @@ export function StaffTimelinePage() {
         const timesheetList = Array.isArray(response.data) 
           ? response.data 
           : (response.data.timesheets || response.data.data || [])
-        setTimesheets(timesheetList)
+        
+        // Transform timesheets to extract job_title from nested job object
+        const transformedTimesheets = timesheetList.map((ts: any) => ({
+          ...ts,
+          job_title: ts.job?.job_title || ts.job_title || ts.title || null,
+          job_id: ts.job?.id || ts.job_id || null
+        }))
+        
+        setTimesheets(transformedTimesheets)
       }
     } catch (error: any) {
       console.error('Error fetching timesheets:', error)
@@ -81,6 +100,51 @@ export function StaffTimelinePage() {
       setIsLoading(false)
     }
   }
+
+  const fetchJobs = async (query: string = '') => {
+    try {
+      setIsLoadingJobs(true)
+      const response = await apiClient.searchJobsByQuery(query || '', 1, 20)
+      if (response.success && response.data) {
+        const jobs = Array.isArray(response.data) ? response.data : (response.data.jobs || [])
+        setJobResults(jobs)
+      }
+    } catch (error: any) {
+      console.error('Error fetching jobs:', error)
+      setJobResults([])
+    } finally {
+      setIsLoadingJobs(false)
+    }
+  }
+
+  // Close job dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (jobDropdownRef.current && !jobDropdownRef.current.contains(event.target as Node)) {
+        setShowJobDropdown(false)
+      }
+    }
+
+    if (showJobDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showJobDropdown])
+
+  // Debounced job search
+  useEffect(() => {
+    if (!showJobDropdown) return
+
+    const trimmed = jobSearchTerm.trim()
+    const timeout = setTimeout(() => {
+      fetchJobs(trimmed)
+    }, 400)
+
+    return () => clearTimeout(timeout)
+  }, [jobSearchTerm, showJobDropdown])
 
   const calculateTotalHours = (startTime: string, endTime: string): number => {
     if (!startTime || !endTime) return 0
@@ -118,8 +182,8 @@ export function StaffTimelinePage() {
   const validateForm = (): boolean => {
     const errors: { [key: string]: string } = {}
     
-    if (!formData.title.trim()) {
-      errors.title = 'Title is required'
+    if (!formData.job_id) {
+      errors.job_id = 'Job selection is required'
     }
     
     if (!formData.date) {
@@ -161,13 +225,17 @@ export function StaffTimelinePage() {
 
     try {
       setIsLoading(true)
-      const payload = {
-        title: formData.title,
+      const payload: any = {
         staff_id: staffId,
         date: formData.date,
         start_time: formData.start_time,
         end_time: formData.end_time,
         total_hours: roundedTotalHours
+      }
+
+      // Add job_id if selected
+      if (formData.job_id) {
+        payload.job_id = formData.job_id
       }
 
       if (editingTimesheet) {
@@ -180,7 +248,10 @@ export function StaffTimelinePage() {
 
       setShowModal(false)
       setEditingTimesheet(null)
-      setFormData({ title: '', date: '', start_time: '', end_time: '' })
+      setFormData({ job_id: null, date: '', start_time: '', end_time: '' })
+      setSelectedJob(null)
+      setJobSearchTerm('')
+      setShowJobDropdown(false)
       setFormErrors({})
       fetchTimesheets()
     } catch (error: any) {
@@ -191,14 +262,40 @@ export function StaffTimelinePage() {
     }
   }
 
-  const handleEdit = (timesheet: StaffTimesheet) => {
+  const handleEdit = async (timesheet: StaffTimesheet) => {
     setEditingTimesheet(timesheet)
     setFormData({
-      title: timesheet.title,
+      job_id: timesheet.job_id || null,
       date: timesheet.date,
       start_time: timesheet.start_time,
       end_time: timesheet.end_time
     })
+    
+    // Set selected job for display
+    if (timesheet.job_id) {
+      // If job_title is available, use it directly
+      if (timesheet.job_title) {
+        setSelectedJob({ id: timesheet.job_id, title: timesheet.job_title })
+        setJobSearchTerm(timesheet.job_title)
+      } else {
+        // Fetch job details if job_title is not available
+        try {
+          const jobResponse = await apiClient.getJobById(timesheet.job_id.toString())
+          // getJobById returns the transformed job object directly, not wrapped in {success, data}
+          const jobTitle = jobResponse.title || 'Untitled Job'
+          setSelectedJob({ id: timesheet.job_id, title: jobTitle })
+          setJobSearchTerm(jobTitle)
+        } catch (error) {
+          console.error('Error fetching job details:', error)
+          // Fallback: show job ID if fetch fails
+          setSelectedJob({ id: timesheet.job_id, title: `Job ${timesheet.job_id}` })
+          setJobSearchTerm(`Job ${timesheet.job_id}`)
+        }
+      }
+    } else {
+      setSelectedJob(null)
+      setJobSearchTerm('')
+    }
     setFormErrors({})
     setShowModal(true)
   }
@@ -224,11 +321,14 @@ export function StaffTimelinePage() {
   const handleDateClick = (arg: any) => {
     setEditingTimesheet(null)
     setFormData({
-      title: '',
+      job_id: null,
       date: arg.dateStr,
       start_time: '',
       end_time: ''
     })
+    setSelectedJob(null)
+    setJobSearchTerm('')
+    setShowJobDropdown(false)
     setFormErrors({})
     setShowModal(true)
   }
@@ -238,9 +338,10 @@ export function StaffTimelinePage() {
     const startDateTime = `${timesheet.date}T${timesheet.start_time}`
     const endDateTime = `${timesheet.date}T${timesheet.end_time}`
     
+    const displayTitle = timesheet.job_title || timesheet.title || 'Untitled'
     return {
       id: timesheet.id.toString(),
-      title: `${timesheet.title} (${formatHoursAndMinutes(timesheet.total_hours)})`,
+      title: `${displayTitle} (${formatHoursAndMinutes(timesheet.total_hours)})`,
       start: startDateTime,
       end: endDateTime,
       backgroundColor: '#3b82f6',
@@ -254,11 +355,12 @@ export function StaffTimelinePage() {
   // Custom event content renderer
   const renderEventContent = (eventInfo: any) => {
     const timesheet = eventInfo.event.extendedProps.timesheet
+    const displayTitle = timesheet.job_title || timesheet.title || 'Untitled'
     return (
       <div className="fc-event-main-frame p-1">
         <div className="fc-event-time text-xs font-semibold">{timesheet.start_time} - {timesheet.end_time}</div>
         <div className="fc-event-title-container">
-          <div className="fc-event-title font-medium">{timesheet.title}</div>
+          <div className="fc-event-title font-medium">{displayTitle}</div>
         </div>
         <div className="fc-event-time text-xs">{formatHoursAndMinutes(timesheet.total_hours)}</div>
       </div>
@@ -287,7 +389,10 @@ export function StaffTimelinePage() {
         </div>
         <Button onClick={() => {
           setEditingTimesheet(null)
-          setFormData({ title: '', date: '', start_time: '', end_time: '' })
+          setFormData({ job_id: null, date: '', start_time: '', end_time: '' })
+          setSelectedJob(null)
+          setJobSearchTerm('')
+          setShowJobDropdown(false)
           setFormErrors({})
           setShowModal(true)
         }}>
@@ -322,7 +427,10 @@ export function StaffTimelinePage() {
         setShowModal(open)
         if (!open) {
           setEditingTimesheet(null)
-          setFormData({ title: '', date: '', start_time: '', end_time: '' })
+          setFormData({ job_id: null, date: '', start_time: '', end_time: '' })
+          setSelectedJob(null)
+          setJobSearchTerm('')
+          setShowJobDropdown(false)
           setFormErrors({})
         }
       }}>
@@ -338,20 +446,85 @@ export function StaffTimelinePage() {
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="title">Title <span className="text-red-500">*</span></Label>
-              <Input
-                id="title"
-                value={formData.title}
-                onChange={(e) => {
-                  setFormData(prev => ({ ...prev, title: e.target.value }))
-                  if (formErrors.title) {
-                    setFormErrors(prev => ({ ...prev, title: '' }))
-                  }
-                }}
-                placeholder="e.g., Office Work"
-              />
-              {formErrors.title && (
-                <p className="text-sm text-red-500">{formErrors.title}</p>
+              <Label htmlFor="job">Job <span className="text-red-500">*</span></Label>
+              <div className="relative" ref={jobDropdownRef}>
+                <Input
+                  id="job"
+                  placeholder="Search jobs..."
+                  value={jobSearchTerm}
+                  onChange={(e) => {
+                    setJobSearchTerm(e.target.value)
+                    setShowJobDropdown(true)
+                  }}
+                  onFocus={() => {
+                    setShowJobDropdown(true)
+                    if (jobResults.length === 0) {
+                      fetchJobs('')
+                    }
+                  }}
+                  className="pl-8"
+                />
+                <Search className="absolute left-2.5 top-[20px] h-4 w-4 -translate-y-1/2 text-gray-400" />
+
+                {showJobDropdown && (
+                  <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                    {isLoadingJobs ? (
+                      <div className="p-3 text-sm text-gray-500">Searching jobs...</div>
+                    ) : jobResults.length === 0 ? (
+                      <div className="p-3 text-sm text-gray-500">No jobs found</div>
+                    ) : (
+                      jobResults.map((job) => (
+                        <button
+                          key={job.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedJob(job)
+                            setJobSearchTerm(job.job_title || 'Untitled Job')
+                            setFormData(prev => ({ ...prev, job_id: job.id }))
+                            setShowJobDropdown(false)
+                            if (formErrors.job_id) {
+                              setFormErrors(prev => ({ ...prev, job_id: '' }))
+                            }
+                          }}
+                          className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
+                        >
+                          <Briefcase className="mt-0.5 h-4 w-4 text-gray-500" />
+                          <div className="flex-1">
+                            <p className="font-medium text-[#2b2b2b]">
+                              {job.job_title || 'Untitled Job'}
+                            </p>
+                            {(job.customerName || job.address) && (
+                              <p className="text-xs text-gray-500">
+                                {[job.customerName, job.address].filter(Boolean).join(' • ')}
+                              </p>
+                            )}
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+              {selectedJob && (
+                <div className="mt-2">
+                  <Badge variant="secondary" className="flex items-center gap-1 w-fit">
+                    {selectedJob.title || `Job ${selectedJob.id}`}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedJob(null)
+                        setJobSearchTerm('')
+                        setFormData(prev => ({ ...prev, job_id: null }))
+                      }}
+                      className="ml-1 hover:text-red-500"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                </div>
+              )}
+              {formErrors.job_id && (
+                <p className="text-sm text-red-500">{formErrors.job_id}</p>
               )}
             </div>
 
@@ -430,7 +603,10 @@ export function StaffTimelinePage() {
                     await handleDelete(editingTimesheet.id)
                     setShowModal(false)
                     setEditingTimesheet(null)
-                    setFormData({ title: '', date: '', start_time: '', end_time: '' })
+                    setFormData({ job_id: null, date: '', start_time: '', end_time: '' })
+                    setSelectedJob(null)
+                    setJobSearchTerm('')
+                    setShowJobDropdown(false)
                     setFormErrors({})
                   }
                 }}
@@ -440,17 +616,20 @@ export function StaffTimelinePage() {
                 Delete
               </Button>
             )}
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowModal(false)
-                setEditingTimesheet(null)
-                setFormData({ title: '', date: '', start_time: '', end_time: '' })
-                setFormErrors({})
-              }}
-            >
-              Cancel
-            </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowModal(false)
+                    setEditingTimesheet(null)
+                    setFormData({ job_id: null, date: '', start_time: '', end_time: '' })
+                    setSelectedJob(null)
+                    setJobSearchTerm('')
+                    setShowJobDropdown(false)
+                    setFormErrors({})
+                  }}
+                >
+                  Cancel
+                </Button>
             <Button onClick={handleSubmit} disabled={isLoading}>
               {isLoading ? 'Saving...' : editingTimesheet ? 'Update' : 'Create'}
             </Button>

@@ -103,7 +103,7 @@ export function NotificationsPage() {
     title: '',
     message: '',
     link: '',
-    recipientType: 'all' as 'all' | 'roles',
+    recipientType: 'all' as 'all' | 'roles' | 'job',
     selectedRoles: [] as string[]
   })
   const [isSending, setIsSending] = useState(false)
@@ -117,7 +117,7 @@ export function NotificationsPage() {
   const [jobSearchTerm, setJobSearchTerm] = useState('')
   const [jobResults, setJobResults] = useState<any[]>([])
   const [isLoadingJobs, setIsLoadingJobs] = useState(false)
-  const [selectedJob, setSelectedJob] = useState<any | null>(null)
+  const [selectedJobs, setSelectedJobs] = useState<any[]>([])
   const [showJobDropdown, setShowJobDropdown] = useState(false)
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || ''
 
@@ -134,6 +134,7 @@ export function NotificationsPage() {
   const lastSearchTerm = useRef('')
   const lastPage = useRef(1)
   const lastFilterStatus = useRef('all')
+  const jobDropdownRef = useRef<HTMLDivElement>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [notificationToDelete, setNotificationToDelete] = useState<string | null>(null)
 
@@ -352,6 +353,23 @@ export function NotificationsPage() {
 
     return () => clearTimeout(timeout)
   }, [jobSearchTerm, showJobDropdown, fetchJobsForNotification])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (jobDropdownRef.current && !jobDropdownRef.current.contains(event.target as Node)) {
+        setShowJobDropdown(false)
+      }
+    }
+
+    if (showJobDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showJobDropdown])
 
   // Helper function to transform API response
   const transformNotifications = (items: any[]): Notification[] => {
@@ -969,6 +987,10 @@ export function NotificationsPage() {
       errors.roles = 'Select at least one role'
     }
 
+    if (notificationForm.recipientType === 'job' && selectedJobs.length === 0) {
+      errors.roles = 'Select at least one job'
+    }
+
     setFormErrors(errors)
 
     if (Object.keys(errors).length > 0) return
@@ -982,49 +1004,61 @@ export function NotificationsPage() {
             .map(role => role.roleName)
         : []
 
-      // Build job-based recipient IDs (labor & lead labor) from selected job
+      // Build job-based recipient IDs (labor & lead labor) from selected jobs
       let jobId: number | string | undefined
-      let laborIds: (number | string)[] | undefined
-      let leadLaborIds: (number | string)[] | undefined
+      let laborIds: (number | string)[] = []
+      let leadLaborIds: (number | string)[] = []
 
-      if (selectedJob) {
-        jobId = selectedJob.id
+      if (notificationForm.recipientType === 'job' && selectedJobs.length > 0) {
+        // Collect all labor and lead labor IDs from all selected jobs
+        const allLaborIds = new Set<number | string>()
+        const allLeadLaborIds = new Set<number | string>()
+
+        selectedJobs.forEach((job) => {
+          // Try to get IDs from arrays first
+          const labor = (job.assignedLabor || []).map((l: any) => l.id).filter(Boolean)
+          const leadLabor = (job.assignedLeadLabor || []).map((l: any) => l.id).filter(Boolean)
+
+          // If arrays have data, use them
+          if (labor.length > 0) {
+            labor.forEach((id: number | string) => allLaborIds.add(id))
+          } else if (job.assigned_labor_ids) {
+            // Fallback: parse from string if array is empty
+            try {
+              const parsed = typeof job.assigned_labor_ids === 'string' 
+                ? JSON.parse(job.assigned_labor_ids) 
+                : job.assigned_labor_ids
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                parsed.forEach((id: number | string) => allLaborIds.add(id))
+              }
+            } catch (e) {
+              console.error('Error parsing assigned_labor_ids:', e)
+            }
+          }
+
+          if (leadLabor.length > 0) {
+            leadLabor.forEach((id: number | string) => allLeadLaborIds.add(id))
+          } else if (job.assigned_lead_labor_ids) {
+            // Fallback: parse from string if array is empty
+            try {
+              const parsed = typeof job.assigned_lead_labor_ids === 'string'
+                ? JSON.parse(job.assigned_lead_labor_ids)
+                : job.assigned_lead_labor_ids
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                parsed.forEach((id: number | string) => allLeadLaborIds.add(id))
+              }
+            } catch (e) {
+              console.error('Error parsing assigned_lead_labor_ids:', e)
+            }
+          }
+        })
+
+        laborIds = Array.from(allLaborIds)
+        leadLaborIds = Array.from(allLeadLaborIds)
         
-        // Try to get IDs from arrays first
-        const labor = (selectedJob.assignedLabor || []).map((l: any) => l.id).filter(Boolean)
-        const leadLabor = (selectedJob.assignedLeadLabor || []).map((l: any) => l.id).filter(Boolean)
-
-        // If arrays have data, use them
-        if (labor.length > 0) {
-          laborIds = labor
-        } else if (selectedJob.assigned_labor_ids) {
-          // Fallback: parse from string if array is empty
-          try {
-            const parsed = typeof selectedJob.assigned_labor_ids === 'string' 
-              ? JSON.parse(selectedJob.assigned_labor_ids) 
-              : selectedJob.assigned_labor_ids
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              laborIds = parsed
-            }
-          } catch (e) {
-            console.error('Error parsing assigned_labor_ids:', e)
-          }
-        }
-
-        if (leadLabor.length > 0) {
-          leadLaborIds = leadLabor
-        } else if (selectedJob.assigned_lead_labor_ids) {
-          // Fallback: parse from string if array is empty
-          try {
-            const parsed = typeof selectedJob.assigned_lead_labor_ids === 'string'
-              ? JSON.parse(selectedJob.assigned_lead_labor_ids)
-              : selectedJob.assigned_lead_labor_ids
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              leadLaborIds = parsed
-            }
-          } catch (e) {
-            console.error('Error parsing assigned_lead_labor_ids:', e)
-          }
+        // If only one job selected, include job_id
+        if (selectedJobs.length === 1) {
+          jobId = selectedJobs[0].id
         }
       }
 
@@ -1060,6 +1094,9 @@ export function NotificationsPage() {
         selectedRoles: []
       })
       setFormErrors({})
+      setSelectedJobs([])
+      setJobSearchTerm('')
+      setShowJobDropdown(false)
       setCurrentPage(1)
       setMainTab('list')
     } catch (error) {
@@ -1241,9 +1278,27 @@ export function NotificationsPage() {
                             ? 'Select at least one role'
                             : undefined
                         }))
+                        setShowJobDropdown(false)
                       }}
                     />
                     Send to specific roles
+                  </label>
+                  <label className="flex items-center gap-3 text-sm text-[#2b2b2b]">
+                    <input
+                      type="radio"
+                      name="recipient-type"
+                      className="h-4 w-4"
+                      checked={notificationForm.recipientType === 'job'}
+                      onChange={() => {
+                        setNotificationForm(prev => ({ ...prev, recipientType: 'job' }))
+                        setFormErrors(prev => ({ ...prev, roles: undefined }))
+                        setShowJobDropdown(true)
+                        if (jobResults.length === 0) {
+                          fetchJobsForNotification('')
+                        }
+                      }}
+                    />
+                    Send to specific job
                   </label>
                 </div>
 
@@ -1276,70 +1331,112 @@ export function NotificationsPage() {
                 )}
               </div>
 
-              {/* Job Assignment (Optional) */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-[#2b2b2b]">
-                  Job Assignment (Optional)
-                </label>
-                <div className="relative">
-                  <Input
-                    placeholder="Search jobs..."
-                    value={jobSearchTerm}
-                    onChange={(e) => {
-                      setJobSearchTerm(e.target.value)
-                      setShowJobDropdown(true)
-                    }}
-                    onFocus={() => {
-                      setShowJobDropdown(true)
-                      if (jobResults.length === 0) {
-                        fetchJobsForNotification('')
-                      }
-                    }}
-                    className="pl-8"
-                  />
-                  <Search className="absolute left-2.5 top-[20px] h-4 w-4 -translate-y-1/2 text-gray-400" />
+              {/* Job Selection - Show only when "Send to specific job" is selected */}
+              {notificationForm.recipientType === 'job' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-[#2b2b2b]">
+                    Select Jobs
+                  </label>
+                  <div className="relative" ref={jobDropdownRef}>
+                    <Input
+                      placeholder="Search jobs..."
+                      value={jobSearchTerm}
+                      onChange={(e) => {
+                        setJobSearchTerm(e.target.value)
+                        setShowJobDropdown(true)
+                      }}
+                      onFocus={() => {
+                        setShowJobDropdown(true)
+                        if (jobResults.length === 0) {
+                          fetchJobsForNotification('')
+                        }
+                      }}
+                      className="pl-8"
+                    />
+                    <Search className="absolute left-2.5 top-[20px] h-4 w-4 -translate-y-1/2 text-gray-400" />
 
-                  {showJobDropdown && (
-                    <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
-                      {isLoadingJobs ? (
-                        <div className="p-3 text-sm text-gray-500">Searching jobs...</div>
-                      ) : jobResults.length === 0 ? (
-                        <div className="p-3 text-sm text-gray-500">No jobs found</div>
-                      ) : (
-                        jobResults.map((job) => (
-                          <button
+                    {showJobDropdown && (
+                      <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                        {isLoadingJobs ? (
+                          <div className="p-3 text-sm text-gray-500">Searching jobs...</div>
+                        ) : jobResults.length === 0 ? (
+                          <div className="p-3 text-sm text-gray-500">No jobs found</div>
+                        ) : (
+                          jobResults.map((job) => {
+                            const isSelected = selectedJobs.some(j => j.id === job.id)
+                            return (
+                              <button
+                                key={job.id}
+                                type="button"
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setSelectedJobs(prev => prev.filter(j => j.id !== job.id))
+                                  } else {
+                                    setSelectedJobs(prev => [...prev, job])
+                                  }
+                                }}
+                                className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
+                              >
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={() => {
+                                    if (isSelected) {
+                                      setSelectedJobs(prev => prev.filter(j => j.id !== job.id))
+                                    } else {
+                                      setSelectedJobs(prev => [...prev, job])
+                                    }
+                                  }}
+                                />
+                                <Briefcase className="mt-0.5 h-4 w-4 text-gray-500" />
+                                <div className="flex-1">
+                                  <p className="font-medium text-[#2b2b2b]">
+                                    {job.title || 'Untitled Job'}
+                                  </p>
+                                  {(job.customerName || job.address) && (
+                                    <p className="text-xs text-gray-500">
+                                      {[job.customerName, job.address].filter(Boolean).join(' • ')}
+                                    </p>
+                                  )}
+                                </div>
+                              </button>
+                            )
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {selectedJobs.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      <p className="text-xs text-gray-500">
+                        Selected {selectedJobs.length} job{selectedJobs.length > 1 ? 's' : ''}:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedJobs.map((job) => (
+                          <Badge
                             key={job.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedJob(job)
-                              setJobSearchTerm(`${job.title || 'Untitled Job'}${job.customerName ? ' - ' + job.customerName : ''}`)
-                              setShowJobDropdown(false)
-                            }}
-                            className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
+                            variant="secondary"
+                            className="flex items-center gap-1"
                           >
-                            <Briefcase className="mt-0.5 h-4 w-4 text-gray-500" />
-                            <div>
-                              <p className="font-medium text-[#2b2b2b]">
-                                {job.title || 'Untitled Job'}
-                              </p>
-                              {(job.customerName || job.address) && (
-                                <p className="text-xs text-gray-500">
-                                  {[job.customerName, job.address].filter(Boolean).join(' • ')}
-                                </p>
-                              )}
-                            </div>
-                          </button>
-                        ))
-                      )}
+                            {job.title || `Job ${job.id}`}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedJobs(prev => prev.filter(j => j.id !== job.id))
+                              }}
+                              className="ml-1 hover:text-red-500"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
                   )}
-                  {selectedJob && (
-                    <p className="mt-1 text-xs text-gray-500">
-                      Selected job ID: <span className="font-mono">{selectedJob.id}</span>
-                    </p>
+                  {formErrors.roles && notificationForm.recipientType === 'job' && (
+                    <p className="mt-1 text-sm text-red-500">{formErrors.roles}</p>
                   )}
                 </div>
-              </div>
+              )}
 
               <div className="flex items-center justify-end">
                 <Button

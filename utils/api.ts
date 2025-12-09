@@ -1541,7 +1541,9 @@ searchTimesheetsByQuery: async (
   page = 1,
   limit = 10,
   startDate: string | null = null,
-  endDate: string | null = null
+  endDate: string | null = null,
+  name: string | null = null,
+  status: string | null = null
 ) => {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
   const token = getAuthToken();
@@ -1559,6 +1561,8 @@ searchTimesheetsByQuery: async (
 
   if (startDate) params.append("start_date", startDate);
   if (endDate) params.append("end_date", endDate);
+  if (name) params.append("name", name);
+  if (status) params.append("status", status);
 
   const url = `${apiBaseUrl}/job/searchTimesheets?${params.toString()}`;
 
@@ -1579,7 +1583,7 @@ searchTimesheetsByQuery: async (
 },
 
 // Search Timesheets by Status 
-searchTimesheetsByStatus: async (status: string, page = 1, limit = 10) => {
+searchTimesheetsByStatus: async (status: string, page = 1, limit = 10, name: string | null = null) => {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
   const token = getAuthToken();
 
@@ -1587,7 +1591,15 @@ searchTimesheetsByStatus: async (status: string, page = 1, limit = 10) => {
     throw new Error("No authentication token found");
   }
 
-  const url = `${apiBaseUrl}/job/searchTimesheets?status=${encodeURIComponent(status)}&page=${page}&limit=${limit}`;
+  const params = new URLSearchParams({
+    status: status,
+    page: page.toString(),
+    limit: limit.toString(),
+  });
+
+  if (name) params.append("name", name);
+
+  const url = `${apiBaseUrl}/job/searchTimesheets?${params.toString()}`;
 
   const response = await fetch(url, {
     method: "GET",
@@ -3156,7 +3168,7 @@ getTimesheetDashboardStats: async () => {
 
   // Staff Timesheet APIs
   createStaffTimesheet: async (timesheetData: {
-    title: string;
+    job_id?: number;
     staff_id: number;
     date: string;
     start_time: string;
@@ -3221,7 +3233,7 @@ getTimesheetDashboardStats: async () => {
   },
 
   updateStaffTimesheet: async (timesheetId: number, timesheetData: {
-    title?: string;
+    job_id?: number;
     date?: string;
     start_time?: string;
     end_time?: string;

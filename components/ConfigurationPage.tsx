@@ -120,10 +120,10 @@ export function ConfigurationPage() {
     }
   };
 
-  const handleReset = () => {
-    setTiers([...originalLoadedTiers]);
-    setMarkupPercentage(originalLoadedMarkup);
-  };
+  // const handleReset = () => {
+  //   setTiers([...originalLoadedTiers]);
+  //   setMarkupPercentage(originalLoadedMarkup);
+  // };
 
   const handleSave = async () => {
     try {
@@ -185,9 +185,9 @@ export function ConfigurationPage() {
             <p className="text-gray-500 mt-1">Configure system-wide settings for pricing and rates</p>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline" className="flex items-center gap-2" onClick={handleReset}>
+            {/* <Button variant="outline" className="flex items-center gap-2" onClick={handleReset}>
               <RefreshCw className="w-4 h-4" /> Reset
-            </Button>
+            </Button> */}
             <Button className="flex items-center gap-2 bg-primary text-white hover:bg-[#0090e6]" onClick={handleSave} disabled={isSaving}>
               {isSaving ? (
                 <div className="flex items-center gap-2">

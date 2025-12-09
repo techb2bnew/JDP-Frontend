@@ -120,6 +120,7 @@ export function TimesheetsPage() {
    const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined })
   const [statusFilter, setStatusFilter] = useState('all');
   const [employeeFilter, setEmployeeFilter] = useState('all');
+  const [allEmployeeOptions, setAllEmployeeOptions] = useState<string[]>([]);
   const [isLoadingTimesheets, setIsLoadingTimesheets] = useState(false);
 const [totalTimesheets, setTotalTimesheets] = useState(0);
  const [currentPage, setCurrentPage] = useState(1);
@@ -161,7 +162,10 @@ const [isLoadingTimesheetView, setIsLoadingTimesheetView] = useState(false);
 // }) || [];
 
 
-  const employeeOptions = Array.from(new Set(timesheets?.dashboard_timesheets.map(t => t.employee.toLowerCase())));
+  // Use allEmployeeOptions for dropdown, fallback to current timesheets if not available
+  const employeeOptions = allEmployeeOptions.length > 0 
+    ? allEmployeeOptions 
+    : Array.from(new Set(timesheets?.dashboard_timesheets.map(t => t.employee.toLowerCase()) || []));
 
 
 
@@ -174,7 +178,19 @@ const [isLoadingTimesheetView, setIsLoadingTimesheetView] = useState(false);
 const fetchAlltimesheets = async () => {
   try {
     setIsLoading(true);
-    const response = await apiClient.getAllTimesheets();
+    // Use searchTimesheets API if employee filter is selected
+    const nameParam = employeeFilter && employeeFilter !== 'all' ? employeeFilter : null;
+    let response;
+    if (nameParam) {
+      response = await apiClient.searchTimesheetsByQuery('', 1, 10, null, null, nameParam, null);
+    } else {
+      response = await apiClient.getAllTimesheets();
+      // Store all employees when fetching without filters
+      const allEmployees = Array.from(new Set(
+        (response.data.dashboard_timesheets || []).map((t: any) => (t.employee || '').toLowerCase())
+      )) as string[];
+      setAllEmployeeOptions(allEmployees);
+    }
     console.log('API Response:', response); // Debug log
     const timesheets = response.data.dashboard_timesheets || [];
     const period = response.data.period || { start_date: '', end_date: '', week_range: '' };
@@ -183,7 +199,7 @@ const fetchAlltimesheets = async () => {
       employee: item.employee || 'N/A',
       job: item.job || 'N/A',
       jobCode: item.job ? item.job.split('(')[1]?.replace(')', '') || 'N/A' : 'N/A', 
-      week: period.week_range,
+      week: item.week || '',
       jobId: item.job_id?.toString() || '', 
       laborId: item.labor_id?.toString() || '', 
       lead_labor_id:item.lead_labor_id?.toString()|| '',
@@ -394,18 +410,21 @@ const fetchBySearchTimesheets = async () => {
   setIsLoadingTimesheets(true);
 
   try {
-    const response = await apiClient.searchTimesheetsByQuery(searchTerm.trim(), 1, 10);
+    const nameParam = employeeFilter && employeeFilter !== 'all' ? employeeFilter : null;
+    const statusParam = statusFilter && statusFilter !== 'all' ? statusFilter : null;
+    const response = await apiClient.searchTimesheetsByQuery(searchTerm.trim(), 1, 10, null, null, nameParam, statusParam);
     console.log('Search API Response:', response); // Debug log
     const timesheetsData = response.data;
     const timesheets = timesheetsData?.dashboard_timesheets || [];
-    // const period = timesheetsData.period || { start_date: '', end_date: '', week_range: '' };
+    const period = timesheetsData?.period || { start_date: '', end_date: '', week_range: '' };
     const transformedTimesheets = timesheets.map((item: any) => ({
       employee: item.employee || 'N/A',
       job: item.job || 'N/A',
       jobCode: item.job ? item.job.split('(')[1]?.replace(')', '') || 'N/A' : 'N/A', 
-      week: timesheetsData?.period?.week_range || '', 
+      week: period.week_range || item.week || '',
       jobId: item.job_id?.toString() || '',
       laborId: item.labor_id?.toString() || '',
+      lead_labor_id: item.lead_labor_id?.toString() || '',
       mon: item.mon || '0h',
       tue: item.tue || '0h',
       wed: item.wed || '0h',
@@ -416,7 +435,9 @@ const fetchBySearchTimesheets = async () => {
       total: item.total || '0h',
       billable: item.billable || '0h',
       status: item.status || 'Unknown',
-      actions: item.actions || [], 
+      actions: item.actions || [],
+      hourly_rate: item.hourly_rate || null,
+      weekly_payment: item.weekly_payment || null,
     }));
 
     console.log('Search transformed timesheets:', transformedTimesheets); 
@@ -458,7 +479,7 @@ useEffect(() => {
   }, 500); 
 
   return () => clearTimeout(debounceTimeout);
-}, [searchTerm, statusFilter]);
+}, [searchTerm, statusFilter, employeeFilter]);
 
 // Add new useEffect for date range changes
 useEffect(() => {
@@ -473,11 +494,17 @@ const fetchTimesheetsByFilters = async () => {
   setIsLoadingTimesheets(true);
 
   try {
+    const nameParam = employeeFilter && employeeFilter !== 'all' ? employeeFilter : null;
     let response;
     if (statusFilter !== 'all') {
-      response = await apiClient.searchTimesheetsByStatus(statusFilter);
+      response = await apiClient.searchTimesheetsByStatus(statusFilter, 1, 10, nameParam);
     } else {
-      response = await apiClient.searchTimesheetsByStatus('Active'); 
+      // If no status filter but employee filter is selected, use searchTimesheetsByQuery
+      if (nameParam) {
+        response = await apiClient.searchTimesheetsByQuery('', 1, 10, null, null, nameParam, null);
+      } else {
+        response = await apiClient.getAllTimesheets();
+      }
     }
 
     const timesheetsData = response.data;
@@ -491,6 +518,7 @@ const fetchTimesheetsByFilters = async () => {
       week: period.week_range,
       jobId: item.job_id?.toString() || '',
       laborId: item.labor_id?.toString() || '',
+      lead_labor_id: item.lead_labor_id?.toString() || '',
       mon: item.mon || '0h',
       tue: item.tue || '0h',
       wed: item.wed || '0h',
@@ -502,6 +530,8 @@ const fetchTimesheetsByFilters = async () => {
       billable: item.billable || '0h',
       status: item.status || 'Unknown',
       actions: item.actions || [],
+      hourly_rate: item.hourly_rate || null,
+      weekly_payment: item.weekly_payment || null,
     }));
 
     setTimesheets(timesheetsData); 
@@ -531,13 +561,22 @@ const fetchTimesheetsByDateRange = async () => {
   setIsLoadingTimesheets(true);
 
   try {
-    // Format dates as YYYY-MM-DD
-    const startDate = dateRange.from.toISOString().split('T')[0];
-    const endDate = dateRange.to.toISOString().split('T')[0];
+    // Format dates as YYYY-MM-DD in local timezone (not UTC)
+    const formatLocalDate = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
+    const startDate = formatLocalDate(dateRange.from);
+    const endDate = formatLocalDate(dateRange.to);
 
     console.log('Fetching timesheets for date range:', { startDate, endDate });
 
-    const response = await apiClient.searchTimesheetsByQuery('', 1, 10, startDate, endDate);
+    const nameParam = employeeFilter && employeeFilter !== 'all' ? employeeFilter : null;
+    const statusParam = statusFilter && statusFilter !== 'all' ? statusFilter : null;
+    const response = await apiClient.searchTimesheetsByQuery('', 1, 10, startDate, endDate, nameParam, statusParam);
     console.log('Date range API Response:', response);
     
     const timesheetsData = response.data;
@@ -796,7 +835,7 @@ const fetchTimesheetsByDateRange = async () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardContent className="p-6 flex items-center justify-between">
             <div>
@@ -824,7 +863,7 @@ const fetchTimesheetsByDateRange = async () => {
             <div className="p-3 bg-blue-100 rounded-lg"><Clock className="h-6 w-6 text-blue-600" /></div>
           </CardContent>
         </Card>
-        <Card>
+        {/* <Card>
           <CardContent className="p-6 flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Billable Hours</p>
@@ -832,7 +871,7 @@ const fetchTimesheetsByDateRange = async () => {
             </div>
             <div className="p-3 bg-green-100 rounded-lg"><CheckCircle className="h-6 w-6 text-green-600" /></div>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
       {/* Filters and Table */}
@@ -857,8 +896,8 @@ const fetchTimesheetsByDateRange = async () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="approved">Paid</SelectItem>
+                  <SelectItem value="draft">Pending</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -880,8 +919,8 @@ const fetchTimesheetsByDateRange = async () => {
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-[240px] justify-start text-left font-normal">
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dateRange.from ? (
-                        dateRange.to ? (
+                      {dateRange?.from ? (
+                        dateRange?.to ? (
                           <>
                             {format(dateRange.from, "LLL dd, y")} -{" "}
                             {format(dateRange.to, "LLL dd, y")}
@@ -898,14 +937,14 @@ const fetchTimesheetsByDateRange = async () => {
                     <Calendar
                       initialFocus
                       mode="range"
-                      defaultMonth={dateRange.from}
+                      defaultMonth={dateRange?.from}
                       selected={dateRange as any}
-                      onSelect={(range: any) => setDateRange(range)}
+                      onSelect={(range: any) => setDateRange(range || { from: undefined, to: undefined })}
                       numberOfMonths={2}
                     />
                   </PopoverContent>
                 </Popover>
-                {dateRange.from && (
+                {dateRange?.from && (
                   <Button
                     variant="outline"
                     size="sm"
