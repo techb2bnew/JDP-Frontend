@@ -902,9 +902,9 @@ export function ContractorListingPage() {
   const [selectedSubJob, setSelectedSubJob] = useState<string | null>(null)
   const [showContractorDetails, setShowContractorDetails] = useState(false)
   const [enhancedJobData, setEnhancedJobData] = useState<any>(null)
-  const [expandedContractors, setExpandedContractors] = useState<Set<string>>(new Set(['CONT-001']))
-  const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set(['PH210_US_JDP']))
-  const [expandedSubJobs, setExpandedSubJobs] = useState<Set<string>>(new Set(['SUB-004']))
+  const [expandedContractors, setExpandedContractors] = useState<Set<string>>(new Set())
+  const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set())
+  const [expandedSubJobs, setExpandedSubJobs] = useState<Set<string>>(new Set())
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [invoiceSubJob, setInvoiceSubJob] = useState<SubJob | null>(null)
   
@@ -1200,6 +1200,37 @@ export function ContractorListingPage() {
   useEffect(() => {
     fetchContractorsData()
   }, [currentPage])
+
+  // Expand all contractors, jobs, and sub-jobs when data is loaded
+  useEffect(() => {
+    if (contractors.length > 0) {
+      const allContractorIds = new Set<string>()
+      const allJobIds = new Set<string>()
+      const allSubJobIds = new Set<string>()
+
+      contractors.forEach((contractor) => {
+        // Add contractor ID
+        allContractorIds.add(contractor.id.toString())
+
+        // Add all job IDs
+        const contractorJobs = contractor.jobs || []
+        contractorJobs.forEach((job: Job) => {
+          allJobIds.add(job.id.toString())
+
+          // Add all sub-job IDs
+          if (job.subJobs && job.subJobs.length > 0) {
+            job.subJobs.forEach((subJob: any) => {
+              allSubJobIds.add(subJob.id.toString())
+            })
+          }
+        })
+      })
+
+      setExpandedContractors(allContractorIds)
+      setExpandedJobs(allJobIds)
+      setExpandedSubJobs(allSubJobIds)
+    }
+  }, [contractors])
 
   // Auto-select first contractor when contractors are loaded
   useEffect(() => {

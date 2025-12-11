@@ -273,6 +273,37 @@ export function CustomersPage() {
     };
   }, [showAddCustomerModal]);
 
+  // Expand all customers, jobs, and sub-jobs when data is loaded
+  useEffect(() => {
+    if (customersWithJobs.length > 0) {
+      const allCustomerIds = new Set<string>()
+      const allJobIds = new Set<string>()
+      const allSubJobIds = new Set<string>()
+
+      customersWithJobs.forEach((customer) => {
+        // Add customer ID
+        allCustomerIds.add(customer.id.toString())
+
+        // Add all job IDs
+        const customerJobs = customer.jobs || []
+        customerJobs.forEach((job: any) => {
+          allJobIds.add(job.id.toString())
+
+          // Add all sub-job IDs
+          if (job.subJobs && job.subJobs.length > 0) {
+            job.subJobs.forEach((subJob: any) => {
+              allSubJobIds.add(subJob.id.toString())
+            })
+          }
+        })
+      })
+
+      setExpandedCustomers(allCustomerIds)
+      setExpandedJobs(allJobIds)
+      setExpandedSubJobs(allSubJobIds)
+    }
+  }, [customersWithJobs])
+
   // Auto-select first customer when customers are loaded
   useEffect(() => {
     if (customersWithJobs.length > 0 && !selectedCustomer) {
