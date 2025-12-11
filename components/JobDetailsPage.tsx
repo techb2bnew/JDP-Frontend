@@ -73,6 +73,7 @@ import { Logo } from './common/Logo'
 import Image from 'next/image'
 import TimeRangePicker from '@wojtekmaj/react-timerange-picker'
 import '@wojtekmaj/react-timerange-picker/dist/TimeRangePicker.css'
+import Autocomplete from 'react-google-autocomplete'
 
 // Sample data structure - replace with your actual data
 const sampleJobData = {
@@ -534,6 +535,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     title: job.title,
     type: job.type,
     location: job.location || `${job.address || ''}, ${job.cityZip || ''}`,
+    address: job.address || '',
+    cityZip: job.cityZip || '',
     description: job.description,
     contractor: job.contractor || job.customer,
     startDate: '01/15/2025',
@@ -664,8 +667,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         ),
         description: editedJob.description,
         priority: editedJob.priority.toLowerCase(),
-        address: job.address || '',
-        city_zip: job.cityZip || '',
+        address: editedJob.address || job.address || '',
+        city_zip: editedJob.cityZip || job.cityZip || '',
         phone: job.phone || undefined,
         email: job.email || undefined,
         bill_to_address: job.billToAddress || undefined,
@@ -761,6 +764,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       title: job.title,
       type: job.type,
       location: job.location || `${job.address || ''}, ${job.cityZip || ''}`,
+      address: job.address || '',
+      cityZip: job.cityZip || '',
       description: job.description,
       contractor: job.contractor || job.customer,
       startDate: '01/15/2025',
@@ -1807,6 +1812,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       title: job.title,
       type: job.type,
       location: job.location || `${job.address || ''}, ${job.cityZip || ''}`,
+      address: job.address || '',
+      cityZip: job.cityZip || '',
       description: job.description,
       contractor: job.contractor || job.customer,
       startDate: (job.created_at && formatDate(job.created_at))
@@ -3905,9 +3912,91 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                   <div className="flex items-center gap-3">
                     <div className="flex-1">
                       <p className="text-sm text-gray-600">Location</p>
-                      <Input
-                        value={editedJob.location}
-                        onChange={(e) => setEditedJob({ ...editedJob, location: e.target.value })}
+                      <Autocomplete
+                        apiKey="AIzaSyBXNyT9zcGdvhAUCUEYTm6e_qPw26AOPgI"
+                        onPlaceSelected={(place: any) => {
+                          if (!place) return;
+
+                          try {
+                            // Parse address components
+                            const addressComponents = place.address_components || [];
+                            let streetNumber = '';
+                            let route = '';
+                            let city = '';
+                            let state = '';
+                            let zipCode = '';
+                            let sublocality = '';
+
+                            addressComponents.forEach((component: any) => {
+                              const types = component.types;
+                              if (types.includes('street_number')) {
+                                streetNumber = component.long_name;
+                              } else if (types.includes('route')) {
+                                route = component.long_name;
+                              } else if (types.includes('locality')) {
+                                city = component.long_name;
+                              } else if (types.includes('sublocality') || types.includes('sublocality_level_1')) {
+                                sublocality = component.long_name;
+                              } else if (types.includes('administrative_area_level_1')) {
+                                state = component.short_name;
+                              } else if (types.includes('postal_code')) {
+                                zipCode = component.long_name;
+                              }
+                            });
+
+                            // Use sublocality if city is not available
+                            if (!city && sublocality) {
+                              city = sublocality;
+                            }
+
+                            // Build address - use street number + route, or fallback to formatted address
+                            let fullAddress = `${streetNumber} ${route}`.trim();
+                            if (!fullAddress) {
+                              const formattedAddress = place.formatted_address || place.name || '';
+                              const parts = formattedAddress.split(',');
+                              fullAddress = parts[0] || '';
+                            }
+
+                            // Build cityZip - prioritize city, state, zip
+                            let cityZip = '';
+                            if (city && state && zipCode) {
+                              cityZip = `${city}, ${state} ${zipCode}`;
+                            } else if (city && state) {
+                              cityZip = `${city}, ${state}`;
+                            } else if (city) {
+                              cityZip = city;
+                            } else if (place.formatted_address) {
+                              const parts = place.formatted_address.split(',');
+                              if (parts.length > 1) {
+                                cityZip = parts.slice(1).join(',').trim();
+                              }
+                            }
+
+                            // Update editedJob with parsed address components
+                            const formattedAddress = place.formatted_address || place.name || fullAddress;
+                            setEditedJob({
+                              ...editedJob,
+                              location: formattedAddress,
+                              address: fullAddress,
+                              cityZip: cityZip,
+                            });
+                          } catch (error) {
+                            console.error('Error parsing place:', error);
+                            // Fallback to formatted address
+                            const address = place.formatted_address || place.name || editedJob.location;
+                            setEditedJob({ ...editedJob, location: address });
+                          }
+                        }}
+                        options={{
+                          types: ['address'],
+                          componentRestrictions: { country: 'us' },
+                        }}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        placeholder="Start typing address..."
+                        defaultValue={editedJob.location}
+                        onChange={(e: any) => {
+                          setEditedJob({ ...editedJob, location: e.target.value });
+                        }}
                       />
                     </div>
                   </div>

@@ -1030,11 +1030,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                 <div className="flex justify-between">
                   <span className="text-gray-600">Due Date:</span>
                   <span className="font-medium">{new Date(formData.dueDate).toLocaleDateString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Estimated Hours:</span>
-                  <span className="font-medium">{formData.estimatedHours || 'Not specified'}</span>
-                </div>
+                </div> 
                 <div className="flex justify-between">
                   <span className="text-gray-600">Estimated Cost:</span>
                   <span className="font-medium">

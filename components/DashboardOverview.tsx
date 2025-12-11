@@ -291,8 +291,7 @@ export function DashboardOverview() {
       period: '',
       icon: DollarSign,
       color: 'text-green-600',
-      bgColor: 'bg-green-50',
-      chartData: [{ month: 'Now', value: summary?.total_revenue || 0 }],
+      bgColor: 'bg-green-50', 
     },
     {
       title: 'Active Jobs',
@@ -302,8 +301,7 @@ export function DashboardOverview() {
       period: '',
       icon: Briefcase,
       color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-      chartData: [{ month: 'Now', value: summary?.active_jobs || 0 }],
+      bgColor: 'bg-blue-50', 
     },
     {
       title: 'Team Members',
@@ -313,8 +311,7 @@ export function DashboardOverview() {
       period: '', 
       icon: Users,
       color: 'text-purple-600',
-      bgColor: 'bg-purple-50',
-      chartData: [{ month: 'Now', value: summary?.team_members?.total || 0 }],
+      bgColor: 'bg-purple-50', 
     },
   ]
 
@@ -367,27 +364,8 @@ export function DashboardOverview() {
                       <div className="text-sm text-muted-foreground">{kpi.title}</div>
                     </div>
                     <div className="text-2xl font-bold text-foreground mb-1">{isKpiLoading ? '…' : kpi.value}</div>
-                    <div className="flex items-center gap-1">
-                      <div className={`flex items-center gap-1 text-sm ${kpi.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-                        {kpi.trend === 'up' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                        {kpi.change}
-                      </div>
-                      <span className="text-xs text-muted-foreground">{kpi.period}</span>
-                    </div>
-                  </div>
-                  <div className="w-20 h-12">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={kpi.chartData}>
-                        <Area
-                          type="monotone"
-                          dataKey="value"
-                          stroke={kpi.color.includes('green') ? '#16a34a' : kpi.color.includes('blue') ? '#2563eb' : kpi.color.includes('purple') ? '#9333ea' : '#eab308'}
-                          fill={kpi.color.includes('green') ? '#16a34a20' : kpi.color.includes('blue') ? '#2563eb20' : kpi.color.includes('purple') ? '#9333ea20' : '#eab30820'}
-                          strokeWidth={2}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
+                     
+                  </div> 
                 </div>
               </CardContent>
             </Card>

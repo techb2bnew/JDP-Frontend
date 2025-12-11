@@ -2795,7 +2795,7 @@ export function ContractorListingPage() {
                 onClick={() => setShowCreateContractModal(true)}
               >
                 <Plus className="h-4 w-4" />
-                Create Contract
+                Create Contractor
               </Button>
             </div>
           )}
