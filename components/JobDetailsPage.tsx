@@ -2972,11 +2972,11 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
     // Filter out empty line items and check if we have at least one valid item
     const validLineItems = inlineInvoiceData.lineItems.filter(item =>
-      item.item && item.item.trim() !== '' && item.rate > 0
+      item.item && item.item.trim() !== ''
     )
 
     if (validLineItems.length === 0) {
-      errors.lineItems = 'Please add at least one product item with name and rate'
+      errors.lineItems = 'Please add at least one product item with name'
     }
 
     if (Object.keys(errors).length > 0) {
@@ -3114,11 +3114,11 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
     // Filter out empty line items and check if we have at least one valid item
     const validLineItems = inlineInvoiceData.lineItems.filter(item =>
-      item.item && item.item.trim() !== '' && item.rate > 0
+      item.item && item.item.trim() !== ''
     )
 
     if (validLineItems.length === 0) {
-      errors.lineItems = 'Please add at least one product item with name and rate'
+      errors.lineItems = 'Please add at least one product item with name'
     }
 
     if (Object.keys(errors).length > 0) {
@@ -6397,7 +6397,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                         <td className="border border-gray-300 px-3 py-2">{item.qty}</td>
                         <td className="border border-gray-300 px-3 py-2 font-medium">{item.item}</td>
                         <td className="border border-gray-300 px-3 py-2 text-sm text-gray-600">{item.description}</td>
-                        <td className="border border-gray-300 px-3 py-2 text-right">${(item.rate || 0).toFixed(2)}</td>
+                        <td className="border border-gray-300 px-3 py-2 text-right">${((item.estimatedPrice && item.estimatedPrice > 0) ? item.estimatedPrice : (item.rate || 0)).toFixed(2)}</td>
                         <td className="border border-gray-300 px-3 py-2 text-right font-medium">${(item.total || 0).toFixed(2)}</td>
                       </tr>
                     ))}
