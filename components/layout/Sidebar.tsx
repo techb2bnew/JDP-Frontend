@@ -55,6 +55,15 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
     return isStaffRole || hasStaffPermissions
   }
 
+  // Check if user is super admin (based on email)
+  const isSuperAdmin = () => {
+    if (typeof window === 'undefined') return false
+    const userData = getUserData()
+    if (!userData?.user) return false
+    // Check if email is jdpadmin2@yopmail.com
+    return userData.user.email === 'jdpadmin2@yopmail.com'
+  }
+
   const navigation = [
     {
       id: "dashboard",
@@ -156,6 +165,16 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       requiredActions: ["view", "create", "edit", "delete"]
     },
     {
+      id: "staff-timeline-admin",
+      name: "Staff Timeline",
+      icon: Clock,
+      href: "/staff-timeline-admin",
+      description: "Manage staff timeline and hours (Super Admin)",
+      module: "staff",
+      requiredActions: ["view", "create", "edit", "delete"],
+      superAdminOnly: true
+    },
+    {
       id: "notifications",
       name: "Notifications",
       icon: Bell,
@@ -196,6 +215,11 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
 
   // Filter navigation items based on permissions
   const filteredNavigation = navigation.filter(item => {
+    // Staff Timeline Admin - only show for super admin
+    if (item.id === 'staff-timeline-admin' || (item as any).superAdminOnly) {
+      return isSuperAdmin()
+    }
+    
     // Staff Timeline - only show for staff users with view permission
     if (item.id === 'staff-timeline') {
       return isStaffUser() && hasAnyPermission('staff_timeline', ['view'])

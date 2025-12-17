@@ -3275,4 +3275,97 @@ getTimesheetDashboardStats: async () => {
 
     return response.json();
   },
+
+  // Staff Timeline Admin APIs
+  getAllStaffWeeklyTimesheetSummary: async (startDate?: string, endDate?: string) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    // Build query params
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+
+    const url = `${apiBaseUrl}/staff-timesheet/getAllStaffWeeklyTimesheetSummary${params.toString() ? '?' + params.toString() : ''}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to fetch staff weekly timesheet summary");
+    }
+
+    return response.json();
+  },
+
+  searchStaffTimesheets: async (query: string) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const url = `${apiBaseUrl}/staff-timesheet/searchStaffTimesheets?q=${encodeURIComponent(query)}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search staff timesheets");
+    }
+
+    return response.json();
+  },
+
+  getStaffWeeklyTimesheetView: async (params: {
+    staff_id: number | string;
+    start_date: string;
+    end_date: string;
+  }) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const queryParams = new URLSearchParams();
+    queryParams.append('staff_id', params.staff_id.toString());
+    queryParams.append('start_date', params.start_date);
+    queryParams.append('end_date', params.end_date);
+
+    const url = `${apiBaseUrl}/staff-timesheet/getWeeklyTimesheetView?${queryParams.toString()}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to fetch staff weekly timesheet view");
+    }
+
+    return response.json();
+  },
 };
