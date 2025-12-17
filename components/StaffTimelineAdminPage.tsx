@@ -475,7 +475,9 @@ export function StaffTimelineAdminPage() {
                   {isLoadingTimesheetView ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8">
-                        <LoadingSpinner />
+                        <div className="flex justify-center items-center">
+                          <LoadingSpinner />
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : dailyBreakdown.length > 0 ? (
