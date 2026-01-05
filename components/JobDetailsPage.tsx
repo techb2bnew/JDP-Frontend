@@ -3913,7 +3913,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                     <div className="flex-1">
                       <p className="text-sm text-gray-600">Location</p>
                       <Autocomplete
-                        apiKey="AIzaSyBXNyT9zcGdvhAUCUEYTm6e_qPw26AOPgI"
+                        apiKey="AIzaSyBtb6hSmwJ9_OznDC5e8BcZM90ms4WD_DE"
                         onPlaceSelected={(place: any) => {
                           if (!place) return;
 

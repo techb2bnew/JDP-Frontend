@@ -737,7 +737,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             <div className="space-y-2">
               <Label htmlFor="address">Address *</Label>
               <Autocomplete
-                apiKey="AIzaSyBXNyT9zcGdvhAUCUEYTm6e_qPw26AOPgI"
+                apiKey="AIzaSyBtb6hSmwJ9_OznDC5e8BcZM90ms4WD_DE"
                 onPlaceSelected={(place: any) => {
                   handlePlaceSelect(place)
                 }}
