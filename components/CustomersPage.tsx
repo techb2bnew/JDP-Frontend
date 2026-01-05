@@ -607,85 +607,107 @@ export function CustomersPage() {
     }
   };
 
-  // Fetch customers with jobs using getJobsByCustomer API
+  // Fetch customers with jobs - fetch all customers first, then merge with jobs
   const fetchCustomersWithJobs = async () => {
     try {
       setIsLoadingCustomers(true);
       
-      const response = await globalApiCall(`${apiBaseUrl}/job/getJobsByCustomer`, {
+      // Step 1: Fetch all customers
+      const customersResponse = await globalApiCall(`${apiBaseUrl}/customer/getCustomers`, {
         method: 'GET'
       });
+      const customersData = await customersResponse.json();
+      console.log('All Customers API Response:', customersData);
 
-      const responseData = await response.json();
-      console.log('Jobs by Customer API Response:', responseData);
-
-      if (responseData.success && responseData.data && Array.isArray(responseData.data)) {
-        // Group jobs by customer_id
-        const customerJobsMap = new Map();
-        
-        responseData.data.forEach((job: any) => {
-          const customerId = job.customer_id || job.customer?.id;
-          if (!customerId) return;
-          
-          if (!customerJobsMap.has(customerId)) {
-            // Create customer object from first job's customer data
-            customerJobsMap.set(customerId, {
-              id: customerId,
-              customer_name: job.customer?.customer_name || '',
-              name: job.customer?.customer_name || '',
-              email: job.customer?.email || '',
-              phone: job.customer?.phone || '',
-              company_name: job.customer?.company_name || '',
-              address: job.customer?.address || '',
-              created_at: job.customer?.created_at || job.created_at || '',
-              jobs: []
-            });
-          }
-          
-          // Add job to customer's jobs array
-          const customer = customerJobsMap.get(customerId);
-          customer.jobs.push(job);
+      // Step 2: Fetch jobs by customer
+      let jobsByCustomer: any[] = [];
+      try {
+        const jobsResponse = await globalApiCall(`${apiBaseUrl}/job/getJobsByCustomer`, {
+          method: 'GET'
         });
+        const jobsData = await jobsResponse.json();
+        console.log('Jobs by Customer API Response:', jobsData);
         
-        // Convert map to array
-        const customersWithJobsArray = Array.from(customerJobsMap.values());
-        
-        // Calculate total jobs for each customer
-        customersWithJobsArray.forEach((customer: any) => {
-          customer.total_jobs = customer.jobs.length;
-        });
-        
-        setCustomersWithJobs(customersWithJobsArray);
-        setAllCustomersWithJobs(customersWithJobsArray); // Store original list
-        setTotalCustomers(customersWithJobsArray.length);
-        
-        // Also set for table view compatibility
-        const transformedCustomers = customersWithJobsArray.map((apiCustomer: any) => ({
-          id: apiCustomer.id?.toString() || `CUST-${Date.now()}`,
-          name: apiCustomer.customer_name || apiCustomer.name || '',
-          email: apiCustomer.email || '',
-          phone: apiCustomer.phone || '',
-          location: apiCustomer.address || '',
-          orders: 0,
-          totalSpent: 0,
-          joinDate: new Date().toISOString().split('T')[0],
-          status: 'active',
-          company: apiCustomer.company_name || '',
-          contactPerson: '',
-          avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face',
-          jobs: apiCustomer.jobs || [],
-          total_jobs: apiCustomer.total_jobs || 0
-        }));
-        setCustomersData(transformedCustomers);
-        setFilteredCustomers(transformedCustomers);
-      } else {
-        console.error('Invalid jobs by customer API response structure:', responseData);
-        setCustomersWithJobs([]);
-        setCustomersData([]);
-        setTotalCustomers(0);
+        if (jobsData.success && jobsData.data && Array.isArray(jobsData.data)) {
+          jobsByCustomer = jobsData.data;
+        }
+      } catch (jobsError) {
+        console.error('Error fetching jobs by customer (continuing with customers only):', jobsError);
+        // Continue even if jobs fetch fails
       }
+
+      // Step 3: Create a map of customer_id to jobs
+      const jobsMap = new Map<number, any[]>();
+      jobsByCustomer.forEach((job: any) => {
+        const customerId = job.customer_id || job.customer?.id;
+        if (!customerId) return;
+        
+        if (!jobsMap.has(customerId)) {
+          jobsMap.set(customerId, []);
+        }
+        jobsMap.get(customerId)!.push(job);
+      });
+
+      // Step 4: Merge customers with their jobs
+      let allCustomers: any[] = [];
+      
+      if (customersData.success && customersData.data && customersData.data.customers) {
+        allCustomers = customersData.data.customers;
+      } else if (customersData.data && Array.isArray(customersData.data)) {
+        allCustomers = customersData.data;
+      }
+
+      const customersWithJobsArray = allCustomers.map((customer: any) => {
+        const customerId = customer.id;
+        const customerJobs = jobsMap.get(customerId) || [];
+        
+        return {
+          id: customerId,
+          customer_name: customer.customer_name || '',
+          name: customer.customer_name || '',
+          email: customer.email || '',
+          phone: customer.phone || '',
+          company_name: customer.company_name || '',
+          address: customer.address || '',
+          created_at: customer.created_at || '',
+          jobs: customerJobs,
+          total_jobs: customerJobs.length
+        };
+      });
+      
+      // Sort by total_jobs descending, then by name
+      customersWithJobsArray.sort((a: any, b: any) => {
+        if (b.total_jobs !== a.total_jobs) {
+          return b.total_jobs - a.total_jobs;
+        }
+        return (a.customer_name || '').localeCompare(b.customer_name || '');
+      });
+      
+      setCustomersWithJobs(customersWithJobsArray);
+      setAllCustomersWithJobs(customersWithJobsArray); // Store original list
+      setTotalCustomers(customersWithJobsArray.length);
+      
+      // Also set for table view compatibility
+      const transformedCustomers = customersWithJobsArray.map((apiCustomer: any) => ({
+        id: apiCustomer.id?.toString() || `CUST-${Date.now()}`,
+        name: apiCustomer.customer_name || apiCustomer.name || '',
+        email: apiCustomer.email || '',
+        phone: apiCustomer.phone || '',
+        location: apiCustomer.address || '',
+        orders: 0,
+        totalSpent: 0,
+        joinDate: apiCustomer.created_at ? new Date(apiCustomer.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        status: 'active',
+        company: apiCustomer.company_name || '',
+        contactPerson: '',
+        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face',
+        jobs: apiCustomer.jobs || [],
+        total_jobs: apiCustomer.total_jobs || 0
+      }));
+      setCustomersData(transformedCustomers);
+      setFilteredCustomers(transformedCustomers);
     } catch (error) {
-      console.error('Error fetching jobs by customer:', error);
+      console.error('Error fetching customers with jobs:', error);
       if (!(error instanceof Error && error.message?.includes('Session expired'))) {
         setCustomersWithJobs([]);
         setCustomersData([]);
