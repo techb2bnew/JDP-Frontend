@@ -2747,7 +2747,7 @@ export function ContractorListingPage() {
                                       onClick={() => selectJob(job.id.toString(), contractor.id.toString())}
                                     >
                                       <div className="flex items-center justify-between w-full">
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2"> 
                                           {hasSubJobs && (
                                             isJobExpanded ? (
                                               <ChevronDown className="h-3 w-3 text-primary" />

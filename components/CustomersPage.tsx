@@ -693,7 +693,7 @@ export function CustomersPage() {
         name: apiCustomer.customer_name || apiCustomer.name || '',
         email: apiCustomer.email || '',
         phone: apiCustomer.phone || '',
-        location: apiCustomer.address || '',
+        location: apiCustomer.address || '', 
         orders: 0,
         totalSpent: 0,
         joinDate: apiCustomer.created_at ? new Date(apiCustomer.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
