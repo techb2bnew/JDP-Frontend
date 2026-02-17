@@ -1,0 +1,46 @@
+name: Deploy JDP Frontend
+
+on:
+  push:
+    branches: ["jdp"] 
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build Next App
+        run: npm run build
+
+      - name: Deploy to EC2
+        uses: easingthemes/ssh-deploy@main
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY_LIVE }}
+          REMOTE_HOST: ${{ secrets.SERVER_IP }}
+          REMOTE_USER: ${{ secrets.SERVER_USER }}
+          TARGET: /var/www/html/JDP-Frontend
+          EXCLUDE: ".git"
+
+      - name: Restart Frontend App
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY_LIVE }}
+          script: |
+            cd /var/www/html/JDP-Frontend
+            npm install --production
+            pm2 restart jdp-frontend || pm2 start npm --name "jdp-frontend" -- start
+            pm2 save
