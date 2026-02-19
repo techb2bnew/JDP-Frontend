@@ -180,7 +180,8 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
   const [isConfirmOpen, setIsConfirmOpen] = useState(false)
   const [approveTarget, setApproveTarget] = useState<ApiBlueSheetItem | null>(null)
   const [isApproving, setIsApproving] = useState(false)
-
+  console.log(blueSheets, "bluesheets");
+  console.log(selectedBlueSheet, "selectedBlueSheet")
   // Fetch bluesheets from API
   const fetchBluesheets = async (page: number = 1) => {
     try {
@@ -189,7 +190,7 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
       
       if (response.success && response.data) {
         setBlueSheets(response.data.bluesheets || [])
-        // Also coerce selected item type if needed
+        // Also coerce selected item type if needed 
         if (selectedBlueSheet) {
           const refreshed = (response.data.bluesheets || []).find((b: any) => b.id === selectedBlueSheet.id)
           if (refreshed) setSelectedBlueSheet(refreshed)

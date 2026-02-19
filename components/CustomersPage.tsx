@@ -118,6 +118,7 @@ export function CustomersPage() {
   const [expandedSubJobs, setExpandedSubJobs] = useState<Set<string>>(new Set())
   const [customersWithJobs, setCustomersWithJobs] = useState<any[]>([])
   const [allCustomersWithJobs, setAllCustomersWithJobs] = useState<any[]>([]) // Store original list for filtering
+  const [paginatedCustomers, setPaginatedCustomers] = useState<any[]>([])
 
   // Fetch customers data and stats on component mount and when page changes
   useEffect(() => {
@@ -612,106 +613,110 @@ export function CustomersPage() {
     try {
       setIsLoadingCustomers(true);
       
-      // Step 1: Fetch all customers
-      const customersResponse = await globalApiCall(`${apiBaseUrl}/customer/getCustomers`, {
+      // Step 1: Fetch paginated customers
+      const customersResponse = await globalApiCall(`${apiBaseUrl}/customer/getCustomers?page=${currentPage}&limit=${itemsPerPage}`, {
         method: 'GET'
       });
       const customersData = await customersResponse.json();
-      console.log('All Customers API Response:', customersData);
+      console.log('Paginated Customers API Response:', customersData);
 
-      // Step 2: Fetch jobs by customer
-      let jobsByCustomer: any[] = [];
-      try {
-        const jobsResponse = await globalApiCall(`${apiBaseUrl}/job/getJobsByCustomer`, {
-          method: 'GET'
+      // Extract pagination info
+      if (customersData.success && customersData.data) {
+        const pagination = customersData.data.pagination || {};
+        const totalPagesFromApi = pagination.totalPages || 1;
+        const totalCustomersFromApi = pagination.total || 0;
+        
+        // Update pagination state
+        setTotalCustomers(totalCustomersFromApi);
+
+        // Step 2: Fetch jobs by customer
+        let jobsByCustomer: any[] = [];
+        try {
+          const jobsResponse = await globalApiCall(`${apiBaseUrl}/job/getJobsByCustomer`, {
+            method: 'GET'
+          });
+          const jobsData = await jobsResponse.json();
+          console.log('Jobs by Customer API Response:', jobsData);
+          
+          if (jobsData.success && jobsData.data && Array.isArray(jobsData.data)) {
+            jobsByCustomer = jobsData.data;
+          }
+        } catch (jobsError) {
+          console.error('Error fetching jobs by customer (continuing with customers only):', jobsError);
+          // Continue even if jobs fetch fails
+        }
+
+        // Step 3: Create a map of customer_id to jobs
+        const jobsMap = new Map<number, any[]>();
+        jobsByCustomer.forEach((job: any) => {
+          const customerId = job.customer_id || job.customer?.id;
+          if (!customerId) return;
+          
+          if (!jobsMap.has(customerId)) {
+            jobsMap.set(customerId, []);
+          }
+          jobsMap.get(customerId)!.push(job);
         });
-        const jobsData = await jobsResponse.json();
-        console.log('Jobs by Customer API Response:', jobsData);
-        
-        if (jobsData.success && jobsData.data && Array.isArray(jobsData.data)) {
-          jobsByCustomer = jobsData.data;
-        }
-      } catch (jobsError) {
-        console.error('Error fetching jobs by customer (continuing with customers only):', jobsError);
-        // Continue even if jobs fetch fails
-      }
 
-      // Step 3: Create a map of customer_id to jobs
-      const jobsMap = new Map<number, any[]>();
-      jobsByCustomer.forEach((job: any) => {
-        const customerId = job.customer_id || job.customer?.id;
-        if (!customerId) return;
+        // Step 4: Merge customers with their jobs
+        let allCustomers: any[] = [];
         
-        if (!jobsMap.has(customerId)) {
-          jobsMap.set(customerId, []);
+        if (customersData.data.customers) {
+          allCustomers = customersData.data.customers;
+        } else if (Array.isArray(customersData.data)) {
+          allCustomers = customersData.data;
         }
-        jobsMap.get(customerId)!.push(job);
-      });
 
-      // Step 4: Merge customers with their jobs
-      let allCustomers: any[] = [];
-      
-      if (customersData.success && customersData.data && customersData.data.customers) {
-        allCustomers = customersData.data.customers;
-      } else if (customersData.data && Array.isArray(customersData.data)) {
-        allCustomers = customersData.data;
-      }
-
-      const customersWithJobsArray = allCustomers.map((customer: any) => {
-        const customerId = customer.id;
-        const customerJobs = jobsMap.get(customerId) || [];
+        const customersWithJobsArray = allCustomers.map((customer: any) => {
+          const customerId = customer.id;
+          const customerJobs = jobsMap.get(customerId) || [];
+          
+          return {
+            id: customerId,
+            customer_name: customer.customer_name || '',
+            name: customer.customer_name || '',
+            email: customer.email || '',
+            phone: customer.phone || '',
+            company_name: customer.company_name || '',
+            address: customer.address || '',
+            created_at: customer.created_at || '',
+            jobs: customerJobs,
+            total_jobs: customerJobs.length
+          };
+        });
         
-        return {
-          id: customerId,
-          customer_name: customer.customer_name || '',
-          name: customer.customer_name || '',
-          email: customer.email || '',
-          phone: customer.phone || '',
-          company_name: customer.company_name || '',
-          address: customer.address || '',
-          created_at: customer.created_at || '',
-          jobs: customerJobs,
-          total_jobs: customerJobs.length
-        };
-      });
-      
-      // Sort by total_jobs descending, then by name
-      customersWithJobsArray.sort((a: any, b: any) => {
-        if (b.total_jobs !== a.total_jobs) {
-          return b.total_jobs - a.total_jobs;
-        }
-        return (a.customer_name || '').localeCompare(b.customer_name || '');
-      });
-      
-      setCustomersWithJobs(customersWithJobsArray);
-      setAllCustomersWithJobs(customersWithJobsArray); // Store original list
-      setTotalCustomers(customersWithJobsArray.length);
-      
-      // Also set for table view compatibility
-      const transformedCustomers = customersWithJobsArray.map((apiCustomer: any) => ({
-        id: apiCustomer.id?.toString() || `CUST-${Date.now()}`,
-        name: apiCustomer.customer_name || apiCustomer.name || '',
-        email: apiCustomer.email || '',
-        phone: apiCustomer.phone || '',
-        location: apiCustomer.address || '', 
-        orders: 0,
-        totalSpent: 0,
-        joinDate: apiCustomer.created_at ? new Date(apiCustomer.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        status: 'active',
-        company: apiCustomer.company_name || '',
-        contactPerson: '',
-        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face',
-        jobs: apiCustomer.jobs || [],
-        total_jobs: apiCustomer.total_jobs || 0
-      }));
-      setCustomersData(transformedCustomers);
-      setFilteredCustomers(transformedCustomers);
-    } catch (error) {
-      console.error('Error fetching customers with jobs:', error);
-      if (!(error instanceof Error && error.message?.includes('Session expired'))) {
-        setCustomersWithJobs([]);
-        setCustomersData([]);
-        setTotalCustomers(0);
+        // Sort by total_jobs descending, then by name
+        customersWithJobsArray.sort((a: any, b: any) => {
+          if (b.total_jobs !== a.total_jobs) {
+            return b.total_jobs - a.total_jobs;
+          }
+          return (a.customer_name || '').localeCompare(b.customer_name || '');
+        });
+        
+        // Set customers directly from API response (server-side pagination)
+        setCustomersWithJobs(customersWithJobsArray);
+        setPaginatedCustomers(customersWithJobsArray); // Use API response directly
+        setAllCustomersWithJobs(customersWithJobsArray); // Store current page list
+        
+        // Also set for table view compatibility
+        const transformedCustomers = customersWithJobsArray.map((apiCustomer: any) => ({
+          id: apiCustomer.id?.toString() || `CUST-${Date.now()}`,
+          name: apiCustomer.customer_name || apiCustomer.name || '',
+          email: apiCustomer.email || '',
+          phone: apiCustomer.phone || '',
+          location: apiCustomer.address || '', 
+          orders: 0,
+          totalSpent: 0,
+          joinDate: apiCustomer.created_at ? new Date(apiCustomer.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          status: 'active',
+          company: apiCustomer.company_name || '',
+          contactPerson: '',
+          avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face',
+          jobs: apiCustomer.jobs || [],
+          total_jobs: apiCustomer.total_jobs || 0
+        }));
+        setCustomersData(transformedCustomers);
+        setFilteredCustomers(transformedCustomers);
       }
     } finally {
       setIsLoadingCustomers(false);
@@ -740,12 +745,49 @@ export function CustomersPage() {
     }
   }, [searchTerm, allCustomersWithJobs]);
 
+  // Server-side pagination - no client-side pagination needed
+  const totalPages = Math.ceil(totalCustomers / itemsPerPage);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handleEditCustomer = async (customer: any) => {
+    try {
+      setCurrentAction('edit');
+      setEditingCustomer(customer);
+      
+      // Fetch customer details for editing
+      await fetchCustomerById(customer.id.toString());
+      
+      setShowAddCustomerModal(true);
+    } catch (error) {
+      console.error('Error preparing customer for edit:', error);
+      if (typeof window !== 'undefined') {
+        const { toast } = await import('sonner');
+        toast.error('Failed to load customer for editing');
+      }
+    }
+  };
+
+  const handleDeleteCustomerClick = (customer: any) => {
+    setCustomerToDelete(customer);
+    setShowDeleteAlert(true);
+  };
 
   const handleUpdateCustomer = async () => {
-    if (!validateForm()) {
-      return;
-    }
-
     if (!editingCustomer) {
       console.error('No customer selected for editing');
       return;
@@ -1060,12 +1102,12 @@ useEffect(() => {
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                 <span className="ml-2 text-sm text-gray-500">Loading customers...</span>
               </div>
-            ) : customersWithJobs.length === 0 ? (
+            ) : paginatedCustomers.length === 0 ? (
               <div className="text-center py-8 text-sm text-gray-500">
                 No customers found
               </div>
             ) : (
-              customersWithJobs.map((customer) => {
+              paginatedCustomers.map((customer) => {
                 const customerJobs = customer.jobs || []
                 const isExpanded = expandedCustomers.has(customer.id.toString())
                 const isSelected = selectedCustomer === customer.id.toString() && !selectedJob
@@ -1079,12 +1121,12 @@ useEffect(() => {
                       <CollapsibleTrigger asChild>
                         <Button
                           variant="ghost"
-                          className={`w-full justify-start p-3 text-left h-auto hover:bg-blue-50 ${
+                          className={`w-full justify-start p-2 text-left h-auto hover:bg-blue-50 ${
                             isSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
                           }`}
                           onClick={() => selectCustomer(customer.id.toString())}
                         >
-                          <div className="flex items-center justify-between w-full">
+                          <div className="  w-full">
                             <div className="flex items-center gap-3">
                               <div className="flex items-center gap-2">
                                 {isExpanded ? (
@@ -1098,6 +1140,34 @@ useEffect(() => {
                                 <div className="font-medium text-gray-900">{customer.customer_name || customer.name}</div>
                                 <div className="text-xs text-gray-500">{customer.total_jobs || customerJobs.length} jobs</div>
                               </div>
+                            </div>
+                            <div className="flex items-center justify-end">
+                              {hasPermission('customers', 'edit') && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 hover:bg-blue-100"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditCustomer(customer);
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4 text-blue-600" />
+                                </Button>
+                              )}
+                              {hasPermission('customers', 'delete') && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 hover:bg-red-100"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteCustomerClick(customer);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-600" />
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </Button>
@@ -1191,8 +1261,55 @@ useEffect(() => {
                 )
               })
             )}
+           
           </div>
+             
+          <div className="pt-4 bg-white border-t border-gray-200">
+            <div className="m-auto text-center ">
+              <div className="text-sm text-gray-600 mb-3 mt-4">
+                {/* Showing {customersWithJobs.length} Pages {totalPages}   */}
+                  Showing {customersWithJobs.length} of {totalCustomers} Customer • Page {currentPage} of {totalPages}
+              </div>
+              <div className="flex justify-center items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePreviousPage}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronDown className="h-4 w-4 rotate-90" />
+                </Button>
+                
+                {/* <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handlePageChange(page)}
+                      className="h-8 w-8 p-0 text-sm"
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                </div> */}
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronDown className="h-4 w-4 -rotate-90" />
+                </Button>
+              </div>
+            </div>
+          </div> 
         </ScrollArea>
+
+      
       </div>
 
       {/* Right Content - Job Details */}

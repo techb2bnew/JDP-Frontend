@@ -1014,6 +1014,11 @@ export function ContractorListingPage() {
   const totalPages = Math.ceil(totalContractors / itemsPerPage)
   const displayContractors = filteredContractors
 
+  // Fetch contractors when page changes
+  useEffect(() => {
+    fetchContractorsData()
+  }, [currentPage])
+
   // Fetch contractor by ID for editing
   const fetchContractorById = async (contractorId: string) => {
     try {
@@ -2704,7 +2709,7 @@ export function ContractorListingPage() {
                         }`}
                         onClick={() => selectContractor(contractor.id.toString())}
                       >
-                        <div className="flex items-center justify-between w-full">
+                        <div className=" w-full">
                           <div className="flex items-center gap-3">
                             <div className="flex items-center gap-2">
                               {isExpanded ? (
@@ -2718,6 +2723,34 @@ export function ContractorListingPage() {
                               <div className="font-medium text-gray-900">{contractor.contractor_name}</div>
                               <div className="text-xs text-gray-500">{contractor.total_jobs} jobs</div>
                             </div>
+                          </div>
+                          <div className="flex justify-end items-center gap-1">
+                            {hasPermission('contractors', 'edit') && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 hover:bg-blue-100"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditContractor(contractor.id.toString());
+                                }}
+                              >
+                                <Edit className="h-4 w-4 text-blue-600" />
+                              </Button>
+                            )}
+                            {hasPermission('contractors', 'delete') && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 hover:bg-red-100"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteContractor(contractor);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-600" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </Button>
@@ -2812,8 +2845,52 @@ export function ContractorListingPage() {
                 </div>
               )
             })}
-          </div>
+          </div> 
+          <div className=" bg-white border-t border-gray-200">
+            <div className="m-auto text-center">
+              <div className="text-sm text-gray-600 mb-3 mt-4">
+                Showing {displayContractors.length} of {totalContractors} contractors • Page {currentPage} of {totalPages}
+              </div>
+              <div className="flex justify-center items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronDown className="h-4 w-4 rotate-90" />
+                </Button>
+                
+                {/* <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(page)}
+                      className="h-8 w-8 p-0 text-sm"
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                </div> */}
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronDown className="h-4 w-4 -rotate-90" />
+                </Button>
+              </div>
+            </div>
+          </div> 
         </ScrollArea>
+
+        
       </div>
 
       {/* Right Content - Job Details */}

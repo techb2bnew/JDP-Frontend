@@ -14,6 +14,9 @@ export const metadata: Metadata = {
     default: 'JDP Admin Dashboard',
     template: '%s | JDP Admin Dashboard'
   },
+  icons: {
+    icon: "/favicon.ico",
+  },
   description: 'Comprehensive ecommerce admin dashboard with staff, job, and contractor management',
   keywords: ['admin', 'dashboard', 'ecommerce', 'management', 'staff', 'jobs', 'contractors'],
   authors: [{ name: 'JDP Team' }],
