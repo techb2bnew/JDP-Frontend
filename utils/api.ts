@@ -3127,6 +3127,35 @@ getTimesheetDashboardStats: async () => {
     return response.json();
   },
 
+  // Auto-fetch supplier invoice from email for a given PO number
+  autoFetchSupplierInvoiceFromEmail: async (payload: { poNumber: string }) => {
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    // Call Next.js app router API route, which in turn talks to backend/Gmail
+    const response = await fetch(`/api/supplier-invoices/auto-fetch-from-email`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.message ||
+          "Failed to auto-fetch supplier invoice from email"
+      );
+    }
+
+    return response.json();
+  },
+
   // Approve a Bluesheet
   approveBluesheet: async (bluesheetId: number, status: string = "approved") => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;

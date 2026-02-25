@@ -60,6 +60,7 @@
     "firebase": "12.5.0",
     "framer-motion": "^11.0.3",
     "fullcalendar": "6.1.19",
+    "googleapis": "171.4.0",
     "html2canvas": "1.4.1",
     "input-otp": "1.4.2",
     "jspdf": "3.0.1",

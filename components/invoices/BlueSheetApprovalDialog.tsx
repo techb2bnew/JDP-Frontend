@@ -37,6 +37,7 @@ import {
   Send,
   ArrowLeft
 } from 'lucide-react'
+import { apiClient } from '@/utils/api'
 
 export interface BlueSheetItem {
   id: number
@@ -210,16 +211,78 @@ export function BlueSheetApprovalDialog({
     }
   }
 
-  const handleAutoFetch = () => {
+  const handleAutoFetch = async () => {
+    if (!blueSheet) return
+
     setIsAutoFetching(true)
-    
-    // Simulate auto-fetch process
-    setTimeout(() => {
-      setSupplierInvoice(mockSupplierInvoice)
-      setIsAutoFetching(false)
+
+    try {
+      const poNumber = `BS-${blueSheet.id}`
+
+      // Call Next.js server API to auto-fetch supplier invoice from email for this PO
+      const response = await apiClient.autoFetchSupplierInvoiceFromEmail({
+        poNumber
+      })
+
+      const rawInvoice: any = (response && (response.data || response.invoice || response)) || {}
+
+      const materialsSource: any[] =
+        rawInvoice.materials || rawInvoice.items || rawInvoice.lines || []
+
+      const mappedInvoice: SupplierInvoice = {
+        id: (rawInvoice.id ?? rawInvoice.invoice_id ?? poNumber).toString(),
+        poNumber: rawInvoice.poNumber || rawInvoice.po_number || poNumber,
+        invoiceNumber:
+          rawInvoice.invoiceNumber ||
+          rawInvoice.invoice_number ||
+          `INV-${blueSheet.id.toString().slice(-3)}`,
+        supplier:
+          rawInvoice.supplier ||
+          rawInvoice.supplier_name ||
+          rawInvoice.vendor ||
+          currentBlueSheet.material_entries[0]?.product?.suppliers?.company_name ||
+          'Unknown Supplier',
+        amount: Number(rawInvoice.amount ?? rawInvoice.total ?? 0),
+        date: rawInvoice.date || rawInvoice.invoice_date || new Date().toISOString(),
+        materials: materialsSource.map((item: any, index: number) => {
+          const quantity = Number(item.quantity ?? item.qty ?? 0)
+          const unitPrice = Number(
+            item.unitPrice ?? item.unit_price ?? item.price ?? item.rate ?? 0
+          )
+
+          return {
+            name: item.name || item.description || `Item ${index + 1}`,
+            quantity,
+            unitPrice,
+            total: Number(
+              item.total ??
+                item.line_total ??
+                item.amount ??
+                item.extended_price ??
+                quantity * unitPrice
+            )
+          }
+        }),
+        status: 'received'
+      }
+
+      if (!mappedInvoice.materials.length) {
+        throw new Error('No materials found in fetched supplier invoice')
+      }
+
+      setSupplierInvoice(mappedInvoice)
+      setEditedSupplierInvoice(null)
       setCurrentStep('comparison')
-      toast.success(`Supplier invoice auto-fetched for PO: BS-${blueSheet.id}`)
-    }, 3500)
+
+      toast.success(`Supplier invoice auto-fetched for PO: ${poNumber}`)
+    } catch (error: any) {
+      console.error('Error auto-fetching supplier invoice from email:', error)
+      toast.error(
+        error?.message || 'Failed to auto-fetch supplier invoice from email. Please try again.'
+      )
+    } finally {
+      setIsAutoFetching(false)
+    }
   }
 
   const handleBlueSheetEdit = () => {
