@@ -660,13 +660,11 @@ export function InvoicesPage() {
 
   const tabItems = [
     { id: 'invoices', label: 'Invoices', icon: Receipt },
-    { id: 'invoice-comparison', label: 'Invoice Comparison', icon: GitCompare },
+    // { id: 'invoice-comparison', label: 'Invoice Comparison', icon: GitCompare },
     { id: 'approvals', label: 'Approvals', icon: CheckSquare, notification: 2 },
   ]
 
-  useEffect(() => {
-    fetchEstimates();
-  }, [currentPage]);
+
 
   const fetchEstimates = async () => {
     setIsLoadingEstimates(true);
@@ -677,7 +675,7 @@ export function InvoicesPage() {
       setTotalEstimates(response.data.total || 0); 
       
       // Also fetch stats when listing is fetched
-      await fetchEstimateStats();
+      // await fetchEstimateStats();
     } catch (error) {
       console.error('Failed to fetch estimates:', error);
     } finally {
@@ -706,7 +704,9 @@ export function InvoicesPage() {
     fetchEstimateStats();
   }, []);
 
-
+  useEffect(() => {
+    fetchEstimates();
+  }, [currentPage]);
 
 
   // const filteredEstimates = estimates.filter((invoice: Estimate) => {

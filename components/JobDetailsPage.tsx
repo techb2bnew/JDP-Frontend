@@ -216,6 +216,73 @@ type JobDocumentItem = {
   updatedAt?: string
 }
 
+// Add these interfaces at the top of your file or in a types file
+interface Product {
+  id: number;
+  product_name?: string;
+  name?: string;
+  sku?: string;
+  supplier_sku?: string;
+  unit?: string;
+  unit_cost?: number;
+  price?: number;
+  stock_quantity?: number;
+  supplier_order_id?: string;
+}
+
+interface ProductQuantity {
+  total_ordered: number;
+  material_used: number;
+  return_to_warehouse: boolean;
+  unit_cost: number;
+}
+
+interface MaterialFormData {
+  product_id: number | null;
+  material_name: string;
+  quantity: number;
+  unit: string;
+  total_ordered: number;
+  material_used: number;
+  supplier_order_id: string;
+  return_to_warehouse: boolean;
+  unit_cost: number;
+  date: string;
+}
+
+interface MaterialErrors {
+  product?: string;
+  date?: string;
+  total_ordered?: string;
+  material_used?: string;
+}
+
+interface MaterialEntry {
+  product_id: number;
+  material_name: string;
+  quantity: number;
+  unit: string;
+  total_ordered: number;
+  material_used: number;
+  supplier_order_id: string;
+  return_to_warehouse: boolean;
+  unit_cost: number; 
+}
+
+interface BulkMaterialPayload {
+  materials: MaterialEntry[];
+}
+
+interface CompleteBluesheetPayload {
+  job_id: number;
+  date: string;
+  notes: string;
+  additional_charges: number;
+  status: string;
+  labor_entries: any[];
+  material_entries: MaterialEntry[];
+}
+
 export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageProps) {
 
 
@@ -297,6 +364,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const [deletingDocumentIds, setDeletingDocumentIds] = useState<number[]>([]);
   const [downloadingDocumentIds, setDownloadingDocumentIds] = useState<number[]>([]);
   const [showUploadDocumentModal, setShowUploadDocumentModal] = useState(false);
+
+
+
+
   const [documentFormData, setDocumentFormData] = useState({
     title: '',
     file: null as File | null
@@ -1025,7 +1096,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
       // Reset the ref to allow useEffect to sync timeRangeValue
       timeRangeValueRef.current = false;
-      
+
       setTimeLogModalMode('view');
       setShowTimeLogModal(true);
       console.log('View modal should be open now with fetched data');
@@ -1142,47 +1213,193 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   };
 
 
-  // Product search function
-  const searchProducts = async (query: string) => {
-    if (query.length < 1) {
+
+
+  const searchProducts = async (query: string): Promise<void> => {
+    if (!query.trim()) {
       setProductSearchResults([]);
       return;
     }
 
     setIsSearchingProducts(true);
     try {
+      // Replace with your actual API call
       const response = await apiClient.searchProductsByQuery(query);
-      console.log('Search API response:', response); // Debug log
-
-      // Filter out custom products (is_custom: true)
-      const filteredProducts = (response.data?.products || []).filter((product: any) =>
-        product.is_custom === false || product.is_custom === undefined
-      );
-
-      console.log('Filtered products:', filteredProducts); // Debug log
-      setProductSearchResults(filteredProducts);
+      setProductSearchResults(response.data.products || []);
     } catch (error) {
       console.error('Error searching products:', error);
-      setProductSearchResults([]);
+      toast.error('Failed to search products');
     } finally {
       setIsSearchingProducts(false);
     }
   };
-
   // Handle product selection
-  const handleProductSelect = (product: any) => {
-    console.log('Selected product:', product); // Debug log
-    setSelectedProduct(product);
-    setMaterialFormData({
-      ...materialFormData,
-      product_id: product.id,
-      material_name: product.product_name || product.name,
-      quantity: product.stock_quantity || 0, // Use stock_quantity from product
-      unit: product.unit || 'pieces', // Use unit from product
-      unit_cost: product.unit_cost || product.price || 0 // Keep for calculation
-    });
-    setProductSearchQuery(product.product_name || product.name);
+  const handleProductSelect = (product: Product): void => {
+    // Check if product already selected
+    const exists = selectedProducts.some(p => p.id === product.id);
+
+    if (!exists) {
+      setSelectedProducts([...selectedProducts, product]);
+      // Initialize quantities for this product
+      setProductQuantities({
+        ...productQuantities,
+        [product.id]: {
+          total_ordered: 0,
+          material_used: 0,
+          return_to_warehouse: false,
+          unit_cost: product.unit_cost || product.price || 0
+        }
+      });
+    }
+
+    // Clear search and close dropdown
+    setProductSearchQuery('');
     setProductSearchResults([]);
+    setShowProductDropdown(false);
+  };
+
+  const handleAddMultipleProducts = async (): Promise<void> => {
+    if (!validateMultipleProducts()) {
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Find existing bluesheet by date
+      const existingBluesheet = job.bluesheets?.find(
+        (bluesheet: any) => bluesheet.date === materialFormData.date
+      );
+
+      // Prepare bulk material entries
+      const materialEntries: MaterialEntry[] = selectedProducts.map(product => ({
+        product_id: product.id,
+        material_name: product.product_name || product.name || '',
+        quantity: product.stock_quantity || 0,
+        unit: product.unit || 'pieces',
+        total_ordered: Number(productQuantities[product.id]?.total_ordered) || 0,
+        material_used: Number(productQuantities[product.id]?.material_used) || 0,
+        supplier_order_id: product.supplier_order_id || '',
+        return_to_warehouse: productQuantities[product.id]?.return_to_warehouse || false,
+        unit_cost: Number(product.unit_cost || product.price || 0), 
+      }));
+
+      if (existingBluesheet) {
+        // Add multiple materials to existing bluesheet
+        const bulkPayload: BulkMaterialPayload = {
+          materials: materialEntries
+        };
+        const completeBluesheetPayload: CompleteBluesheetPayload = {
+          job_id: job.id,
+          date: materialFormData.date,
+          notes: `Daily work bluesheet for ${job.title || 'construction site'}`,
+          additional_charges: 0,
+          status: 'approved',
+          labor_entries: [],
+          material_entries: materialEntries
+        };
+        // await apiClient.createBulkBluesheetMaterials(bulkPayload, existingBluesheet.id);
+        await apiClient.createCompleteBluesheet(completeBluesheetPayload);
+
+        toast.success(`${selectedProducts.length} product(s) added to existing bluesheet successfully!`);
+      }   
+      else {
+        // Create new complete bluesheet with multiple materials
+        const completeBluesheetPayload: CompleteBluesheetPayload = {
+          job_id: job.id,
+          date: materialFormData.date,
+          notes: `Daily work bluesheet for ${job.title || 'construction site'}`,
+          additional_charges: 0,
+          status: 'approved',
+          labor_entries: [],
+          material_entries: materialEntries
+        };
+
+        await apiClient.createCompleteBluesheet(completeBluesheetPayload);
+        toast.success(`New bluesheet created with ${selectedProducts.length} product(s) successfully!`);
+      }
+
+      // Close modal and reset
+      setShowAddMaterialModal(false);
+      resetForm();
+
+      // Refresh job data
+      await refreshJobData();
+    } catch (error) {
+      console.error('Error adding materials:', error);
+      toast.error('Failed to add materials');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Reset form with proper types
+  const resetForm = (): void => {
+    setSelectedProducts([]);
+    setProductQuantities({});
+    setMaterialFormData({
+      product_id: null,
+      material_name: '',
+      quantity: 0,
+      unit: 'pieces',
+      total_ordered: 0,
+      material_used: 0,
+      supplier_order_id: '',
+      return_to_warehouse: false,
+      unit_cost: 0,
+      date: new Date().toISOString().split('T')[0]
+    });
+    setProductSearchQuery('');
+    setMaterialErrors({});
+  };
+
+  const removeSelectedProduct = (productId: number): void => {
+    setSelectedProducts(selectedProducts.filter(p => p.id !== productId));
+    const newQuantities = { ...productQuantities };
+    delete newQuantities[productId];
+    setProductQuantities(newQuantities);
+  };
+
+  const handleQuantityChange = (
+    productId: number,
+    field: keyof ProductQuantity,
+    value: string | number | boolean
+  ): void => {
+    setProductQuantities({
+      ...productQuantities,
+      [productId]: {
+        ...productQuantities[productId],
+        [field]: field === 'return_to_warehouse' ? value : Number(value) || 0
+      }
+    });
+  };
+
+  const validateMultipleProducts = (): boolean => {
+    const errors: MaterialErrors = {};
+
+    if (!materialFormData.date) {
+      errors.date = 'Date is required';
+      setMaterialErrors(errors);
+      toast.error('Please select a date');
+      return false;
+    }
+
+    // Check if any products are selected
+    if (selectedProducts.length === 0) {
+      toast.error('Please select at least one product');
+      return false;
+    }
+
+    // Validate each product has required fields
+    for (const product of selectedProducts) {
+      const quantities = productQuantities[product.id];
+      if (!quantities || (!quantities.total_ordered && !quantities.material_used)) {
+        toast.error(`Please enter quantities for ${product.product_name || product.name}`);
+        return false;
+      }
+    }
+
+    setMaterialErrors({});
+    return true;
   };
 
   const validateMaterialForm = () => {
@@ -1669,7 +1886,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     try {
       // Set flag to prevent useEffect from running
       isRefreshingMaterialsRef.current = true;
-      
+
       const updatedJobData = await apiClient.getJobById(jobId);
       const updatedJobs = jobs.map((j: any) => j.id === jobId ? updatedJobData : j);
       setJobs(updatedJobs);
@@ -1681,7 +1898,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         if (currentJob.bluesheets) {
           setBluesheets(currentJob.bluesheets);
         }
-        
+
         // Fetch materials immediately with the fresh job data
         const bluesheetMaterials: any[] = [];
         if (currentJob.bluesheets && currentJob.bluesheets.length > 0) {
@@ -1779,7 +1996,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     if (isRefreshingMaterialsRef.current) {
       return;
     }
-    
+
     // Only fetch materials if job.bluesheets has actually changed
     if (job.bluesheets) {
       fetchMaterials();
@@ -1925,17 +2142,16 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     date: new Date().toISOString().split('T')[0]
   });
 
-  // Product search states
-  const [productSearchQuery, setProductSearchQuery] = useState('');
-  const [productSearchResults, setProductSearchResults] = useState<any[]>([]);
+  // Product search states 
   const [isSearchingProducts, setIsSearchingProducts] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
-  const [materialErrors, setMaterialErrors] = useState({
-    product: '',
-    date: '',
-    total_ordered: '',
-    material_used: '',
-  });
+  const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
+  const [productQuantities, setProductQuantities] = useState<Record<number, ProductQuantity>>({});
+  const [productSearchResults, setProductSearchResults] = useState<Product[]>([]);
+  const [showProductDropdown, setShowProductDropdown] = useState<boolean>(false);
+  const [productSearchQuery, setProductSearchQuery] = useState<string>('');
+  const [materialErrors, setMaterialErrors] = useState<MaterialErrors>({});
+
 
   const [timeLogFormData, setTimeLogFormData] = useState({
     selectedLabor: null as any,
@@ -5292,8 +5508,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${entry.role === 'lead_labor'
-                                      ? 'bg-purple-100 text-purple-800'
-                                      : 'bg-blue-100 text-blue-800'
+                                    ? 'bg-purple-100 text-purple-800'
+                                    : 'bg-blue-100 text-blue-800'
                                     }`}>
                                     {entry.role === 'lead_labor' ? 'Lead' : 'Labor'}
                                   </span>
@@ -5614,174 +5830,217 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       </Dialog> */}
 
       {/* Add Material Modal */}
-      <Dialog open={showAddMaterialModal} onOpenChange={setShowAddMaterialModal}>
-        <DialogContent className="sm:max-w-[500px]">
+      <Dialog open={showAddMaterialModal} onOpenChange={(open) => {
+        setShowAddMaterialModal(open);
+        if (!open) {
+          resetForm();
+        }
+      }}>
+        <DialogContent className="sm:max-w-[900px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add Product</DialogTitle>
-            <DialogDescription>Add a new product to this job</DialogDescription>
+            <DialogTitle>Add Products to Job</DialogTitle>
+            <DialogDescription>Select multiple products to add to this job</DialogDescription>
           </DialogHeader>
+
           <div className="space-y-4">
             {/* Product Search */}
             <div>
-              <Label className="mb-2">Search Product</Label>
+              <Label className="mb-2">Search and Add Products</Label>
               <div className="relative">
-                <Input
-                  value={productSearchQuery}
-                  onChange={(e) => {
-                    setProductSearchQuery(e.target.value);
-                    searchProducts(e.target.value);
-                  }}
-                  placeholder="Type to search products..."
-                  className={`pr-10 ${materialErrors.product ? 'border-red-500' : ''}`}
-                />
-                {materialErrors.product && (
-                  <p className="text-xs text-red-600 mt-1">{materialErrors.product}</p>
-                )}
-                {isSearchingProducts && (
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                    <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
+                <div className="flex gap-2">
+                  <div className="flex-1 relative">
+                    <Input
+                      value={productSearchQuery}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        setProductSearchQuery(e.target.value);
+                        searchProducts(e.target.value);
+                        setShowProductDropdown(true);
+                      }}
+                      placeholder="Type to search products..."
+                      className={`pr-10 ${materialErrors.product ? 'border-red-500' : ''}`}
+                    />
+                    {isSearchingProducts && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Search Results Dropdown */}
+                {showProductDropdown && productSearchResults.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-80 overflow-y-auto">
+                    {productSearchResults.map((product: Product) => {
+                      const isSelected = selectedProducts.some(p => p.id === product.id);
+                      return (
+                        <div
+                          key={product.id}
+                          className={`p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-200 last:border-b-0 ${isSelected ? 'bg-blue-50' : ''
+                            }`}
+                          onClick={() => handleProductSelect(product)}
+                        >
+                          <div className="flex items-center gap-2">
+                            {isSelected && (
+                              <Check className="w-4 h-4 text-blue-600" />
+                            )}
+                            <div className="flex-1">
+                              <div className="font-medium">{product.product_name || product.name}</div>
+                              <div className="text-sm text-gray-600">
+                                SKU: {product.sku || product.supplier_sku || 'N/A'} •
+                                Unit: {product.unit || 'N/A'} •
+                                Cost: ${product.unit_cost || product.price || 0} •
+                                Stock: {product.stock_quantity || 0}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
+              {materialErrors.product && (
+                <p className="text-xs text-red-600 mt-1">{materialErrors.product}</p>
+              )}
+            </div>
 
-              {/* Search Results Dropdown */}
-              {productSearchResults.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                  {productSearchResults.map((product) => (
-                    <div
-                      key={product.id}
-                      className="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-200 last:border-b-0"
-                      onClick={() => handleProductSelect(product)}
-                    >
-                      <div className="font-medium">{product.product_name || product.name}</div>
-                      <div className="text-sm text-gray-600">
-                        SKU: {product.sku || product.supplier_sku || 'N/A'} • Unit: {product.unit || 'N/A'} • Cost: ${product.unit_cost || product.price || 0}
+            {/* Selected Products List */}
+            {selectedProducts.length > 0 && (
+              <div className="border rounded-md p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="font-medium">Selected Products ({selectedProducts.length})</Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedProducts([]);
+                      setProductQuantities({});
+                    }}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    Clear All
+                  </Button>
+                </div>
+
+                <div className=" max-h-80 overflow-y-auto grid grid-cols-2 gap-3">
+                  {selectedProducts.map((product: Product) => (
+                    <div key={product.id} className="bg-gray-50 p-3 rounded-md">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <span className="font-medium">{product.product_name || product.name}</span>
+                          <span className="text-sm text-gray-600 ml-2">
+                            (SKU: {product.sku || product.supplier_sku || 'N/A'})
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => removeSelectedProduct(product.id)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <Label className="text-xs">Unit Cost</Label>
+                          <div className="font-medium">${product.unit_cost || product.price || 0}</div>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Available Stock</Label>
+                          <div className="font-medium">{product.stock_quantity || 0} {product.unit || 'units'}</div>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Total Ordered</Label>
+                          <Input
+                            type="number"
+                            value={productQuantities[product.id]?.total_ordered || ''}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                              handleQuantityChange(product.id, 'total_ordered', e.target.value)
+                            }
+                            placeholder="Qty"
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Material Used</Label>
+                          <Input
+                            type="number"
+                            value={productQuantities[product.id]?.material_used || ''}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                              handleQuantityChange(product.id, 'material_used', e.target.value)
+                            }
+                            placeholder="Used"
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Return to Warehouse Checkbox for each product */}
+                      <div className="mt-2 flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id={`return_${product.id}`}
+                          checked={productQuantities[product.id]?.return_to_warehouse || false}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            handleQuantityChange(product.id, 'return_to_warehouse', e.target.checked)
+                          }
+                          className="rounded border-gray-300"
+                        />
+                        <Label htmlFor={`return_${product.id}`} className="text-xs">
+                          Return to Warehouse
+                        </Label>
                       </div>
                     </div>
                   ))}
                 </div>
-              )}
-            </div>
-
-            {/* Selected Product Info */}
-            {selectedProduct && (
-              <div className="bg-green-50 p-3 border border-green-200 rounded-md">
-                <div className="flex items-center gap-2 mb-2">
-                  <Package className="w-4 h-4 text-green-600" />
-                  <span className="font-medium text-green-800">Selected Product</span>
-                </div>
-                <div className="text-sm">
-                  <div><strong>Name:</strong> {selectedProduct.product_name || selectedProduct.name}</div>
-                  <div><strong>SKU:</strong> {selectedProduct.sku || selectedProduct.supplier_sku || 'N/A'}</div>
-                  <div><strong>Stock Quantity:</strong> {selectedProduct.stock_quantity || 0}</div>
-                  <div><strong>Unit:</strong> {selectedProduct.unit || 'N/A'}</div>
-                  <div><strong>Unit Cost:</strong> ${selectedProduct.unit_cost || selectedProduct.price || 0}</div>
-                </div>
               </div>
             )}
 
-            {/* Date */}
+            {/* Common Date for all products */}
             <div>
-              <Label className="mb-2">Date</Label>
+              <Label className="mb-2">Date for All Products</Label>
               <Input
                 type="date"
                 value={materialFormData.date}
-                onChange={(e) => setMaterialFormData({ ...materialFormData, date: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setMaterialFormData({ ...materialFormData, date: e.target.value })
+                }
+                className={materialErrors.date ? 'border-red-500' : ''}
               />
               {materialErrors.date && (
                 <p className="text-xs text-red-600 mt-1">{materialErrors.date}</p>
               )}
             </div>
-
-
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* Total Ordered */}
-              <div>
-                <Label className="mb-2">Total Ordered</Label>
-                <Input
-                  type="number"
-                  value={materialFormData.total_ordered === 0 ? "" : materialFormData.total_ordered}
-                  onChange={(e) => setMaterialFormData({ ...materialFormData, total_ordered: Number(e.target.value) })}
-                />
-                {materialErrors.total_ordered && (
-                  <p className="text-xs text-red-600 mt-1">{materialErrors.total_ordered}</p>
-                )}
-              </div>
-
-              {/* Material Used */}
-              <div>
-                <Label className="mb-2">Material Used</Label>
-                <Input
-                  type="number"
-                  value={materialFormData.material_used === 0 ? "" : materialFormData.material_used}
-                  onChange={(e) => setMaterialFormData({ ...materialFormData, material_used: Number(e.target.value) })}
-                />
-                {materialErrors.material_used && (
-                  <p className="text-xs text-red-600 mt-1">{materialErrors.material_used}</p>
-                )}
-              </div>
-            </div>
-
-
-            {/* Return to Warehouse Checkbox */}
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="return_to_warehouse"
-                checked={materialFormData.return_to_warehouse}
-                onChange={(e) => setMaterialFormData({ ...materialFormData, return_to_warehouse: e.target.checked })}
-                className="rounded border-gray-300"
-              />
-              <Label htmlFor="return_to_warehouse" className="text-sm font-medium">
-                Return to Warehouse
-              </Label>
-            </div>
-
-            {/* Total Cost Display */}
-            {/* <div className='bg-blue-100 p-3 border border-blue-300 rounded flex items-center gap-2'>
-              <Building className='w-4 h-4' />
-              <Label>Total Cost: ${(materialFormData.quantity * materialFormData.unit_cost).toFixed(2)}</Label>
-            </div> */}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddMaterialModal(false)} disabled={isLoading}>
+
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => {
+              resetForm();
+              setShowAddMaterialModal(false);
+            }} disabled={isLoading}>
               Cancel
             </Button>
             <Button
               className="bg-primary text-primary-foreground hover:bg-primary/90"
-              onClick={handleAddProduct}
-              disabled={isLoading}
+              onClick={handleAddMultipleProducts}
+              disabled={isLoading || selectedProducts.length === 0}
             >
               {isLoading ? (
                 <div className="flex items-center gap-2">
                   <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                      fill="none"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                    />
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
                   Adding...
                 </div>
               ) : (
-                'Add Product'
+                `Add ${selectedProducts.length} Product${selectedProducts.length > 1 ? 's' : ''}`
               )}
             </Button>
           </DialogFooter>
-
         </DialogContent>
       </Dialog>
 

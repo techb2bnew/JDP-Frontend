@@ -1,5 +1,5 @@
 import { clearAuthData } from "./auth";
-
+import type { BulkMaterialPayload } from '@/types/materials';
 // API utility functions with authentication
 
 const API_BASE_URL = "http://127.0.0.1:3000/api";
@@ -225,8 +225,8 @@ export const apiClient = {
       status: (job.status === "active"
         ? "pending"
         : job.status === "in_progress"
-        ? "in-progress"
-        : job.status) as "pending" | "in-progress" | "completed" | "cancelled",
+          ? "in-progress"
+          : job.status) as "pending" | "in-progress" | "completed" | "cancelled",
       assignedLeadLabor: job.assigned_lead_labor
         ? job.assigned_lead_labor.map((ll: any) => ll.id.toString())
         : [],
@@ -324,15 +324,15 @@ export const apiClient = {
           job.status === "active"
             ? "pending"
             : job.status === "in_progress"
-            ? "in-progress"
-            : job.status,
+              ? "in-progress"
+              : job.status,
         assignedLeadLabor: job.assigned_lead_labor
           ? job.assigned_lead_labor.map((ll: any) => ll.id.toString())
           : [],
         assignedLabor: job.assigned_labor
           ? job.assigned_labor.map(
-              (l: any) => l.user?.full_name || l.labor_code
-            )
+            (l: any) => l.user?.full_name || l.labor_code
+          )
           : [],
         contractor: job.contractor_id
           ? job.contractor_id.toString()
@@ -1063,29 +1063,29 @@ export const apiClient = {
   },
 
   // Get All Products
-getAllProducts: async () => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
+  getAllProducts: async () => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
 
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
 
-  const response = await fetch(`${apiBaseUrl}/products/getAllProducts?is_custom=true`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
+    const response = await fetch(`${apiBaseUrl}/products/getAllProducts?is_custom=true`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to fetch products");
-  }
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to fetch products");
+    }
 
-  return response.json();
-},
+    return response.json();
+  },
 
   // Get All Customers
   getAllCustomers: async () => {
@@ -1229,714 +1229,714 @@ getAllProducts: async () => {
     return response.json();
   },
 
-// Search Products by Status
-searchProductsByStatus: async (status:any) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const response = await fetch(`${apiBaseUrl}/products/searchProducts?status=${status}`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search products by status");
-  }
-
-  return response.json();
-},
-// Search Products by Query
-searchProductsByQuery: async (query:any) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const response = await fetch(`${apiBaseUrl}/products/searchProducts?q=${encodeURIComponent(query)}`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search products by query");
-  }
-
-  return response.json();
-},
-// Search Jobs by Query
-searchJobsByQuery: async (query: string, page = 1, limit = 10) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const url = `${apiBaseUrl}/job/searchJobs?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search jobs by query");
-  }
-
-  return response.json();
-},
-
-// Search Jobs by Job Type
-searchJobsByType: async (jobType: any) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const response = await fetch(`${apiBaseUrl}/job/searchJobs?job_type=${encodeURIComponent(jobType)}`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search jobs by job type");
-  }
-
-  return response.json();
-},
-// Search Jobs by Status
-searchJobsByStatus: async (status: any) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const response = await fetch(`${apiBaseUrl}/job/searchJobs?status=${encodeURIComponent(status)}`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search jobs by status");
-  }
-
-  return response.json();
-},
-// Search Jobs by Priority
-searchJobsByPriority: async (priority: any) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const response = await fetch(`${apiBaseUrl}/job/searchJobs?priority=${encodeURIComponent(priority)}`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search jobs by priority");
-  }
-
-  return response.json();
-},
-
-// Search Orders by Query (email, order ID, etc.)
-searchOrdersByQuery: async (query: string, page = 1, limit = 10) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const url = `${apiBaseUrl}/orders/searchOrders?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search orders by query");
-  }
-
-  return response.json();
-},
-
-// Search Orders by Status
-searchOrdersByStatus: async (status: string, page = 1, limit = 10) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const url = `${apiBaseUrl}/orders/searchOrders?status=${encodeURIComponent(status)}&page=${page}&limit=${limit}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search orders by status");
-  }
-
-  return response.json();
-},
-// Search Orders by Date Range
-searchOrdersByDateRange: async (fromDate: string, toDate: string, page = 1, limit = 10) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const url = `${apiBaseUrl}/orders/searchOrders?order_date_from=${fromDate}&order_date_to=${toDate}&page=${page}&limit=${limit}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search orders by date range");
-  }
-
-  return response.json();
-},
-
-// Search Estimates by Query 
-searchEstimatesByQuery: async (query: string, page = 1, limit = 10) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const url = `${apiBaseUrl}/estimates/searchEstimates?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search estimates by query");
-  }
-
-  return response.json();
-},
-// Search Estimates by Status 
-searchEstimatesByStatus: async (status: string, page = 1, limit = 10) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const url = `${apiBaseUrl}/estimates/searchEstimates?status=${encodeURIComponent(status)}&page=${page}&limit=${limit}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search estimates by status");
-  }
-
-  return response.json();
-},
-// Search Estimates by Invoice Type 
-searchEstimatesByInvoiceType: async (invoiceType: string, page = 1, limit = 10) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const url = `${apiBaseUrl}/estimates/searchEstimates?invoice_type=${encodeURIComponent(invoiceType)}&page=${page}&limit=${limit}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search estimates by invoice type");
-  }
-
-  return response.json();
-},
-// Search Timesheets by Query 
-searchTimesheetsByQuery: async (
-  query: string,
-  page = 1,
-  limit = 10,
-  startDate: string | null = null,
-  endDate: string | null = null,
-  name: string | null = null,
-  status: string | null = null
-) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  // Build query params dynamically
-  const params = new URLSearchParams({
-    q: query,
-    page: page.toString(),
-    limit: limit.toString(),
-  });
-
-  if (startDate) params.append("start_date", startDate);
-  if (endDate) params.append("end_date", endDate);
-  if (name) params.append("name", name);
-  if (status) params.append("status", status);
-
-  const url = `${apiBaseUrl}/job/searchTimesheets?${params.toString()}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search timesheets by query");
-  }
-
-  return response.json();
-},
-
-// Search Timesheets by Status 
-searchTimesheetsByStatus: async (status: string, page = 1, limit = 10, name: string | null = null) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const params = new URLSearchParams({
-    status: status,
-    page: page.toString(),
-    limit: limit.toString(),
-  });
-
-  if (name) params.append("name", name);
-
-  const url = `${apiBaseUrl}/job/searchTimesheets?${params.toString()}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search timesheets by status");
-  }
-
-  return response.json();
-},
-// Search Staff by Query 
-searchStaffByQuery: async (query: string, page = 1, limit = 10) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const url = `${apiBaseUrl}/staff/searchStaff?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search staff");
-  }
-
-  return response.json();
-},
-searchLeadLaborByQuery: async (query: string, page = 1, limit = 10) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const url = `${apiBaseUrl}/lead-labor/searchLeadLabor?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search lead labor");
-  }
-
-  return response.json();
-},
-searchLaborByQuery: async (query: string, page = 1, limit = 10) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const url = `${apiBaseUrl}/labor/searchLabor?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search labor");
-  }
-
-  return response.json();
-},
-searchSuppliersByQuery: async (query: string, page = 1, limit = 10) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const url = `${apiBaseUrl}/suppliers/searchSuppliers?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search suppliers");
-  }
-
-  return response.json();
-},
-searchCutomerByQuery: async (search: string, page = 1, limit = 10) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const url = `${apiBaseUrl}/customer/getCustomers?search=${encodeURIComponent(search)}&page=${page}&limit=${limit}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to get customers");
-  }
-
-  return response.json();
-},
-
-searchStaffByStatus: async (status: string, page = 1, limit = 10) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const url = `${apiBaseUrl}/staff/searchStaff?status=${encodeURIComponent(status)}&page=${page}&limit=${limit}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search staff by status");
-  }
-
-  return response.json();
-},
-searchLeadLaborByStatus: async (status: string, page = 1, limit = 10) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const url = `${apiBaseUrl}/lead-labor/searchLeadLabor?status=${encodeURIComponent(status)}&page=${page}&limit=${limit}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search lead labor by status");
-  }
-
-  return response.json();
-},
-searchLaborByStatus: async (status: string, page = 1, limit = 10) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const url = `${apiBaseUrl}/labor/searchLabor?status=${encodeURIComponent(status)}&page=${page}&limit=${limit}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search labor by status");
-  }
-
-  return response.json();
-},
-searchSuppliersByStatus: async (status: string, page = 1, limit = 10) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const url = `${apiBaseUrl}/suppliers/searchSuppliers?status=${encodeURIComponent(status)}&page=${page}&limit=${limit}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to search suppliers by status");
-  }
-
-  return response.json();
-},
-getCustomersByStatus: async (status: string, page = 1, limit = 10) => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const url = `${apiBaseUrl}/customer/getCustomers?status=${encodeURIComponent(status)}&page=${page}&limit=${limit}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to fetch customers by status");
-  }
-
-  return response.json();
-},
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-approveWeekTimesheet: async ({
-  jobId,
-  laborId,
-  lead_labor_id,
-  startDate,
-  endDate,
-  status,
-}: {
-  jobId: number;
-  laborId: number;
-  lead_labor_id:number;
-  startDate: string;
-  endDate: string;
-  status: string;
-}) => {
-
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
-
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
-
-  const url = `${apiBaseUrl}/job/approveWeekTimesheet`;
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      jobId,
-      laborId,
-      lead_labor_id,
-      startDate,
-      endDate,
-      status,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || "Failed to approve timesheet");
-  }
-
-  return response.json();
-},
-
-  
+  // Search Products by Status
+  searchProductsByStatus: async (status: any) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const response = await fetch(`${apiBaseUrl}/products/searchProducts?status=${status}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search products by status");
+    }
+
+    return response.json();
+  },
+  // Search Products by Query
+  searchProductsByQuery: async (query: any) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const response = await fetch(`${apiBaseUrl}/products/searchProducts?q=${encodeURIComponent(query)}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search products by query");
+    }
+
+    return response.json();
+  },
+  // Search Jobs by Query
+  searchJobsByQuery: async (query: string, page = 1, limit = 10) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const url = `${apiBaseUrl}/job/searchJobs?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search jobs by query");
+    }
+
+    return response.json();
+  },
+
+  // Search Jobs by Job Type
+  searchJobsByType: async (jobType: any) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const response = await fetch(`${apiBaseUrl}/job/searchJobs?job_type=${encodeURIComponent(jobType)}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search jobs by job type");
+    }
+
+    return response.json();
+  },
+  // Search Jobs by Status
+  searchJobsByStatus: async (status: any) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const response = await fetch(`${apiBaseUrl}/job/searchJobs?status=${encodeURIComponent(status)}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search jobs by status");
+    }
+
+    return response.json();
+  },
+  // Search Jobs by Priority
+  searchJobsByPriority: async (priority: any) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const response = await fetch(`${apiBaseUrl}/job/searchJobs?priority=${encodeURIComponent(priority)}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search jobs by priority");
+    }
+
+    return response.json();
+  },
+
+  // Search Orders by Query (email, order ID, etc.)
+  searchOrdersByQuery: async (query: string, page = 1, limit = 10) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const url = `${apiBaseUrl}/orders/searchOrders?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search orders by query");
+    }
+
+    return response.json();
+  },
+
+  // Search Orders by Status
+  searchOrdersByStatus: async (status: string, page = 1, limit = 10) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const url = `${apiBaseUrl}/orders/searchOrders?status=${encodeURIComponent(status)}&page=${page}&limit=${limit}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search orders by status");
+    }
+
+    return response.json();
+  },
+  // Search Orders by Date Range
+  searchOrdersByDateRange: async (fromDate: string, toDate: string, page = 1, limit = 10) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const url = `${apiBaseUrl}/orders/searchOrders?order_date_from=${fromDate}&order_date_to=${toDate}&page=${page}&limit=${limit}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search orders by date range");
+    }
+
+    return response.json();
+  },
+
+  // Search Estimates by Query 
+  searchEstimatesByQuery: async (query: string, page = 1, limit = 10) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const url = `${apiBaseUrl}/estimates/searchEstimates?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search estimates by query");
+    }
+
+    return response.json();
+  },
+  // Search Estimates by Status 
+  searchEstimatesByStatus: async (status: string, page = 1, limit = 10) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const url = `${apiBaseUrl}/estimates/searchEstimates?status=${encodeURIComponent(status)}&page=${page}&limit=${limit}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search estimates by status");
+    }
+
+    return response.json();
+  },
+  // Search Estimates by Invoice Type 
+  searchEstimatesByInvoiceType: async (invoiceType: string, page = 1, limit = 10) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const url = `${apiBaseUrl}/estimates/searchEstimates?invoice_type=${encodeURIComponent(invoiceType)}&page=${page}&limit=${limit}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search estimates by invoice type");
+    }
+
+    return response.json();
+  },
+  // Search Timesheets by Query 
+  searchTimesheetsByQuery: async (
+    query: string,
+    page = 1,
+    limit = 10,
+    startDate: string | null = null,
+    endDate: string | null = null,
+    name: string | null = null,
+    status: string | null = null
+  ) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    // Build query params dynamically
+    const params = new URLSearchParams({
+      q: query,
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+
+    if (startDate) params.append("start_date", startDate);
+    if (endDate) params.append("end_date", endDate);
+    if (name) params.append("name", name);
+    if (status) params.append("status", status);
+
+    const url = `${apiBaseUrl}/job/searchTimesheets?${params.toString()}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search timesheets by query");
+    }
+
+    return response.json();
+  },
+
+  // Search Timesheets by Status 
+  searchTimesheetsByStatus: async (status: string, page = 1, limit = 10, name: string | null = null) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const params = new URLSearchParams({
+      status: status,
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+
+    if (name) params.append("name", name);
+
+    const url = `${apiBaseUrl}/job/searchTimesheets?${params.toString()}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search timesheets by status");
+    }
+
+    return response.json();
+  },
+  // Search Staff by Query 
+  searchStaffByQuery: async (query: string, page = 1, limit = 10) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const url = `${apiBaseUrl}/staff/searchStaff?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search staff");
+    }
+
+    return response.json();
+  },
+  searchLeadLaborByQuery: async (query: string, page = 1, limit = 10) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const url = `${apiBaseUrl}/lead-labor/searchLeadLabor?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search lead labor");
+    }
+
+    return response.json();
+  },
+  searchLaborByQuery: async (query: string, page = 1, limit = 10) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const url = `${apiBaseUrl}/labor/searchLabor?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search labor");
+    }
+
+    return response.json();
+  },
+  searchSuppliersByQuery: async (query: string, page = 1, limit = 10) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const url = `${apiBaseUrl}/suppliers/searchSuppliers?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search suppliers");
+    }
+
+    return response.json();
+  },
+  searchCutomerByQuery: async (search: string, page = 1, limit = 10) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const url = `${apiBaseUrl}/customer/getCustomers?search=${encodeURIComponent(search)}&page=${page}&limit=${limit}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to get customers");
+    }
+
+    return response.json();
+  },
+
+  searchStaffByStatus: async (status: string, page = 1, limit = 10) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const url = `${apiBaseUrl}/staff/searchStaff?status=${encodeURIComponent(status)}&page=${page}&limit=${limit}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search staff by status");
+    }
+
+    return response.json();
+  },
+  searchLeadLaborByStatus: async (status: string, page = 1, limit = 10) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const url = `${apiBaseUrl}/lead-labor/searchLeadLabor?status=${encodeURIComponent(status)}&page=${page}&limit=${limit}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search lead labor by status");
+    }
+
+    return response.json();
+  },
+  searchLaborByStatus: async (status: string, page = 1, limit = 10) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const url = `${apiBaseUrl}/labor/searchLabor?status=${encodeURIComponent(status)}&page=${page}&limit=${limit}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search labor by status");
+    }
+
+    return response.json();
+  },
+  searchSuppliersByStatus: async (status: string, page = 1, limit = 10) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const url = `${apiBaseUrl}/suppliers/searchSuppliers?status=${encodeURIComponent(status)}&page=${page}&limit=${limit}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to search suppliers by status");
+    }
+
+    return response.json();
+  },
+  getCustomersByStatus: async (status: string, page = 1, limit = 10) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const url = `${apiBaseUrl}/customer/getCustomers?status=${encodeURIComponent(status)}&page=${page}&limit=${limit}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to fetch customers by status");
+    }
+
+    return response.json();
+  },
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  approveWeekTimesheet: async ({
+    jobId,
+    laborId,
+    lead_labor_id,
+    startDate,
+    endDate,
+    status,
+  }: {
+    jobId: number;
+    laborId: number;
+    lead_labor_id: number;
+    startDate: string;
+    endDate: string;
+    status: string;
+  }) => {
+
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const url = `${apiBaseUrl}/job/approveWeekTimesheet`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        jobId,
+        laborId,
+        lead_labor_id,
+        startDate,
+        endDate,
+        status,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to approve timesheet");
+    }
+
+    return response.json();
+  },
+
+
 
   // Get Estimate By Id
   getEstimateById: async (id: number) => {
@@ -1989,31 +1989,31 @@ approveWeekTimesheet: async ({
   },
 
 
-getTimesheetDashboardStats: async () => {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  const token = getAuthToken();
+  getTimesheetDashboardStats: async () => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
 
-  if (!token) {
-    throw new Error("No authentication token found");
-  }
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
 
-  const response = await fetch(`${apiBaseUrl}/job/getTimesheetDashboardStats`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
+    const response = await fetch(`${apiBaseUrl}/job/getTimesheetDashboardStats`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-  if (!response.ok) {
-    throw new Error("Failed to fetch timesheet dashboard stats");
-  }
+    if (!response.ok) {
+      throw new Error("Failed to fetch timesheet dashboard stats");
+    }
 
-  console.log("Fetch Timesheet Dashboard Stats", response);
-  return response.json();
-},
+    console.log("Fetch Timesheet Dashboard Stats", response);
+    return response.json();
+  },
 
-  
+
 
   getProjectSummary: async (jobId: string | number) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -2583,14 +2583,6 @@ getTimesheetDashboardStats: async () => {
     email_address: string;
     estimate_date: string;
 
-    materials_cost: number;
-    labor_cost: number;
-    additional_costs: number;
-    subtotal: number;
-    tax_percentage: number;
-    tax_amount: number;
-    total_amount: number;
-
     status: string;
     invoice_type: string;
     invoice_number: string;
@@ -2599,19 +2591,7 @@ getTimesheetDashboardStats: async () => {
 
     job_id: number;
 
-    // additional_cost: {
-    //   description: string;
-    //   amount: number;
-    // };
-
-    custom_labor: {
-      full_name: string;
-      email: string;
-      hours_worked: number;
-      hourly_rate: number;
-      job_id: number;
-      is_custom: boolean;
-    }[];
+    total_amount: number;
 
     custom_products: {
       product_name: string;
@@ -2640,7 +2620,7 @@ getTimesheetDashboardStats: async () => {
       },
       body: JSON.stringify(estimateData),
     });
- 
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.message || "Failed to create estimate");
@@ -2770,7 +2750,7 @@ getTimesheetDashboardStats: async () => {
     notes: string;
     date_of_joining: string;
     is_custom: boolean;
-    total_cost:number;
+    total_cost: number;
   }) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
     const token = getAuthToken();
@@ -2992,7 +2972,7 @@ getTimesheetDashboardStats: async () => {
 
   // Bluesheet Labor Management APIs
   addLaborToBluesheet: async (bluesheetId: number, laborData: any) => {
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL; 
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
     const response = await fetch(`${apiBaseUrl}/bluesheet/bluesheet/${bluesheetId}/labor`, {
       method: 'POST',
       headers: {
@@ -3049,6 +3029,28 @@ getTimesheetDashboardStats: async () => {
     return response.json();
   },
 
+  // Add this to your apiClient
+// Add this to your apiClient
+createBulkBluesheetMaterials: async (bulkData: BulkMaterialPayload, bluesheetId: number): Promise<any> => {
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+
+  const response = await fetch(`${apiBaseUrl}/bluesheet/bluesheet/${bluesheetId}/material`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${getAuthToken()}`,
+    },
+    body: JSON.stringify(bulkData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || "Failed to create bulk bluesheet materials");
+  }
+
+  return response.json();
+},
+
   createBluesheetMaterial: async (materialData: any, bluesheetId: number) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 
@@ -3094,7 +3096,7 @@ getTimesheetDashboardStats: async () => {
 
     const response = await fetch(`${apiBaseUrl}/bluesheet/material/${materialId}`, {
       method: 'DELETE',
-      headers: { 
+      headers: {
         'Authorization': `Bearer ${getAuthToken()}`,
       },
     });
@@ -3149,7 +3151,7 @@ getTimesheetDashboardStats: async () => {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(
         errorData.message ||
-          "Failed to auto-fetch supplier invoice from email"
+        "Failed to auto-fetch supplier invoice from email"
       );
     }
 
@@ -3175,6 +3177,57 @@ getTimesheetDashboardStats: async () => {
     }
 
     return response.json();
+  },
+  // Update/Create Bluesheet Materials
+  updateBluesheetMaterials: async (bluesheetId: number, materials: any[]) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+
+    const payload = {
+      materials: materials.map((item: any) => {
+        const base: any = {
+          material_name: item.material_name,
+          unit: item.unit || 'pieces',
+          total_ordered: item.total_ordered || 0,
+          material_used: item.material_used || 0,
+          unit_cost: item.unit_cost || 0,
+          supplier_order_id: item.supplier_order_id || '',
+          return_to_warehouse: item.return_to_warehouse || false,
+          date: item.date || new Date().toISOString().split('T')[0],
+          product_id: item.product_id || null,
+        }
+
+
+        // Add total_cost if exists
+        if (item.total_cost) {
+          base.total_cost = item.total_cost
+        }
+        // Existing material — id bajao
+        if (item.id && String(item.id).length < 13 && !item._isNew) {
+          base.id = item.id
+        }
+
+        return base
+      })
+    }
+
+    const response = await fetch(
+      `${apiBaseUrl}/bluesheet/bluesheet/${bluesheetId}/materialupdatecreate`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
+        body: JSON.stringify(payload),
+      }
+    )
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.message || 'Failed to update bluesheet materials')
+    }
+
+    return response.json()
   },
 
   deleteProductFromEstimate: async (estimateProductId: number) => {
