@@ -24,8 +24,8 @@ import jsPDF from 'jspdf'
 import { globalApiCall } from '../utils/globalApiHandler'
 import { usePermissions } from '../contexts/PermissionContext'
 import { ArrowUpAZ, Edit, Trash2 } from 'lucide-react'
-import { 
-  ChevronDown, 
+import {
+  ChevronDown,
   ChevronRight,
   User,
   MapPin,
@@ -907,7 +907,16 @@ export function ContractorListingPage() {
   const [expandedSubJobs, setExpandedSubJobs] = useState<Set<string>>(new Set())
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [invoiceSubJob, setInvoiceSubJob] = useState<SubJob | null>(null)
-  
+  const [customersWithJobs, setCustomersWithJobs] = useState<any[]>([])
+  const [allCustomersWithJobs, setAllCustomersWithJobs] = useState<any[]>([]) // Store original list for filtering
+  const [paginatedCustomers, setPaginatedCustomers] = useState<any[]>([])
+
+  const [showChangeOrderModal, setShowChangeOrderModal] = useState(false);
+  const [changeOrderJob, setChangeOrderJob] = useState<any>(null);
+  const [changeOrderTitle, setChangeOrderTitle] = useState('');
+  const [changeOrderEstimate, setChangeOrderEstimate] = useState<number | string>('');
+  const [isUpdatingChangeOrder, setIsUpdatingChangeOrder] = useState(false);
+  const [changeOrderErrors, setChangeOrderErrors] = useState<Record<string, string>>({});
   // Create Contract Modal State
   const [showCreateContractModal, setShowCreateContractModal] = useState(false)
   const [contractFormData, setContractFormData] = useState({
@@ -919,7 +928,7 @@ export function ContractorListingPage() {
     company_name: '',
     status: 'active'
   })
-  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({})
+  const [validationErrors, setValidationErrors] = useState<{ [key: string]: string }>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Contractor Listing State
@@ -949,7 +958,7 @@ export function ContractorListingPage() {
   const fetchContractorsData = async () => {
     try {
       setIsLoadingContractors(true)
-      
+
       const response = await globalApiCall(`${apiBaseUrl}/contractor/getContractors?include_jobs=true&page=${currentPage}&limit=${itemsPerPage}`, {
         method: 'GET'
       })
@@ -980,19 +989,19 @@ export function ContractorListingPage() {
   const filteredContractors = contractors
     .filter(contractor => {
       const matchesSearch = contractor.contractor_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           contractor.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           contractor.company_name?.toLowerCase().includes(searchTerm.toLowerCase())
-      
+        contractor.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        contractor.company_name?.toLowerCase().includes(searchTerm.toLowerCase())
+
       const matchesStatus = statusFilter === 'all' || contractor.status === statusFilter
-      
+
       return matchesSearch && matchesStatus
     })
     .sort((a, b) => {
       if (!sortBy) return 0
-      
+
       const aValue = a[sortBy] || ''
       const bValue = b[sortBy] || ''
-      
+
       if (sortOrder === 'asc') {
         return aValue.toString().localeCompare(bValue.toString())
       } else {
@@ -1067,10 +1076,10 @@ export function ContractorListingPage() {
         method: 'GET'
       })
       const responseData = await response.json()
-      
+
       if (responseData.success) {
         const contractorData = responseData.data
-        
+
         // Fetch job details for each sub-job like JobManagementPage does
         const jobsWithDetails = await Promise.all(
           contractorData.subJobs.map(async (subJob: any) => {
@@ -1080,10 +1089,10 @@ export function ContractorListingPage() {
               })
               const jobDetailsData = await jobDetailsResponse.json()
               const jobData = jobDetailsData.success ? jobDetailsData.data : subJob
-              
+
               // Parse labor IDs and fetch labor details
               let assignedLaborDetails = []
-              
+
               if (jobData.assigned_labor_ids) {
                 try {
                   const laborIds = JSON.parse(jobData.assigned_labor_ids)
@@ -1106,7 +1115,7 @@ export function ContractorListingPage() {
                   console.error('Error parsing labor IDs:', error)
                 }
               }
-              
+
               return {
                 ...jobData,
                 assignedLaborDetails
@@ -1117,13 +1126,13 @@ export function ContractorListingPage() {
             }
           })
         )
-        
+
         // Update contractor data with fetched job details
         const updatedContractorData = {
           ...contractorData,
           subJobs: jobsWithDetails
         }
-        
+
         setSelectedContractor(updatedContractorData)
         setShowContractorDetails(true)
       } else {
@@ -1160,7 +1169,7 @@ export function ContractorListingPage() {
     if (!contractorToDelete) return
 
     setIsDeleting(true)
-    try { 
+    try {
       const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -1249,24 +1258,24 @@ export function ContractorListingPage() {
 
   // Validation function
   const validateForm = () => {
-    const errors: {[key: string]: string} = {}
-    
+    const errors: { [key: string]: string } = {}
+
     if (!contractFormData.contractor_name.trim()) {
       errors.contractor_name = 'Contractor name is required'
     }
-    
+
     if (!contractFormData.email.trim()) {
       errors.email = 'Email is required'
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contractFormData.email)) {
       errors.email = 'Please enter a valid email address'
     }
-    
+
     if (!contractFormData.phone.trim()) {
       errors.phone = 'Phone number is required'
     } else if (!/^\d{10}$/.test(contractFormData.phone.replace(/\D/g, ''))) {
       errors.phone = 'Phone number must be exactly 10 digits'
     }
-    
+
     setValidationErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -1316,10 +1325,10 @@ export function ContractorListingPage() {
       }
 
       // Call API - Create or Update
-      const apiUrl = isEditMode 
+      const apiUrl = isEditMode
         ? `${apiBaseUrl}/contractor/updateContractor/${editingContractor.id}`
         : `${apiBaseUrl}/contractor/createContractor`
-      
+
       const response = await globalApiCall(apiUrl, {
         method: 'POST',
         headers: {
@@ -1335,7 +1344,7 @@ export function ContractorListingPage() {
         const successMessage = isEditMode ? 'Contractor updated successfully!' : 'Contractor created successfully!'
         toast.success(successMessage)
         setShowCreateContractModal(false)
-        
+
         // Reset form and edit state
         setContractFormData({
           contractor_name: '',
@@ -1433,14 +1442,14 @@ export function ContractorListingPage() {
     setSelectedContractor(contractorId)
     setSelectedJob(jobId)
     setSelectedSubJob(null)
-    
+
     // Clear previous enhanced job data
     setEnhancedJobData(null)
-    
+
     // Fetch enhanced job data for the main job
-    try { 
-      const jobDetails = await apiClient.getJobById(jobId) 
-      
+    try {
+      const jobDetails = await apiClient.getJobById(jobId)
+
       // Store the enhanced job data for use in JobDetailsPage
       setEnhancedJobData(jobDetails)
       console.log('Enhanced main job data set:', jobDetails)
@@ -1450,19 +1459,19 @@ export function ContractorListingPage() {
   }
 
   const selectSubJob = async (subJobId: string, jobId: string, contractorId: string) => {
-   
-    
+
+
     setSelectedContractor(contractorId)
     setSelectedJob(jobId)
     setSelectedSubJob(subJobId)
-    
+
     // Clear previous enhanced job data
     setEnhancedJobData(null)
-    
+
     // Fetch the latest job details from API exactly like JobManagementPage does
-    try { 
-      const jobDetails = await apiClient.getJobById(subJobId) 
-      
+    try {
+      const jobDetails = await apiClient.getJobById(subJobId)
+
       // Store the enhanced job data for use in JobDetailsPage
       setEnhancedJobData(jobDetails)
       console.log('Enhanced job data set:', jobDetails)
@@ -1485,7 +1494,7 @@ export function ContractorListingPage() {
     try {
       // First try to open a new window
       const printWindow = window.open('', '_blank', 'width=800,height=600')
-      
+
       if (!printWindow) {
         // If popup is blocked, use alternative method
         toast.error('Popup blocked. Using alternative print method...')
@@ -1495,7 +1504,7 @@ export function ContractorListingPage() {
 
       // Generate the HTML content for printing
       const printContent = generateInvoiceHTML(invoiceSubJob, selectedJobData, selectedContractorData)
-      
+
       printWindow.document.write(`
         <!DOCTYPE html>
         <html>
@@ -1669,20 +1678,20 @@ export function ContractorListingPage() {
         </body>
         </html>
       `)
-      
+
       printWindow.document.close()
-      
+
       // Wait for content to load, then print
       setTimeout(() => {
         try {
           printWindow.focus()
           printWindow.print()
-          
+
           // Close window after a delay to allow printing
           setTimeout(() => {
             printWindow.close()
           }, 1000)
-          
+
           toast.success('Print dialog opened successfully!')
         } catch (error) {
           console.error('Error in print timeout:', error)
@@ -1706,14 +1715,14 @@ export function ContractorListingPage() {
     try {
       // Create a temporary div with print content
       const printContent = generateInvoiceHTML(invoiceSubJob, selectedJobData, selectedContractorData)
-      
+
       // Create a temporary container
       const tempDiv = document.createElement('div')
       tempDiv.innerHTML = printContent
       tempDiv.style.position = 'absolute'
       tempDiv.style.left = '-9999px'
       tempDiv.style.top = '-9999px'
-      
+
       // Add print styles
       const printStyles = document.createElement('style')
       printStyles.textContent = `
@@ -1734,7 +1743,7 @@ export function ContractorListingPage() {
           }
         }
       `
-      
+
       // Add classes and styles
       tempDiv.className = 'print-invoice'
       tempDiv.style.fontFamily = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
@@ -1745,20 +1754,20 @@ export function ContractorListingPage() {
       tempDiv.style.padding = '20px'
       tempDiv.style.maxWidth = '800px'
       tempDiv.style.margin = '0 auto'
-      
+
       // Add to document
       document.head.appendChild(printStyles)
       document.body.appendChild(tempDiv)
-      
+
       // Print
       window.print()
-      
+
       // Clean up
       setTimeout(() => {
         document.body.removeChild(tempDiv)
         document.head.removeChild(printStyles)
       }, 1000)
-      
+
       toast.success('Print dialog opened successfully!')
     } catch (error) {
       console.error('Error in alternative print method:', error)
@@ -1933,22 +1942,22 @@ export function ContractorListingPage() {
       const pdf = new jsPDF('p', 'mm', 'a4')
       const pageWidth = pdf.internal.pageSize.getWidth()
       const pageHeight = pdf.internal.pageSize.getHeight()
-      
+
       // Set font
       pdf.setFont('helvetica')
-      
+
       // Colors
       const primaryColor: [number, number, number] = [59, 130, 246] // Blue
       const textColor: [number, number, number] = [55, 65, 81] // Gray-700
       const lightGray: [number, number, number] = [243, 244, 246] // Gray-100
-      
+
       let yPosition = 20
-      
+
       // Header
       pdf.setFontSize(24)
       pdf.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2])
       pdf.text('INVOICE', 20, yPosition)
-      
+
       // Invoice details
       pdf.setFontSize(10)
       pdf.setTextColor(textColor[0], textColor[1], textColor[2])
@@ -1958,7 +1967,7 @@ export function ContractorListingPage() {
       pdf.text(`Issue Date: ${formatDate(invoiceSubJob.invoices[0]?.issueDate || new Date().toISOString())}`, 20, yPosition)
       yPosition += 5
       pdf.text(`Due Date: ${formatDate(invoiceSubJob.invoices[0]?.dueDate || new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString())}`, 20, yPosition)
-      
+
       // Company details (right side)
       pdf.setFontSize(12)
       pdf.text('JDP Corporation', pageWidth - 20, 20, { align: 'right' })
@@ -1967,9 +1976,9 @@ export function ContractorListingPage() {
       pdf.text('City, State 12345', pageWidth - 20, 30, { align: 'right' })
       pdf.text('Phone: (555) 123-4567', pageWidth - 20, 35, { align: 'right' })
       pdf.text('Email: billing@jdpcorp.com', pageWidth - 20, 40, { align: 'right' })
-      
+
       yPosition = 60
-      
+
       // Bill To section
       pdf.setFontSize(12)
       pdf.text('Bill To:', 20, yPosition)
@@ -1978,7 +1987,7 @@ export function ContractorListingPage() {
       pdf.text(selectedJobData.customer?.customer_name || selectedJobData.customer?.company_name || 'N/A', 20, yPosition)
       yPosition += 5
       pdf.text(selectedJobData.location, 20, yPosition)
-      
+
       // Job Details section
       yPosition = 60
       pdf.setFontSize(12)
@@ -1992,14 +2001,14 @@ export function ContractorListingPage() {
       pdf.text(`Contractor: ${selectedContractorData.name}`, pageWidth - 20, yPosition, { align: 'right' })
       yPosition += 5
       pdf.text(`Completion: ${invoiceSubJob.completedDate ? formatDate(invoiceSubJob.completedDate) : 'In Progress'}`, pageWidth - 20, yPosition, { align: 'right' })
-      
+
       yPosition = 100
-      
+
       // Materials Used section
       pdf.setFontSize(12)
       pdf.text('Materials Used', 20, yPosition)
       yPosition += 10
-      
+
       // Table header
       pdf.setFillColor(lightGray[0], lightGray[1], lightGray[2])
       pdf.rect(20, yPosition - 5, pageWidth - 40, 8, 'F')
@@ -2010,36 +2019,36 @@ export function ContractorListingPage() {
       pdf.text('Unit Price', 140, yPosition)
       pdf.text('Total', pageWidth - 30, yPosition, { align: 'right' })
       yPosition += 8
-      
+
       // Materials data
       const materialsUsed = invoiceSubJob.orders.filter(order => order.quantityUsed > 0)
       let totalMaterialCost = 0
-      
+
       materialsUsed.forEach((order) => {
         const total = order.unitPrice * order.quantityUsed
         totalMaterialCost += total
-        
+
         pdf.text(order.sku, 22, yPosition)
         pdf.text(order.name, 50, yPosition)
         pdf.text(order.quantityUsed.toString(), 120, yPosition)
         pdf.text(`$${order.unitPrice.toFixed(2)}`, 140, yPosition)
         pdf.text(`$${total.toFixed(2)}`, pageWidth - 30, yPosition, { align: 'right' })
         yPosition += 6
-        
+
         // Check if we need a new page
         if (yPosition > pageHeight - 50) {
           pdf.addPage()
           yPosition = 20
         }
       })
-      
+
       yPosition += 10
-      
+
       // Labor section
       pdf.setFontSize(12)
       pdf.text('Labor', 20, yPosition)
       yPosition += 10
-      
+
       // Labor table header
       pdf.setFillColor(lightGray[0], lightGray[1], lightGray[2])
       pdf.rect(20, yPosition - 5, pageWidth - 40, 8, 'F')
@@ -2050,68 +2059,68 @@ export function ContractorListingPage() {
       pdf.text('Rate', 130, yPosition)
       pdf.text('Total', pageWidth - 30, yPosition, { align: 'right' })
       yPosition += 8
-      
+
       // Labor data
       const approvedTimesheets = invoiceSubJob.timesheets.filter(ts => ts.approved)
       let totalLaborCost = 0
-      
+
       approvedTimesheets.forEach((timesheet) => {
         totalLaborCost += timesheet.totalAmount
-        
+
         pdf.text(timesheet.laborName, 22, yPosition)
         pdf.text(formatDate(timesheet.date), 80, yPosition)
         pdf.text(`${timesheet.hoursWorked}h`, 110, yPosition)
         pdf.text(`$${timesheet.hourlyRate.toFixed(2)}/h`, 130, yPosition)
         pdf.text(`$${timesheet.totalAmount.toFixed(2)}`, pageWidth - 30, yPosition, { align: 'right' })
         yPosition += 6
-        
+
         // Check if we need a new page
         if (yPosition > pageHeight - 50) {
           pdf.addPage()
           yPosition = 20
         }
       })
-      
+
       yPosition += 20
-      
+
       // Invoice summary
       const subtotal = totalMaterialCost + totalLaborCost
       const taxRate = 0.08
       const taxAmount = subtotal * taxRate
       const totalAmount = subtotal + taxAmount
-      
+
       // Summary box
       const summaryWidth = 80
       const summaryX = pageWidth - summaryWidth - 20
-      
+
       pdf.setFillColor(lightGray[0], lightGray[1], lightGray[2])
       pdf.rect(summaryX, yPosition - 5, summaryWidth, 35, 'F')
-      
+
       pdf.setFontSize(10)
       pdf.text('Materials Subtotal:', summaryX + 5, yPosition)
       pdf.text(`$${totalMaterialCost.toFixed(2)}`, summaryX + summaryWidth - 5, yPosition, { align: 'right' })
       yPosition += 6
-      
+
       pdf.text('Labor Subtotal:', summaryX + 5, yPosition)
       pdf.text(`$${totalLaborCost.toFixed(2)}`, summaryX + summaryWidth - 5, yPosition, { align: 'right' })
       yPosition += 6
-      
+
       pdf.text('Subtotal:', summaryX + 5, yPosition)
       pdf.text(`$${subtotal.toFixed(2)}`, summaryX + summaryWidth - 5, yPosition, { align: 'right' })
       yPosition += 6
-      
+
       pdf.text('Tax (8%):', summaryX + 5, yPosition)
       pdf.text(`$${taxAmount.toFixed(2)}`, summaryX + summaryWidth - 5, yPosition, { align: 'right' })
       yPosition += 6
-      
+
       pdf.setFontSize(12)
       pdf.setFont('helvetica', 'bold')
       pdf.text('Total Amount:', summaryX + 5, yPosition)
       pdf.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2])
       pdf.text(`$${totalAmount.toFixed(2)}`, summaryX + summaryWidth - 5, yPosition, { align: 'right' })
-      
+
       yPosition += 20
-      
+
       // Payment terms
       pdf.setTextColor(textColor[0], textColor[1], textColor[2])
       pdf.setFont('helvetica', 'normal')
@@ -2121,14 +2130,14 @@ export function ContractorListingPage() {
       pdf.text('Payment is due within 14 days of invoice date. Late payments may be subject to a 1.5% monthly service charge.', 20, yPosition)
       yPosition += 6
       pdf.text('Thank you for your business!', 20, yPosition)
-      
+
       // Generate filename
       const invoiceNumber = invoiceSubJob.invoices[0]?.invoiceNumber || `INV-${invoiceSubJob.id}`
       const filename = `${invoiceNumber}_${(selectedJobData.customer?.customer_name || selectedJobData.customer?.company_name || 'Customer').replace(/\s+/g, '_')}.pdf`
-      
+
       // Download the PDF
       pdf.save(filename)
-      
+
       toast.success('Invoice PDF downloaded successfully!')
     } catch (error) {
       console.error('Error generating PDF:', error)
@@ -2143,7 +2152,7 @@ export function ContractorListingPage() {
 
   const getStatusBadge = (status: string, type: 'job' | 'invoice' | 'approval' | 'transaction' | 'order' = 'job') => {
     const baseClasses = "text-xs font-medium"
-    
+
     if (type === 'job') {
       switch (status) {
         case 'complete':
@@ -2231,13 +2240,134 @@ export function ContractorListingPage() {
     }
   }
 
+
+
+  // Change order
+  const handleChangeOrderClick = (job: any, contractorId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent job selection
+    setChangeOrderJob({
+      ...job,  // Store the entire job object
+      contractorId: contractorId,
+      originalId: job.id // Store original ID for reference
+    });
+    // Set default title as "Change Order - [Original Title]"
+    setChangeOrderTitle(`${''}`);
+    setChangeOrderEstimate(job.estimated_cost || job.estimatedCost || '');
+    setChangeOrderErrors({});
+    setShowChangeOrderModal(true);
+  };
+
+  const handleChangeOrderSave = async () => {
+    // Validate
+    const errors: Record<string, string> = {};
+    if (!changeOrderTitle.trim()) {
+      errors.title = 'Job title is required';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setChangeOrderErrors(errors);
+      return;
+    }
+
+    setIsUpdatingChangeOrder(true);
+    try {
+      // Original job data
+      const originalJob = changeOrderJob;
+
+      // Prepare payload for NEW JOB (Change Order)
+      // Copy most fields from original job but with new title
+      const payload: any = {
+        job_title: changeOrderTitle, // New title
+        job_type: originalJob.job_type || originalJob.type || 'service_based',
+        description: originalJob.description || '',
+        priority: originalJob.priority || 'medium',
+        address: originalJob.address || '',
+        city_zip: originalJob.city_zip || originalJob.cityZip || '',
+        phone: originalJob.phone || '',
+        email: originalJob.email || '',
+        bill_to_address: originalJob.bill_to_address || originalJob.billToAddress || '',
+        bill_to_city_zip: originalJob.bill_to_city_zip || originalJob.billToCityZip || '',
+        bill_to_phone: originalJob.bill_to_phone || originalJob.billToPhone || '',
+        bill_to_email: originalJob.bill_to_email || originalJob.billToEmail || '',
+        same_as_address: originalJob.same_as_address || originalJob.sameAsAddress || false,
+        due_date: originalJob.due_date || originalJob.dueDate || '',
+        // estimated_hours: originalJob.estimated_hours || originalJob.estimatedHours || 0, 
+        estimated_cost: Number(changeOrderEstimate),
+        status: 'pending', // New job starts as pending
+
+        // Copy assigned labor if exists
+        assigned_lead_labor_ids: originalJob.assigned_lead_labor_ids ||
+          (originalJob.assignedLeadLabor ? JSON.stringify(originalJob.assignedLeadLabor) : undefined),
+        assigned_labor_ids: originalJob.assigned_labor_ids ||
+          (originalJob.assignedLabor ? JSON.stringify(originalJob.assignedLabor) : undefined),
+
+      };
+
+      // Add customer_id or contractor_id based on job type
+      if (originalJob.job_type === 'service_based' || originalJob.type === 'service-based') {
+        payload.customer_id = originalJob.customer_id || originalJob.customer;
+      } else {
+        payload.contractor_id = originalJob.contractor_id || originalJob.contractor;
+      }
+
+      console.log('Creating change order with payload:', payload);
+
+      // Call API to CREATE NEW JOB (not update)
+      const response = await apiClient.createJob(payload); // Remove changeOrderJob.id
+      console.log('Change order creation response:', response);
+
+      // Get the newly created job from response
+      const newJob = response.data || response;
+
+      // Update Local State - Add the new job to the list
+      setCustomersWithJobs(prevCustomers => {
+        return prevCustomers.map(customer => {  
+          if (customer.id.toString() === changeOrderJob.customerId) {
+            // Add the new job to the customer's jobs list
+            const updatedJobs = [...(customer.jobs || [])];
+
+            // Check if this job should be a subjob of the original
+            // For now, add as a main job
+            updatedJobs.push({
+              ...newJob,
+              id: newJob.id,
+              job_title: changeOrderTitle,
+              estimated_cost: Number(changeOrderEstimate),
+              title: changeOrderTitle,
+              isChangeOrder: true,
+              originalJobId: originalJob.id
+            });
+
+            return {
+              ...customer,
+              jobs: updatedJobs
+            };
+          }
+          return customer;
+        });
+      });
+
+      toast.success('Change order created successfully!');
+      fetchContractorsData();
+      setShowChangeOrderModal(false);
+      setChangeOrderJob(null);
+      setChangeOrderTitle('');
+    } catch (error) {
+      console.error('Error creating change order:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to create change order');
+    } finally {
+      setIsUpdatingChangeOrder(false);
+    }
+  };
+
+
   const selectedContractorData = selectedContractor ? contractors.find(c => c.id.toString() === selectedContractor) : null
   const selectedJobData = selectedJob ? selectedContractorData?.jobs.find((j: Job) => j.id.toString() === selectedJob) : null
   console.log(selectedJobData, 'selectedJobData')
   console.log(selectedContractorData, 'selectedContractorData')
   const SubJobDetails = ({ subJob }: { subJob: SubJob }) => {
     const isExpanded = expandedSubJobs.has(subJob.id.toString())
-    
+
     return (
       <Card className="mt-4 border-l-4 border-l-primary bg-gradient-to-r from-primary/5 to-transparent">
         <Collapsible open={isExpanded} onOpenChange={() => toggleSubJob(subJob.id.toString())}>
@@ -2591,7 +2721,7 @@ export function ContractorListingPage() {
                       <Receipt className="h-4 w-4 text-indigo-600" />
                       Invoices
                     </CardTitle>
-                    <Button 
+                    <Button
                       onClick={() => handleGenerateInvoice(subJob)}
                       className="bg-primary hover:bg-primary/90 text-primary-foreground"
                       size="sm"
@@ -2639,7 +2769,7 @@ export function ContractorListingPage() {
                     <div className="text-center py-6">
                       <Receipt className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                       <p className="text-sm text-muted-foreground mb-3">No invoices generated yet</p>
-                      <Button 
+                      <Button
                         onClick={() => handleGenerateInvoice(subJob)}
                         variant="outline"
                         size="sm"
@@ -2662,7 +2792,7 @@ export function ContractorListingPage() {
   return (
     <div className="h-full flex">
       {/* Left Sidebar - Contractor Listings */}
-<div className="w-80 bg-gray-50 border-r border-gray-200 flex flex-col sticky top-0 h-screen">
+      <div className="w-80 bg-gray-50 border-r border-gray-200 flex flex-col sticky top-0 h-screen">
         {/* Sidebar Header */}
         <div className="p-4 border-b border-gray-200 bg-white">
           <div className="flex items-center gap-3">
@@ -2678,8 +2808,8 @@ export function ContractorListingPage() {
 
         {/* Search */}
         <div className="p-4 bg-white border-b border-gray-200">
-          <input 
-            type="text" 
+          <input
+            type="text"
             placeholder="Search contractors or jobs..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -2704,9 +2834,8 @@ export function ContractorListingPage() {
                     <CollapsibleTrigger asChild>
                       <Button
                         variant="ghost"
-                        className={`w-full justify-start p-3 text-left h-auto hover:bg-blue-50 ${
-                          isSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
-                        }`}
+                        className={`w-full justify-start p-3 text-left h-auto hover:bg-blue-50 ${isSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
+                          }`}
                         onClick={() => selectContractor(contractor.id.toString())}
                       >
                         <div className=" w-full">
@@ -2774,13 +2903,12 @@ export function ContractorListingPage() {
                                   <CollapsibleTrigger asChild>
                                     <Button
                                       variant="ghost"
-                                      className={`w-full justify-start p-2 text-left h-auto text-sm hover:bg-blue-50 ${
-                                        isJobSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
-                                      }`}
+                                      className={`w-full justify-start p-2 text-left h-auto text-sm hover:bg-blue-50 ${isJobSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
+                                        }`}
                                       onClick={() => selectJob(job.id.toString(), contractor.id.toString())}
                                     >
                                       <div className="flex items-center justify-between w-full">
-                                        <div className="flex items-center gap-2"> 
+                                        <div className="flex items-center gap-2">
                                           {hasSubJobs && (
                                             isJobExpanded ? (
                                               <ChevronDown className="h-3 w-3 text-primary" />
@@ -2794,9 +2922,28 @@ export function ContractorListingPage() {
                                               {job.job_title}
                                             </div>
                                             <div className="text-xs text-gray-500">
-                                              {job.status}  
+                                              {job.status}
                                             </div>
                                           </div>
+                                        </div>
+                                        <div onClick={(e) => e.stopPropagation()}>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            title='Change Order'
+                                            className="h-8 w-8 px-2 text-xs text-blue-600 hover:text-blue-800  hover:bg-blue-100"
+                                            onClick={(e) => handleChangeOrderClick(job, contractor.id.toString(), e)}
+                                          >
+                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                              <path d="M6 2H14L20 8V22H6V2Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                                              <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                                              <path d="M9 14C9 12.9 9.9 12 11 12H15L13.5 10.5M15 12L13.5 13.5"
+                                                stroke="currentColor"
+                                                stroke-width="2"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round" />
+                                            </svg>
+                                          </Button>
                                         </div>
                                       </div>
                                     </Button>
@@ -2812,9 +2959,8 @@ export function ContractorListingPage() {
                                             <Minus className="h-3 w-3 text-primary/30 mt-1.5 mr-2" />
                                             <Button
                                               variant="ghost"
-                                              className={`flex-1 justify-start p-1.5 text-left h-auto text-xs hover:bg-blue-50 ${
-                                                isSubJobSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
-                                              }`}
+                                              className={`flex-1 justify-start p-1.5 text-left h-auto text-xs hover:bg-blue-50 ${isSubJobSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
+                                                }`}
                                               onClick={() => selectSubJob(subJob.id.toString(), job.id.toString(), contractor.id.toString())}
                                             >
                                               <div className="flex items-center gap-2 w-full">
@@ -2824,8 +2970,8 @@ export function ContractorListingPage() {
                                                     {subJob.job_title}
                                                   </div>
                                                   <div className="text-xs text-gray-500">
-                                              {subJob.status}  
-                                            </div>
+                                                    {subJob.status}
+                                                  </div>
                                                 </div>
                                               </div>
                                             </Button>
@@ -2845,7 +2991,7 @@ export function ContractorListingPage() {
                 </div>
               )
             })}
-          </div> 
+          </div>
           <div className=" bg-white border-t border-gray-200">
             <div className="m-auto text-center">
               <div className="text-sm text-gray-600 mb-3 mt-4">
@@ -2861,7 +3007,7 @@ export function ContractorListingPage() {
                 >
                   <ChevronDown className="h-4 w-4 rotate-90" />
                 </Button>
-                
+
                 {/* <div className="flex items-center gap-1">
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                     <Button
@@ -2875,7 +3021,7 @@ export function ContractorListingPage() {
                     </Button>
                   ))}
                 </div> */}
-                
+
                 <Button
                   variant="outline"
                   size="sm"
@@ -2887,19 +3033,19 @@ export function ContractorListingPage() {
                 </Button>
               </div>
             </div>
-          </div> 
+          </div>
         </ScrollArea>
 
-        
+
       </div>
 
       {/* Right Content - Job Details */}
-      <div className="flex-1 bg-white"  style={{width: '80%', margin: '0 auto'}}>
+      <div className="flex-1 bg-white" style={{ width: '80%', margin: '0 auto' }}>
         <div className="p-4 border-b border-gray-200">
           {hasPermission('contractors', 'create') && (
             <div className="flex justify-end">
-              <Button 
-                className="gap-2 text-white" 
+              <Button
+                className="gap-2 text-white"
                 onClick={() => setShowCreateContractModal(true)}
               >
                 <Plus className="h-4 w-4" />
@@ -2913,8 +3059,8 @@ export function ContractorListingPage() {
         <div className=" ">
           {selectedContractor && !selectedJob ? (
             <div>
-              <ContractorDetailsPage 
-                contractorId={selectedContractor} 
+              <ContractorDetailsPage
+                contractorId={selectedContractor}
                 onBack={handleBackFromContractorDetails}
               />
             </div>
@@ -2986,10 +3132,10 @@ export function ContractorListingPage() {
                     <p className="text-sm text-gray-600 mb-1">Start Date</p>
                     <p className="font-medium">{formatDate(selectedJobData.created_at)}</p>
                   </div>
-               
+
                 </div>
                 <div className="space-y-4">
-                <div>
+                  <div>
                     <p className="text-sm text-gray-600 mb-1">Due Date</p>
                     <p className="font-medium">{formatDate(selectedJobData.due_date)}</p>
                   </div>
@@ -3014,17 +3160,17 @@ export function ContractorListingPage() {
                     {selectedJobData.subJobs?.length || 0} Sub-Jobs
                   </Badge>
                 </div>
-                
+
                 {/* Show sub-job details if sub-job is selected */}
                 {selectedSubJob ? (
                   selectedJobData.subJobs.map((subJob: Job) => {
                     if (subJob.id.toString() !== selectedSubJob) return null
-                    
+
                     // Use enhanced job data if available (from API call), otherwise use subJob data
                     const jobData = enhancedJobData && enhancedJobData.id.toString() === subJob.id.toString() ? enhancedJobData : subJob
-                    
-                   
-                    
+
+
+
                     // Ensure the subJob has the customer data properly structured
                     const jobWithCustomerData = {
                       ...jobData,
@@ -3059,15 +3205,15 @@ export function ContractorListingPage() {
                       assignedMaterialsDetails: jobData.assignedMaterialsDetails || [],
                       bluesheets: jobData.bluesheets || []
                     }
-                  
+
                     const allJobs = [jobWithCustomerData]
                     console.log('All jobs:', allJobs)
-                    
+
                     // Create a proper setJobs function that updates the contractor data
                     const handleSetJobs = async (updatedJobs: any[]) => {
                       if (updatedJobs.length > 0) {
                         const updatedJob = updatedJobs[0]
-                        
+
                         // Update enhancedJobData with fresh data from API to ensure materials/labor are included
                         try {
                           const freshJobData = await apiClient.getJobById(updatedJob.id)
@@ -3075,9 +3221,9 @@ export function ContractorListingPage() {
                         } catch (error) {
                           console.error('Error refreshing job data:', error)
                         }
-                        
+
                         // Update the contractor's jobs array with the updated job data
-                        setContractors(prevContractors => 
+                        setContractors(prevContractors =>
                           prevContractors.map(contractor => {
                             if (contractor.id.toString() === selectedContractor) {
                               return {
@@ -3086,8 +3232,8 @@ export function ContractorListingPage() {
                                   if (job.id.toString() === selectedJob) {
                                     return {
                                       ...job,
-                                      subJobs: job.subJobs?.map((subJobItem: Job) => 
-                                        subJobItem.id.toString() === updatedJob.id 
+                                      subJobs: job.subJobs?.map((subJobItem: Job) =>
+                                        subJobItem.id.toString() === updatedJob.id
                                           ? { ...subJobItem, ...updatedJob }
                                           : subJobItem
                                       ) || []
@@ -3102,13 +3248,13 @@ export function ContractorListingPage() {
                         )
                       }
                     }
-                    
+
                     return (
-                      <JobDetailsPage 
-                        key={subJob.id} 
-                        jobId={subJob.id.toString()} 
+                      <JobDetailsPage
+                        key={subJob.id}
+                        jobId={subJob.id.toString()}
                         onBack={() => setSelectedSubJob(null)}
-                        jobs={allJobs} 
+                        jobs={allJobs}
                         setJobs={handleSetJobs}
                       />
                     )
@@ -3118,9 +3264,9 @@ export function ContractorListingPage() {
                   (() => {
                     // Use enhanced job data if available (from API call), otherwise use selectedJobData
                     const jobData = enhancedJobData && enhancedJobData.id.toString() === selectedJobData.id.toString() ? enhancedJobData : selectedJobData
-                    
-                   
-                    
+
+
+
                     // Ensure the job has the customer data properly structured
                     const jobWithCustomerData = {
                       ...jobData,
@@ -3155,15 +3301,15 @@ export function ContractorListingPage() {
                       assignedMaterialsDetails: jobData.assignedMaterialsDetails || [],
                       bluesheets: jobData.bluesheets || []
                     }
-                  
+
                     const allJobs = [jobWithCustomerData]
                     console.log('All jobs:', allJobs)
-                    
+
                     // Create a proper setJobs function that updates the contractor data
                     const handleSetJobs = async (updatedJobs: any[]) => {
                       if (updatedJobs.length > 0) {
                         const updatedJob = updatedJobs[0]
-                        
+
                         // Update enhancedJobData with fresh data from API to ensure materials/labor are included
                         try {
                           const freshJobData = await apiClient.getJobById(updatedJob.id)
@@ -3171,15 +3317,15 @@ export function ContractorListingPage() {
                         } catch (error) {
                           console.error('Error refreshing job data:', error)
                         }
-                        
+
                         // Update the contractor's jobs array with the updated job data
-                        setContractors(prevContractors => 
+                        setContractors(prevContractors =>
                           prevContractors.map(contractor => {
                             if (contractor.id.toString() === selectedContractor) {
                               return {
                                 ...contractor,
-                                jobs: contractor.jobs.map((job: Job) => 
-                                  job.id.toString() === selectedJob 
+                                jobs: contractor.jobs.map((job: Job) =>
+                                  job.id.toString() === selectedJob
                                     ? { ...job, ...updatedJob }
                                     : job
                                 )
@@ -3190,13 +3336,13 @@ export function ContractorListingPage() {
                         )
                       }
                     }
-                    
+
                     return (
-                      <JobDetailsPage 
-                        key={selectedJobData.id} 
-                        jobId={selectedJobData.id.toString()} 
+                      <JobDetailsPage
+                        key={selectedJobData.id}
+                        jobId={selectedJobData.id.toString()}
                         onBack={() => setSelectedJob(null)}
-                        jobs={allJobs} 
+                        jobs={allJobs}
                         setJobs={handleSetJobs}
                       />
                     )
@@ -3208,7 +3354,7 @@ export function ContractorListingPage() {
           </div>
         ) : (
           <div className="">
-           
+
           </div>
         )}
       </div>
@@ -3225,15 +3371,15 @@ export function ContractorListingPage() {
               Review and download the invoice for {invoiceSubJob?.title}
             </DialogDescription>
           </DialogHeader>
-          
+
           {invoiceSubJob && selectedJobData && selectedContractorData && (
-            <InvoiceTemplate 
-              subJob={invoiceSubJob} 
-              job={selectedJobData} 
-              contractor={selectedContractorData} 
+            <InvoiceTemplate
+              subJob={invoiceSubJob}
+              job={selectedJobData}
+              contractor={selectedContractorData}
             />
           )}
-          
+
           <DialogFooter className="flex gap-2">
             <Button variant="outline" onClick={handlePrintInvoice}>
               <Printer className="h-4 w-4 mr-2" />
@@ -3251,91 +3397,189 @@ export function ContractorListingPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Change Order Modal */}
+      <Dialog open={showChangeOrderModal} onOpenChange={setShowChangeOrderModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Change Order</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Job ID Display */}
+            <div className="space-y-2">
+              <Label className="text-sm text-gray-500">Job ID</Label>
+              <div className="bg-gray-50 p-2 rounded-md border border-gray-200">
+                <p className="text-sm font-medium">{changeOrderJob?.id || 'N/A'}</p>
+              </div>
+            </div>
+
+            {/* New Job Title Input */}
+            <div className="space-y-2">
+              <Label htmlFor="changeOrderTitle" className="text-sm font-medium">
+                Job Title <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="changeOrderTitle"
+                value={changeOrderTitle}
+                onChange={(e) => {
+                  setChangeOrderTitle(e.target.value);
+                  if (changeOrderErrors.title) {
+                    setChangeOrderErrors({ ...changeOrderErrors, title: '' });
+                  }
+                }}
+                placeholder="Enter new job title"
+                className={changeOrderErrors.title ? 'border-red-500' : ''}
+                autoFocus
+              />
+              {changeOrderErrors.title && (
+                <p className="text-red-500 text-xs mt-1">{changeOrderErrors.title}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="changeOrderEstimate" className="text-sm font-medium">
+                Estimate Amount ($) <span className="text-red-500">*</span>
+              </Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                <Input
+                  id="changeOrderEstimate"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={changeOrderEstimate}
+                  onChange={(e) => {
+                    setChangeOrderEstimate(e.target.value);
+                    if (changeOrderErrors.estimate) {
+                      setChangeOrderErrors({ ...changeOrderErrors, estimate: '' });
+                    }
+                  }}
+                  placeholder="0.00"
+                  className={`pl-7 ${changeOrderErrors.estimate ? 'border-red-500' : ''}`}
+                />
+              </div>
+              {changeOrderErrors.estimate && (
+                <p className="text-red-500 text-xs mt-1">{changeOrderErrors.estimate}</p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowChangeOrderModal(false);
+                setChangeOrderJob(null);
+                setChangeOrderTitle('');
+                setChangeOrderErrors({});
+              }}
+              disabled={isUpdatingChangeOrder}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleChangeOrderSave}
+              disabled={isUpdatingChangeOrder || !changeOrderTitle.trim()}
+              className="bg-primary text-white hover:bg-primary/90"
+            >
+              {isUpdatingChangeOrder ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Submitting...
+                </>
+              ) : (
+                'Submit Change Order'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
       {/* Create Contract Modal */}
       <Dialog open={showCreateContractModal} onOpenChange={setShowCreateContractModal}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"> 
+            <DialogTitle className="flex items-center gap-2">
               {isViewMode ? 'View Contractor' : isEditMode ? 'Edit Contractor' : 'Create New Contractor'}
             </DialogTitle>
             <DialogDescription>
               {isViewMode ? 'View contractor information and details.' : isEditMode ? 'Update contractor information and status.' : 'Add a new contractor to the system with their contact information and status.'}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-4">
-            {/* Contractor Name */}
-            <div className="space-y-2">
-              <Label htmlFor="contractor_name" className="text-sm font-medium">
-                Contractor Name *
-              </Label>
-              <Input
-                id="contractor_name"
-                value={contractFormData.contractor_name}
-                onChange={(e) => handleInputChange('contractor_name', e.target.value)}
-                placeholder="Enter contractor's name"
-                disabled={isViewMode}
-                className={validationErrors.contractor_name ? 'border-red-500 focus:border-red-500' : ''}
-              />
-              {validationErrors.contractor_name && (
-                <p className="text-sm text-red-600">{validationErrors.contractor_name}</p>
-              )}
-            </div>
-
-            {/* Email */}
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">
-                Email Address *
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                value={contractFormData.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-                placeholder="Enter email address"
-                disabled={isViewMode}
-                className={validationErrors.email ? 'border-red-500 focus:border-red-500' : ''}
-              />
-              {validationErrors.email && (
-                <p className="text-sm text-red-600">{validationErrors.email}</p>
-              )}
-            </div>
-
-            {/* Phone Number */}
-            <div className="space-y-2">
-              <Label htmlFor="phone" className="text-sm font-medium">
-                Phone Number *
-              </Label>
-              <Input
-                id="phone"
-                value={contractFormData.phone}
-                onChange={(e) => handleInputChange('phone', e.target.value)}
-                placeholder="Enter 10-digit phone number"
-                disabled={isViewMode}
-                className={validationErrors.phone ? 'border-red-500 focus:border-red-500' : ''}
-              />
-              {validationErrors.phone && (
-                <p className="text-sm text-red-600">{validationErrors.phone}</p>
-              )}
-            </div>
-
-            <div>
-                  <Label className="mb-2" htmlFor="company">Company</Label>
-                  <Input
-                    id="company"
-                    value={contractFormData.company_name}
-                    onChange={(e) => handleInputChange('company_name', e.target.value)}
-                    placeholder="Enter company name"
-                    disabled={isViewMode}
-                    className="mt-1"
-                  />
-                </div>
+              {/* Contractor Name */}
+              <div className="space-y-2">
+                <Label htmlFor="contractor_name" className="text-sm font-medium">
+                  Contractor Name *
+                </Label>
+                <Input
+                  id="contractor_name"
+                  value={contractFormData.contractor_name}
+                  onChange={(e) => handleInputChange('contractor_name', e.target.value)}
+                  placeholder="Enter contractor's name"
+                  disabled={isViewMode}
+                  className={validationErrors.contractor_name ? 'border-red-500 focus:border-red-500' : ''}
+                />
+                {validationErrors.contractor_name && (
+                  <p className="text-sm text-red-600">{validationErrors.contractor_name}</p>
+                )}
               </div>
+
+              {/* Email */}
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-medium">
+                  Email Address *
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={contractFormData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  placeholder="Enter email address"
+                  disabled={isViewMode}
+                  className={validationErrors.email ? 'border-red-500 focus:border-red-500' : ''}
+                />
+                {validationErrors.email && (
+                  <p className="text-sm text-red-600">{validationErrors.email}</p>
+                )}
+              </div>
+
+              {/* Phone Number */}
+              <div className="space-y-2">
+                <Label htmlFor="phone" className="text-sm font-medium">
+                  Phone Number *
+                </Label>
+                <Input
+                  id="phone"
+                  value={contractFormData.phone}
+                  onChange={(e) => handleInputChange('phone', e.target.value)}
+                  placeholder="Enter 10-digit phone number"
+                  disabled={isViewMode}
+                  className={validationErrors.phone ? 'border-red-500 focus:border-red-500' : ''}
+                />
+                {validationErrors.phone && (
+                  <p className="text-sm text-red-600">{validationErrors.phone}</p>
+                )}
+              </div>
+
+              <div>
+                <Label className="mb-2" htmlFor="company">Company</Label>
+                <Input
+                  id="company"
+                  value={contractFormData.company_name}
+                  onChange={(e) => handleInputChange('company_name', e.target.value)}
+                  placeholder="Enter company name"
+                  disabled={isViewMode}
+                  className="mt-1"
+                />
+              </div>
+            </div>
             {/* address */}
             <div className="space-y-2">
               <Label htmlFor="address" className="text-sm font-medium">
-              Address
+                Address
               </Label>
               <Textarea
                 id="address"
@@ -3371,13 +3615,13 @@ export function ContractorListingPage() {
           <DialogFooter className="flex gap-2">
             {isViewMode ? (
               <>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={handleCloseModal}
                 >
                   Close
                 </Button>
-                <Button 
+                <Button
                   onClick={handleSwitchToEdit}
                   className="bg-primary text-primary-foreground hover:bg-primary/90"
                 >
@@ -3387,14 +3631,14 @@ export function ContractorListingPage() {
               </>
             ) : (
               <>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={handleCloseModal}
                   disabled={isSubmitting}
                 >
                   Cancel
                 </Button>
-                <Button 
+                <Button
                   onClick={handleCreateContract}
                   disabled={isSubmitting}
                   className="bg-primary text-primary-foreground hover:bg-primary/90"
@@ -3423,7 +3667,7 @@ export function ContractorListingPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Contractor</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete <strong>{contractorToDelete?.contractor_name}</strong>? 
+              Are you sure you want to delete <strong>{contractorToDelete?.contractor_name}</strong>?
               This action cannot be undone and will permanently remove the contractor from the system.
             </AlertDialogDescription>
           </AlertDialogHeader>

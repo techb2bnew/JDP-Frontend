@@ -266,7 +266,7 @@ interface MaterialEntry {
   material_used: number;
   supplier_order_id: string;
   return_to_warehouse: boolean;
-  unit_cost: number; 
+  unit_cost: number;
 }
 
 interface BulkMaterialPayload {
@@ -1280,7 +1280,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         material_used: Number(productQuantities[product.id]?.material_used) || 0,
         supplier_order_id: product.supplier_order_id || '',
         return_to_warehouse: productQuantities[product.id]?.return_to_warehouse || false,
-        unit_cost: Number(product.unit_cost || product.price || 0), 
+        unit_cost: Number(product.unit_cost || product.price || 0),
       }));
 
       if (existingBluesheet) {
@@ -1301,7 +1301,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         await apiClient.createCompleteBluesheet(completeBluesheetPayload);
 
         toast.success(`${selectedProducts.length} product(s) added to existing bluesheet successfully!`);
-      }   
+      }
       else {
         // Create new complete bluesheet with multiple materials
         const completeBluesheetPayload: CompleteBluesheetPayload = {
@@ -1364,12 +1364,35 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     field: keyof ProductQuantity,
     value: string | number | boolean
   ): void => {
+
+    const existing = productQuantities[productId] || {};
+
+    let updatedValue =
+      field === "return_to_warehouse" ? value : Number(value) || 0;
+
+    let updatedData = {
+      ...existing,
+      [field]: updatedValue
+    };
+
+    const totalOrdered =
+      field === "total_ordered"
+        ? Number(value)
+        : Number(updatedData.total_ordered || 0);
+
+    const materialUsed =
+      field === "material_used"
+        ? Number(value)
+        : Number(updatedData.material_used || 0);
+
+    // ❌ material used total ordered se jyada nahi hona chahiye
+    if (materialUsed > totalOrdered) {
+      updatedData.material_used = totalOrdered;
+    }
+
     setProductQuantities({
       ...productQuantities,
-      [productId]: {
-        ...productQuantities[productId],
-        [field]: field === 'return_to_warehouse' ? value : Number(value) || 0
-      }
+      [productId]: updatedData
     });
   };
 
@@ -5953,7 +5976,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                           <div className="font-medium">{product.stock_quantity || 0} {product.unit || 'units'}</div>
                         </div>
                         <div>
-                          <Label className="text-xs">Total Ordered</Label>
+                          <Label className="text-xs mb-2">Total Ordered</Label>
                           <Input
                             type="number"
                             value={productQuantities[product.id]?.total_ordered || ''}
@@ -5965,7 +5988,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                           />
                         </div>
                         <div>
-                          <Label className="text-xs">Material Used</Label>
+                          <Label className="text-xs mb-2">Material Used</Label>
                           <Input
                             type="number"
                             value={productQuantities[product.id]?.material_used || ''}
@@ -5979,20 +6002,23 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                       </div>
 
                       {/* Return to Warehouse Checkbox for each product */}
-                      <div className="mt-2 flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id={`return_${product.id}`}
-                          checked={productQuantities[product.id]?.return_to_warehouse || false}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                            handleQuantityChange(product.id, 'return_to_warehouse', e.target.checked)
-                          }
-                          className="rounded border-gray-300"
-                        />
-                        <Label htmlFor={`return_${product.id}`} className="text-xs">
-                          Return to Warehouse
-                        </Label>
-                      </div>
+                      {productQuantities[product.id]?.total_ordered !==
+                        productQuantities[product.id]?.material_used && (
+                          <div className="mt-2 flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id={`return_${product.id}`}
+                              checked={productQuantities[product.id]?.return_to_warehouse || false}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                handleQuantityChange(product.id, 'return_to_warehouse', e.target.checked)
+                              }
+                              className="rounded border-gray-300"
+                            />
+                            <Label htmlFor={`return_${product.id}`} className="text-xs">
+                              Return to Warehouse
+                            </Label>
+                          </div>
+                        )}
                     </div>
                   ))}
                 </div>

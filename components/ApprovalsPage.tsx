@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Button } from './ui/button'
 import {
   AlertDialog,
@@ -17,7 +17,7 @@ import { BlueSheetApprovalDialog, BlueSheetItem as DialogBlueSheetItem } from '.
 import { ArrowLeft, CheckSquare, X, Clock, FileText, User, Upload, Eye, Edit, RotateCcw, Building } from 'lucide-react'
 import { apiClient } from '../utils/api'
 import { LoadingSpinner } from './common/LoadingSpinner'
-
+import { BlueSheetSelectionModal } from './invoices/BlueSheetSelectionModal'
 interface Job {
   id: string
   title: string
@@ -170,6 +170,7 @@ const getRandomApprover = () => {
 
 export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsProps) {
   const [blueSheets, setBlueSheets] = useState<ApiBlueSheetItem[]>([])
+  const [allBlueSheets, setAllBlueSheets] = useState<ApiBlueSheetItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -180,6 +181,9 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
   const [isConfirmOpen, setIsConfirmOpen] = useState(false)
   const [approveTarget, setApproveTarget] = useState<ApiBlueSheetItem | null>(null)
   const [isApproving, setIsApproving] = useState(false)
+  const [showSelectionModal, setShowSelectionModal] = useState(false)
+  const [jobSheetsForModal, setJobSheetsForModal] = useState<ApiBlueSheetItem[]>([])
+  const [selectionTarget, setSelectionTarget] = useState<ApiBlueSheetItem | null>(null)
   console.log(blueSheets, "bluesheets");
   console.log(selectedBlueSheet, "selectedBlueSheet")
   // Fetch bluesheets from API
@@ -187,12 +191,14 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
     try {
       setIsLoading(true)
       const response = await apiClient.getBluesheets(page, 10)
-      
+
       if (response.success && response.data) {
-        setBlueSheets(response.data.bluesheets || [])
-        // Also coerce selected item type if needed 
+        const sheets = response.data.bluesheets || []
+        setBlueSheets(sheets)
+        setAllBlueSheets(sheets)  // <-- ADD THIS
+
         if (selectedBlueSheet) {
-          const refreshed = (response.data.bluesheets || []).find((b: any) => b.id === selectedBlueSheet.id)
+          const refreshed = sheets.find((b: any) => b.id === selectedBlueSheet.id)
           if (refreshed) setSelectedBlueSheet(refreshed)
         }
         setTotalPages(response.data.pagination?.total_pages || 1)
@@ -201,6 +207,7 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
     } catch (error) {
       console.error('Error fetching bluesheets:', error)
       setBlueSheets([])
+      setAllBlueSheets([])
     } finally {
       setIsLoading(false)
     }
@@ -211,12 +218,23 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
     fetchBluesheets(currentPage)
   }, [currentPage])
 
+  const uniqueJobSheets = useMemo(() => {
+    const jobMap = new Map<number, ApiBlueSheetItem>()
+    for (const sheet of blueSheets) {
+      const existing = jobMap.get(sheet.job_id)
+      if (!existing || new Date(sheet.date) > new Date(existing.date)) {
+        jobMap.set(sheet.job_id, sheet)
+      }
+    }
+    return Array.from(jobMap.values())
+  }, [blueSheets])
+
   // Only show BlueSheet items for the main listing
   const filteredBlueSheets = blueSheets
 
   // Calculate pending count and notify parent component
   const pendingCount = blueSheets.filter(item => item.status === 'pending').length
-  
+
   // Notify parent component of approval count changes
   React.useEffect(() => {
     if (onApprovalCountChange) {
@@ -225,13 +243,60 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
   }, [pendingCount, onApprovalCountChange])
 
   const handleApprove = (blueSheet: ApiBlueSheetItem) => {
-    setSelectedBlueSheet(blueSheet)
-    setShowApprovalDialog(true)
+    setJobSheetsForModal(blueSheets.filter(sheet => sheet.job_id === blueSheet.job_id))
+    setShowSelectionModal(true)
   }
 
   const handleApproveClick = (blueSheet: ApiBlueSheetItem) => {
     setApproveTarget(blueSheet)
     setIsConfirmOpen(true)
+  }
+  const handleSelectionSubmit = (selectedSheets: ApiBlueSheetItem[]) => {
+    setShowSelectionModal(false)
+    if (selectedSheets.length === 0) return
+
+    const firstSheet = selectedSheets[0]
+
+    // Saari selected bluesheets ke material_entries merge karo
+    const mergedMaterials = selectedSheets.flatMap(sheet => sheet.material_entries)
+
+    // Saari labor_entries bhi merge karo
+    const mergedLabor = selectedSheets.flatMap(sheet => sheet.labor_entries)
+
+    // Total cost saari sheets ka sum
+    const mergedTotalCost = selectedSheets.reduce((sum, sheet) => sum + sheet.total_cost, 0)
+
+    // Notes combine karo
+    const mergedNotes = selectedSheets
+      .map(sheet => sheet.notes)
+      .filter(Boolean)
+      .join(' | ')
+
+    const dialogSheet: DialogBlueSheetItem = {
+      id: firstSheet.id,
+      job_id: firstSheet.job_id,
+      date: firstSheet.date,
+      created_by: firstSheet.created_by,
+      notes: mergedNotes || firstSheet.notes,
+      additional_charges: selectedSheets.reduce((sum, s) => sum + s.additional_charges, 0),
+      total_cost: mergedTotalCost,
+      status: firstSheet.status,
+      created_at: firstSheet.created_at,
+      updated_at: firstSheet.updated_at,
+      job: firstSheet.job,
+      created_by_user: firstSheet.created_by_user,
+      labor_entries: mergedLabor,
+      material_entries: mergedMaterials,
+    }
+
+    console.log('Merged dialogSheet:', {
+      totalSheets: selectedSheets.length,
+      totalMaterials: mergedMaterials.length,
+      totalCost: mergedTotalCost,
+    })
+
+    setSelectedBlueSheet(dialogSheet)
+    setTimeout(() => setShowApprovalDialog(true), 0)
   }
 
   const confirmApprove = async () => {
@@ -239,9 +304,9 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
     try {
       setIsApproving(true)
       await apiClient.approveBluesheet(approveTarget.id, 'approved')
-      setBlueSheets(blueSheets.map(item => 
-        item.id === approveTarget.id ? { 
-          ...item, 
+      setBlueSheets(blueSheets.map(item =>
+        item.id === approveTarget.id ? {
+          ...item,
           status: 'approved' as const
         } : item
       ))
@@ -256,18 +321,18 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
   }
 
   const handleQuickApprove = (id: number) => {
-    setBlueSheets(blueSheets.map(item => 
-      item.id === id ? { 
-        ...item, 
+    setBlueSheets(blueSheets.map(item =>
+      item.id === id ? {
+        ...item,
         status: 'approved' as const
       } : item
     ))
   }
 
   const handleReject = (id: number) => {
-    setBlueSheets(blueSheets.map(item => 
-      item.id === id ? { 
-        ...item, 
+    setBlueSheets(blueSheets.map(item =>
+      item.id === id ? {
+        ...item,
         status: 'rejected' as const
       } : item
     ))
@@ -289,7 +354,7 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
   }
 
   const handleApprovalComplete = (approvedItem: ApiBlueSheetItem) => {
-    setBlueSheets(blueSheets.map(item => 
+    setBlueSheets(blueSheets.map(item =>
       item.id === approvedItem.id ? {
         ...approvedItem,
         status: 'approved' as const
@@ -541,26 +606,34 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
                     <TableCell>{getStatusBadge(blueSheet)}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        {blueSheet.status === 'pending' && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleApprove(blueSheet)}
+                          className="bg-primary text-white hover:bg-[#0090e6] gap-1"
+                        >
+                          <Eye className="h-3 w-3" />
+                          Review & Approve
+                        </Button>
+                        {/* {blueSheet.status === 'pending' && (
                           <>
-                          <Button 
-                              size="sm"  
+                            <Button
+                              size="sm"
                               onClick={() => handleApproveClick(blueSheet)}
                               className="bg-primary text-white hover:bg-[#0090e6] gap-1"
-                            > 
-                               Approve
+                            >
+                              Approve
                             </Button>
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               onClick={() => handleApprove(blueSheet)}
                               className="bg-primary text-white hover:bg-[#0090e6] gap-1"
                             >
                               <Eye className="h-3 w-3" />
                               Review & Approve
                             </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
+                            <Button
+                              size="sm"
+                              variant="outline"
                               onClick={() => handleReject(blueSheet.id)}
                               className="text-red-600 border-red-200 hover:bg-red-50"
                             >
@@ -570,8 +643,8 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
                         )}
                         {blueSheet.status !== 'pending' && (
                           <>
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               variant="outline"
                               onClick={() => {
                                 setSelectedBlueSheet(blueSheet)
@@ -582,8 +655,8 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
                               <Eye className="h-3 w-3" />
                               View
                             </Button>
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               variant="outline"
                               onClick={() => handleEdit(blueSheet.id)}
                               className="gap-1 text-blue-600 border-blue-200 hover:bg-blue-50"
@@ -591,8 +664,8 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
                               <Edit className="h-3 w-3" />
                               Edit
                             </Button>
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               variant="outline"
                               onClick={() => handleUpdate(blueSheet.id)}
                               className="gap-1 text-green-600 border-green-200 hover:bg-green-50"
@@ -601,7 +674,7 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
                               Update
                             </Button>
                           </>
-                        )}
+                        )} */}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -641,7 +714,15 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
           </div>
         </div>
       )}
-
+      <BlueSheetSelectionModal
+        isOpen={showSelectionModal}
+        onClose={() => {
+          setShowSelectionModal(false)
+          setJobSheetsForModal([])
+        }}
+        blueSheets={jobSheetsForModal}
+        onSubmitSelected={handleSelectionSubmit}
+      />
       {/* BlueSheet Approval Dialog - Commented out due to interface mismatch */}
       <BlueSheetApprovalDialog
         isOpen={showApprovalDialog}

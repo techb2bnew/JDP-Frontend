@@ -123,6 +123,7 @@ export function BlueSheetApprovalDialog({
   blueSheet,
   onApprovalComplete
 }: BlueSheetApprovalDialogProps) {
+  console.log('Dialog render', { isOpen, blueSheet })
   const [supplierInvoice, setSupplierInvoice] = useState<SupplierInvoice | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [isAutoFetching, setIsAutoFetching] = useState(false)
@@ -267,8 +268,8 @@ export function BlueSheetApprovalDialog({
       [field]: value,  
     }
 
-    if (field === 'total_ordered' || field === 'unit_cost') {
-      newMaterials[index].total_cost = newMaterials[index].total_ordered * newMaterials[index].unit_cost
+    if (field === 'material_used' || field === 'unit_cost') {
+      newMaterials[index].total_cost = newMaterials[index].material_used * newMaterials[index].unit_cost
     }
 
     const newAmount = newMaterials.reduce((sum, item) => sum + (item.total_cost || 0), 0)
@@ -819,18 +820,16 @@ export function BlueSheetApprovalDialog({
                         <div>
                           <Label className="text-sm text-gray-600">Materials ({blueSheet.material_entries.length})</Label>
                           <div className="mt-3 space-y-3">
-                            {blueSheet.material_entries.slice(0, 4).map((item: any, index: number) => (
+                            {blueSheet.material_entries.slice(0).map((item: any, index: number) => (
                               <div key={index} className="flex justify-between text-base p-4 bg-gray-50 rounded-lg">
                                 <div>
                                   <span className="font-medium">{item.material_name}</span>
-                                  <p className="text-sm text-gray-500">Qty: {item.total_ordered} × {formatCurrency(item.unit_cost)}</p>
+                                  <p className="text-sm text-gray-500">Used Material: {item.material_used} × {formatCurrency(item.unit_cost)}</p>
                                 </div>
-                                <span className="text-lg font-medium">{formatCurrency(item.total_cost || item.total_ordered * item.unit_cost)}</span>
+                                <span className="text-lg font-medium">{formatCurrency(item.total_cost || item.material_used * item.unit_cost)}</span>
                               </div>
                             ))}
-                            {blueSheet.material_entries.length > 4 && (
-                              <p className="text-sm text-gray-500 text-center">+{blueSheet.material_entries.length - 4} more...</p>
-                            )}
+                             
                           </div>
                         </div>
                         <div className="flex items-center justify-between text-xl font-medium pt-6 border-t">
@@ -944,11 +943,11 @@ export function BlueSheetApprovalDialog({
                                 <td className="px-3 py-2.5 text-center">
                                   {bs ? (
                                     isBlueSheetEditMode ? (
-                                      <Input type="number" value={bs.total_ordered}
-                                        onChange={(e) => handleBlueSheetMaterialChange(bsIdx!, 'total_ordered', parseFloat(e.target.value) || 0)}
+                                      <Input type="number" value={bs.material_used}
+                                        onChange={(e) => handleBlueSheetMaterialChange(bsIdx!, 'material_used', parseFloat(e.target.value) || 0)}
                                         className="h-7 text-center text-xs w-12 mx-auto px-1" min="0" />
                                     ) : (
-                                      <span className={`font-semibold ${!qtyMatch && hasSup ? 'text-amber-600' : 'text-gray-700'}`}>{bs.total_ordered}</span>
+                                      <span className={`font-semibold ${!qtyMatch && hasSup ? 'text-amber-600' : 'text-gray-700'}`}>{bs.material_used}</span>
                                     )
                                   ) : <span className="text-gray-300">—</span>}
                                 </td>
@@ -1018,7 +1017,7 @@ export function BlueSheetApprovalDialog({
                                 <td className="px-3 py-2.5 text-right">
                                   {bs ? (
                                     <span className="font-bold text-[#00A1FF]">
-                                      {formatCurrency(bs.total_cost || bs.total_ordered * bs.unit_cost)}
+                                      {formatCurrency(bs.total_cost || bs.material_used * bs.unit_cost)}
                                     </span>
                                   ) : <span className="text-gray-300">—</span>}
                                 </td>
@@ -1044,7 +1043,7 @@ export function BlueSheetApprovalDialog({
                                     <div className="flex flex-col items-center gap-0.5">
                                       <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center"><AlertTriangle className="w-3 h-3 text-amber-600" /></div>
                                       {!nameMatch && <span className="text-[9px] text-amber-700 font-semibold leading-tight text-center">Name<br />differs</span>}
-                                      {!qtyMatch && <span className="text-[9px] text-amber-700 font-semibold leading-tight text-center">Qty<br />{bs?.total_ordered}≠{sup?.quantity}</span>}
+                                      {!qtyMatch && <span className="text-[9px] text-amber-700 font-semibold leading-tight text-center">Qty<br />{bs?.material_used}≠{sup?.quantity}</span>}
                                     </div>
                                   )}
                                 </td>

@@ -52,12 +52,18 @@ import { Textarea } from './ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { apiClient } from '@/utils/api'
 import Autocomplete from 'react-google-autocomplete'
-
+import { toast } from 'sonner'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../components/ui/tooltip";
 // Static customers data removed - now using API data from /customer/getCustomers
 
 const getStatusColor = (status: string) => {
   switch (status) {
-    case 'active': return 'bg-green-100 text-green-800' 
+    case 'active': return 'bg-green-100 text-green-800'
     case 'inactive': return 'bg-gray-100 text-gray-800'
     default: return 'bg-gray-100 text-gray-800'
   }
@@ -81,7 +87,7 @@ export function CustomersPage() {
     company: '',
     status: 'active'
   })
- 
+
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -98,6 +104,13 @@ export function CustomersPage() {
   const [isLoadingView, setIsLoadingView] = useState(false);
   const [currentAction, setCurrentAction] = useState<'add' | 'edit' | 'view'>('add');
   const [filteredCustomers, setFilteredCustomers] = useState<any>(null);
+  // Add these state variables
+  const [showChangeOrderModal, setShowChangeOrderModal] = useState(false);
+  const [changeOrderJob, setChangeOrderJob] = useState<any>(null);
+  const [changeOrderTitle, setChangeOrderTitle] = useState('');
+  const [isUpdatingChangeOrder, setIsUpdatingChangeOrder] = useState(false);
+  const [changeOrderErrors, setChangeOrderErrors] = useState<Record<string, string>>({});
+  const [changeOrderEstimate, setChangeOrderEstimate] = useState<number | string>('');
   const [customerStats, setCustomerStats] = useState({
     total: 0,
     active: 0,
@@ -182,7 +195,7 @@ export function CustomersPage() {
     const observer = new MutationObserver(() => {
       const pacContainer = document.querySelector('.pac-container');
       const overlay = document.querySelector('[data-radix-dialog-overlay]');
-      
+
       if (pacContainer && overlay) {
         const isVisible = pacContainer.getAttribute('style')?.includes('display: none') === false;
         if (isVisible || window.getComputedStyle(pacContainer).display !== 'none') {
@@ -236,13 +249,13 @@ export function CustomersPage() {
 
     // Try immediately
     let addressInput = attachListeners();
-    
+
     // If not found, wait a bit and try again
     if (!addressInput) {
       const timer = setTimeout(() => {
         addressInput = attachListeners();
       }, 100);
-      
+
       return () => {
         clearTimeout(timer);
         observer.disconnect();
@@ -369,14 +382,14 @@ export function CustomersPage() {
     setSelectedJob(jobId);
     setSelectedCustomer(customerId);
     setSelectedSubJob(null);
-    
+
     // Clear previous enhanced job data
     setEnhancedJobData(null);
-    
+
     // Fetch enhanced job data for the main job
-    try { 
-      const jobDetails = await apiClient.getJobById(jobId) 
-      
+    try {
+      const jobDetails = await apiClient.getJobById(jobId)
+
       // Store the enhanced job data for use in JobDetailsPage
       setEnhancedJobData(jobDetails)
       console.log('Enhanced main job data set:', jobDetails)
@@ -389,14 +402,14 @@ export function CustomersPage() {
     setSelectedSubJob(subJobId);
     setSelectedJob(jobId);
     setSelectedCustomer(customerId);
-    
+
     // Clear previous enhanced job data
     setEnhancedJobData(null);
-    
+
     // Fetch the latest job details from API exactly like JobManagementPage does
-    try { 
-      const jobDetails = await apiClient.getJobById(subJobId) 
-      
+    try {
+      const jobDetails = await apiClient.getJobById(subJobId)
+
       // Store the enhanced job data for use in JobDetailsPage
       setEnhancedJobData(jobDetails)
       console.log('Enhanced job data set:', jobDetails)
@@ -502,7 +515,7 @@ export function CustomersPage() {
   const fetchCustomerStats = async () => {
     try {
       setIsLoadingStats(true);
-      
+
       const response = await globalApiCall(`${apiBaseUrl}/customer/getCustomerStats/stats`, {
         method: 'GET'
       });
@@ -536,7 +549,7 @@ export function CustomersPage() {
 
     try {
       setIsLoading(true);
-      
+
       // Get system IP address
       const getSystemIP = async () => {
         try {
@@ -550,7 +563,7 @@ export function CustomersPage() {
       };
 
       const systemIP = await getSystemIP();
-      
+
       const payload = {
         customer_name: customerFormData.name,
         company_name: customerFormData.company || '',
@@ -578,7 +591,7 @@ export function CustomersPage() {
           const { toast } = await import('sonner');
           toast.success('Customer created successfully!');
         }
-        
+
         setShowAddCustomerModal(false);
         setEditingCustomer(null);
         setCustomerFormData({
@@ -612,7 +625,7 @@ export function CustomersPage() {
   const fetchCustomersWithJobs = async () => {
     try {
       setIsLoadingCustomers(true);
-      
+
       // Step 1: Fetch paginated customers
       const customersResponse = await globalApiCall(`${apiBaseUrl}/customer/getCustomers?page=${currentPage}&limit=${itemsPerPage}`, {
         method: 'GET'
@@ -625,7 +638,7 @@ export function CustomersPage() {
         const pagination = customersData.data.pagination || {};
         const totalPagesFromApi = pagination.totalPages || 1;
         const totalCustomersFromApi = pagination.total || 0;
-        
+
         // Update pagination state
         setTotalCustomers(totalCustomersFromApi);
 
@@ -637,7 +650,7 @@ export function CustomersPage() {
           });
           const jobsData = await jobsResponse.json();
           console.log('Jobs by Customer API Response:', jobsData);
-          
+
           if (jobsData.success && jobsData.data && Array.isArray(jobsData.data)) {
             jobsByCustomer = jobsData.data;
           }
@@ -651,7 +664,7 @@ export function CustomersPage() {
         jobsByCustomer.forEach((job: any) => {
           const customerId = job.customer_id || job.customer?.id;
           if (!customerId) return;
-          
+
           if (!jobsMap.has(customerId)) {
             jobsMap.set(customerId, []);
           }
@@ -660,7 +673,7 @@ export function CustomersPage() {
 
         // Step 4: Merge customers with their jobs
         let allCustomers: any[] = [];
-        
+
         if (customersData.data.customers) {
           allCustomers = customersData.data.customers;
         } else if (Array.isArray(customersData.data)) {
@@ -670,7 +683,7 @@ export function CustomersPage() {
         const customersWithJobsArray = allCustomers.map((customer: any) => {
           const customerId = customer.id;
           const customerJobs = jobsMap.get(customerId) || [];
-          
+
           return {
             id: customerId,
             customer_name: customer.customer_name || '',
@@ -684,7 +697,7 @@ export function CustomersPage() {
             total_jobs: customerJobs.length
           };
         });
-        
+
         // Sort by total_jobs descending, then by name
         customersWithJobsArray.sort((a: any, b: any) => {
           if (b.total_jobs !== a.total_jobs) {
@@ -692,19 +705,19 @@ export function CustomersPage() {
           }
           return (a.customer_name || '').localeCompare(b.customer_name || '');
         });
-        
+
         // Set customers directly from API response (server-side pagination)
         setCustomersWithJobs(customersWithJobsArray);
         setPaginatedCustomers(customersWithJobsArray); // Use API response directly
         setAllCustomersWithJobs(customersWithJobsArray); // Store current page list
-        
+
         // Also set for table view compatibility
         const transformedCustomers = customersWithJobsArray.map((apiCustomer: any) => ({
           id: apiCustomer.id?.toString() || `CUST-${Date.now()}`,
           name: apiCustomer.customer_name || apiCustomer.name || '',
           email: apiCustomer.email || '',
           phone: apiCustomer.phone || '',
-          location: apiCustomer.address || '', 
+          location: apiCustomer.address || '',
           orders: 0,
           totalSpent: 0,
           joinDate: apiCustomer.created_at ? new Date(apiCustomer.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
@@ -740,7 +753,7 @@ export function CustomersPage() {
         const searchLower = searchTerm.toLowerCase();
         return customerName.includes(searchLower);
       });
-      
+
       setCustomersWithJobs(filtered);
     }
   }, [searchTerm, allCustomersWithJobs]);
@@ -768,10 +781,10 @@ export function CustomersPage() {
     try {
       setCurrentAction('edit');
       setEditingCustomer(customer);
-      
+
       // Fetch customer details for editing
       await fetchCustomerById(customer.id.toString());
-      
+
       setShowAddCustomerModal(true);
     } catch (error) {
       console.error('Error preparing customer for edit:', error);
@@ -795,7 +808,7 @@ export function CustomersPage() {
 
     try {
       setIsLoading(true);
-      
+
       // Get system IP address
       const getSystemIP = async () => {
         try {
@@ -809,7 +822,7 @@ export function CustomersPage() {
       };
 
       const systemIP = await getSystemIP();
-      
+
       const payload = {
         customer_name: customerFormData.name,
         company_name: customerFormData.company || '',
@@ -837,7 +850,7 @@ export function CustomersPage() {
           const { toast } = await import('sonner');
           toast.success('Customer updated successfully!');
         }
-        
+
         setShowAddCustomerModal(false);
         setEditingCustomer(null);
         setCustomerFormData({
@@ -871,7 +884,7 @@ export function CustomersPage() {
     if (!customerToDelete) return;
 
     try {
-      setIsLoading(true); 
+      setIsLoading(true);
       const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -890,7 +903,7 @@ export function CustomersPage() {
           const { toast } = await import('sonner');
           toast.success('Customer deleted successfully!');
         }
-        
+
         setShowDeleteAlert(false);
         setCustomerToDelete(null);
         // Refresh the customers list and stats
@@ -913,7 +926,7 @@ export function CustomersPage() {
   const fetchCustomerForView = async (customerId: string) => {
     try {
       setIsLoadingView(true);
-      
+
       const response = await globalApiCall(`${apiBaseUrl}/customer/getCustomerById/${customerId}`, {
         method: 'GET'
       });
@@ -942,7 +955,7 @@ export function CustomersPage() {
   const fetchCustomerById = async (customerId: string) => {
     try {
       setIsLoading(true);
-      
+
       const response = await globalApiCall(`${apiBaseUrl}/customer/getCustomerById/${customerId}`, {
         method: 'GET'
       });
@@ -952,7 +965,7 @@ export function CustomersPage() {
 
       if (responseData.success && responseData.data) {
         const apiCustomer = responseData.data;
-        
+
         // Transform API response to match form data format
         const customerData = {
           name: apiCustomer.customer_name || '',
@@ -989,7 +1002,7 @@ export function CustomersPage() {
       'Email',
       'Phone',
       'Location',
-      'Company', 
+      'Company',
       'Status'
     ];
 
@@ -1000,7 +1013,7 @@ export function CustomersPage() {
       customer.email,
       customer.phone,
       customer.location,
-      customer.company,  
+      customer.company,
       customer.status.toUpperCase()
     ]);
 
@@ -1021,50 +1034,169 @@ export function CustomersPage() {
     link.click();
     document.body.removeChild(link);
   };
-useEffect(() => {
-  const fetchCustomersByStatus = async () => {
-    if (!statusFilter || statusFilter === 'all') {
-      // Reset to full list when 'all' is selected
-      fetchCustomersData(currentPage, itemsPerPage);
+  useEffect(() => {
+    const fetchCustomersByStatus = async () => {
+      if (!statusFilter || statusFilter === 'all') {
+        // Reset to full list when 'all' is selected
+        fetchCustomersData(currentPage, itemsPerPage);
+        return;
+      }
+
+      setIsLoadingCustomers(true);
+
+      try {
+        const res = await apiClient.getCustomersByStatus(statusFilter);
+        const customers = res.data?.customers || [];
+
+        // Transform API response to match component's expected format
+        const transformedCustomers = customers.map((apiCustomer: any) => ({
+          id: apiCustomer.id?.toString() || `CUST-${Date.now()}`,
+          name: apiCustomer.customer_name || '',
+          email: apiCustomer.email || '',
+          phone: apiCustomer.phone || '',
+          location: apiCustomer.address || '',
+          orders: apiCustomer.total_orders || 0,
+          totalSpent: apiCustomer.total_spent || 0,
+          joinDate: apiCustomer.created_at ? new Date(apiCustomer.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          status: apiCustomer.status || 'active',
+          company: apiCustomer.company_name || '',
+          contactPerson: apiCustomer.contact_person || '',
+          avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face'
+        }));
+
+        setFilteredCustomers(transformedCustomers);
+        setTotalCustomers(res.data?.pagination?.total ?? transformedCustomers.length ?? 0);
+      } catch (error) {
+        console.error("Customer fetch error:", error);
+        setFilteredCustomers([]);
+        setTotalCustomers(0);
+      } finally {
+        setIsLoadingCustomers(false);
+      }
+    };
+
+    fetchCustomersByStatus();
+  }, [statusFilter, currentPage, itemsPerPage]);
+
+
+  // Change order
+  const handleChangeOrderClick = (job: any, customerId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent job selection
+    setChangeOrderJob({
+      ...job,  // Store the entire job object
+      customerId: customerId,
+      originalId: job.id // Store original ID for reference
+    });
+    // Set default title as "Change Order - [Original Title]"
+    setChangeOrderTitle(`${''}`);
+    setChangeOrderEstimate(job.estimated_cost || job.estimatedCost || '');
+    setChangeOrderErrors({});
+    setShowChangeOrderModal(true);
+  };
+
+  const handleChangeOrderSave = async () => {
+    // Validate
+    const errors: Record<string, string> = {};
+    if (!changeOrderTitle.trim()) {
+      errors.title = 'Job title is required';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setChangeOrderErrors(errors);
       return;
     }
 
-    setIsLoadingCustomers(true);
-
+    setIsUpdatingChangeOrder(true);
     try {
-      const res = await apiClient.getCustomersByStatus(statusFilter);
-      const customers = res.data?.customers || [];
+      // Original job data
+      const originalJob = changeOrderJob;
 
-      // Transform API response to match component's expected format
-      const transformedCustomers = customers.map((apiCustomer: any) => ({
-        id: apiCustomer.id?.toString() || `CUST-${Date.now()}`,
-        name: apiCustomer.customer_name || '',
-        email: apiCustomer.email || '',
-        phone: apiCustomer.phone || '',
-        location: apiCustomer.address || '',
-        orders: apiCustomer.total_orders || 0,
-        totalSpent: apiCustomer.total_spent || 0,
-        joinDate: apiCustomer.created_at ? new Date(apiCustomer.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        status: apiCustomer.status || 'active',
-        company: apiCustomer.company_name || '',
-        contactPerson: apiCustomer.contact_person || '',
-        avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face'
-      }));
+      // Prepare payload for NEW JOB (Change Order)
+      // Copy most fields from original job but with new title
+      const payload: any = {
+        job_title: changeOrderTitle, // New title
+        job_type: originalJob.job_type || originalJob.type || 'service_based',
+        description: originalJob.description || '',
+        priority: originalJob.priority || 'medium',
+        address: originalJob.address || '',
+        city_zip: originalJob.city_zip || originalJob.cityZip || '',
+        phone: originalJob.phone || '',
+        email: originalJob.email || '',
+        bill_to_address: originalJob.bill_to_address || originalJob.billToAddress || '',
+        bill_to_city_zip: originalJob.bill_to_city_zip || originalJob.billToCityZip || '',
+        bill_to_phone: originalJob.bill_to_phone || originalJob.billToPhone || '',
+        bill_to_email: originalJob.bill_to_email || originalJob.billToEmail || '',
+        same_as_address: originalJob.same_as_address || originalJob.sameAsAddress || false,
+        due_date: originalJob.due_date || originalJob.dueDate || '',
+        // estimated_hours: originalJob.estimated_hours || originalJob.estimatedHours || 0,
+                estimated_cost: Number(changeOrderEstimate),
 
-      setFilteredCustomers(transformedCustomers);
-      setTotalCustomers(res.data?.pagination?.total ?? transformedCustomers.length ?? 0);
+        status: 'pending', // New job starts as pending
+
+        // Copy assigned labor if exists
+        assigned_lead_labor_ids: originalJob.assigned_lead_labor_ids ||
+          (originalJob.assignedLeadLabor ? JSON.stringify(originalJob.assignedLeadLabor) : undefined),
+        assigned_labor_ids: originalJob.assigned_labor_ids ||
+          (originalJob.assignedLabor ? JSON.stringify(originalJob.assignedLabor) : undefined),
+
+      };
+
+      // Add customer_id or contractor_id based on job type
+      if (originalJob.job_type === 'service_based' || originalJob.type === 'service-based') {
+        payload.customer_id = originalJob.customer_id || originalJob.customer;
+      } else {
+        payload.contractor_id = originalJob.contractor_id || originalJob.contractor;
+      }
+
+      console.log('Creating change order with payload:', payload);
+
+      // Call API to CREATE NEW JOB (not update)
+      const response = await apiClient.createJob(payload); // Remove changeOrderJob.id
+      console.log('Change order creation response:', response);
+
+      // Get the newly created job from response
+      const newJob = response.data || response;
+
+      // Update Local State - Add the new job to the list
+      setCustomersWithJobs(prevCustomers => {
+        return prevCustomers.map(customer => {
+          if (customer.id.toString() === changeOrderJob.customerId) {
+            // Add the new job to the customer's jobs list
+            const updatedJobs = [...(customer.jobs || [])];
+
+            // Check if this job should be a subjob of the original
+            // For now, add as a main job
+            updatedJobs.push({
+              ...newJob,
+              id: newJob.id,
+              job_title: changeOrderTitle,
+              estimated_cost: Number(changeOrderEstimate), 
+              title: changeOrderTitle,
+              isChangeOrder: true,
+              originalJobId: originalJob.id
+            });
+
+            return {
+              ...customer,
+              jobs: updatedJobs
+            };
+          }
+          return customer;
+        });
+      });
+
+      toast.success('Change order created successfully!');
+      fetchCustomersWithJobs();
+      setShowChangeOrderModal(false);
+      setChangeOrderJob(null);
+      setChangeOrderTitle('');
     } catch (error) {
-      console.error("Customer fetch error:", error);
-      setFilteredCustomers([]);
-      setTotalCustomers(0);
+      console.error('Error creating change order:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to create change order');
     } finally {
-      setIsLoadingCustomers(false);
+      setIsUpdatingChangeOrder(false);
     }
   };
-
-  fetchCustomersByStatus();
-}, [statusFilter, currentPage, itemsPerPage]);
-
 
   return (
     <div className="h-full flex">
@@ -1085,8 +1217,8 @@ useEffect(() => {
 
         {/* Search */}
         <div className="p-4 bg-white border-b border-gray-200">
-          <input 
-            type="text" 
+          <input
+            type="text"
             placeholder="Search customers or jobs..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -1121,9 +1253,8 @@ useEffect(() => {
                       <CollapsibleTrigger asChild>
                         <Button
                           variant="ghost"
-                          className={`w-full justify-start p-2 text-left h-auto hover:bg-blue-50 ${
-                            isSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
-                          }`}
+                          className={`w-full justify-start p-2 text-left h-auto hover:bg-blue-50 ${isSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
+                            }`}
                           onClick={() => selectCustomer(customer.id.toString())}
                         >
                           <div className="  w-full">
@@ -1146,6 +1277,7 @@ useEffect(() => {
                                 <Button
                                   variant="ghost"
                                   size="sm"
+                                  title='Edit Customer'
                                   className="h-8 w-8 p-0 hover:bg-blue-100"
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1159,6 +1291,7 @@ useEffect(() => {
                                 <Button
                                   variant="ghost"
                                   size="sm"
+                                  title="Delete Customer"
                                   className="h-8 w-8 p-0 hover:bg-red-100"
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1191,9 +1324,8 @@ useEffect(() => {
                                     <CollapsibleTrigger asChild>
                                       <Button
                                         variant="ghost"
-                                        className={`w-full justify-start p-2 text-left h-auto text-sm hover:bg-blue-50 ${
-                                          isJobSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
-                                        }`}
+                                        className={`w-full justify-start p-2 text-left h-auto text-sm hover:bg-blue-50 ${isJobSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
+                                          }`}
                                         onClick={() => selectJob(job.id.toString(), customer.id.toString())}
                                       >
                                         <div className="flex items-center justify-between w-full">
@@ -1211,9 +1343,29 @@ useEffect(() => {
                                                 {job.job_title || job.title}
                                               </div>
                                               <div className="text-xs text-gray-500">
-                                                {job.status}  
+                                                {job.status}
                                               </div>
                                             </div>
+
+                                          </div>
+                                          <div onClick={(e) => e.stopPropagation()}>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              title='Change Order'
+                                              className="h-8 w-8 px-2 text-xs text-blue-600 hover:text-blue-800  hover:bg-blue-100"
+                                              onClick={(e) => handleChangeOrderClick(job, customer.id.toString(), e)}
+                                            >
+                                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M6 2H14L20 8V22H6V2Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                                                <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                                                <path d="M9 14C9 12.9 9.9 12 11 12H15L13.5 10.5M15 12L13.5 13.5"
+                                                  stroke="currentColor"
+                                                  stroke-width="2"
+                                                  stroke-linecap="round"
+                                                  stroke-linejoin="round" />
+                                              </svg>
+                                            </Button>
                                           </div>
                                         </div>
                                       </Button>
@@ -1229,9 +1381,8 @@ useEffect(() => {
                                               <Minus className="h-3 w-3 text-primary/30 mt-1.5 mr-2" />
                                               <Button
                                                 variant="ghost"
-                                                className={`flex-1 justify-start p-1.5 text-left h-auto text-xs hover:bg-blue-50 ${
-                                                  isSubJobSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
-                                                }`}
+                                                className={`flex-1 justify-start p-1.5 text-left h-auto text-xs hover:bg-blue-50 ${isSubJobSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
+                                                  }`}
                                                 onClick={() => selectSubJob(subJob.id.toString(), job.id.toString(), customer.id.toString())}
                                               >
                                                 <div className="flex items-center gap-2 w-full">
@@ -1240,7 +1391,7 @@ useEffect(() => {
                                                     <div className="text-xs text-gray-700 truncate">
                                                       {subJob.job_title || subJob.title}
                                                     </div>
-                                                   
+
                                                   </div>
                                                 </div>
                                               </Button>
@@ -1261,14 +1412,14 @@ useEffect(() => {
                 )
               })
             )}
-           
+
           </div>
-             
+
           <div className="pt-4 bg-white border-t border-gray-200">
             <div className="m-auto text-center ">
               <div className="text-sm text-gray-600 mb-3 mt-4">
                 {/* Showing {customersWithJobs.length} Pages {totalPages}   */}
-                  Showing {customersWithJobs.length} of {totalCustomers} Customer • Page {currentPage} of {totalPages}
+                Showing {customersWithJobs.length} of {totalCustomers} Customer • Page {currentPage} of {totalPages}
               </div>
               <div className="flex justify-center items-center gap-2">
                 <Button
@@ -1280,7 +1431,7 @@ useEffect(() => {
                 >
                   <ChevronDown className="h-4 w-4 rotate-90" />
                 </Button>
-                
+
                 {/* <div className="flex items-center gap-1">
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                     <Button
@@ -1294,7 +1445,7 @@ useEffect(() => {
                     </Button>
                   ))}
                 </div> */}
-                
+
                 <Button
                   variant="outline"
                   size="sm"
@@ -1306,14 +1457,14 @@ useEffect(() => {
                 </Button>
               </div>
             </div>
-          </div> 
+          </div>
         </ScrollArea>
 
-      
+
       </div>
 
       {/* Right Content - Job Details */}
-      <div className="flex-1 bg-white" style={{width: '80%', margin: '0 auto'}}>
+      <div className="flex-1 bg-white" style={{ width: '80%', margin: '0 auto' }}>
         <div className="p-4 border-b border-gray-200">
           <div className="flex justify-between items-center">
             <div>
@@ -1406,14 +1557,14 @@ useEffect(() => {
                     {selectedJobData.subJobs?.length || 0} Sub-Jobs
                   </Badge>
                 </div>
-                
+
                 {/* Show sub-job details if sub-job is selected */}
                 {selectedSubJob ? (
                   selectedJobData.subJobs?.map((subJob: any) => {
                     if (subJob.id.toString() !== selectedSubJob) return null;
-                    
+
                     const jobData = enhancedJobData && enhancedJobData.id.toString() === subJob.id.toString() ? enhancedJobData : subJob;
-                    
+
                     const jobWithCustomerData = {
                       ...jobData,
                       id: subJob.id.toString(),
@@ -1438,13 +1589,13 @@ useEffect(() => {
                       assignedLaborDetails: jobData.assignedLaborDetails || [],
                       assignedLeadLaborDetails: jobData.assignedLeadLaborDetails || []
                     };
-                    
+
                     const allJobs = [jobWithCustomerData];
-                    
+
                     const handleSetJobs = (updatedJobs: any[]) => {
                       if (updatedJobs.length > 0) {
                         const updatedJob = updatedJobs[0];
-                        setCustomersWithJobs(prevCustomers => 
+                        setCustomersWithJobs(prevCustomers =>
                           prevCustomers.map(customer => {
                             if (customer.id.toString() === selectedCustomer) {
                               return {
@@ -1453,8 +1604,8 @@ useEffect(() => {
                                   if (job.id.toString() === selectedJob) {
                                     return {
                                       ...job,
-                                      subJobs: job.subJobs?.map((subJobItem: any) => 
-                                        subJobItem.id.toString() === updatedJob.id 
+                                      subJobs: job.subJobs?.map((subJobItem: any) =>
+                                        subJobItem.id.toString() === updatedJob.id
                                           ? { ...subJobItem, ...updatedJob }
                                           : subJobItem
                                       ) || []
@@ -1469,13 +1620,13 @@ useEffect(() => {
                         );
                       }
                     };
-                    
+
                     return (
-                      <JobDetailsPage 
-                        key={subJob.id} 
-                        jobId={subJob.id.toString()} 
+                      <JobDetailsPage
+                        key={subJob.id}
+                        jobId={subJob.id.toString()}
                         onBack={() => setSelectedSubJob(null)}
-                        jobs={allJobs} 
+                        jobs={allJobs}
                         setJobs={handleSetJobs}
                       />
                     );
@@ -1484,7 +1635,7 @@ useEffect(() => {
                   /* Show main job details if no sub-job is selected */
                   (() => {
                     const jobData = enhancedJobData && enhancedJobData.id.toString() === selectedJobData.id.toString() ? enhancedJobData : selectedJobData;
-                    
+
                     const jobWithCustomerData = {
                       ...jobData,
                       id: selectedJobData.id.toString(),
@@ -1509,19 +1660,19 @@ useEffect(() => {
                       assignedLaborDetails: jobData.assignedLaborDetails || [],
                       assignedLeadLaborDetails: jobData.assignedLeadLaborDetails || []
                     };
-                    
+
                     const allJobs = [jobWithCustomerData];
-                    
+
                     const handleSetJobs = (updatedJobs: any[]) => {
                       if (updatedJobs.length > 0) {
                         const updatedJob = updatedJobs[0];
-                        setCustomersWithJobs(prevCustomers => 
+                        setCustomersWithJobs(prevCustomers =>
                           prevCustomers.map(customer => {
                             if (customer.id.toString() === selectedCustomer) {
                               return {
                                 ...customer,
-                                jobs: customer.jobs.map((job: any) => 
-                                  job.id.toString() === selectedJob 
+                                jobs: customer.jobs.map((job: any) =>
+                                  job.id.toString() === selectedJob
                                     ? { ...job, ...updatedJob }
                                     : job
                                 )
@@ -1532,13 +1683,13 @@ useEffect(() => {
                         );
                       }
                     };
-                    
+
                     return (
-                      <JobDetailsPage 
-                        key={selectedJobData.id} 
-                        jobId={selectedJobData.id.toString()} 
+                      <JobDetailsPage
+                        key={selectedJobData.id}
+                        jobId={selectedJobData.id.toString()}
                         onBack={() => setSelectedJob(null)}
-                        jobs={allJobs} 
+                        jobs={allJobs}
                         setJobs={handleSetJobs}
                       />
                     );
@@ -1555,7 +1706,7 @@ useEffect(() => {
                 <h1 className="text-3xl font-bold text-gray-900">{selectedCustomerData.customer_name || selectedCustomerData.name}</h1>
                 <p className="text-lg text-gray-600">Customer Details</p>
               </div>
-              <Badge 
+              <Badge
                 variant="default"
                 className="px-3 py-1 bg-green-100 text-green-800 border-green-200"
               >
@@ -1606,11 +1757,11 @@ useEffect(() => {
                         <div>
                           <span className="text-sm text-gray-600">Join Date</span>
                           <p className="text-gray-900">
-                            {selectedCustomerData.created_at 
+                            {selectedCustomerData.created_at
                               ? formatDate(selectedCustomerData.created_at)
-                              : selectedCustomerData.jobs?.[0]?.customer?.created_at 
-                              ? formatDate(selectedCustomerData.jobs[0].customer.created_at)
-                              : 'N/A'}
+                              : selectedCustomerData.jobs?.[0]?.customer?.created_at
+                                ? formatDate(selectedCustomerData.jobs[0].customer.created_at)
+                                : 'N/A'}
                           </p>
                         </div>
                       </div>
@@ -1697,8 +1848,8 @@ useEffect(() => {
         }
         setShowAddCustomerModal(open);
       }}>
-        <DialogContent 
-          className="max-w-2xl overflow-visible" 
+        <DialogContent
+          className="max-w-2xl overflow-visible"
           style={{ zIndex: 100 }}
           onInteractOutside={(e) => {
             // Prevent modal close when clicking on autocomplete dropdown
@@ -1891,7 +2042,7 @@ useEffect(() => {
                         if (overlay) {
                           (overlay as HTMLElement).style.pointerEvents = 'none';
                         }
-                        
+
                         // Use formatted_address if available, otherwise use name
                         const address = place.formatted_address || place.name || '';
                         if (address) {
@@ -1900,7 +2051,7 @@ useEffect(() => {
                             setValidationErrors({ ...validationErrors, address: '' });
                           }
                         }
-                        
+
                         // Re-enable overlay after a short delay
                         setTimeout(() => {
                           const pacContainer = document.querySelector('.pac-container');
@@ -1922,9 +2073,8 @@ useEffect(() => {
                         setValidationErrors({ ...validationErrors, address: '' });
                       }
                     }}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent mt-1 ${
-                      validationErrors.address ? 'border-red-500' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent mt-1 ${validationErrors.address ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     placeholder="Enter full address"
                   />
                   {validationErrors.address && (
@@ -1956,7 +2106,7 @@ useEffect(() => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem> 
+                      <SelectItem value="inactive">Inactive</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1995,7 +2145,7 @@ useEffect(() => {
                     Edit
                   </Button>
                 )}
-               
+
               </div>
             ) : (
               <div className="flex gap-2">
@@ -2038,6 +2188,104 @@ useEffect(() => {
         </DialogContent>
       </Dialog>
 
+      {/* Change Order Modal */}
+      <Dialog open={showChangeOrderModal} onOpenChange={setShowChangeOrderModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Change Order</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Job ID Display */}
+            <div className="space-y-2">
+              <Label className="text-sm text-gray-500">Job ID</Label>
+              <div className="bg-gray-50 p-2 rounded-md border border-gray-200">
+                <p className="text-sm font-medium">{changeOrderJob?.id || 'N/A'}</p>
+              </div>
+            </div>
+
+            {/* New Job Title Input */}
+            <div className="space-y-2">
+              <Label htmlFor="changeOrderTitle" className="text-sm font-medium">
+                Job Title <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="changeOrderTitle"
+                value={changeOrderTitle}
+                onChange={(e) => {
+                  setChangeOrderTitle(e.target.value);
+                  if (changeOrderErrors.title) {
+                    setChangeOrderErrors({ ...changeOrderErrors, title: '' });
+                  }
+                }}
+                placeholder="Enter new job title"
+                className={changeOrderErrors.title ? 'border-red-500' : ''}
+                autoFocus
+              />
+              {changeOrderErrors.title && (
+                <p className="text-red-500 text-xs mt-1">{changeOrderErrors.title}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="changeOrderEstimate" className="text-sm font-medium">
+                Estimate Amount ($) <span className="text-red-500">*</span>
+              </Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                <Input
+                  id="changeOrderEstimate"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={changeOrderEstimate}
+                  onChange={(e) => {
+                    setChangeOrderEstimate(e.target.value);
+                    if (changeOrderErrors.estimate) {
+                      setChangeOrderErrors({ ...changeOrderErrors, estimate: '' });
+                    }
+                  }}
+                  placeholder="0.00"
+                  className={`pl-7 ${changeOrderErrors.estimate ? 'border-red-500' : ''}`}
+                />
+              </div>
+              {changeOrderErrors.estimate && (
+                <p className="text-red-500 text-xs mt-1">{changeOrderErrors.estimate}</p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowChangeOrderModal(false);
+                setChangeOrderJob(null);
+                setChangeOrderTitle('');
+                setChangeOrderErrors({});
+              }}
+              disabled={isUpdatingChangeOrder}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleChangeOrderSave}
+              disabled={isUpdatingChangeOrder || !changeOrderTitle.trim()}
+              className="bg-primary text-white hover:bg-primary/90"
+            >
+              {isUpdatingChangeOrder ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Submitting...
+                </>
+              ) : (
+                'Submit Change Order'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Confirmation */}
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
         <AlertDialogContent>
@@ -2049,8 +2297,8 @@ useEffect(() => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isLoading}>No</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDeleteCustomer} 
+            <AlertDialogAction
+              onClick={handleDeleteCustomer}
               disabled={isLoading}
               className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
             >
