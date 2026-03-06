@@ -3157,7 +3157,26 @@ createBulkBluesheetMaterials: async (bulkData: BulkMaterialPayload, bluesheetId:
 
     return response.json();
   },
+// Approve a Bulk Bluesheet
+    approveBulkBluesheet: async (ids: number[], status: string = "approved") => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 
+    const response = await fetch(`${apiBaseUrl}/bluesheet/bluesheetApproved/bulk`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getAuthToken()}`,
+      },
+      body: JSON.stringify({ ids, status }),  // { "ids": [66, 65, 67], "status": "approved" }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to approve bluesheet");
+    }
+
+    return response.json();
+},
   // Approve a Bluesheet
   approveBluesheet: async (bluesheetId: number, status: string = "approved") => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -3178,6 +3197,24 @@ createBulkBluesheetMaterials: async (bulkData: BulkMaterialPayload, bluesheetId:
 
     return response.json();
   },
+
+  getJobBluesheets: async (jobId: number) => {
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+  const response = await fetch(`${apiBaseUrl}/bluesheet/job/${jobId}/bluesheets`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${getAuthToken()}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || "Failed to fetch job bluesheets");
+  }
+
+  return response.json();
+},
   // Update/Create Bluesheet Materials
   updateBluesheetMaterials: async (bluesheetId: number, materials: any[]) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;

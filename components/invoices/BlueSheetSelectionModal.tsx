@@ -9,14 +9,14 @@ import {
     ChevronLeft, ChevronRight, Eye, FileText, Upload
 } from 'lucide-react'
 import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogAction,
-  AlertDialogCancel,
+    AlertDialog,
+    AlertDialogContent,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogAction,
+    AlertDialogCancel,
 } from '../ui/alert-dialog'
 import { apiClient } from '../../utils/api'
 
@@ -70,8 +70,8 @@ export function BlueSheetSelectionModal({
     const [approveTarget, setApproveTarget] = useState<ApiBlueSheetItem | null>(null)
     const [isConfirmOpen, setIsConfirmOpen] = useState(false)
     const [isApproving, setIsApproving] = useState(false)
-    const [ blueSheetss, setBlueSheets] = useState<ApiBlueSheetItem[]>([])
-
+    const [blueSheetss, setBlueSheets] = useState<ApiBlueSheetItem[]>([])
+    const [isBulkApproving, setIsBulkApproving] = useState(false)
     React.useEffect(() => {
         if (isOpen) { setSelectedIds(new Set()); setCurrentPage(1) }
     }, [isOpen])
@@ -130,26 +130,46 @@ export function BlueSheetSelectionModal({
         setApproveTarget(blueSheet)
         setIsConfirmOpen(true)
     }
-     const confirmApprove = async () => {
-        if (!approveTarget) return
+
+    const handleBulkApprove = async () => {
+        if (selectedIds.size === 0) return
+        setIsConfirmOpen(true)
+    }
+
+    const confirmApprove = async () => {
+    // Single approve — row ke Approve button se
+    if (approveTarget && selectedIds.size === 0) {
         try {
-          setIsApproving(true)
-          await apiClient.approveBluesheet(approveTarget.id, 'approved')
-          setBlueSheets(blueSheets.map(item =>
-            item.id === approveTarget.id ? {
-              ...item,
-              status: 'approved' as const
-            } : item
-          ))
-        //   fetchBluesheets(currentPage)
+            setIsApproving(true)
+            await apiClient.approveBulkBluesheet([approveTarget.id], 'approved')
+            onSubmitSelected(blueSheets.filter(b => b.id === approveTarget.id))
         } catch (error) {
-          console.error('Error approving bluesheet:', error)
+            console.error('Error approving bluesheet:', error)
         } finally {
-          setIsApproving(false)
-          setIsConfirmOpen(false)
-          setApproveTarget(null)
+            setIsApproving(false)
+            setIsConfirmOpen(false)
+            setApproveTarget(null)
         }
-      }
+        return
+    }
+
+    // Bulk approve — selected saari IDs ek call mein
+    const selectedIdsArray = Array.from(selectedIds)  // [66, 65, 67]
+    const selectedSheets = blueSheets.filter(b => selectedIds.has(b.id))
+
+    try {
+        setIsApproving(true)
+        await apiClient.approveBulkBluesheet(selectedIdsArray, 'approved')
+        onSubmitSelected(selectedSheets)
+    } catch (error) {
+        console.error('Bulk approve error:', error)
+    } finally {
+        setIsApproving(false)
+        setIsConfirmOpen(false)
+        setApproveTarget(null)
+        clearAll()  // selection clear karo
+    }
+}
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -239,7 +259,7 @@ export function BlueSheetSelectionModal({
                                     <TableHead className="text-white font-medium">Submitted By</TableHead>
                                     <TableHead className="text-white font-medium">Date</TableHead>
                                     <TableHead className="text-white font-medium">Amount</TableHead>
-                                    <TableHead className="text-white font-medium">Supplier Invoice</TableHead>
+                                    {/* <TableHead className="text-white font-medium">Supplier Invoice</TableHead> */}
                                     <TableHead className="text-white font-medium">Status</TableHead>
                                     <TableHead className="text-white font-medium">Action</TableHead>
                                 </TableRow>
@@ -252,10 +272,10 @@ export function BlueSheetSelectionModal({
                                             key={blueSheet.id}
                                             onClick={() => toggleItem(blueSheet.id)}
                                             className={`cursor-pointer transition-colors ${isSelected
-                                                    ? 'bg-[#E6F6FF] hover:bg-[#d4eeff]'
-                                                    : index % 2 === 1
-                                                        ? 'bg-[#eff4fa] hover:bg-[#e2ecf7]'
-                                                        : 'hover:bg-[#f8fafc]'
+                                                ? 'bg-[#E6F6FF] hover:bg-[#d4eeff]'
+                                                : index % 2 === 1
+                                                    ? 'bg-[#eff4fa] hover:bg-[#e2ecf7]'
+                                                    : 'hover:bg-[#f8fafc]'
                                                 }`}
                                         >
                                             <TableCell className="pl-5" onClick={e => e.stopPropagation()}>
@@ -312,11 +332,11 @@ export function BlueSheetSelectionModal({
                                                 </span>
                                             </TableCell>
 
-                                            <TableCell>
+                                            {/* <TableCell>
                                                 <Badge className="bg-gray-50 text-gray-600 border-gray-200 text-xs">
                                                     <Upload className="w-3 h-3 mr-1" />Pending
                                                 </Badge>
-                                            </TableCell>
+                                            </TableCell> */}
 
                                             <TableCell>{getStatusBadge(blueSheet)}</TableCell>
                                             <TableCell className="pr-5">
@@ -384,35 +404,44 @@ export function BlueSheetSelectionModal({
                     <Button variant="outline" onClick={onClose} className="gap-2">
                         <X className="h-4 w-4" />Cancel
                     </Button>
-                    <Button onClick={handleSubmit} disabled={selectedIds.size === 0}
-                        className="bg-[#00A1FF] hover:bg-[#0090e6] text-white gap-2 min-w-[180px]">
-                        <Eye className="h-4 w-4" />
-                        Review & Approve
-                        {selectedIds.size > 0 && (
-                            <Badge className="bg-white/20 text-white border-0 text-xs ml-1 h-5 px-1.5">
-                                {selectedIds.size}
-                            </Badge>
+                    <Button
+                        onClick={handleBulkApprove}   
+                        disabled={selectedIds.size === 0 || isApproving}
+                        className="bg-[#00A1FF] hover:bg-[#0090e6] text-white gap-2 min-w-[180px]"
+                    >
+                        {isApproving ? (
+                            <>Processing...</>
+                        ) : (
+                            <>
+                                <CheckSquare className="h-4 w-4" />
+                                Approve Selected
+                                {selectedIds.size > 0 && (
+                                    <Badge className="bg-white/20 text-white border-0 text-xs ml-1 h-5 px-1.5">
+                                        {selectedIds.size}
+                                    </Badge>
+                                )}
+                            </>
                         )}
                     </Button>
                 </div>
 
             </DialogContent>
-             <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
+            <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
                         <AlertDialogTitle>Approve this Blue Sheet?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Are you sure you want to approve this bluesheet?
+                            Are you sure you want to approve this bluesheet?
                         </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
                         <AlertDialogCancel disabled={isApproving} onClick={() => setIsConfirmOpen(false)}>No</AlertDialogCancel>
                         <AlertDialogAction disabled={isApproving} onClick={confirmApprove}>Yes</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Dialog>
 
-        
+
     )
 }

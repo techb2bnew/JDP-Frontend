@@ -40,16 +40,7 @@ interface Job {
 }
 
 interface ApiBlueSheetItem {
-  id: number
   job_id: number
-  date: string
-  created_by: number
-  notes: string
-  additional_charges: number
-  total_cost: number
-  status: 'pending' | 'approved' | 'rejected'
-  created_at: string
-  updated_at: string
   job: {
     id: number
     status: string
@@ -78,81 +69,33 @@ interface ApiBlueSheetItem {
     bill_to_address: string
     bill_to_city_zip: string
   }
-  created_by_user: {
+  bluesheet_count: number
+  amount: number
+  total_cost: number
+  latest_bluesheet_id: number
+  latest_bluesheet_date: string
+  submitted_by: {
     id: number
     email: string
     full_name: string
   }
-  labor_entries: Array<{
+  approved_by: {
     id: number
-    date: string | null
-    role: string
-    labor?: {
-      id: number
-      users: {
-        id: number
-        email: string
-        phone: string | null
-        full_name: string
-      }
-      labor_code: string
-      hourly_rate: number
-    }
-    labor_id: number | null
-    created_at: string
-    lead_labor?: {
-      id: number
-      users: {
-        id: number
-        email: string
-        phone: string
-        full_name: string
-      }
-      labor_code: string
-    }
-    total_cost: number
-    updated_at: string
-    description: string | null
-    hourly_rate: number
-    total_hours: string
-    employee_name: string
-    lead_labor_id: number | null
-    regular_hours: string
-    overtime_hours: string
-  }>
-  material_entries: Array<{
-    id: number
-    date: string | null
-    unit: string
-    product: {
-      id: number
-      unit: string
-      jdp_sku: string | null
-      category: string | null
-      jdp_price: number | null
-      suppliers: {
-        id: number
-        company_name: string
-        contact_person: string
-      }
-      description: string | null
-      supplier_id: number
-      product_name: string
-      supplier_sku: string
-      supplier_cost_price: number | null
-    }
-    quantity: number
-    unit_cost: number
-    created_at: string
-    product_id: number
-    total_cost: number | null
-    updated_at: string
-    material_name: string
-    material_used: number
-    total_ordered: number
-    supplier_order_id: string
-    return_to_warehouse: boolean
-  }>
+    email: string
+    full_name: string
+  } | null
+
+  id?: number
+  date?: string
+  created_by?: number
+  notes?: string
+  additional_charges?: number
+  status?: 'pending' | 'approved' | 'rejected'
+  created_at?: string
+  updated_at?: string
+  created_by_user?: { id: number; email: string; full_name: string }
+  labor_entries?: Array<any>
+  material_entries?: Array<any>
 }
 
 interface JobApprovalsProps {
@@ -176,13 +119,13 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
   const [totalPages, setTotalPages] = useState(1)
   const [totalRecords, setTotalRecords] = useState(0)
 
-  const [selectedBlueSheet, setSelectedBlueSheet] = useState<DialogBlueSheetItem | null>(null)
+  const [selectedBlueSheet, setSelectedBlueSheet] = useState<any>(null)
   const [showApprovalDialog, setShowApprovalDialog] = useState(false)
   const [isConfirmOpen, setIsConfirmOpen] = useState(false)
   const [approveTarget, setApproveTarget] = useState<ApiBlueSheetItem | null>(null)
   const [isApproving, setIsApproving] = useState(false)
   const [showSelectionModal, setShowSelectionModal] = useState(false)
-  const [jobSheetsForModal, setJobSheetsForModal] = useState<ApiBlueSheetItem[]>([])
+  const [jobSheetsForModal, setJobSheetsForModal] = useState<any[]>([])
   const [selectionTarget, setSelectionTarget] = useState<ApiBlueSheetItem | null>(null)
   console.log(blueSheets, "bluesheets");
   console.log(selectedBlueSheet, "selectedBlueSheet")
@@ -193,14 +136,25 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
       const response = await apiClient.getBluesheets(page, 10)
 
       if (response.success && response.data) {
-        const sheets = response.data.bluesheets || []
-        setBlueSheets(sheets)
-        setAllBlueSheets(sheets)  // <-- ADD THIS
+        const sheets = response.data.jobs || []
+ 
+        const normalized = sheets.map((item: any) => ({
+          ...item,
+          id: item.latest_bluesheet_id,          
+          date: item.latest_bluesheet_date,
+          status: item.approved_by ? 'approved' : 'pending',
+          created_by_user: item.submitted_by,    
+          notes: '',
+          additional_charges: 0,
+          bluesheet_count: item.bluesheet_count || 1,
+          total_cost:item.total_cost,
+          labor_entries: [],
+          material_entries: [],
+          created_by: item.submitted_by?.id,
+        }))
 
-        if (selectedBlueSheet) {
-          const refreshed = sheets.find((b: any) => b.id === selectedBlueSheet.id)
-          if (refreshed) setSelectedBlueSheet(refreshed)
-        }
+        setBlueSheets(normalized)
+        setAllBlueSheets(normalized)
         setTotalPages(response.data.pagination?.total_pages || 1)
         setTotalRecords(response.data.pagination?.total_records || 0)
       }
@@ -218,16 +172,7 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
     fetchBluesheets(currentPage)
   }, [currentPage])
 
-  const uniqueJobSheets = useMemo(() => {
-    const jobMap = new Map<number, ApiBlueSheetItem>()
-    for (const sheet of blueSheets) {
-      const existing = jobMap.get(sheet.job_id)
-      if (!existing || new Date(sheet.date) > new Date(existing.date)) {
-        jobMap.set(sheet.job_id, sheet)
-      }
-    }
-    return Array.from(jobMap.values())
-  }, [blueSheets])
+
 
   // Only show BlueSheet items for the main listing
   const filteredBlueSheets = blueSheets
@@ -242,70 +187,89 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
     }
   }, [pendingCount, onApprovalCountChange])
 
-  const handleApprove = (blueSheet: ApiBlueSheetItem) => {
-    setJobSheetsForModal(blueSheets.filter(sheet => sheet.job_id === blueSheet.job_id))
+ const [isLoadingSheets, setIsLoadingSheets] = useState(false)
+
+const handleApprove = async (blueSheet: ApiBlueSheetItem) => {
+  try {
+    setIsLoadingSheets(true)
+    
+    const response = await apiClient.getJobBluesheets(blueSheet.job_id)
+    
+    const sheets = response.data || response.jobs || response || []
+    const sheetsArray = Array.isArray(sheets) ? sheets : []
+
+    const sheetsForModal = sheetsArray.map((sheet: any) => ({
+      ...sheet,
+      id: sheet.id ?? sheet.latest_bluesheet_id,
+      date: sheet.date ?? sheet.latest_bluesheet_date ?? '',
+      status: sheet.status ?? 'pending',
+      notes: sheet.notes ?? '',
+      additional_charges: sheet.additional_charges ?? 0,
+      created_by: sheet.created_by ?? sheet.submitted_by?.id ?? 0,
+      created_by_user: sheet.created_by_user ?? sheet.submitted_by ?? { id: 0, email: '', full_name: 'N/A' },
+      labor_entries: sheet.labor_entries ?? [],
+      material_entries: sheet.material_entries ?? [],
+      created_at: sheet.created_at ?? '',
+      updated_at: sheet.updated_at ?? '',
+    }))
+
+    setJobSheetsForModal(sheetsForModal)
     setShowSelectionModal(true)
+    
+  } catch (error) {
+    console.error('Error fetching job bluesheets:', error)
+  } finally {
+    setIsLoadingSheets(false)
   }
+}
 
   const handleApproveClick = (blueSheet: ApiBlueSheetItem) => {
     setApproveTarget(blueSheet)
     setIsConfirmOpen(true)
   }
-  const handleSelectionSubmit = (selectedSheets: ApiBlueSheetItem[]) => {
+ const handleSelectionSubmit = (selectedSheets: any[]) => {
     setShowSelectionModal(false)
     if (selectedSheets.length === 0) return
 
     const firstSheet = selectedSheets[0]
 
-    // Saari selected bluesheets ke material_entries merge karo
-    const mergedMaterials = selectedSheets.flatMap(sheet => sheet.material_entries)
+    const mergedMaterials = selectedSheets.flatMap(sheet => sheet.material_entries ?? [])
+    const mergedLabor = selectedSheets.flatMap(sheet => sheet.labor_entries ?? [])
+    const mergedTotalCost = selectedSheets.reduce((sum, sheet) => sum + (sheet.total_cost ?? 0), 0)
+    const mergedNotes = selectedSheets.map(sheet => sheet.notes).filter(Boolean).join(' | ')
 
-    // Saari labor_entries bhi merge karo
-    const mergedLabor = selectedSheets.flatMap(sheet => sheet.labor_entries)
-
-    // Total cost saari sheets ka sum
-    const mergedTotalCost = selectedSheets.reduce((sum, sheet) => sum + sheet.total_cost, 0)
-
-    // Notes combine karo
-    const mergedNotes = selectedSheets
-      .map(sheet => sheet.notes)
-      .filter(Boolean)
-      .join(' | ')
-
-    const dialogSheet: DialogBlueSheetItem = {
-      id: firstSheet.id,
-      job_id: firstSheet.job_id,
-      date: firstSheet.date,
-      created_by: firstSheet.created_by,
-      notes: mergedNotes || firstSheet.notes,
-      additional_charges: selectedSheets.reduce((sum, s) => sum + s.additional_charges, 0),
+    const dialogSheet = {
+      id: firstSheet.id ?? firstSheet.latest_bluesheet_id ?? 0,
+      job_id: firstSheet.job_id ?? 0,
+      date: firstSheet.date ?? firstSheet.latest_bluesheet_date ?? '',
+      created_by: firstSheet.created_by ?? firstSheet.submitted_by?.id ?? 0,
+      notes: mergedNotes || firstSheet.notes || '',
+      additional_charges: selectedSheets.reduce((sum, s) => sum + (s.additional_charges ?? 0), 0),
       total_cost: mergedTotalCost,
-      status: firstSheet.status,
-      created_at: firstSheet.created_at,
-      updated_at: firstSheet.updated_at,
+      status: (firstSheet.status ?? 'pending') as 'pending' | 'approved' | 'rejected',
+      created_at: firstSheet.created_at ?? '',
+      updated_at: firstSheet.updated_at ?? '',
       job: firstSheet.job,
-      created_by_user: firstSheet.created_by_user,
+      created_by_user: firstSheet.created_by_user ?? firstSheet.submitted_by ?? { id: 0, email: '', full_name: 'N/A' },
       labor_entries: mergedLabor,
       material_entries: mergedMaterials,
     }
-
-    console.log('Merged dialogSheet:', {
-      totalSheets: selectedSheets.length,
-      totalMaterials: mergedMaterials.length,
-      totalCost: mergedTotalCost,
-    })
 
     setSelectedBlueSheet(dialogSheet)
     setTimeout(() => setShowApprovalDialog(true), 0)
   }
 
-  const confirmApprove = async () => {
+const confirmApprove = async () => {
     if (!approveTarget) return
+    
+    const id = approveTarget.id ?? approveTarget.latest_bluesheet_id  // undefined fallback
+    if (!id) return
+    
     try {
       setIsApproving(true)
-      await apiClient.approveBluesheet(approveTarget.id, 'approved')
+      await apiClient.approveBulkBluesheet([id], 'approved') 
       setBlueSheets(blueSheets.map(item =>
-        item.id === approveTarget.id ? {
+        item.id === id ? {
           ...item,
           status: 'approved' as const
         } : item
@@ -353,16 +317,17 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
     fetchBluesheets(currentPage)
   }
 
-  const handleApprovalComplete = (approvedItem: ApiBlueSheetItem) => {
-    setBlueSheets(blueSheets.map(item =>
-      item.id === approvedItem.id ? {
-        ...approvedItem,
-        status: 'approved' as const
-      } : item
-    ))
-    setShowApprovalDialog(false)
-    setSelectedBlueSheet(null)
-  }
+const handleApprovalComplete = (approvedItem: any) => {
+  setBlueSheets(blueSheets.map(item =>
+    item.job_id === approvedItem.job_id ? {
+      ...item,
+      status: 'approved' as const
+    } : item
+  ))
+  setShowApprovalDialog(false)
+  setSelectedBlueSheet(null)
+  fetchBluesheets(currentPage)  // refresh karo
+}
 
   const getStatusBadge = (blueSheet: ApiBlueSheetItem) => {
     switch (blueSheet.status) {
@@ -529,11 +494,10 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
                 <TableHead className="text-white font-medium">Customer/Contractor</TableHead>
                 <TableHead className="text-white font-medium">Job Details</TableHead>
                 {/* <TableHead className="text-white font-medium">PO Number</TableHead> */}
-                <TableHead className="text-white font-medium">Submitted By</TableHead>
-                <TableHead className="text-white font-medium">Date</TableHead>
+                <TableHead className="text-white font-medium">Submitted By</TableHead> 
                 <TableHead className="text-white font-medium">Amount</TableHead>
-                <TableHead className="text-white font-medium">Supplier Invoice</TableHead>
-                <TableHead className="text-white font-medium">Status</TableHead>
+                <TableHead className="text-white font-medium">Bluesheet Count</TableHead>
+                {/* <TableHead className="text-white font-medium">Status</TableHead> */}
                 <TableHead className="text-white font-medium">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -590,20 +554,20 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <User className="h-4 w-4 text-gray-400" />
-                        <span className="font-medium">{blueSheet.created_by_user.full_name}</span>
+                        <span className="font-medium">
+                          {blueSheet.submitted_by?.full_name || blueSheet.created_by_user?.full_name || 'N/A'}
+                        </span>
                       </div>
-                    </TableCell>
-                    <TableCell className="text-sm">{formatDate(blueSheet.date)}</TableCell>
+                    </TableCell> 
                     <TableCell className="font-medium">{formatCurrency(blueSheet.total_cost)}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Badge className="bg-gray-50 text-gray-600 border-gray-200">
-                          <Upload className="w-3 h-3 mr-1" />
-                          Pending
+                     
+                        <Badge className="bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-50">
+                          {blueSheet.bluesheet_count} Sheets
                         </Badge>
-                      </div>
+                       
                     </TableCell>
-                    <TableCell>{getStatusBadge(blueSheet)}</TableCell>
+                    {/* <TableCell>{getStatusBadge(blueSheet)}</TableCell> */}
                     <TableCell>
                       <div className="flex gap-2">
                         <Button
