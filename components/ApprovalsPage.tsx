@@ -127,6 +127,7 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
   const [showSelectionModal, setShowSelectionModal] = useState(false)
   const [jobSheetsForModal, setJobSheetsForModal] = useState<any[]>([])
   const [selectionTarget, setSelectionTarget] = useState<ApiBlueSheetItem | null>(null)
+  const [selectedBlueSheets, setSelectedBlueSheets] = useState<any[]>([])
   console.log(blueSheets, "bluesheets");
   console.log(selectedBlueSheet, "selectedBlueSheet")
   // Fetch bluesheets from API
@@ -137,17 +138,17 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
 
       if (response.success && response.data) {
         const sheets = response.data.jobs || []
- 
+
         const normalized = sheets.map((item: any) => ({
           ...item,
-          id: item.latest_bluesheet_id,          
+          id: item.latest_bluesheet_id,
           date: item.latest_bluesheet_date,
           status: item.approved_by ? 'approved' : 'pending',
-          created_by_user: item.submitted_by,    
+          created_by_user: item.submitted_by,
           notes: '',
           additional_charges: 0,
           bluesheet_count: item.bluesheet_count || 1,
-          total_cost:item.total_cost,
+          total_cost: item.total_cost,
           labor_entries: [],
           material_entries: [],
           created_by: item.submitted_by?.id,
@@ -187,50 +188,51 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
     }
   }, [pendingCount, onApprovalCountChange])
 
- const [isLoadingSheets, setIsLoadingSheets] = useState(false)
+  const [isLoadingSheets, setIsLoadingSheets] = useState(false)
 
-const handleApprove = async (blueSheet: ApiBlueSheetItem) => {
-  try {
-    setIsLoadingSheets(true)
-    
-    const response = await apiClient.getJobBluesheets(blueSheet.job_id)
-    
-    const sheets = response.data || response.jobs || response || []
-    const sheetsArray = Array.isArray(sheets) ? sheets : []
+  const handleApprove = async (blueSheet: ApiBlueSheetItem) => {
+    try {
+      setIsLoadingSheets(true)
 
-    const sheetsForModal = sheetsArray.map((sheet: any) => ({
-      ...sheet,
-      id: sheet.id ?? sheet.latest_bluesheet_id,
-      date: sheet.date ?? sheet.latest_bluesheet_date ?? '',
-      status: sheet.status ?? 'pending',
-      notes: sheet.notes ?? '',
-      additional_charges: sheet.additional_charges ?? 0,
-      created_by: sheet.created_by ?? sheet.submitted_by?.id ?? 0,
-      created_by_user: sheet.created_by_user ?? sheet.submitted_by ?? { id: 0, email: '', full_name: 'N/A' },
-      labor_entries: sheet.labor_entries ?? [],
-      material_entries: sheet.material_entries ?? [],
-      created_at: sheet.created_at ?? '',
-      updated_at: sheet.updated_at ?? '',
-    }))
+      const response = await apiClient.getJobBluesheets(blueSheet.job_id)
 
-    setJobSheetsForModal(sheetsForModal)
-    setShowSelectionModal(true)
-    
-  } catch (error) {
-    console.error('Error fetching job bluesheets:', error)
-  } finally {
-    setIsLoadingSheets(false)
+      const sheets = response.data || response.jobs || response || []
+      const sheetsArray = Array.isArray(sheets) ? sheets : []
+
+      const sheetsForModal = sheetsArray.map((sheet: any) => ({
+        ...sheet,
+        id: sheet.id ?? sheet.latest_bluesheet_id,
+        date: sheet.date ?? sheet.latest_bluesheet_date ?? '',
+        status: sheet.status ?? 'pending',
+        notes: sheet.notes ?? '',
+        additional_charges: sheet.additional_charges ?? 0,
+        created_by: sheet.created_by ?? sheet.submitted_by?.id ?? 0,
+        created_by_user: sheet.created_by_user ?? sheet.submitted_by ?? { id: 0, email: '', full_name: 'N/A' },
+        labor_entries: sheet.labor_entries ?? [],
+        material_entries: sheet.material_entries ?? [],
+        materials_invoiced: sheet.materials_invoiced,
+        created_at: sheet.created_at ?? '',
+        updated_at: sheet.updated_at ?? '',
+      }))
+
+      setJobSheetsForModal(sheetsForModal)
+      setShowSelectionModal(true)
+
+    } catch (error) {
+      console.error('Error fetching job bluesheets:', error)
+    } finally {
+      setIsLoadingSheets(false)
+    }
   }
-}
 
   const handleApproveClick = (blueSheet: ApiBlueSheetItem) => {
     setApproveTarget(blueSheet)
     setIsConfirmOpen(true)
   }
- const handleSelectionSubmit = (selectedSheets: any[]) => {
+  const handleSelectionSubmit = (selectedSheets: any[]) => {
     setShowSelectionModal(false)
     if (selectedSheets.length === 0) return
-
+    setSelectedBlueSheets(selectedSheets)
     const firstSheet = selectedSheets[0]
 
     const mergedMaterials = selectedSheets.flatMap(sheet => sheet.material_entries ?? [])
@@ -259,15 +261,15 @@ const handleApprove = async (blueSheet: ApiBlueSheetItem) => {
     setTimeout(() => setShowApprovalDialog(true), 0)
   }
 
-const confirmApprove = async () => {
+  const confirmApprove = async () => {
     if (!approveTarget) return
-    
+
     const id = approveTarget.id ?? approveTarget.latest_bluesheet_id  // undefined fallback
     if (!id) return
-    
+
     try {
       setIsApproving(true)
-      await apiClient.approveBulkBluesheet([id], 'approved') 
+      await apiClient.approveBulkBluesheet([id], 'approved')
       setBlueSheets(blueSheets.map(item =>
         item.id === id ? {
           ...item,
@@ -317,17 +319,17 @@ const confirmApprove = async () => {
     fetchBluesheets(currentPage)
   }
 
-const handleApprovalComplete = (approvedItem: any) => {
-  setBlueSheets(blueSheets.map(item =>
-    item.job_id === approvedItem.job_id ? {
-      ...item,
-      status: 'approved' as const
-    } : item
-  ))
-  setShowApprovalDialog(false)
-  setSelectedBlueSheet(null)
-  fetchBluesheets(currentPage)  // refresh karo
-}
+  const handleApprovalComplete = (approvedItem: any) => {
+    setBlueSheets(blueSheets.map(item =>
+      item.job_id === approvedItem.job_id ? {
+        ...item,
+        status: 'approved' as const
+      } : item
+    ))
+    setShowApprovalDialog(false)
+    setSelectedBlueSheet(null)
+    fetchBluesheets(currentPage)  // refresh karo
+  }
 
   const getStatusBadge = (blueSheet: ApiBlueSheetItem) => {
     switch (blueSheet.status) {
@@ -494,7 +496,7 @@ const handleApprovalComplete = (approvedItem: any) => {
                 <TableHead className="text-white font-medium">Customer/Contractor</TableHead>
                 <TableHead className="text-white font-medium">Job Details</TableHead>
                 {/* <TableHead className="text-white font-medium">PO Number</TableHead> */}
-                <TableHead className="text-white font-medium">Submitted By</TableHead> 
+                <TableHead className="text-white font-medium">Submitted By</TableHead>
                 <TableHead className="text-white font-medium">Amount</TableHead>
                 <TableHead className="text-white font-medium">Bluesheet Count</TableHead>
                 {/* <TableHead className="text-white font-medium">Status</TableHead> */}
@@ -558,14 +560,14 @@ const handleApprovalComplete = (approvedItem: any) => {
                           {blueSheet.submitted_by?.full_name || blueSheet.created_by_user?.full_name || 'N/A'}
                         </span>
                       </div>
-                    </TableCell> 
+                    </TableCell>
                     <TableCell className="font-medium">{formatCurrency(blueSheet.total_cost)}</TableCell>
                     <TableCell>
-                     
-                        <Badge className="bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-50">
-                          {blueSheet.bluesheet_count} Sheets
-                        </Badge>
-                       
+
+                      <Badge className="bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-50">
+                        {blueSheet.bluesheet_count} Sheets
+                      </Badge>
+
                     </TableCell>
                     {/* <TableCell>{getStatusBadge(blueSheet)}</TableCell> */}
                     <TableCell>
@@ -694,6 +696,7 @@ const handleApprovalComplete = (approvedItem: any) => {
           setShowApprovalDialog(false)
           setSelectedBlueSheet(null)
         }}
+        selectedBlueSheets={selectedBlueSheets}
         blueSheet={selectedBlueSheet}
         onApprovalComplete={handleApprovalComplete}
       />

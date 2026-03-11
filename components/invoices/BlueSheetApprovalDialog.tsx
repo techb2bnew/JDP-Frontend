@@ -114,6 +114,7 @@ interface BlueSheetApprovalDialogProps {
   isOpen: boolean
   onClose: () => void
   blueSheet: BlueSheetItem | null
+  selectedBlueSheets?: BlueSheetItem[]
   onApprovalComplete: (approvedItem: BlueSheetItem) => void
 }
 
@@ -121,6 +122,7 @@ export function BlueSheetApprovalDialog({
   isOpen,
   onClose,
   blueSheet,
+  selectedBlueSheets = [],
   onApprovalComplete
 }: BlueSheetApprovalDialogProps) {
   console.log('Dialog render', { isOpen, blueSheet })
@@ -229,7 +231,7 @@ export function BlueSheetApprovalDialog({
     const totalOrdered = currentMaterial.total_ordered || 1
     const unitCost = product.jdp_price || product.unit_cost || 0
     const totalCost = totalOrdered * unitCost
- 
+
     newMaterials[index] = {
       ...currentMaterial,
       material_name: product.product_name,
@@ -239,7 +241,7 @@ export function BlueSheetApprovalDialog({
       supplier_id: product.supplier_id ? Number(product.supplier_id) : null,
       jdp_sku: product.jdp_sku || '',
       id: currentMaterial.id,                                  // existing DB row id preserve
-      product: { ...product, id: Number(product.id) },  
+      product: { ...product, id: Number(product.id) },
     }
 
     console.log(`[ProductSelect] index=${index} product_id=${newMaterials[index].product_id}`)
@@ -254,9 +256,7 @@ export function BlueSheetApprovalDialog({
     setActiveRow(null)
     toast.success(`Product "${product.product_name}" selected`)
   }
-
-  // ─── handleBlueSheetMaterialChange ────────────────────────────────────────
-  // Sirf ek field update — product_id ko KABHI reset mat karo
+ 
   const handleBlueSheetMaterialChange = (index: number, field: string, value: any) => {
     if (!editedBlueSheet) return
 
@@ -265,7 +265,7 @@ export function BlueSheetApprovalDialog({
 
     newMaterials[index] = {
       ...current,
-      [field]: value,  
+      [field]: value,
     }
 
     if (field === 'material_used' || field === 'unit_cost') {
@@ -283,14 +283,12 @@ export function BlueSheetApprovalDialog({
     try {
       console.log('=== SAVE DEBUG ===')
 
-      const materialsForAPI = editedBlueSheet.material_entries.map((item: any) => {
-        // ── product_id: item.product_id > item.product.id > null ──
+      const materialsForAPI = editedBlueSheet.material_entries.map((item: any) => { 
         const resolvedProductId =
           item.product_id != null ? Number(item.product_id) :
-          item.product?.id != null ? Number(item.product.id) :
-          null
-
-        // ── materialId: sirf existing (non-new) rows ke liye ──
+            item.product?.id != null ? Number(item.product.id) :
+              null
+ 
         const materialId = (item.id) ? item.id : undefined
 
         console.log(
@@ -314,7 +312,7 @@ export function BlueSheetApprovalDialog({
           jdp_sku: item.jdp_sku || item.product?.jdp_sku || '',
           supplier_order_id: item.supplier_order_id || '',
           return_to_warehouse: item.return_to_warehouse || false,
-          date: item.date || new Date().toISOString().split('T')[0], 
+          date: item.date || new Date().toISOString().split('T')[0],
         }
       })
 
@@ -627,8 +625,98 @@ export function BlueSheetApprovalDialog({
         estimated_price: item.unit_cost || 0,
         total_cost: item.total_cost ?? (item.total_ordered || 0) * (item.unit_cost || 0),
         jdp_price: item.unit_cost || 0,
+        total_ordered: item.total_ordered || 0,
+        material_used: item.material_used || 0,
         is_custom: false,
       }))
+      const bluesheetIds = selectedBlueSheets.length > 0
+        ? selectedBlueSheets.map(bs => bs.id)
+        : [finalBlueSheet.id]
+      const today = new Date().toISOString().split('T')[0]
+      const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
+      const estimatePayload = {
+        job_id: finalBlueSheet.job_id,
+        estimate_title: `BlueSheet #${finalBlueSheet.id} — ${finalBlueSheet.job.job_title}`,
+        priority: (finalBlueSheet.job.priority as 'low' | 'medium' | 'high') || 'medium',
+        service_type: finalBlueSheet.job.job_type === 'contract_based' ? 'contract_based' : 'service_based',
+        invoice_type: 'estimate',
+        status: 'draft',
+        estimate_date: today,
+        due_date: thirtyDaysLater,
+        invoice_number: `INV-BS-${finalBlueSheet.id}-${Date.now().toString().slice(-6)}`,
+        issue_date: today,
+        email_address: finalBlueSheet.job.customer?.email || finalBlueSheet.job.bill_to_email || '',
+        bill_to_address: finalBlueSheet.job.bill_to_address || finalBlueSheet.job.customer?.address || '',
+        customer_id: finalBlueSheet.job.customer?.id ?? 0,
+        po_number: `BS-${finalBlueSheet.id}`,
+        rep: finalBlueSheet.created_by_user?.full_name || '',
+        notes: finalBlueSheet.notes || '',
+        total_amount: finalBlueSheet.total_cost + (finalBlueSheet.additional_charges ?? 0),
+        location: finalBlueSheet.job.bill_to_address || finalBlueSheet.job.customer?.address || '',
+        bluesheet_ids: bluesheetIds,
+        valid_until: thirtyDaysLater,
+        description: finalBlueSheet.notes || '',
+        custom_products: customProducts,
+        invoice_source: "quickbook",
+      }
+
+      await apiClient.createEstimate(estimatePayload)
+      await apiClient.approveBluesheet(finalBlueSheet.id, 'approved')
+      onApprovalComplete(finalBlueSheet)
+      toast.success('BlueSheet approved & estimate created!')
+      onClose()
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to create estimate.')
+    } finally {
+      setIsApproving(false)
+    }
+  }
+ 
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(amount)
+
+  const currentBlueSheet = editedBlueSheet || blueSheet
+  const currentSupplierInvoice = editedSupplierInvoice || supplierInvoice
+  const comparisons = generateComparison()
+  const totalDiscrepancyAmount = comparisons.reduce((sum, comp) => {
+    if (comp.blueSheetItem && comp.supplierItem)
+      return sum + Math.abs((comp.blueSheetItem.total_cost || 0) - comp.supplierItem.total)
+    return sum
+  }, 0)
+
+  // ──────────────────────────────────────────────────────────────────────────
+
+
+  const handleSendCustomInvoice = async () => {
+    const finalBlueSheet = editedBlueSheet || blueSheet
+    if (!finalBlueSheet) return
+
+    try {
+      setIsApproving(true)
+ 
+      const customProducts = finalBlueSheet.material_entries.map((item: any) => ({
+        ...(item.product?.id ? { id: item.product.id } : {}),
+        job_id: finalBlueSheet.job_id,
+        product_name: item.material_name,
+        description: item.product?.description || item.material_name,
+        supplier_id: item.product?.supplier_id ?? item.product?.suppliers?.id ?? 1,
+        supplier_sku: item.product?.supplier_sku || '',
+        jdp_sku: item.product?.jdp_sku || item.jdp_sku || '',
+        unit: item.unit || 'piece',
+        stock_quantity: item.total_ordered || 0,
+        unit_cost: item.unit_cost || 0,
+        estimated_price: item.unit_cost || 0,
+        total_cost: item.total_cost ?? (item.total_ordered || 0) * (item.unit_cost || 0),
+        jdp_price: item.unit_cost || 0,
+        total_ordered: item.total_ordered || 0,
+        material_used: item.material_used || 0,
+        is_custom: false,
+      }))
+
+      const bluesheetIds = selectedBlueSheets.length > 0
+        ? selectedBlueSheets.map(bs => bs.id)
+        : [finalBlueSheet.id]
 
       const today = new Date().toISOString().split('T')[0]
       const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -651,39 +739,104 @@ export function BlueSheetApprovalDialog({
         rep: finalBlueSheet.created_by_user?.full_name || '',
         notes: finalBlueSheet.notes || '',
         total_amount: finalBlueSheet.total_cost + (finalBlueSheet.additional_charges ?? 0),
-        location: finalBlueSheet.job.bill_to_address || '',
+        location: finalBlueSheet.job.bill_to_address || finalBlueSheet.job.customer?.address || '',
+        bluesheet_ids: bluesheetIds,
         valid_until: thirtyDaysLater,
         description: finalBlueSheet.notes || '',
         custom_products: customProducts,
-        invoice_source: "quickbook",  
+        invoice_source: 'custom',
       }
 
-      await apiClient.createEstimate(estimatePayload)
-      await apiClient.approveBluesheet(finalBlueSheet.id, 'approved')
+      const estimateResponse = await apiClient.createEstimate(estimatePayload)
+      const estimateId = estimateResponse?.data?.id
+      if (!estimateId) throw new Error('Estimate ID not returned from API')
+
+      toast.success('Estimate created!')
+ 
+      const getAuthToken = (): string | null => {
+        if (typeof window !== 'undefined') {
+          const savedAuth = localStorage.getItem('jdp_auth')
+          if (savedAuth) {
+            try {
+              const authData = JSON.parse(savedAuth)
+              if (authData.token && authData.expires > Date.now()) return authData.token
+            } catch { }
+          }
+        }
+        return null
+      }
+
+      const token = getAuthToken()
+      if (!token) throw new Error('No authentication token found')
+ 
+      const todayDate = new Date()
+      const customerEmail = finalBlueSheet.job.customer?.email || finalBlueSheet.job.bill_to_email || ''
+      const customerId = finalBlueSheet.job.customer?.id ?? 0
+
+      const isContractBased = finalBlueSheet.job.job_type === 'contract_based'
+      const contractorId = finalBlueSheet.job.contractor?.id ?? null
+
+      const sendPayload: any = {
+        estimateNumber: `INV-BS-${finalBlueSheet.id}`,
+        estimateDate: todayDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }),
+        customerName: finalBlueSheet.job.customer?.customer_name || finalBlueSheet.job.contractor?.contractor_name || '',
+        customerEmail: customerEmail,
+        customerAddress: finalBlueSheet.job.customer?.address || finalBlueSheet.job.contractor?.address || '',
+        billToAddress: finalBlueSheet.job.bill_to_address || '',
+        poNumber: `BS-${finalBlueSheet.id}`,
+        project: finalBlueSheet.job.job_title || '',
+        rep: finalBlueSheet.created_by_user?.full_name || '',
+        notes: finalBlueSheet.notes || '',
+        signatureText: 'ACCEPTED BY________________DATE_____',
+        invoiceType: 'Estimate',
+        lineItems: finalBlueSheet.material_entries.map((item: any) => ({
+          qty: item.material_used || item.total_ordered || 0,
+          item: item.material_name,
+          description: item.material_name,
+          rate: item.unit_cost || 0,
+          total: item.total_cost || 0,
+        })),
+        subtotal: finalBlueSheet.total_cost,
+        total: finalBlueSheet.total_cost,
+      }
+ 
+      if (isContractBased && contractorId) {
+        sendPayload.contractor_id = contractorId
+      } else {
+        sendPayload.customer_id = customerId
+      }
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/invoices/sendInvoiceToCustomer/${estimateId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(sendPayload),
+        }
+      )
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`Send failed: ${response.status} — ${errorText}`)
+      }
+
+      toast.success('Invoice sent to customer successfully!')
       onApprovalComplete(finalBlueSheet)
-      toast.success('BlueSheet approved & estimate created!')
       onClose()
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to create estimate.')
+      console.error('Send custom invoice error:', error)
+      toast.error(error?.message || 'Failed to send invoice to customer.')
     } finally {
       setIsApproving(false)
     }
   }
 
-  // ─── Helpers ───────────────────────────────────────────────────────────────
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(amount)
 
-  const currentBlueSheet = editedBlueSheet || blueSheet
-  const currentSupplierInvoice = editedSupplierInvoice || supplierInvoice
-  const comparisons = generateComparison()
-  const totalDiscrepancyAmount = comparisons.reduce((sum, comp) => {
-    if (comp.blueSheetItem && comp.supplierItem)
-      return sum + Math.abs((comp.blueSheetItem.total_cost || 0) - comp.supplierItem.total)
-    return sum
-  }, 0)
 
-  // ──────────────────────────────────────────────────────────────────────────
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="w-screen h-screen max-w-full max-h-full min-w-full min-h-full overflow-hidden p-0 rounded-none border-0">
@@ -829,7 +982,7 @@ export function BlueSheetApprovalDialog({
                                 <span className="text-lg font-medium">{formatCurrency(item.total_cost || item.material_used * item.unit_cost)}</span>
                               </div>
                             ))}
-                             
+
                           </div>
                         </div>
                         <div className="flex items-center justify-between text-xl font-medium pt-6 border-t">
@@ -1252,10 +1405,16 @@ export function BlueSheetApprovalDialog({
                     </Button>
                     <div className="flex gap-6">
                       <Button variant="outline" onClick={onClose} className="h-14 text-lg px-6" size="lg">Cancel</Button>
-                      <Button onClick={handleFinalApproval} disabled={isApproving} className="bg-primary text-white hover:bg-green-700 gap-3 h-14 text-lg px-8" size="lg">
-                        <Send className="h-5 w-5" />
-                        {isApproving ? 'Approving...' : 'Final Approval & Generate Invoice'}
-                      </Button>
+                      <div className='flex gap-3'>
+                        <Button onClick={handleSendCustomInvoice} disabled={isApproving} className="bg-primary text-white hover:bg-green-700 gap-3 h-14 text-lg px-8" size="lg">
+                          <Send className="h-5 w-5" />
+                          {isApproving ? 'Approving...' : 'Send Custom Invoice to Customer'}
+                        </Button>
+                        <Button onClick={handleFinalApproval} disabled={isApproving} className="bg-primary text-white hover:bg-green-700 gap-3 h-14 text-lg px-8" size="lg">
+                          <Send className="h-5 w-5" />
+                          {isApproving ? 'Approving...' : 'Send Invoice to Quickbooks'}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
