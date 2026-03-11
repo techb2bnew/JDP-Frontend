@@ -257,7 +257,7 @@ export function BlueSheetApprovalDialog({
     setActiveRow(null)
     toast.success(`Product "${product.product_name}" selected`)
   }
- 
+
   const handleBlueSheetMaterialChange = (index: number, field: string, value: any) => {
     if (!editedBlueSheet) return
 
@@ -284,12 +284,12 @@ export function BlueSheetApprovalDialog({
     try {
       console.log('=== SAVE DEBUG ===')
 
-      const materialsForAPI = editedBlueSheet.material_entries.map((item: any) => { 
+      const materialsForAPI = editedBlueSheet.material_entries.map((item: any) => {
         const resolvedProductId =
           item.product_id != null ? Number(item.product_id) :
             item.product?.id != null ? Number(item.product.id) :
               null
- 
+
         const materialId = (item.id) ? item.id : undefined
 
         console.log(
@@ -673,7 +673,7 @@ export function BlueSheetApprovalDialog({
       setIsApproving(false)
     }
   }
- 
+
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(amount)
 
@@ -695,7 +695,7 @@ export function BlueSheetApprovalDialog({
 
     try {
       setIsApprovingCustomer(true)
- 
+
       const customProducts = finalBlueSheet.material_entries.map((item: any) => ({
         ...(item.product?.id ? { id: item.product.id } : {}),
         job_id: finalBlueSheet.job_id,
@@ -753,7 +753,7 @@ export function BlueSheetApprovalDialog({
       if (!estimateId) throw new Error('Estimate ID not returned from API')
 
       toast.success('Estimate created!')
- 
+
       const getAuthToken = (): string | null => {
         if (typeof window !== 'undefined') {
           const savedAuth = localStorage.getItem('jdp_auth')
@@ -769,7 +769,7 @@ export function BlueSheetApprovalDialog({
 
       const token = getAuthToken()
       if (!token) throw new Error('No authentication token found')
- 
+
       const todayDate = new Date()
       const customerEmail = finalBlueSheet.job.customer?.email || finalBlueSheet.job.bill_to_email || ''
       const customerId = finalBlueSheet.job.customer?.id ?? 0
@@ -800,7 +800,7 @@ export function BlueSheetApprovalDialog({
         subtotal: finalBlueSheet.total_cost,
         total: finalBlueSheet.total_cost,
       }
- 
+
       if (isContractBased && contractorId) {
         sendPayload.contractor_id = contractorId
       } else {
@@ -986,10 +986,32 @@ export function BlueSheetApprovalDialog({
 
                           </div>
                         </div>
-                        <div className="flex items-center justify-between text-xl font-medium pt-6 border-t">
-                          <span>Total:</span>
-                          <span className="text-[#00A1FF]">{formatCurrency(blueSheet.total_cost)}</span>
-                        </div>
+                        {(() => {
+                          // Material entries se directly calculate karo
+                          const materialTotal = blueSheet.material_entries.reduce(
+                            (sum: number, item: any) => sum + (item.total_cost || item.material_used * item.unit_cost || 0),
+                            0
+                          )
+
+                          const grandTotal = selectedBlueSheets.length > 0
+                            ? selectedBlueSheets.reduce((sum, bs) => {
+                              const bsTotal = (bs.material_entries?.length > 0)
+                                ? bs.material_entries.reduce(
+                                  (s: number, item: any) => s + (item.total_cost || item.material_used * item.unit_cost || 0),
+                                  0
+                                )
+                                : (bs.total_cost || 0)
+                              return sum + bsTotal
+                            }, 0)
+                            : materialTotal
+
+                          return (
+                            <div className="flex items-center justify-between text-xl font-medium pt-6 border-t">
+                              <span>Total {selectedBlueSheets.length > 1 ? `(${selectedBlueSheets.length} BluSheets)` : ''}:</span>
+                              <span className="text-[#00A1FF]">{formatCurrency(grandTotal)}</span>
+                            </div>
+                          )
+                        })()}
                       </CardContent>
                     </Card>
                   </div>
@@ -1263,7 +1285,14 @@ export function BlueSheetApprovalDialog({
                         {/* Totals Row */}
                         <tr className="border-t-2 border-gray-300 bg-gray-50">
                           <td colSpan={3} className="px-3 py-3 text-right text-xs font-semibold text-gray-600">BlueSheet Total:</td>
-                          <td className="px-3 py-3 text-right font-bold text-[#00A1FF] text-sm">{formatCurrency(currentBlueSheet.total_cost)}</td>
+                          <td className="px-3 py-3 text-right font-bold text-[#00A1FF] text-sm">
+                            {formatCurrency(
+                              currentBlueSheet.material_entries.reduce(
+                                (sum: number, item: any) => sum + (item.total_cost || item.material_used * item.unit_cost || 0),
+                                0
+                              )
+                            )}
+                          </td>
                           <td className="px-2 py-3 bg-white/70 border-x border-gray-200" />
                           <td colSpan={3} className="px-3 py-3 text-right text-xs font-semibold text-gray-600">Supplier Total:</td>
                           <td className="px-3 py-3 text-right font-bold text-emerald-600 text-sm">
@@ -1408,12 +1437,12 @@ export function BlueSheetApprovalDialog({
                       <Button variant="outline" onClick={onClose} className="h-14 text-lg px-6" size="lg">Cancel</Button>
                       <div className='flex gap-3'>
                         <Button onClick={handleSendCustomInvoice} disabled={isApprovingCustomer || isApproving} className="bg-primary text-white hover:bg-green-700 gap-3 h-14 text-lg px-8" size="lg">
-                          <Send className="h-5 w-5" /> 
-                           {isApprovingCustomer ? 'Approving...' : 'Send Invoice to Quickbooks'}
+                          <Send className="h-5 w-5" />
+                          {isApprovingCustomer ? 'Approving...' : 'Send Custom Invoice'}
                         </Button>
                         <Button onClick={handleFinalApproval} disabled={isApproving || isApprovingCustomer} className="bg-primary text-white hover:bg-green-700 gap-3 h-14 text-lg px-8" size="lg">
                           <Send className="h-5 w-5" />
-                          {isApproving ? 'Approving...' : 'Send Invoice to Quickbooks'}
+                          {isApproving ? 'Approving...' : 'Send Quickbook Invoice'}
                         </Button>
                       </div>
                     </div>
