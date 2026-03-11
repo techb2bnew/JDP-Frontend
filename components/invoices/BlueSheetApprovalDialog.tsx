@@ -136,6 +136,7 @@ export function BlueSheetApprovalDialog({
   const [editedBlueSheet, setEditedBlueSheet] = useState<BlueSheetItem | null>(null)
   const [editedSupplierInvoice, setEditedSupplierInvoice] = useState<SupplierInvoice | null>(null)
   const [isApproving, setIsApproving] = useState(false)
+  const [isApprovingCustomer, setIsApprovingCustomer] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [filteredProducts, setFilteredProducts] = useState<any[]>([])
   const [activeRow, setActiveRow] = useState<number | null>(null)
@@ -693,7 +694,7 @@ export function BlueSheetApprovalDialog({
     if (!finalBlueSheet) return
 
     try {
-      setIsApproving(true)
+      setIsApprovingCustomer(true)
  
       const customProducts = finalBlueSheet.material_entries.map((item: any) => ({
         ...(item.product?.id ? { id: item.product.id } : {}),
@@ -830,7 +831,7 @@ export function BlueSheetApprovalDialog({
       console.error('Send custom invoice error:', error)
       toast.error(error?.message || 'Failed to send invoice to customer.')
     } finally {
-      setIsApproving(false)
+      setIsApprovingCustomer(false)
     }
   }
 
@@ -1406,11 +1407,11 @@ export function BlueSheetApprovalDialog({
                     <div className="flex gap-6">
                       <Button variant="outline" onClick={onClose} className="h-14 text-lg px-6" size="lg">Cancel</Button>
                       <div className='flex gap-3'>
-                        <Button onClick={handleSendCustomInvoice} disabled={isApproving} className="bg-primary text-white hover:bg-green-700 gap-3 h-14 text-lg px-8" size="lg">
-                          <Send className="h-5 w-5" />
-                          {isApproving ? 'Approving...' : 'Send Custom Invoice to Customer'}
+                        <Button onClick={handleSendCustomInvoice} disabled={isApprovingCustomer || isApproving} className="bg-primary text-white hover:bg-green-700 gap-3 h-14 text-lg px-8" size="lg">
+                          <Send className="h-5 w-5" /> 
+                           {isApprovingCustomer ? 'Approving...' : 'Send Invoice to Quickbooks'}
                         </Button>
-                        <Button onClick={handleFinalApproval} disabled={isApproving} className="bg-primary text-white hover:bg-green-700 gap-3 h-14 text-lg px-8" size="lg">
+                        <Button onClick={handleFinalApproval} disabled={isApproving || isApprovingCustomer} className="bg-primary text-white hover:bg-green-700 gap-3 h-14 text-lg px-8" size="lg">
                           <Send className="h-5 w-5" />
                           {isApproving ? 'Approving...' : 'Send Invoice to Quickbooks'}
                         </Button>
