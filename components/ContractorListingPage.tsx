@@ -2931,7 +2931,7 @@ export function ContractorListingPage() {
                                             variant="ghost"
                                             size="sm"
                                             title='Change Order'
-                                            className="h-8 w-8 px-2 text-xs text-blue-600 hover:text-blue-800  hover:bg-blue-100"
+                                            className="px-2 text-xs text-blue-600 hover:text-blue-800 bg-blue-100"
                                             onClick={(e) => handleChangeOrderClick(job, contractor.id.toString(), e)}
                                           >
                                             Change Order
