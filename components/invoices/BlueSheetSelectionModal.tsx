@@ -38,6 +38,7 @@ interface ApiBlueSheetItem {
     created_by_user: { id: number; email: string; full_name: string }
     labor_entries: Array<any>
     material_entries: Array<any>
+    total_labor_hours: number
 }
 
 interface BlueSheetSelectionModalProps {

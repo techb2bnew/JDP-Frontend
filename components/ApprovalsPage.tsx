@@ -195,9 +195,12 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
       setIsLoadingSheets(true)
 
       const response = await apiClient.getJobBluesheets(blueSheet.job_id)
+ 
+      const responseData = response.data || response
+      const bluesheets = responseData?.bluesheets || responseData?.data || responseData || []
+      const sheetsArray = Array.isArray(bluesheets) ? bluesheets : []
 
-      const sheets = response.data || response.jobs || response || []
-      const sheetsArray = Array.isArray(sheets) ? sheets : []
+      const totalLaborHours = responseData?.total_labor_hours 
 
       const sheetsForModal = sheetsArray.map((sheet: any) => ({
         ...sheet,
@@ -211,6 +214,7 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
         labor_entries: sheet.labor_entries ?? [],
         material_entries: sheet.material_entries ?? [],
         materials_invoiced: sheet.materials_invoiced,
+        total_labor_hours: sheet.total_labor_hours ?? totalLaborHours ?? null, 
         created_at: sheet.created_at ?? '',
         updated_at: sheet.updated_at ?? '',
       }))
@@ -255,6 +259,8 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
       created_by_user: firstSheet.created_by_user ?? firstSheet.submitted_by ?? { id: 0, email: '', full_name: 'N/A' },
       labor_entries: mergedLabor,
       material_entries: mergedMaterials,
+      // total labor hours string passed directly from API (e.g. "58h34m")
+      total_labor_hours: firstSheet.total_labor_hours ?? null,
     }
 
     setSelectedBlueSheet(dialogSheet)

@@ -27,7 +27,7 @@ interface NewInvoiceDialogProps {
   onSave: (invoice: Partial<Invoice>) => void
   jobs: any[];
   jobId?: number;
-onInvoiceSaved?: (invoice: any) => void;
+  onInvoiceSaved?: (invoice: any) => void;
   isViewMode?: boolean;
   viewInvoiceData?: any;
 }
@@ -92,11 +92,11 @@ export interface CreateEstimatePayload {
 interface ProductFormData {
   id: number;
   product_name: string;
-  name: string;          
-  sku: string;           
+  name: string;
+  sku: string;
   jdpSku: string;
-  unitPrice: number;     
-  unit: string;         
+  unitPrice: number;
+  unit: string;
   stock: number;
   supplierId: number | null;
   supplierName?: string;
@@ -121,7 +121,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
       full_name: string;
     };
   }[]>([]);
-const [products, setProducts] = useState<ProductFormData[]>([]);
+  const [products, setProducts] = useState<ProductFormData[]>([]);
 
 
 
@@ -200,33 +200,33 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
     if (currentJob) {
       // Determine if it's contract-based
       const isContractBased = currentJob.type === 'contract_based' || currentJob.type === 'contract-based';
-      
+
       // Get customer/contractor name and address
       let customerName = '';
       let customerAddress = '';
-      
+
       if (isContractBased) {
-        customerName = currentJob.contractorName || 
-                       currentJob.contractor?.contractor_name || 
-                       currentJob.contractor?.name || 
-                       currentJob.contractor?.full_name || 
-                       '';
-        customerAddress = currentJob.contractorAddress || 
-                         currentJob.contractor?.address || 
-                         currentJob.location || 
-                         currentJob.address || 
-                         '';
+        customerName = currentJob.contractorName ||
+          currentJob.contractor?.contractor_name ||
+          currentJob.contractor?.name ||
+          currentJob.contractor?.full_name ||
+          '';
+        customerAddress = currentJob.contractorAddress ||
+          currentJob.contractor?.address ||
+          currentJob.location ||
+          currentJob.address ||
+          '';
       } else {
-        customerName = currentJob.customerName || 
-                       currentJob.customer?.customer_name || 
-                       currentJob.customer?.name || 
-                       '';
-        customerAddress = currentJob.location || 
-                         currentJob.address || 
-                         currentJob.customer?.address || 
-                         '';
+        customerName = currentJob.customerName ||
+          currentJob.customer?.customer_name ||
+          currentJob.customer?.name ||
+          '';
+        customerAddress = currentJob.location ||
+          currentJob.address ||
+          currentJob.customer?.address ||
+          '';
       }
-      
+
       setInlineInvoiceData(prev => ({
         ...prev,
         customerName: customerName,
@@ -246,7 +246,7 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
       });
 
       const customerName = viewInvoiceData?.contractor?.contractor_name ?? viewInvoiceData?.customer?.customer_name;
-      const customerAddress = viewInvoiceData?.contractor?.address ??viewInvoiceData?.customer?.address;
+      const customerAddress = viewInvoiceData?.contractor?.address ?? viewInvoiceData?.customer?.address;
       const project = viewInvoiceData?.estimate_title || 'No project name';
 
       console.log('Processed customer data:', { customerName, customerAddress, project });
@@ -361,24 +361,24 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
       let customerId: number | null = null;
       let contractorId: number | null = null;
       let isContractBased = false;
-      
+
       if (isViewMode && viewInvoiceData) {
         // In view mode, get from viewInvoiceData
-        isContractBased = viewInvoiceData.service_type === 'contract_based' || 
-                          viewInvoiceData.job?.job_type === 'contract_based' ||
-                          viewInvoiceData.contractor_id !== null && viewInvoiceData.contractor_id !== undefined;
-        
+        isContractBased = viewInvoiceData.service_type === 'contract_based' ||
+          viewInvoiceData.job?.job_type === 'contract_based' ||
+          viewInvoiceData.contractor_id !== null && viewInvoiceData.contractor_id !== undefined;
+
         // Try multiple ways to get the IDs
-        customerId = viewInvoiceData.customer_id || 
-                     viewInvoiceData.customer?.id || 
-                     (viewInvoiceData.customer && typeof viewInvoiceData.customer === 'number' ? viewInvoiceData.customer : null) ||
-                     null;
-        
-        contractorId = viewInvoiceData.contractor_id || 
-                       viewInvoiceData.contractor?.id || 
-                       (viewInvoiceData.contractor && typeof viewInvoiceData.contractor === 'number' ? viewInvoiceData.contractor : null) ||
-                       null;
-        
+        customerId = viewInvoiceData.customer_id ||
+          viewInvoiceData.customer?.id ||
+          (viewInvoiceData.customer && typeof viewInvoiceData.customer === 'number' ? viewInvoiceData.customer : null) ||
+          null;
+
+        contractorId = viewInvoiceData.contractor_id ||
+          viewInvoiceData.contractor?.id ||
+          (viewInvoiceData.contractor && typeof viewInvoiceData.contractor === 'number' ? viewInvoiceData.contractor : null) ||
+          null;
+
         console.log('View mode - IDs from viewInvoiceData:', {
           customer_id: customerId,
           contractor_id: contractorId,
@@ -391,21 +391,21 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
         if (!currentJob) {
           throw new Error('Job not found')
         }
-        
+
         isContractBased = currentJob.type === 'contract_based' || currentJob.type === 'contract-based';
-        
+
         if (isContractBased) {
-          contractorId = currentJob.contractor_id || 
-                         (currentJob.contractor && typeof currentJob.contractor === 'number' ? Number(currentJob.contractor) : null) ||
-                         (currentJob.contractor && typeof currentJob.contractor === 'string' ? Number(currentJob.contractor) : null) ||
-                         null;
+          contractorId = currentJob.contractor_id ||
+            (currentJob.contractor && typeof currentJob.contractor === 'number' ? Number(currentJob.contractor) : null) ||
+            (currentJob.contractor && typeof currentJob.contractor === 'string' ? Number(currentJob.contractor) : null) ||
+            null;
           console.log('Create mode - contractor_id from currentJob:', contractorId);
         } else {
-          customerId = currentJob.customer_id || 
-                       (currentJob.customer && typeof currentJob.customer === 'number' ? currentJob.customer : null) ||
-                       (currentJob.customer && typeof currentJob.customer === 'string' ? Number(currentJob.customer) : null) ||
-                       Number(currentJob?.customer) || 
-                       null;
+          customerId = currentJob.customer_id ||
+            (currentJob.customer && typeof currentJob.customer === 'number' ? currentJob.customer : null) ||
+            (currentJob.customer && typeof currentJob.customer === 'string' ? Number(currentJob.customer) : null) ||
+            Number(currentJob?.customer) ||
+            null;
           console.log('Create mode - customer_id from currentJob:', customerId);
         }
       }
@@ -442,9 +442,9 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
       // Get customer email - from viewInvoiceData in view mode, otherwise from currentJob
       let customerEmail = 'customer@example.com';
       if (isViewMode && viewInvoiceData) {
-        customerEmail = viewInvoiceData.customer?.email || 
-                        viewInvoiceData.email_address || 
-                        'customer@example.com';
+        customerEmail = viewInvoiceData.customer?.email ||
+          viewInvoiceData.email_address ||
+          'customer@example.com';
       } else {
         const currentJob = jobsList.find((j: any) => j.id === inlineInvoiceData.jobId)
         customerEmail = currentJob?.email || 'customer@example.com';
@@ -658,10 +658,10 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
 
   const fetchSuppliersList = async (searchQuery: string = '') => {
     try {
-      const response = searchQuery 
+      const response = searchQuery
         ? await apiClient.searchSuppliersByQuery(searchQuery)
         : await apiClient.getAllSuppliers()
-      
+
       const suppliersData = response.data?.suppliers || response.data?.data || []
       setSuppliersList(suppliersData.map((s: any) => ({
         id: s.id,
@@ -676,10 +676,10 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
 
   const fetchProductsList = async (searchQuery: string = '') => {
     try {
-      const response = searchQuery 
+      const response = searchQuery
         ? await apiClient.searchProductsByQuery(searchQuery)
         : await apiClient.getAllProducts()
-      
+
       const productsData = response.data?.products || response.data?.data || []
       setProductsList(productsData.map((p: any) => ({
         id: p.id,
@@ -697,10 +697,10 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
 
   const fetchJobsList = async (searchQuery: string = '') => {
     try {
-      const response = searchQuery 
+      const response = searchQuery
         ? await apiClient.searchJobsByQuery(searchQuery, 1, 10)
         : await apiClient.getJobs(1, 10)
-      
+
       const jobsData = response.data || []
       console.log(jobsData, 'jobsData')
       setJobsList(jobsData)
@@ -713,36 +713,36 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
     const job = jobsList.find((j: any) => j.id === jobId)
     if (job) {
       setSelectedJob(job)
-      
+
       // Determine if it's contract-based
       const isContractBased = job.type === 'contract_based' || job.type === 'contract-based';
-      
+
       // Get customer/contractor name and address
       let customerName = '';
       let customerAddress = '';
-      
+
       if (isContractBased) {
-        customerName = job.contractorName || 
-                       job.contractor?.contractor_name || 
-                       job.contractor?.name || 
-                       job.contractor?.full_name || 
-                       '';
-        customerAddress = job.contractorAddress || 
-                         job.contractor?.address || 
-                         job.location || 
-                         job.address || 
-                         '';
+        customerName = job.contractorName ||
+          job.contractor?.contractor_name ||
+          job.contractor?.name ||
+          job.contractor?.full_name ||
+          '';
+        customerAddress = job.contractorAddress ||
+          job.contractor?.address ||
+          job.location ||
+          job.address ||
+          '';
       } else {
-        customerName = job.customerName || 
-                       job.customer?.customer_name || 
-                       job.customer?.name || 
-                       '';
-        customerAddress = job.location || 
-                         job.address || 
-                         job.customer?.address || 
-                         '';
+        customerName = job.customerName ||
+          job.customer?.customer_name ||
+          job.customer?.name ||
+          '';
+        customerAddress = job.location ||
+          job.address ||
+          job.customer?.address ||
+          '';
       }
-      
+
       setInlineInvoiceData(prev => ({
         ...prev,
         jobId: job.id,
@@ -751,7 +751,7 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
         billToAddress: job.billToAddress || '',
         project: job.title || ''
       }))
-      
+
       console.log('Selected job:', job);
       console.log('isContractBased:', isContractBased);
       console.log('customerName:', customerName);
@@ -768,7 +768,7 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
   const handleSaveInvoiceAsDraft = async () => {
     // Validation
     const errors: Record<string, string> = {}
-    
+
     if (!inlineInvoiceData.jobId) {
       errors.jobId = 'Please select a job first'
     }
@@ -793,7 +793,7 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
     setSavingDraft(true)
     try {
       const subtotal = calculateInvoiceSubtotal()
-      
+
       const customProducts = inlineInvoiceData.lineItems.map(item => ({
         product_name: item.item,
         description: item.description || '',
@@ -806,44 +806,44 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
         unit_cost: item.rate,
         jdp_price: item.rate,
         estimated_price: item.estimatedPrice || 0,
-        total_cost: item.total 
+        total_cost: item.total
       }))
 
       // Get customer_id or contractor_id - from viewInvoiceData if in view mode, otherwise from currentJob
       let customerId: number | null = null;
       let contractorId: number | null = null;
       let isContractBased = false;
-      
+
       if (isViewMode && viewInvoiceData) {
         // In view mode, get from viewInvoiceData
-        isContractBased = viewInvoiceData.service_type === 'contract_based' || 
-                          viewInvoiceData.job?.job_type === 'contract_based' ||
-                          (viewInvoiceData.contractor_id !== null && viewInvoiceData.contractor_id !== undefined);
-        
-        customerId = viewInvoiceData.customer_id || 
-                     viewInvoiceData.customer?.id || 
-                     (viewInvoiceData.customer && typeof viewInvoiceData.customer === 'number' ? viewInvoiceData.customer : null) ||
-                     null;
-        
-        contractorId = viewInvoiceData.contractor_id || 
-                       viewInvoiceData.contractor?.id || 
-                       (viewInvoiceData.contractor && typeof viewInvoiceData.contractor === 'number' ? viewInvoiceData.contractor : null) ||
-                       null;
+        isContractBased = viewInvoiceData.service_type === 'contract_based' ||
+          viewInvoiceData.job?.job_type === 'contract_based' ||
+          (viewInvoiceData.contractor_id !== null && viewInvoiceData.contractor_id !== undefined);
+
+        customerId = viewInvoiceData.customer_id ||
+          viewInvoiceData.customer?.id ||
+          (viewInvoiceData.customer && typeof viewInvoiceData.customer === 'number' ? viewInvoiceData.customer : null) ||
+          null;
+
+        contractorId = viewInvoiceData.contractor_id ||
+          viewInvoiceData.contractor?.id ||
+          (viewInvoiceData.contractor && typeof viewInvoiceData.contractor === 'number' ? viewInvoiceData.contractor : null) ||
+          null;
       } else {
         // In create mode, get from currentJob
         isContractBased = currentJob?.type === 'contract_based' || currentJob?.type === 'contract-based';
-        
+
         if (isContractBased) {
-          contractorId = currentJob.contractor_id || 
-                         (currentJob.contractor && typeof currentJob.contractor === 'number' ? Number(currentJob.contractor) : null) ||
-                         (currentJob.contractor && typeof currentJob.contractor === 'string' ? Number(currentJob.contractor) : null) ||
-                         null;
+          contractorId = currentJob.contractor_id ||
+            (currentJob.contractor && typeof currentJob.contractor === 'number' ? Number(currentJob.contractor) : null) ||
+            (currentJob.contractor && typeof currentJob.contractor === 'string' ? Number(currentJob.contractor) : null) ||
+            null;
         } else {
-          customerId = currentJob.customer_id || 
-                       (currentJob.customer && typeof currentJob.customer === 'number' ? currentJob.customer : null) ||
-                       (currentJob.customer && typeof currentJob.customer === 'string' ? Number(currentJob.customer) : null) ||
-                       Number(currentJob?.customer) || 
-                       null;
+          customerId = currentJob.customer_id ||
+            (currentJob.customer && typeof currentJob.customer === 'number' ? currentJob.customer : null) ||
+            (currentJob.customer && typeof currentJob.customer === 'string' ? Number(currentJob.customer) : null) ||
+            Number(currentJob?.customer) ||
+            null;
         }
       }
 
@@ -872,7 +872,7 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
       } else if (customerId) {
         payload.customer_id = customerId;
       }
-      
+
       console.log('Draft invoice payload with IDs:', {
         customer_id: payload.customer_id,
         contractor_id: payload.contractor_id,
@@ -881,14 +881,14 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
 
       await apiClient.createEstimate(payload as any)
       toast.success('Invoice saved as draft!')
-      
+
       // Refresh the estimates list
       if (onInvoiceSaved) {
         onInvoiceSaved(payload)
       }
-      
+
       onOpenChange(false)
-      
+
       // Reset form
       setInlineInvoiceData({
         date: new Date().toISOString().split('T')[0],
@@ -939,7 +939,7 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
   const handlePreviewAndSend = async () => {
     // Validation
     const errors: Record<string, string> = {}
-    
+
     if (!inlineInvoiceData.jobId) {
       errors.jobId = 'Please select a job first'
     }
@@ -964,7 +964,7 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
     setSendingInvoice(true)
     try {
       const subtotal = calculateInvoiceSubtotal()
-      
+
       const customProducts = inlineInvoiceData.lineItems.map(item => ({
         product_name: item.item,
         description: item.description || '',
@@ -984,37 +984,37 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
       let customerId: number | null = null;
       let contractorId: number | null = null;
       let isContractBased = false;
-      
+
       if (isViewMode && viewInvoiceData) {
         // In view mode, get from viewInvoiceData
-        isContractBased = viewInvoiceData.service_type === 'contract_based' || 
-                          viewInvoiceData.job?.job_type === 'contract_based' ||
-                          (viewInvoiceData.contractor_id !== null && viewInvoiceData.contractor_id !== undefined);
-        
-        customerId = viewInvoiceData.customer_id || 
-                     viewInvoiceData.customer?.id || 
-                     (viewInvoiceData.customer && typeof viewInvoiceData.customer === 'number' ? viewInvoiceData.customer : null) ||
-                     null;
-        
-        contractorId = viewInvoiceData.contractor_id || 
-                       viewInvoiceData.contractor?.id || 
-                       (viewInvoiceData.contractor && typeof viewInvoiceData.contractor === 'number' ? viewInvoiceData.contractor : null) ||
-                       null;
+        isContractBased = viewInvoiceData.service_type === 'contract_based' ||
+          viewInvoiceData.job?.job_type === 'contract_based' ||
+          (viewInvoiceData.contractor_id !== null && viewInvoiceData.contractor_id !== undefined);
+
+        customerId = viewInvoiceData.customer_id ||
+          viewInvoiceData.customer?.id ||
+          (viewInvoiceData.customer && typeof viewInvoiceData.customer === 'number' ? viewInvoiceData.customer : null) ||
+          null;
+
+        contractorId = viewInvoiceData.contractor_id ||
+          viewInvoiceData.contractor?.id ||
+          (viewInvoiceData.contractor && typeof viewInvoiceData.contractor === 'number' ? viewInvoiceData.contractor : null) ||
+          null;
       } else {
         // In create mode, get from currentJob
         isContractBased = currentJob?.type === 'contract_based' || currentJob?.type === 'contract-based';
-        
+
         if (isContractBased) {
-          contractorId = currentJob.contractor_id || 
-                         (currentJob.contractor && typeof currentJob.contractor === 'number' ? Number(currentJob.contractor) : null) ||
-                         (currentJob.contractor && typeof currentJob.contractor === 'string' ? Number(currentJob.contractor) : null) ||
-                         null;
+          contractorId = currentJob.contractor_id ||
+            (currentJob.contractor && typeof currentJob.contractor === 'number' ? Number(currentJob.contractor) : null) ||
+            (currentJob.contractor && typeof currentJob.contractor === 'string' ? Number(currentJob.contractor) : null) ||
+            null;
         } else {
-          customerId = currentJob.customer_id || 
-                       (currentJob.customer && typeof currentJob.customer === 'number' ? currentJob.customer : null) ||
-                       (currentJob.customer && typeof currentJob.customer === 'string' ? Number(currentJob.customer) : null) ||
-                       Number(currentJob?.customer) || 
-                       null;
+          customerId = currentJob.customer_id ||
+            (currentJob.customer && typeof currentJob.customer === 'number' ? currentJob.customer : null) ||
+            (currentJob.customer && typeof currentJob.customer === 'string' ? Number(currentJob.customer) : null) ||
+            Number(currentJob?.customer) ||
+            null;
         }
       }
 
@@ -1043,7 +1043,7 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
       } else if (customerId) {
         payload.customer_id = customerId;
       }
-      
+
       console.log('Send invoice payload with IDs:', {
         customer_id: payload.customer_id,
         contractor_id: payload.contractor_id,
@@ -1055,14 +1055,14 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
 
       // Send invoice to customer using estimate ID
       await sendInvoiceToCustomer(response.data.id)
-      
+
       // Refresh the estimates list
       if (onInvoiceSaved) {
         onInvoiceSaved(payload)
       }
-      
+
       onOpenChange(false)
-      
+
       // Reset form
       setInlineInvoiceData({
         date: new Date().toISOString().split('T')[0],
@@ -1273,104 +1273,104 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
     return Object.keys(stepErrors).length === 0
   }
 
-    const isPriority = (value: any): value is "low" | "medium" | "high" =>
-  ["low", "medium", "high"].includes(value);
+  const isPriority = (value: any): value is "low" | "medium" | "high" =>
+    ["low", "medium", "high"].includes(value);
 
 
   const handleSave = async () => {
-  setLoading(true);
-  try {
-    const laborPayload =
-      newInvoice.labor?.map((l) => ({
-        full_name: l.laborName,
-        email: l.email || "customer@example.com",
-        hours_worked: l.hours,
-        hourly_rate: l.hourlyRate,
+    setLoading(true);
+    try {
+      const laborPayload =
+        newInvoice.labor?.map((l) => ({
+          full_name: l.laborName,
+          email: l.email || "customer@example.com",
+          hours_worked: l.hours,
+          hourly_rate: l.hourlyRate,
+          job_id: Number(newInvoice.jobId),
+          is_custom: true,
+        })) || [];
+
+      const productsPayload =
+        newInvoice.items?.map((i) => ({
+          product_name: i.description,
+          supplier_id: i.supplierId && i.supplierId > 0 ? i.supplierId : 1,
+          supplier_sku: i.sku || "",
+          jdp_sku: i.jdp_sku || "SKU-DEFAULT",
+          stock_quantity: i.quantity,
+          job_id: Number(newInvoice.jobId),
+          unit: i.unit ? i.unit.toString() : "1",
+          is_custom: true,
+          unit_cost: i.unitPrice,
+        })) || [];
+
+      const payload: CreateEstimatePayload = {
+        estimate_title: "New Estimate",
+        customer_id: Number(newInvoice.customerId),
+
+        priority: isPriority(newInvoice.priority) ? newInvoice.priority : "medium",
+        valid_until: newInvoice.dueDate || "",
+        location: newInvoice.location || "N/A",
+        description: newInvoice.notes || "",
+        service_type: "service_based",
+        email_address: newInvoice.emailAddress || "customer@example.com",
+        estimate_date: newInvoice.issueDate || "",
+
+        materials_cost: itemsTotal,
+        labor_cost: laborTotal,
+        additional_costs: additionalTotal,
+        subtotal,
+        tax_percentage: (newInvoice.taxRate || 0) * 100,
+        tax_amount: taxAmount,
+        total_amount: totalAmount,
+
+        status: "draft",
+        invoice_type: newInvoice.type || "proposal_invoice",
+        invoice_number: `INV-${Date.now()}`,
+        issue_date: newInvoice.issueDate || "",
+        due_date: newInvoice.dueDate || "",
+
         job_id: Number(newInvoice.jobId),
-        is_custom: true,
-      })) || [];
 
-    const productsPayload =
-      newInvoice.items?.map((i) => ({
-        product_name: i.description,
-        supplier_id: i.supplierId && i.supplierId > 0 ? i.supplierId : 1,
-        supplier_sku: i.sku || "",
-        jdp_sku: i.jdp_sku || "SKU-DEFAULT",
-        stock_quantity: i.quantity,
-       job_id: Number(newInvoice.jobId),
-        unit: i.unit ? i.unit.toString() : "1",
-        is_custom: true,
-        unit_cost: i.unitPrice,
-      })) || [];
+        // additional_cost: newInvoice.additionalCosts?.length
+        //   ? {
+        //       description: newInvoice.additionalCosts[0].description || "",
+        //       amount: newInvoice.additionalCosts.reduce((sum, c) => sum + c.amount, 0),
+        //     }
+        //   : { description: "", amount: 0 },
 
-    const payload: CreateEstimatePayload = {
-      estimate_title: "New Estimate",
-      customer_id: Number(newInvoice.customerId),
+        custom_labor: laborPayload,
+        custom_products: productsPayload,
+      };
 
-      priority: isPriority(newInvoice.priority) ? newInvoice.priority : "medium",
-      valid_until: newInvoice.dueDate || "",
-      location: newInvoice.location || "N/A",
-      description: newInvoice.notes || "",
-      service_type: "service_based",
-      email_address: newInvoice.emailAddress || "customer@example.com",
-      estimate_date: newInvoice.issueDate || "",
+      const createdInvoice = await apiClient.createEstimate(payload);
+      dispatch(addInvoice(createdInvoice));
+      toast.success("Invoice created successfully!");
+      onOpenChange(false);
 
-      materials_cost: itemsTotal,
-      labor_cost: laborTotal,
-      additional_costs: additionalTotal,
-      subtotal,
-      tax_percentage: (newInvoice.taxRate || 0) * 100,
-      tax_amount: taxAmount,
-      total_amount: totalAmount,
+      onInvoiceSaved?.(createdInvoice);
 
-      status: "draft",
-      invoice_type: newInvoice.type || "proposal_invoice",
-      invoice_number: `INV-${Date.now()}`,
-      issue_date: newInvoice.issueDate || "",
-      due_date: newInvoice.dueDate || "",
+      setNewInvoice({
+        customerId: "",
+        jobId: undefined,
+        type: "proposal_invoice",
+        issueDate: format(new Date(), "yyyy-MM-dd"),
+        dueDate: format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"),
+        items: [],
+        labor: [],
+        additionalCosts: [],
+        notes: "",
+        taxRate: 0.08,
+        priority: "medium",
+      });
 
-      job_id: Number(newInvoice.jobId),
-
-      // additional_cost: newInvoice.additionalCosts?.length
-      //   ? {
-      //       description: newInvoice.additionalCosts[0].description || "",
-      //       amount: newInvoice.additionalCosts.reduce((sum, c) => sum + c.amount, 0),
-      //     }
-      //   : { description: "", amount: 0 },
-
-      custom_labor: laborPayload,
-      custom_products: productsPayload,
-    };
-
-    const createdInvoice = await apiClient.createEstimate(payload);
-    dispatch(addInvoice(createdInvoice));
-    toast.success("Invoice created successfully!");
-    onOpenChange(false);
-
-    onInvoiceSaved?.(createdInvoice);
-
-    setNewInvoice({
-      customerId: "",
-      jobId: undefined,
-      type: "proposal_invoice",
-      issueDate: format(new Date(), "yyyy-MM-dd"),
-      dueDate: format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"),
-      items: [],
-      labor: [],
-      additionalCosts: [],
-      notes: "",
-      taxRate: 0.08,
-      priority: "medium",
-    });
-
-    setCurrentStep(1);
-  } catch (error) {
-    console.error("Error creating invoice:", error);
-    toast.error("Failed to create invoice");
-  } finally {
-    setLoading(false);
-  }
-};
+      setCurrentStep(1);
+    } catch (error) {
+      console.error("Error creating invoice:", error);
+      toast.error("Failed to create invoice");
+    } finally {
+      setLoading(false);
+    }
+  };
 
 
 
@@ -1396,36 +1396,36 @@ const [products, setProducts] = useState<ProductFormData[]>([]);
 
 
   console.log(suppliers, "supp")
-    useEffect(() => {
-      const fetchSuppliers = async () => {
-        try {
-          const response = await apiClient.getAllSuppliers();       
-          setSuppliers(response.data.data);
-        } catch (error) {
-          console.error('Error fetching suppliers:', error);
-        }
-      };
-  
-      fetchSuppliers();
-    }, []);
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      try {
+        const response = await apiClient.getAllSuppliers();
+        setSuppliers(response.data.data);
+      } catch (error) {
+        console.error('Error fetching suppliers:', error);
+      }
+    };
 
-    console.log(products, "products");
+    fetchSuppliers();
+  }, []);
 
-useEffect(() => {
-  const fetchProducts = async () => {
-    try {
-      const response = await apiClient.getAllProducts();
-      setProducts(response.data.data);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-    }
-  };
+  console.log(products, "products");
 
-  fetchProducts();
-  fetchProductsList();
-  fetchSuppliersList();
-  fetchJobsList();
-}, []);
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await apiClient.getAllProducts();
+        setProducts(response.data.data);
+      } catch (error) {
+        console.error('Error fetching products:', error);
+      }
+    };
+
+    fetchProducts();
+    fetchProductsList();
+    fetchSuppliersList();
+    fetchJobsList();
+  }, []);
 
 
 
@@ -1447,28 +1447,28 @@ useEffect(() => {
           transition={{ duration: 0.4 }}
           className="mb-6"
         >
-        <Card className="bg-white shadow-lg border-2 border-primary/20">
-                      {/* Invoice Type Selector */}
-                      <div className="p-6 border-b border-gray-200 bg-gray-50">
-                        <div className="flex items-center gap-4">
-                          <Label className="text-primary font-semibold">Invoice Type:</Label>
+          <Card className="bg-white shadow-lg border-2 border-primary/20">
+            {/* Invoice Type Selector */}
+            <div className="p-6 border-b border-gray-200 bg-gray-50">
+              <div className="flex items-center gap-4">
+                <Label className="text-primary font-semibold">Invoice Type:</Label>
                 <div className="relative w-[250px]">
-                          <Select 
-                            value={inlineInvoiceData.invoiceType} 
+                  <Select
+                    value={inlineInvoiceData.invoiceType}
                     onValueChange={(value) => setInlineInvoiceData(prev => ({ ...prev, invoiceType: value }))}
-                          >
+                  >
                     <SelectTrigger className="border-primary/30 focus:border-primary">
                       <SelectValue placeholder="Select invoice type..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Estimate">Estimate</SelectItem>
-                              <SelectItem value="Downpayment Invoice">Downpayment Invoice</SelectItem>
-                              <SelectItem value="Rough Invoice">Rough Invoice</SelectItem>
-                              <SelectItem value="Progressive Invoice">Progressive Invoice</SelectItem>
-                              <SelectItem value="Final Invoice">Final Invoice</SelectItem>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Estimate">Estimate</SelectItem>
+                      <SelectItem value="Downpayment Invoice">Downpayment Invoice</SelectItem>
+                      <SelectItem value="Rough Invoice">Rough Invoice</SelectItem>
+                      <SelectItem value="Progressive Invoice">Progressive Invoice</SelectItem>
+                      <SelectItem value="Final Invoice">Final Invoice</SelectItem>
                       <SelectItem value="Custom">+ Add Custom</SelectItem>
-                            </SelectContent>
-                          </Select>
+                    </SelectContent>
+                  </Select>
                 </div>
                 {inlineInvoiceData.invoiceType === 'Custom' && (
                   <div className="relative w-[300px]">
@@ -1480,13 +1480,13 @@ useEffect(() => {
                     />
                   </div>
                 )}
-                        </div>
-                      </div>
+              </div>
+            </div>
 
-                      <div className="p-8">
-                        {/* Header */}
+            <div className="p-8">
+              {/* Header */}
               <div className="flex justify-between items-end mb-8">
-                          <div className="flex-shrink-0">
+                <div className="flex-shrink-0">
                   <Image
                     src='/assets/logos/logo-jdp.png'
                     alt="logo"
@@ -1494,27 +1494,27 @@ useEffect(() => {
                     height={63}
                     className='w-[140px] '
                   />
-                          </div>
+                </div>
 
-                          <div className="text-right">
+                <div className="text-right">
                   <h1 className="text-2xl font-bold mb-4">{inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType}</h1>
-                            <div className="grid grid-cols-2">
-                              <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">Date</Label>
-                              <Input
-                                value={inlineInvoiceData.date}
-                                onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, date: e.target.value }))}
-                                className="px-3 py-2 text-sm"
+                  <div className="grid grid-cols-2">
+                    <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">Date</Label>
+                    <Input
+                      value={inlineInvoiceData.date}
+                      onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, date: e.target.value }))}
+                      className="px-3 py-2 text-sm"
                       readOnly={isViewMode}
-                              />
+                    />
                   </div>
                   {/* Show Estimate Number only in view mode */}
                   {isViewMode && (
                     <div className="grid grid-cols-2">
-                              <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">
-                                {inlineInvoiceData.invoiceType === 'Estimate' ? 'Estimate #' : 'Invoice #'}
-                              </Label>
-                              <div>
-                                <Input
+                      <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">
+                        {inlineInvoiceData.invoiceType === 'Estimate' ? 'Estimate #' : 'Invoice #'}
+                      </Label>
+                      <div>
+                        <Input
                           value={inlineInvoiceData.estimateNumber || viewInvoiceData?.invoice_number || ''}
                           className="px-3 py-2 text-sm"
                           disabled={true}
@@ -1522,43 +1522,43 @@ useEffect(() => {
                       </div>
                     </div>
                   )}
-                          </div>
-                        </div>
+                </div>
+              </div>
 
-                        {/* Job Selection */}
-                        <div className="mb-6">
-                          <Label className="block bg-gray-600 text-white px-3 py-2 mb-0 text-sm font-semibold">Select Job</Label>
-                          <div className="border border-gray-300 p-4">
-                            <Select 
-                              value={inlineInvoiceData.jobId?.toString() || ''} 
-                              onValueChange={(value) => {
+              {/* Job Selection */}
+              <div className="mb-6">
+                <Label className="block bg-gray-600 text-white px-3 py-2 mb-0 text-sm font-semibold">Select Job</Label>
+                <div className="border border-gray-300 p-4">
+                  <Select
+                    value={inlineInvoiceData.jobId?.toString() || ''}
+                    onValueChange={(value) => {
                       if (!isViewMode) {
-                                handleJobSelection(value)
-                                setValidationErrors(prev => ({ ...prev, jobId: '' }))
+                        handleJobSelection(value)
+                        setValidationErrors(prev => ({ ...prev, jobId: '' }))
                       }
-                              }}
+                    }}
                     disabled={isViewMode}
-                            >
+                  >
                     <SelectTrigger className={`border-primary/30 focus:border-primary bg-white ${validationErrors.jobId ? 'border-red-500' : ''} ${isViewMode ? 'opacity-50' : ''}`}>
-                                <SelectValue placeholder="Select a job..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {jobsList.length > 0 ? (
-                                  jobsList.map((job: any) => (
-                                    <SelectItem key={job.id} value={job.id.toString()}>
-                                      #{job.id} - {job.title}
-                                    </SelectItem>
-                                  ))
-                                ) : (
-                                  <SelectItem value="none" disabled>No jobs available</SelectItem>
-                                )}
-                              </SelectContent>
-                            </Select>
-                            {validationErrors.jobId && (
-                              <p className="text-red-500 text-xs mt-1">{validationErrors.jobId}</p>
-                            )}
-                          </div>
-                        </div>
+                      <SelectValue placeholder="Select a job..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {jobsList.length > 0 ? (
+                        jobsList.map((job: any) => (
+                          <SelectItem key={job.id} value={job.id.toString()}>
+                            #{job.id} - {job.title}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="none" disabled>No jobs available</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {validationErrors.jobId && (
+                    <p className="text-red-500 text-xs mt-1">{validationErrors.jobId}</p>
+                  )}
+                </div>
+              </div>
 
               {/* Bill To Section */}
               <div className="mb-6">
@@ -1618,18 +1618,18 @@ useEffect(() => {
                 )}
               </div>
 
-                        {/* Customer Information */}
-                        <div className="mb-6">
+              {/* Customer Information */}
+              <div className="mb-6">
                 <Label className="block bg-gray-600 text-white px-3 py-2 mb-0 text-sm font-semibold">Customer Name / Address</Label>
-                          <div className="border border-gray-300 p-4 min-h-[120px]">
+                <div className="border border-gray-300 p-4 min-h-[120px]">
 
-                            <Input
+                  <Input
                     value={selectedJob?.type === 'contract-based' ? (selectedJob?.contractorName || selectedJob?.contractor?.name || inlineInvoiceData.customerName) : inlineInvoiceData.customerName}
-                              onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customerName: e.target.value }))}
-                              className="mb-2 border-0 p-0 focus-visible:ring-0"
+                    onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customerName: e.target.value }))}
+                    className="mb-2 border-0 p-0 focus-visible:ring-0"
                     placeholder={selectedJob?.type === 'contract-based' ? 'Contractor Name' : 'Customer Name'}
-                              readOnly
-                            />
+                    readOnly
+                  />
                   <Textarea
                     value={selectedJob?.type === 'contract-based' ? (selectedJob?.contractorAddress || selectedJob?.contractor?.address || inlineInvoiceData.customerAddress) : inlineInvoiceData.customerAddress}
                     onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customerAddress: e.target.value }))}
@@ -1638,27 +1638,27 @@ useEffect(() => {
                     placeholder={selectedJob?.type === 'contract-based' ? 'Contractor Address' : 'Customer Address'}
                     readOnly
                   />
-                          </div>
-                        </div>
+                </div>
+              </div>
 
-                        {/* PO and Project */}
+              {/* PO and Project */}
               <div className="mb-6">
                 <div className="grid grid-cols-3 gap-0">
-                            <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">P.O. No.</Label>
+                  <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">P.O. No.</Label>
                   <Label className="bg-gray-600 text-white px-3 py-2 text-center text-sm font-semibold">Project</Label>
                   <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">Rep</Label>
-                           </div>
+                </div>
                 <div className="grid grid-cols-3 gap-0">
-                            <div>
-                              <Input
-                                value={inlineInvoiceData.poNumber}
+                  <div>
+                    <Input
+                      value={inlineInvoiceData.poNumber}
                       onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, poNumber: e.target.value }))}
                       className="px-3 py-2 text-sm rounded-none border-t-0"
-                                placeholder="PO Number"
+                      placeholder="PO Number"
                       readOnly={isViewMode}
-                              />
-                            </div>
-                              <Input
+                    />
+                  </div>
+                  <Input
                     value={inlineInvoiceData.project || ''}
                     onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, project: e.target.value }))}
                     className="px-3 py-2 text-sm rounded-none border-t-0"
@@ -1672,70 +1672,70 @@ useEffect(() => {
                     placeholder="Rep"
                     readOnly={isViewMode}
                   />
-                            </div>
-                          </div>
+                </div>
+              </div>
 
               <div className="mb-6">
                 <div className="grid grid-cols-3 gap-0">
                   <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">Due Date</Label>
                   <Label className="bg-gray-600 text-white px-3 py-2 text-center text-sm font-semibold">Payment / Credits</Label>
                   <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">Balance Due</Label>
-                        </div>
+                </div>
                 <div className="grid grid-cols-3 gap-0">
                   <div>
-                            <Input
+                    <Input
                       type="date"
                       value={inlineInvoiceData.dueDate}
                       onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, dueDate: e.target.value }))}
                       className="px-3 py-2 text-sm rounded-none border-t-0"
                       readOnly={isViewMode}
                     />
-                          </div>
-                          <Input
+                  </div>
+                  <Input
                     value={inlineInvoiceData.paymentCredits}
                     onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, paymentCredits: parseFloat(e.target.value) || 0 }))}
                     className="px-3 py-2 text-sm rounded-none border-t-0"
                     placeholder="Payment / Credits"
                     readOnly={isViewMode}
                   />
-                          <Input
+                  <Input
                     value={inlineInvoiceData.balanceDue}
                     onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, balanceDue: e.target.value }))}
                     className="px-3 py-2 text-sm rounded-none border-t-0"
                     placeholder="Balance Due"
                     readOnly={isViewMode}
-                          />
-                        </div>
-                      </div>
+                  />
+                </div>
+              </div>
 
-                        {/* Line Items Table */}
+              {/* Line Items Table */}
               <div className="mb-6 overflow-x-auto mt-4">
-                          <table className="w-full border-collapse">
-                            <thead>
-                              <tr className="bg-gray-600 text-white">
-                                <th className="border border-gray-300 px-3 py-2 w-16 text-sm font-semibold">Qty</th>
-                                <th className="border border-gray-300 px-3 py-2 w-48 text-sm font-semibold">Item</th>
-                                <th className="border border-gray-300 px-3 py-2 text-sm font-semibold">Description</th>
-                                <th className="border border-gray-300 px-3 py-2 w-28 text-sm font-semibold">Rate</th>
-                                <th className="border border-gray-300 px-3 py-2 w-32 text-sm font-semibold">Estimated Price</th>
-                                <th className="border border-gray-300 px-3 py-2 w-28 text-sm font-semibold">Total</th>
-                                <th className="border border-gray-300 px-3 py-2 w-16"></th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {inlineInvoiceData.lineItems.map((item) => (
-                                <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                                  <td className="border border-gray-300 p-1">
-                                    <Input
-                                      type="number"
-                                      value={item.qty}
-                                      onChange={(e) => updateInvoiceLineItem(item.id, 'qty', parseFloat(e.target.value) || 0)}
-                                      className="text-center border-0 p-2"
-                                      min="0"
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gray-600 text-white">
+                      <th className="border border-gray-300 px-3 py-2 w-16 text-sm font-semibold">Qty</th>
+                      <th className="border border-gray-300 px-3 py-2 w-48 text-sm font-semibold">Item</th>
+                      <th className="border border-gray-300 px-3 py-2 text-sm font-semibold">Description</th>
+                      <th className="border border-gray-300 px-3 py-2 w-28 text-sm font-semibold">Rate</th>
+                      <th className="border border-gray-300 px-3 py-2 w-32 text-sm font-semibold">Estimated Price</th>
+                      <th className="border border-gray-300 px-3 py-2 w-28 text-sm font-semibold">Total</th>
+                      <th className="border border-gray-300 px-3 py-2 w-16"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inlineInvoiceData.lineItems.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="border border-gray-300 p-1">
+                          <Input
+                            type="number"
+                            value={item.qty}
+                            onChange={(e) => updateInvoiceLineItem(item.id, 'qty', parseFloat(e.target.value) || 0)}
+                            className="text-center border-0 p-2"
+                            min="0"
                             readOnly={isViewMode}
-                                    />
-                                  </td>
-                                  <td className="border border-gray-300 p-1 relative">
+                          />
+                        </td>
+                        <td className="border border-gray-300 p-1 relative">
                           {item.isCustomProduct ? (
                             <Input
                               value={item.item}
@@ -1745,178 +1745,178 @@ useEffect(() => {
                               readOnly={isViewMode}
                             />
                           ) : (
-                                    <div className="relative product-search-container">
-                                      <Input
-                                        value={item.item}
-                                        onChange={(e) => {
+                            <div className="relative product-search-container">
+                              <Input
+                                value={item.item}
+                                onChange={(e) => {
                                   const value = e.target.value
                                   updateInvoiceLineItem(item.id, 'item', value)
                                   updateInvoiceLineItem(item.id, 'searchQuery', value)
-                                          updateInvoiceLineItem(item.id, 'showSearchResults', true)
+                                  updateInvoiceLineItem(item.id, 'showSearchResults', true)
                                   // Direct API call on input change
                                   if (value && value.length > 2) {
                                     fetchProductsList(value)
                                   }
-                                        }}
-                                        onFocus={() => {
-                                          if (item.item) {
-                                            updateInvoiceLineItem(item.id, 'searchQuery', item.item)
-                                            updateInvoiceLineItem(item.id, 'showSearchResults', true)
-                                          }
-                                        }}
-                                        className="border-0 p-2 pr-8"
-                                        placeholder="Search or enter product name..."
+                                }}
+                                onFocus={() => {
+                                  if (item.item) {
+                                    updateInvoiceLineItem(item.id, 'searchQuery', item.item)
+                                    updateInvoiceLineItem(item.id, 'showSearchResults', true)
+                                  }
+                                }}
+                                className="border-0 p-2 pr-8"
+                                placeholder="Search or enter product name..."
                                 readOnly={isViewMode}
-                                      />
-                                      <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                    </div>
+                              />
+                              <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            </div>
                           )}
                           {!item.isCustomProduct && item.showSearchResults && item.searchQuery && (
-                                      <div className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1">
-                                        {(() => {
-                                          const filtered = getFilteredProducts(item.searchQuery || '')
+                            <div className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1">
+                              {(() => {
+                                const filtered = getFilteredProducts(item.searchQuery || '')
 
-                                          return (
-                                            <>
-                                              {filtered.length > 0 ? (
-                                                filtered.map(product => (
-                                                  <div
-                                                    key={product.id}
-                                                    onMouseDown={(e) => {
-                                                      e.preventDefault()
-                                                      selectProduct(item.id, product)
-                                                    }}
-                                                    className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100 transition-colors"
-                                                  >
-                                                    <div className="font-medium text-sm mb-1">{product.name}</div>
-                                                    <div className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
-                                                      {product.description}
-                                                    </div>
-                                                    <div className="text-xs text-primary mt-2">
-                                                      {product.jdpSKU} • ${product.jdpPrice.toFixed(2)}
-                                                      {product.estimatedPrice && product.estimatedPrice > 0 && ` • Est: $${product.estimatedPrice.toFixed(2)}`}
-                                                    </div>
-                                                  </div>
-                                                ))
-                                              ) : (
-                                                <div className="p-3">
-                                                  <div className="text-sm text-muted-foreground mb-2">No products found</div>
-                                                  <Button
-                                                    size="sm"
-                                                    onMouseDown={(e) => {
-                                                      e.preventDefault()
-                                                      addCustomProduct(item.id, item.searchQuery || '')
-                                                    }}
-                                                    className="w-full bg-primary hover:bg-primary/90"
-                                                  >
-                                                    <Plus className="h-3 w-3 mr-1" />
-                                                    Add "{item.searchQuery}"
-                                                  </Button>
-                                                </div>
-                                              )}
-                                            </>
-                                          )
-                                        })()}
+                                return (
+                                  <>
+                                    {filtered.length > 0 ? (
+                                      filtered.map(product => (
+                                        <div
+                                          key={product.id}
+                                          onMouseDown={(e) => {
+                                            e.preventDefault()
+                                            selectProduct(item.id, product)
+                                          }}
+                                          className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100 transition-colors"
+                                        >
+                                          <div className="font-medium text-sm mb-1">{product.name}</div>
+                                          <div className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
+                                            {product.description}
+                                          </div>
+                                          <div className="text-xs text-primary mt-2">
+                                            {product.jdpSKU} • ${product.jdpPrice.toFixed(2)}
+                                            {product.estimatedPrice && product.estimatedPrice > 0 && ` • Est: $${product.estimatedPrice.toFixed(2)}`}
+                                          </div>
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <div className="p-3">
+                                        <div className="text-sm text-muted-foreground mb-2">No products found</div>
+                                        <Button
+                                          size="sm"
+                                          onMouseDown={(e) => {
+                                            e.preventDefault()
+                                            addCustomProduct(item.id, item.searchQuery || '')
+                                          }}
+                                          className="w-full bg-primary hover:bg-primary/90"
+                                        >
+                                          <Plus className="h-3 w-3 mr-1" />
+                                          Add "{item.searchQuery}"
+                                        </Button>
                                       </div>
                                     )}
-                                  </td>
-                                  <td className="border border-gray-300 p-1">
-                                    <textarea
-                                      value={item.description}
-                                      onChange={(e) => {
-                                        updateInvoiceLineItem(item.id, 'description', e.target.value)
-                                      }}
-                                      className="border-0 p-2   "
-                                      placeholder="Enter product description"
-                                      rows={4}
-                                      readOnly={isViewMode}
-                                    />
-                                  </td>
-
-                                  <td className="border border-gray-300 p-1">
-                          <div className="relative">
-                            <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
-                                    <Input
-                                      type="number"
-                                      value={item.rate}
-                                      onChange={(e) => updateInvoiceLineItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
-                              className="text-right border-0 p-2 pl-6"
-                                      min="0"
-                                      step="0.01"
-                              readOnly={isViewMode}
-                                    />
-                          </div>
-                                  </td>
-                                  <td className="border border-gray-300 p-1">
-                          <div className="relative">
-                            <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
-                                    <Input
-                                      type="number"
-                                      value={item.estimatedPrice || ""}
-                                      onChange={(e) => updateInvoiceLineItem(item.id, 'estimatedPrice', parseFloat(e.target.value) || 0)}
-                              className="text-right border-0 p-2 pl-6"
-                                      min="0"
-                                      step="0.01"
-                                      placeholder="0.00"
-                              readOnly={isViewMode}
-                                    />
-                          </div>
-                                  </td>
-                                  <td className="border border-gray-300 p-2 text-right">
-                                    ${item.total.toFixed(2)}
-                                  </td>
-                                  <td className="border border-gray-300 p-1 text-center">
-                                    {inlineInvoiceData.lineItems.length > 1 && (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => removeInvoiceLineItem(item.id)}
-                                        className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
-                              {/* Subtotal Row */}
-                              <tr>
-                      <td colSpan={5} className="border border-gray-300 p-2"></td>
-                                <td className="border border-gray-300 p-2 text-right font-bold">
-                                  ${calculateInvoiceSubtotal().toFixed(2)}
-                                </td>
-                                <td className="border border-gray-300 p-1"></td>
-                              </tr>
-                            </tbody>
-                          </table>
-                         <div className="flex justify-end mt-4">
-                            <div className="text-right min-w-[200px]">
-                              <div className="flex justify-between mb-2">
-                                <span className="text-sm text-gray-700">Payments / Credits:</span>
-                                <span className="text-sm text-gray-700">
-                                  ${(inlineInvoiceData.paymentCredits || 0).toFixed(2)}
-                                </span>
-                              </div>
-                              <div className="flex justify-between bg-gray-100 px-3 py-2 rounded">
-                                <span className="font-bold text-sm text-gray-700">Balance Due:</span>
-                                <span className="font-bold text-sm text-gray-700">
-                                  ${parseFloat((inlineInvoiceData.balanceDue||0 ).toString()).toFixed(2)}
-                                </span>
-                              </div>
+                                  </>
+                                )
+                              })()}
                             </div>
+                          )}
+                        </td>
+                        <td className="border border-gray-300 p-1">
+                          <textarea
+                            value={item.description}
+                            onChange={(e) => {
+                              updateInvoiceLineItem(item.id, 'description', e.target.value)
+                            }}
+                            className="border-0 p-2   "
+                            placeholder="Enter product description"
+                            rows={4}
+                            readOnly={isViewMode}
+                          />
+                        </td>
+
+                        <td className="border border-gray-300 p-1">
+                          <div className="relative">
+                            <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                            <Input
+                              type="number"
+                              value={item.rate}
+                              onChange={(e) => updateInvoiceLineItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
+                              className="text-right border-0 p-2 pl-6"
+                              min="0"
+                              step="0.01"
+                              readOnly={isViewMode}
+                            />
                           </div>
+                        </td>
+                        <td className="border border-gray-300 p-1">
+                          <div className="relative">
+                            <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                            <Input
+                              type="number"
+                              value={item.estimatedPrice || ""}
+                              onChange={(e) => updateInvoiceLineItem(item.id, 'estimatedPrice', parseFloat(e.target.value) || 0)}
+                              className="text-right border-0 p-2 pl-6"
+                              min="0"
+                              step="0.01"
+                              placeholder="0.00"
+                              readOnly={isViewMode}
+                            />
+                          </div>
+                        </td>
+                        <td className="border border-gray-300 p-2 text-right">
+                          ${item.total.toFixed(2)}
+                        </td>
+                        <td className="border border-gray-300 p-1 text-center">
+                          {inlineInvoiceData.lineItems.length > 1 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeInvoiceLineItem(item.id)}
+                              className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {/* Subtotal Row */}
+                    <tr>
+                      <td colSpan={5} className="border border-gray-300 p-2"></td>
+                      <td className="border border-gray-300 p-2 text-right font-bold">
+                        ${calculateInvoiceSubtotal().toFixed(2)}
+                      </td>
+                      <td className="border border-gray-300 p-1"></td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div className="flex justify-end mt-4">
+                  <div className="text-right min-w-[200px]">
+                    <div className="flex justify-between mb-2">
+                      <span className="text-sm text-gray-700">Payments / Credits:</span>
+                      <span className="text-sm text-gray-700">
+                        ${(inlineInvoiceData.paymentCredits || 0).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between bg-gray-100 px-3 py-2 rounded">
+                      <span className="font-bold text-sm text-gray-700">Balance Due:</span>
+                      <span className="font-bold text-sm text-gray-700">
+                        ${parseFloat((inlineInvoiceData.balanceDue || 0).toString()).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
 
                 {/* Add Buttons */}
                 <div className="mt-4 flex gap-3">
-                          <Button
-                            onClick={addInvoiceLineItem}
-                            variant="outline"
+                  <Button
+                    onClick={addInvoiceLineItem}
+                    variant="outline"
                     className="border-dashed border-2 border-primary text-primary hover:bg-primary/5"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Line Item
-                          </Button>
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Line Item
+                  </Button>
                   <Button
                     onClick={addCustomLineItem}
                     variant="outline"
@@ -1926,54 +1926,54 @@ useEffect(() => {
                     Add Custom
                   </Button>
                 </div>
-                          {validationErrors.lineItems && (
-                            <p className="text-red-500 text-xs mt-2">{validationErrors.lineItems}</p>
-                          )}
-                        </div>
+                {validationErrors.lineItems && (
+                  <p className="text-red-500 text-xs mt-2">{validationErrors.lineItems}</p>
+                )}
+              </div>
 
-                        {/* Notes Section */}
-                        <div className="mb-6 overflow-x-auto">
-                          <table className="w-full border-collapse">
-                            <tbody>
-                              <tr>
-                                <td className="border border-gray-300 p-3 bg-white text-sm" style={{ minHeight: '120px' }}>
-                                  <Textarea
-                                    value={inlineInvoiceData.notes}
-                                    onChange={(e) => {
-                                      setInlineInvoiceData(prev => ({ ...prev, notes: e.target.value }))
-                                    }}
-                                    className="w-full min-h-[100px] border-0 p-0 focus-visible:ring-0 resize-none"
-                                    placeholder="NOTES&#10;JDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE"
-                                    readOnly={isViewMode}
-                                  />
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
+              {/* Notes Section */}
+              <div className="mb-6 overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <tbody>
+                    <tr>
+                      <td className="border border-gray-300 p-3 bg-white text-sm" style={{ minHeight: '120px' }}>
+                        <Textarea
+                          value={inlineInvoiceData.notes}
+                          onChange={(e) => {
+                            setInlineInvoiceData(prev => ({ ...prev, notes: e.target.value }))
+                          }}
+                          className="w-full min-h-[100px] border-0 p-0 focus-visible:ring-0 resize-none"
+                          placeholder="NOTES&#10;JDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE"
+                          readOnly={isViewMode}
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
 
-                        {/* Footer disclaimer and Total */}
-                        <div className="mb-6">
-                          <div className="border border-gray-300 p-3 text-xs text-center bg-white">
-                            <p>
-                              JDP is not responsible for repair of lamps & landscaping, house owner utilities including
-                              cables, sprinkler systems, television or telephone cables, etc. that may be cut or damaged
-                              during installation. Price are subject to change prior to receipt of down payment.
-                            </p>
-                          </div>
-                          <div className="flex justify-end mt-4">
-                            <div className="text-right">
-                              <div className="flex items-center gap-4">
-                                <span className="text-xl font-bold">Total</span>
-                                <span className="text-2xl font-bold">
-                                  ${calculateInvoiceSubtotal().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
+              {/* Footer disclaimer and Total */}
+              <div className="mb-6">
+                <div className="border border-gray-300 p-3 text-xs text-center bg-white">
+                  <p>
+                    JDP is not responsible for repair of lamps & landscaping, house owner utilities including
+                    cables, sprinkler systems, television or telephone cables, etc. that may be cut or damaged
+                    during installation. Price are subject to change prior to receipt of down payment.
+                  </p>
+                </div>
+                <div className="flex justify-end mt-4">
+                  <div className="text-right">
+                    <div className="flex items-center gap-4">
+                      <span className="text-xl font-bold">Total</span>
+                      <span className="text-2xl font-bold">
+                        ${calculateInvoiceSubtotal().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
                 <div className='text-center text-sm text-blue-500 font-bold'>
                   <p>1432 Oakpointe Drive Waconia, MN 55387 paul@jdpelectric.us</p>
-                        </div>
+                </div>
               </div>
               <div className="secnacher">
                 {/* Customer Acceptance Section */}
@@ -2011,51 +2011,51 @@ useEffect(() => {
                 </div>
               </div>
 
-                      </div>
+            </div>
 
-                      {/* Action Buttons */}
+            {/* Action Buttons */}
             {!isViewMode && (
-                      <div className="border-t bg-gray-50 px-8 py-6">
-                        <div className="flex items-center justify-between">
-                          <Button
-                            variant="outline"
-                            onClick={() => {
-                              onOpenChange(false)
-                              setValidationErrors({})
-                            }}
-                            className="border-gray-300"
-                          >
-                            <X className="h-4 w-4 mr-2" />
-                            Cancel
-                          </Button>
-                          <div className="flex gap-3">
-                            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                              <Button
-                                onClick={handleSaveInvoiceAsDraft}
-                                variant="outline"
-                                size="lg"
-                                className="border-primary text-primary hover:bg-primary/5"
+              <div className="border-t bg-gray-50 px-8 py-6">
+                <div className="flex items-center justify-between">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      onOpenChange(false)
+                      setValidationErrors({})
+                    }}
+                    className="border-gray-300"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Cancel
+                  </Button>
+                  <div className="flex gap-3">
+                    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                      <Button
+                        onClick={handleSaveInvoiceAsDraft}
+                        variant="outline"
+                        size="lg"
+                        className="border-primary text-primary hover:bg-primary/5"
                         disabled={savingDraft || sendingInvoice}
-                              >
-                                <FileText className="h-5 w-5 mr-2" />
+                      >
+                        <FileText className="h-5 w-5 mr-2" />
                         {savingDraft ? 'Saving...' : 'Save as Draft'}
-                              </Button>
-                            </motion.div>
+                      </Button>
+                    </motion.div>
 
-                            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                              <Button
-                                onClick={handlePreviewAndSend}
-                                size="lg"
-                                className="bg-primary hover:bg-primary/90 text-white"
+                    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                      <Button
+                        onClick={handlePreviewAndSend}
+                        size="lg"
+                        className="bg-primary hover:bg-primary/90 text-white"
                         disabled={savingDraft || sendingInvoice}
-                              >
-                                <Eye className="h-5 w-5 mr-2" />
+                      >
+                        <Eye className="h-5 w-5 mr-2" />
                         {sendingInvoice ? 'Sending...' : 'Preview & Send to Customer'}
-                              </Button>
-                            </motion.div>
-                          </div>
-                        </div>
-                      </div>
+                      </Button>
+                    </motion.div>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* View Mode - Only Close Button */}
@@ -2071,35 +2071,35 @@ useEffect(() => {
                     Close
                   </Button>
                   <div className="flex gap-3">
-                            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                              <Button
-                                onClick={handleSaveInvoiceAsDraft}
-                                variant="outline"
-                                size="lg"
-                                className="border-primary text-primary hover:bg-primary/5"
+                    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                      <Button
+                        onClick={handleSaveInvoiceAsDraft}
+                        variant="outline"
+                        size="lg"
+                        className="border-primary text-primary hover:bg-primary/5"
                         disabled={savingDraft || sendingInvoice}
-                              >
-                                <FileText className="h-5 w-5 mr-2" />
+                      >
+                        <FileText className="h-5 w-5 mr-2" />
                         {savingDraft ? 'Saving...' : 'Save as Draft'}
-                              </Button>
-                            </motion.div>
+                      </Button>
+                    </motion.div>
 
-                            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                              <Button
-                                onClick={handlePreviewAndSend}
-                                size="lg"
-                                className="bg-primary hover:bg-primary/90 text-white"
+                    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                      <Button
+                        onClick={handlePreviewAndSend}
+                        size="lg"
+                        className="bg-primary hover:bg-primary/90 text-white"
                         disabled={savingDraft || sendingInvoice}
-                              >
-                                <Eye className="h-5 w-5 mr-2" />
+                      >
+                        <Eye className="h-5 w-5 mr-2" />
                         {sendingInvoice ? 'Sending...' : 'Preview & Send to Customer'}
-                              </Button>
-                            </motion.div>
-                          </div>
+                      </Button>
+                    </motion.div>
+                  </div>
                 </div>
               </div>
             )}
-                    </Card>
+          </Card>
         </motion.div>
         {/* <div className="mb-6">
                           <div className="grid grid-cols-2 gap-0">

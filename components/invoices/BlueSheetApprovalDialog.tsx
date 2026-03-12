@@ -85,6 +85,7 @@ export interface BlueSheetItem {
   }
   labor_entries: any[]
   material_entries: any[]
+  total_labor_hours?: string | null
 }
 
 interface SupplierInvoice {
@@ -729,6 +730,8 @@ export function BlueSheetApprovalDialog({
     return sum
   }, 0)
 
+  // Labor total hours: parse strings like "2h 30m", "01:15:00", "3h", or plain numbers (hours)
+  const totalLaborLabel = currentBlueSheet.total_labor_hours || null
   // ──────────────────────────────────────────────────────────────────────────
 
 
@@ -999,16 +1002,17 @@ export function BlueSheetApprovalDialog({
                               </div>
 
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 text-sm">
+                              <div className="p-3 rounded-lg bg-white border border-gray-200">
+                                  <p className="text-xs font-semibold uppercase text-gray-400 mb-1">From</p>
+                                  <p className="font-small text-[#1a1a2e]">Supplier Invoice: {currentSupplierInvoice?.invoiceNumber}</p>
+                                  <p className="text-gray-600">({currentSupplierInvoice?.supplier || '—'})</p>
+                                </div>
                                 <div className="p-3 rounded-lg bg-white border border-gray-200">
                                   <p className="text-xs font-semibold uppercase text-gray-400 mb-1">Bill To</p>
                                   <p className="font-small text-[#1a1a2e]">BlueSheet: PO BS-{blueSheet.id}</p>
                                   <p className="text-gray-600">({blueSheet.job.customer?.customer_name || blueSheet.job.contractor?.contractor_name || 'N/A'})</p>
                                 </div>
-                                <div className="p-3 rounded-lg bg-white border border-gray-200">
-                                  <p className="text-xs font-semibold uppercase text-gray-400 mb-1">From</p>
-                                  <p className="font-small text-[#1a1a2e]">Supplier Invoice: {currentSupplierInvoice?.invoiceNumber}</p>
-                                  <p className="text-gray-600">({currentSupplierInvoice?.supplier || '—'})</p>
-                                </div>
+                               
                               </div>
                             </div>
 
@@ -1033,7 +1037,140 @@ export function BlueSheetApprovalDialog({
 
                         {/* Tables inside same invoice card */}
                         <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto_1fr] gap-0 bg-gray-100/80 p-3">
-                      {/* Left: BlueSheet table — same top design as reference */}
+                        <Card className="border-0 rounded-none shadow-none">
+                        <CardHeader className="bg-[#0f2d1f] text-white py-3 px-4 rounded-none">
+                          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-emerald-400" /> Supplier Materials
+                          </CardTitle>
+                          {/* <p className="text-xs text-white/80 mt-0.5">{currentSupplierInvoice?.invoiceNumber} · {currentSupplierInvoice?.supplier}</p> */}
+                        </CardHeader>
+                        <CardContent className="p-0">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm border-collapse">
+                              <thead>
+                                <tr className="bg-[#134422] text-white text-xs">
+                                  <th className="text-left py-2.5 px-3 font-medium border-r border-white/20">#</th>
+                                  <th className="text-left py-2.5 px-3 font-medium border-r border-white/20">Description</th>
+                                  <th className="text-center py-2.5 px-2 w-14 border-r border-white/20">Qty</th>
+                                  <th className="text-right py-2.5 px-3 w-28 border-r border-white/20">Supplier Price</th>
+                                  <th className="text-right py-2.5 px-3 w-28 border-r border-white/20">Total Amount</th>
+                                  {(isSupplierEditMode && currentSupplierInvoice && currentSupplierInvoice.materials.length > 1) && <th className="w-8" />}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {comparisonPairs.map((pair, rowIdx) => {
+                                  const { sup, supIdx } = pair
+                                  if (!sup) return (
+                                    <tr key={rowIdx} className="border-t border-gray-200 bg-gray-50 h-11">
+                                      <td className="py-2 px-3 text-gray-400 border-r border-gray-200 align-middle">—</td>
+                                      <td className="py-2 px-3 text-gray-400 border-r border-gray-200 align-middle">No Data in Supplier</td>
+                                      <td className="py-2 px-2 text-center border-r border-gray-200 align-middle">—</td>
+                                      <td className="py-2 px-3 text-right border-r border-gray-200 align-middle">—</td>
+                                      <td className="py-2 px-3 text-right border-r border-gray-200 align-middle">—</td>
+                                      {(isSupplierEditMode && currentSupplierInvoice && currentSupplierInvoice.materials.length > 1) && <td className="border-r border-gray-200 align-middle" />}
+                                    </tr>
+                                  )
+                                  return (
+                                    <tr key={rowIdx} className="border-t border-gray-200 hover:bg-gray-50/50 h-11">
+                                      <td className="py-2 px-3 text-gray-500 border-r border-gray-200 align-middle">{rowIdx + 1}</td>
+                                      <td className="py-2 px-3 border-r border-gray-200 align-middle">
+                                        {isSupplierEditMode ? <Input value={sup.name} onChange={(e) => handleSupplierMaterialChange(supIdx!, 'name', e.target.value)} className="h-8 text-xs" /> : <span className="font-small text-[#1a1a2e]">{sup.name}</span>}
+                                      </td>
+                                      <td className="py-2 px-2 text-center border-r border-gray-200 align-middle">
+                                        {isSupplierEditMode ? <Input type="number" value={sup.quantity} onChange={(e) => handleSupplierMaterialChange(supIdx!, 'quantity', parseFloat(e.target.value) || 0)} className="h-7 text-center text-xs w-12 mx-auto" min="0" /> : <span className="font-medium">{sup.quantity}</span>}
+                                      </td>
+                                      <td className="py-2 px-3 text-right border-r border-gray-200 align-middle">
+                                        {isSupplierEditMode ? <Input type="number" step="0.01" value={sup.unitPrice} onChange={(e) => handleSupplierMaterialChange(supIdx!, 'unitPrice', parseFloat(e.target.value) || 0)} className="h-7 text-xs text-right" min="0" /> : formatCurrency(sup.unitPrice)}
+                                      </td>
+                                      <td className="py-2 px-3 text-right font-semibold text-emerald-600 border-r border-gray-200 align-middle">{formatCurrency(sup.total)}</td>
+                                      {isSupplierEditMode && currentSupplierInvoice && currentSupplierInvoice.materials.length > 1 && (
+                                        <td className="py-1 border-r border-gray-200 align-middle">
+                                          <button onClick={() => removeSupplierMaterial(supIdx!)} className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded p-0.5" title="Remove"><X className="h-3 w-3" /></button>
+                                        </td>
+                                      )}
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                              <tfoot>
+                                <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold h-[44px]">
+                                  <td colSpan={2} className="py-3 px-3 text-right border-r border-gray-200">Total</td>
+                                  <td className="py-3 px-2 border-r border-gray-200" />
+                                  <td className="py-3 px-3 border-r border-gray-200" />
+                                  <td className="py-3 px-3 text-right text-emerald-600 border-r border-gray-200">{currentSupplierInvoice ? formatCurrency(currentSupplierInvoice.amount) : '—'}</td>
+                                  {(isSupplierEditMode && currentSupplierInvoice && currentSupplierInvoice.materials.length > 1) && <td className="border-r border-gray-200" />}
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      {/* Center: Reconciliation Status column */}
+                      <div className="min-w-[160px]   flex flex-col border-x border-gray-200">
+                        {/* Spacer to match table CardHeader height */}
+                        <div className="bg-[#2d3748] text-white px-3 text-sm font-semibold border-b border-white/10 h-[55px] flex items-center justify-center">
+                          Reconciliation
+                        </div>
+                        {/* Header to match table THEAD height */}
+                        <div className="bg-gray-700 text-white text-xs font-semibold px-3 text-center border-b border-white/10 h-[55px] flex items-center justify-center">
+                          Reconciliation Status
+                        </div>
+                        <div className="flex-1 bg-gray-100/80">
+                          {comparisonPairs.map((pair, rowIdx) => {
+                            const { bs, sup } = pair
+                            const hasBS = !!bs
+                            const hasSup = !!sup
+                            let status: 'match' | 'price_diff' | 'quantity_diff' | 'missing_in_supplier' | 'missing_in_bluesheet' = 'match'
+                            if (!hasSup) status = 'missing_in_supplier'
+                            else if (!hasBS) status = 'missing_in_bluesheet'
+                            else {
+                              const priceDiff = Math.abs((bs!.unit_cost || 0) - (sup!.unitPrice || 0)) > 0.01
+                              const qtyDiff = (bs!.total_ordered ?? bs!.material_used) !== (sup!.quantity ?? 0)
+                              if (priceDiff) status = 'price_diff'
+                              else if (qtyDiff) status = 'quantity_diff'
+                            }
+                            const rowBg = !hasSup ? 'bg-red-50' : !hasBS ? 'bg-blue-50' : status === 'match' ? 'bg-emerald-50' : 'bg-amber-50'
+                            return (
+                              <div key={rowIdx} className={`px-2 border-b border-gray-200 h-11 flex items-center justify-center ${rowBg}`}>
+                                {status === 'match' && (
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center"><Check className="h-3.5 w-3.5 text-emerald-600" /></div>
+                                    <span className="text-[10px] font-medium text-emerald-700">Match</span>
+                                  </div>
+                                )}
+                                {status === 'price_diff' && (
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center"><AlertTriangle className="h-3.5 w-3.5 text-amber-600" /></div>
+                                    <span className="text-[10px] font-medium text-amber-700 text-center leading-tight">Rate Discrepancy</span>
+                                  </div>
+                                )}
+                                {status === 'quantity_diff' && (
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center"><AlertTriangle className="h-3.5 w-3.5 text-amber-600" /></div>
+                                    <span className="text-[10px] font-medium text-amber-700 text-center leading-tight">Qty diff</span>
+                                  </div>
+                                )}
+                                {status === 'missing_in_supplier' && (
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center"><X className="h-3.5 w-3.5 text-red-600" /></div>
+                                    <span className="text-[10px] font-medium text-red-700 text-center leading-tight">No Data</span>
+                                  </div>
+                                )}
+                                {status === 'missing_in_bluesheet' && (
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center"><Plus className="h-3.5 w-3.5 text-blue-600" /></div>
+                                    <span className="text-[10px] font-medium text-blue-700 text-center leading-tight">Extra in Supplier</span>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                        {/* Footer spacer to match table footer row */}
+                        {/* <div className="bg-gray-100 border-t border-gray-200 h-[44px]" /> */}
+                      </div>
+
+                       
                       <Card className="border-0 rounded-none border-r border-gray-200 shadow-none">
                         <CardHeader className="bg-[#1a2f3d] text-white py-3 px-4 rounded-none">
                           <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -1119,141 +1256,13 @@ export function BlueSheetApprovalDialog({
                                   <td className="py-3 px-3 text-right text-[#00A1FF] border-r border-gray-200">{formatCurrency(currentBlueSheet.material_entries.reduce((s: number, i: any) => s + (i.total_cost || i.material_used * i.unit_cost || 0), 0))}</td>
                                   {(isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1) && <td className="border-r border-gray-200" />}
                                 </tr>
-                              </tfoot>
-                            </table>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {/* Center: Reconciliation Status column */}
-                      <div className="min-w-[160px]   flex flex-col border-x border-gray-200">
-                        {/* Spacer to match table CardHeader height */}
-                        <div className="bg-[#2d3748] text-white px-3 text-sm font-semibold border-b border-white/10 h-[55px] flex items-center justify-center">
-                          Reconciliation
-                        </div>
-                        {/* Header to match table THEAD height */}
-                        <div className="bg-gray-700 text-white text-xs font-semibold px-3 text-center border-b border-white/10 h-[55px] flex items-center justify-center">
-                          Reconciliation Status
-                        </div>
-                        <div className="flex-1 bg-gray-100/80">
-                          {comparisonPairs.map((pair, rowIdx) => {
-                            const { bs, sup } = pair
-                            const hasBS = !!bs
-                            const hasSup = !!sup
-                            let status: 'match' | 'price_diff' | 'quantity_diff' | 'missing_in_supplier' | 'missing_in_bluesheet' = 'match'
-                            if (!hasSup) status = 'missing_in_supplier'
-                            else if (!hasBS) status = 'missing_in_bluesheet'
-                            else {
-                              const priceDiff = Math.abs((bs!.unit_cost || 0) - (sup!.unitPrice || 0)) > 0.01
-                              const qtyDiff = (bs!.total_ordered ?? bs!.material_used) !== (sup!.quantity ?? 0)
-                              if (priceDiff) status = 'price_diff'
-                              else if (qtyDiff) status = 'quantity_diff'
-                            }
-                            const rowBg = !hasSup ? 'bg-red-50' : !hasBS ? 'bg-blue-50' : status === 'match' ? 'bg-emerald-50' : 'bg-amber-50'
-                            return (
-                              <div key={rowIdx} className={`px-2 border-b border-gray-200 h-11 flex items-center justify-center ${rowBg}`}>
-                                {status === 'match' && (
-                                  <div className="flex flex-col items-center gap-0.5">
-                                    <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center"><Check className="h-3.5 w-3.5 text-emerald-600" /></div>
-                                    <span className="text-[10px] font-medium text-emerald-700">Match</span>
-                                  </div>
+                                {totalLaborLabel && (
+                                  <tr className="bg-white text-xs text-gray-700">
+                                    <td colSpan={3} className="py-2 px-3 text-left font-bold text-[#00A1FF] text-[15px]">Labor Total Hours</td>
+                                    <td colSpan={2} className="py-2 px-3 text-right font-bold text-[15px] text-blue-700">{totalLaborLabel}</td>
+                                    {(isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1) && <td />}
+                                  </tr>
                                 )}
-                                {status === 'price_diff' && (
-                                  <div className="flex flex-col items-center gap-0.5">
-                                    <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center"><AlertTriangle className="h-3.5 w-3.5 text-amber-600" /></div>
-                                    <span className="text-[10px] font-medium text-amber-700 text-center leading-tight">Rate Discrepancy</span>
-                                  </div>
-                                )}
-                                {status === 'quantity_diff' && (
-                                  <div className="flex flex-col items-center gap-0.5">
-                                    <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center"><AlertTriangle className="h-3.5 w-3.5 text-amber-600" /></div>
-                                    <span className="text-[10px] font-medium text-amber-700 text-center leading-tight">Qty diff</span>
-                                  </div>
-                                )}
-                                {status === 'missing_in_supplier' && (
-                                  <div className="flex flex-col items-center gap-0.5">
-                                    <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center"><X className="h-3.5 w-3.5 text-red-600" /></div>
-                                    <span className="text-[10px] font-medium text-red-700 text-center leading-tight">No Data</span>
-                                  </div>
-                                )}
-                                {status === 'missing_in_bluesheet' && (
-                                  <div className="flex flex-col items-center gap-0.5">
-                                    <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center"><Plus className="h-3.5 w-3.5 text-blue-600" /></div>
-                                    <span className="text-[10px] font-medium text-blue-700 text-center leading-tight">Extra in Supplier</span>
-                                  </div>
-                                )}
-                              </div>
-                            )
-                          })}
-                        </div>
-                        {/* Footer spacer to match table footer row */}
-                        {/* <div className="bg-gray-100 border-t border-gray-200 h-[44px]" /> */}
-                      </div>
-
-                      {/* Right: Supplier Invoice table — same top design as reference */}
-                      <Card className="border-0 rounded-none shadow-none">
-                        <CardHeader className="bg-[#0f2d1f] text-white py-3 px-4 rounded-none">
-                          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-emerald-400" /> Supplier Materials
-                          </CardTitle>
-                          {/* <p className="text-xs text-white/80 mt-0.5">{currentSupplierInvoice?.invoiceNumber} · {currentSupplierInvoice?.supplier}</p> */}
-                        </CardHeader>
-                        <CardContent className="p-0">
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-sm border-collapse">
-                              <thead>
-                                <tr className="bg-[#134422] text-white text-xs">
-                                  <th className="text-left py-2.5 px-3 font-medium border-r border-white/20">#</th>
-                                  <th className="text-left py-2.5 px-3 font-medium border-r border-white/20">Description</th>
-                                  <th className="text-center py-2.5 px-2 w-14 border-r border-white/20">Qty</th>
-                                  <th className="text-right py-2.5 px-3 w-28 border-r border-white/20">Supplier Price</th>
-                                  <th className="text-right py-2.5 px-3 w-28 border-r border-white/20">Total Amount</th>
-                                  {(isSupplierEditMode && currentSupplierInvoice && currentSupplierInvoice.materials.length > 1) && <th className="w-8" />}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {comparisonPairs.map((pair, rowIdx) => {
-                                  const { sup, supIdx } = pair
-                                  if (!sup) return (
-                                    <tr key={rowIdx} className="border-t border-gray-200 bg-gray-50 h-11">
-                                      <td className="py-2 px-3 text-gray-400 border-r border-gray-200 align-middle">—</td>
-                                      <td className="py-2 px-3 text-gray-400 border-r border-gray-200 align-middle">No Data in Supplier</td>
-                                      <td className="py-2 px-2 text-center border-r border-gray-200 align-middle">—</td>
-                                      <td className="py-2 px-3 text-right border-r border-gray-200 align-middle">—</td>
-                                      <td className="py-2 px-3 text-right border-r border-gray-200 align-middle">—</td>
-                                      {(isSupplierEditMode && currentSupplierInvoice && currentSupplierInvoice.materials.length > 1) && <td className="border-r border-gray-200 align-middle" />}
-                                    </tr>
-                                  )
-                                  return (
-                                    <tr key={rowIdx} className="border-t border-gray-200 hover:bg-gray-50/50 h-11">
-                                      <td className="py-2 px-3 text-gray-500 border-r border-gray-200 align-middle">{rowIdx + 1}</td>
-                                      <td className="py-2 px-3 border-r border-gray-200 align-middle">
-                                        {isSupplierEditMode ? <Input value={sup.name} onChange={(e) => handleSupplierMaterialChange(supIdx!, 'name', e.target.value)} className="h-8 text-xs" /> : <span className="font-small text-[#1a1a2e]">{sup.name}</span>}
-                                      </td>
-                                      <td className="py-2 px-2 text-center border-r border-gray-200 align-middle">
-                                        {isSupplierEditMode ? <Input type="number" value={sup.quantity} onChange={(e) => handleSupplierMaterialChange(supIdx!, 'quantity', parseFloat(e.target.value) || 0)} className="h-7 text-center text-xs w-12 mx-auto" min="0" /> : <span className="font-medium">{sup.quantity}</span>}
-                                      </td>
-                                      <td className="py-2 px-3 text-right border-r border-gray-200 align-middle">
-                                        {isSupplierEditMode ? <Input type="number" step="0.01" value={sup.unitPrice} onChange={(e) => handleSupplierMaterialChange(supIdx!, 'unitPrice', parseFloat(e.target.value) || 0)} className="h-7 text-xs text-right" min="0" /> : formatCurrency(sup.unitPrice)}
-                                      </td>
-                                      <td className="py-2 px-3 text-right font-semibold text-emerald-600 border-r border-gray-200 align-middle">{formatCurrency(sup.total)}</td>
-                                      {isSupplierEditMode && currentSupplierInvoice && currentSupplierInvoice.materials.length > 1 && (
-                                        <td className="py-1 border-r border-gray-200 align-middle">
-                                          <button onClick={() => removeSupplierMaterial(supIdx!)} className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded p-0.5" title="Remove"><X className="h-3 w-3" /></button>
-                                        </td>
-                                      )}
-                                    </tr>
-                                  )
-                                })}
-                              </tbody>
-                              <tfoot>
-                                <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold h-[44px]">
-                                  <td colSpan={2} className="py-3 px-3 text-right border-r border-gray-200">Total</td>
-                                  <td className="py-3 px-2 border-r border-gray-200" />
-                                  <td className="py-3 px-3 border-r border-gray-200" />
-                                  <td className="py-3 px-3 text-right text-emerald-600 border-r border-gray-200">{currentSupplierInvoice ? formatCurrency(currentSupplierInvoice.amount) : '—'}</td>
-                                  {(isSupplierEditMode && currentSupplierInvoice && currentSupplierInvoice.materials.length > 1) && <td className="border-r border-gray-200" />}
-                                </tr>
                               </tfoot>
                             </table>
                           </div>
@@ -1263,30 +1272,39 @@ export function BlueSheetApprovalDialog({
                       </CardContent>
                     </Card>
                   ) : (
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                      {/* Left: BlueSheet table (same design) */}
-                      <Card className="border border-[#00A1FF]/30 shadow-md overflow-hidden">
-                        <CardHeader className="bg-[#1a2f3d] text-white py-4 px-5">
-                          <CardTitle className="text-base font-semibold flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-[#00A1FF]" /> BlueSheet Materials
-                          </CardTitle>
-                          {/* <p className="text-xs text-white/80 mt-1">PO: BS-{blueSheet.id} · {blueSheet.job.job_title} · {blueSheet.job.customer?.customer_name || 'N/A'}</p> */}
-                        </CardHeader>
-                        <CardContent className="p-0">
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="bg-[#162f3d] text-white text-xs">
-                                  <th className="text-left py-2.5 px-3 font-medium">#</th>
-                                  <th className="text-left py-2.5 px-3 font-medium">Description</th>
-                                  <th className="text-center py-2.5 px-2 w-14">Qty</th>
-                                  <th className="text-right py-2.5 px-3 w-24">Rate</th>
-                                  <th className="text-right py-2.5 px-3 w-24">Amount</th>
-                                  {(isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1) && <th className="w-8" />}
+                    /* Full-width BlueSheet when no supplier invoice */
+                    <Card className="border border-[#00A1FF]/30 shadow-md overflow-hidden">
+                      <CardHeader className="bg-[#1a2f3d] text-white py-4 px-5">
+                        <CardTitle className="text-base font-semibold flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-[#00A1FF]" /> BlueSheet Materials
+                        </CardTitle>
+                        <p className="text-xs text-white/80 mt-1">
+                          PO: BS-{blueSheet.id} · {blueSheet.job.job_title} · {blueSheet.job.customer?.customer_name || 'N/A'}
+                        </p>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="bg-[#162f3d] text-white text-xs">
+                                <th className="text-left py-2.5 px-3 font-medium">#</th>
+                                <th className="text-left py-2.5 px-3 font-medium">Description</th>
+                                <th className="text-center py-2.5 px-2 w-14">Qty</th>
+                                <th className="text-right py-2.5 px-3 w-24">Rate</th>
+                                <th className="text-right py-2.5 px-3 w-24">Amount</th>
+                                {(isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1) && <th className="w-8" />}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {currentBlueSheet.material_entries.length === 0 ? (
+                                <tr className="border-t border-gray-100 bg-white">
+                                  <td colSpan={5} className="py-4 px-3 text-center text-sm text-gray-500">
+                                    No material data in this BlueSheet
+                                  </td>
+                                  {(isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1) && <td />}
                                 </tr>
-                              </thead>
-                              <tbody>
-                                {currentBlueSheet.material_entries.map((item: any, idx: number) => (
+                              ) : (
+                                currentBlueSheet.material_entries.map((item: any, idx: number) => (
                                   <tr key={idx} className="border-t border-gray-100 hover:bg-gray-50/50">
                                     <td className="py-2 px-3 text-gray-500">{idx + 1}</td>
                                     <td className="py-2 px-3">
@@ -1325,55 +1343,30 @@ export function BlueSheetApprovalDialog({
                                       <td className="py-1"><button onClick={() => removeBlueSheetMaterial(idx)} className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded p-0.5" title="Remove"><X className="h-3 w-3" /></button></td>
                                     )}
                                   </tr>
-                                ))}
-                              </tbody>
-                              <tfoot>
-                                <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
-                                  <td colSpan={2} className="py-3 px-3 text-right">Total</td>
-                                  <td className="py-3 px-2" />
-                                  <td className="py-3 px-3" />
-                                  <td className="py-3 px-3 text-right text-[#00A1FF]">{formatCurrency(currentBlueSheet.material_entries.reduce((s: number, i: any) => s + (i.total_cost || i.material_used * i.unit_cost || 0), 0))}</td>
-                                  {(isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1) && <td />}
+                                ))
+                              )}
+                            </tbody>
+                            <tfoot>
+                              <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
+                                <td colSpan={2} className="py-3 px-3 text-right">Total</td>
+                                <td className="py-3 px-2" />
+                                <td className="py-3 px-3" />
+                                <td className="py-3 px-3 text-right text-[#00A1FF]">
+                                  {formatCurrency(currentBlueSheet.material_entries.reduce((s: number, i: any) => s + (i.total_cost || i.material_used * i.unit_cost || 0), 0))}
+                                </td>
+                                {(isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1) && <td />}
+                              </tr>
+                              {totalLaborLabel && (
+                                <tr className="bg-white text-xs text-gray-700">
+                                  <td colSpan={3} className="py-2 px-3 text-left font-bold text-[15px] text-blue-700">Labor total hours</td>
+                                  <td colSpan={2} className="py-2 px-3 text-right font-bold text-[15px] text-blue-700">{totalLaborLabel}</td>
                                 </tr>
-                              </tfoot>
-                            </table>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {/* Right: Supplier-style table area with single message row */}
-                      <Card className="border border-gray-200 bg-white shadow-sm overflow-hidden rounded-xl">
-                        <CardHeader className="bg-[#0f2d1f] text-white py-4 px-5">
-                          <CardTitle className="text-base font-semibold flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-emerald-400" /> Supplier Materials
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-0">
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="bg-[#134422] text-white text-xs">
-                                  <th className="text-left py-2.5 px-3 font-medium">#</th>
-                                  <th className="text-left py-2.5 px-3 font-medium">Description</th>
-                                  <th className="text-center py-2.5 px-2 w-14">Qty</th>
-                                  <th className="text-right py-2.5 px-3 w-28">Supplier Price</th>
-                                  <th className="text-right py-2.5 px-3 w-28">Total Amount</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <tr className="border-t border-gray-200 bg-gray-50">
-                                  <td className="py-2 px-3 text-gray-400">—</td>
-                                  <td className="py-2 px-3 text-gray-600 font-medium">No supplier invoice data found</td>
-                                  <td className="py-2 px-2 text-center text-gray-400">—</td>
-                                  <td className="py-2 px-3 text-right text-gray-400">—</td>
-                                  <td className="py-2 px-3 text-right text-gray-400">—</td>
-                                </tr>
-                              </tbody>
-                            </table>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
+                              )}
+                            </tfoot>
+                          </table>
+                        </div>
+                      </CardContent>
+                    </Card>
                   )}
 
                   {/* Add row / Save / Proceed */}
