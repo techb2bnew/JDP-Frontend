@@ -4316,7 +4316,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                 <div>
                   <Label className="flex items-center gap-2 mb-2">
                     <Users className="h-4 w-4 text-[#00A1FF]" />
-                    Lead Labor
+                    Assigned Labor
                   </Label>
 
                   {isEditing ? (

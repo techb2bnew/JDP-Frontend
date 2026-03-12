@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select'
+import { Input } from './input'
 import { LoadingSpinner } from '../common/LoadingSpinner'
 
 interface AutoScrollSelectProps {
@@ -14,6 +15,7 @@ interface AutoScrollSelectProps {
   displayField: string
   valueField: string
   className?: string
+  refreshKey?: number
 }
 
 export function AutoScrollSelect({
@@ -23,7 +25,8 @@ export function AutoScrollSelect({
   fetchData,
   displayField,
   valueField,
-  className
+  className,
+  refreshKey
 }: AutoScrollSelectProps) {
   const [items, setItems] = useState<Array<{ id: string; name: string; [key: string]: any }>>([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -33,6 +36,7 @@ export function AutoScrollSelect({
   const [hasMore, setHasMore] = useState(true)
   const [isOpen, setIsOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<any>(null)
+  const [searchTerm, setSearchTerm] = useState('')
 
   const loadData = useCallback(async (page: number, append: boolean = false) => {
     try {
@@ -102,6 +106,13 @@ export function AutoScrollSelect({
     }
   }, [value, items.length, loadData])
 
+  // Explicit refresh from parent (e.g. after creating new item)
+  useEffect(() => {
+    if (refreshKey !== undefined) {
+      loadData(1)
+    }
+  }, [refreshKey, loadData])
+
   const handleOpenChange = (open: boolean) => { 
     setIsOpen(open)
     if (open) {
@@ -120,19 +131,31 @@ export function AutoScrollSelect({
     onValueChange(selectedValue, foundItem)
   }
 
+  const filteredItems = items.filter(item =>
+    item[displayField]?.toString().toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
   return (
     <Select value={value} onValueChange={handleValueChange} onOpenChange={handleOpenChange}>
       <SelectTrigger className={className}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
-      <SelectContent className="max-h-60">
+      <SelectContent className="max-h-72">
         {isLoading ? (
           <div className="flex items-center justify-center p-4">
             <LoadingSpinner  />
           </div>
         ) : (
           <>
-            {items.map((item) => (
+            <div className="p-2 pb-1 border-b border-gray-100">
+              <Input
+                placeholder="Search..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-8 text-xs"
+              />
+            </div>
+            {filteredItems.map((item) => (
               <SelectItem 
                 key={item[valueField]} 
                 value={item[valueField]}

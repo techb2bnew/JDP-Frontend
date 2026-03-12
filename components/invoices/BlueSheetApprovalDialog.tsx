@@ -130,13 +130,14 @@ export function BlueSheetApprovalDialog({
   const [isUploading, setIsUploading] = useState(false)
   const [isAutoFetching, setIsAutoFetching] = useState(false)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
-  const [currentStep, setCurrentStep] = useState<'upload' | 'comparison' | 'review'>('upload')
+  const [currentStep, setCurrentStep] = useState<'upload' | 'review'>('upload')
   const [isBlueSheetEditMode, setIsBlueSheetEditMode] = useState(false)
   const [isSupplierEditMode, setIsSupplierEditMode] = useState(false)
   const [editedBlueSheet, setEditedBlueSheet] = useState<BlueSheetItem | null>(null)
   const [editedSupplierInvoice, setEditedSupplierInvoice] = useState<SupplierInvoice | null>(null)
   const [isApproving, setIsApproving] = useState(false)
   const [isApprovingCustomer, setIsApprovingCustomer] = useState(false)
+  const [isProceedingToReview, setIsProceedingToReview] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [filteredProducts, setFilteredProducts] = useState<any[]>([])
   const [activeRow, setActiveRow] = useState<number | null>(null)
@@ -152,6 +153,7 @@ export function BlueSheetApprovalDialog({
       setCurrentStep('upload')
       setIsBlueSheetEditMode(false)
       setIsSupplierEditMode(false)
+      setIsProceedingToReview(false)
       setEditedBlueSheet(JSON.parse(JSON.stringify(blueSheet))) // deep copy
       setEditedSupplierInvoice(null)
       setFilteredProducts([])
@@ -172,7 +174,40 @@ export function BlueSheetApprovalDialog({
     }
   }, [supplierInvoice, editedSupplierInvoice])
 
-  if (!blueSheet) return null
+  // Must be before early return so hooks order is stable
+  const currentBlueSheet = editedBlueSheet || blueSheet
+  const currentSupplierInvoice = editedSupplierInvoice || supplierInvoice
+  const comparisonPairs = React.useMemo(() => {
+    if (!currentBlueSheet?.material_entries) return []
+    const bsItems = currentBlueSheet.material_entries || []
+    const supItems = currentSupplierInvoice?.materials || []
+    const usedSupIdx = new Set<number>()
+    const pairs: Array<{ bs?: any; bsIdx?: number; sup?: any; supIdx?: number }> = []
+    bsItems.forEach((bsItem: any, bsIdx: number) => {
+      let matchedSupIdx = -1, score = 0
+      supItems.forEach((supItem: any, supIdx: number) => {
+        if (usedSupIdx.has(supIdx)) return
+        const exact = bsItem.material_name?.toLowerCase() === supItem.name?.toLowerCase()
+        const partial =
+          bsItem.material_name?.toLowerCase().includes(supItem.name?.toLowerCase()) ||
+          supItem.name?.toLowerCase().includes(bsItem.material_name?.toLowerCase())
+        if (exact && score < 100) { matchedSupIdx = supIdx; score = 100 }
+        else if (partial && score < 80) { matchedSupIdx = supIdx; score = 80 }
+      })
+      if (matchedSupIdx >= 0) {
+        usedSupIdx.add(matchedSupIdx)
+        pairs.push({ bs: bsItem, bsIdx, sup: supItems[matchedSupIdx], supIdx: matchedSupIdx })
+      } else {
+        pairs.push({ bs: bsItem, bsIdx })
+      }
+    })
+    supItems.forEach((sup: any, supIdx: number) => {
+      if (!usedSupIdx.has(supIdx)) pairs.push({ sup, supIdx })
+    })
+    return pairs
+  }, [currentBlueSheet?.material_entries, currentSupplierInvoice?.materials])
+
+  if (!blueSheet || !currentBlueSheet) return null
 
   // ─── Product Search ────────────────────────────────────────────────────────
   const handleProductSearch = async (query: string, rowIndex: number) => {
@@ -407,7 +442,6 @@ export function BlueSheetApprovalDialog({
 
       setSupplierInvoice(mappedInvoice)
       setEditedSupplierInvoice(null)
-      setCurrentStep('comparison')
       toast.success(`Invoice parsed: ${mappedInvoice.materials.length} materials`)
     } catch (error: any) {
       toast.error(error?.message || 'Failed to process invoice.')
@@ -451,7 +485,6 @@ export function BlueSheetApprovalDialog({
       if (!mappedInvoice.materials.length) throw new Error('No materials found in fetched supplier invoice')
       setSupplierInvoice(mappedInvoice)
       setEditedSupplierInvoice(null)
-      setCurrentStep('comparison')
       toast.success(`Supplier invoice auto-fetched for PO: ${poNumber}`)
     } catch (error: any) {
       toast.error(error?.message || 'Failed to auto-fetch supplier invoice.')
@@ -598,12 +631,24 @@ export function BlueSheetApprovalDialog({
   }
 
   // ─── Proceed / Final Approval ──────────────────────────────────────────────
-  const handleProceedToReview = () => {
+  const handleProceedToReview = async () => {
     if (isBlueSheetEditMode || isSupplierEditMode) {
       toast.error('Please save your changes before proceeding')
       return
     }
-    setCurrentStep('review')
+    const ids = selectedBlueSheets?.length
+      ? selectedBlueSheets.map(bs => bs.id)
+      : [blueSheet.id]
+    try {
+      setIsProceedingToReview(true)
+      await apiClient.approveBulkBluesheet(ids, 'approved')
+      toast.success('BlueSheet(s) approved')
+      setCurrentStep('review')
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to approve BlueSheet(s)')
+    } finally {
+      setIsProceedingToReview(false)
+    }
   }
 
   const handleFinalApproval = async () => {
@@ -677,8 +722,6 @@ export function BlueSheetApprovalDialog({
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(amount)
 
-  const currentBlueSheet = editedBlueSheet || blueSheet
-  const currentSupplierInvoice = editedSupplierInvoice || supplierInvoice
   const comparisons = generateComparison()
   const totalDiscrepancyAmount = comparisons.reduce((sum, comp) => {
     if (comp.blueSheetItem && comp.supplierItem)
@@ -861,481 +904,499 @@ export function BlueSheetApprovalDialog({
 
         <div className="flex-1 overflow-hidden bg-gray-50">
           <Tabs value={currentStep} onValueChange={setCurrentStep as any} className="h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-3 mx-8 mt-6 h-12">
+            <TabsList className="grid w-full grid-cols-2 mx-8 mt-6 h-12 max-w-md">
               <TabsTrigger value="upload" className={`gap-2 text-base ${currentStep === 'upload' ? 'bg-white' : ''}`}>
-                <Upload className="h-5 w-5" />Upload & Fetch
+                <Upload className="h-5 w-5" />Upload & Compare
               </TabsTrigger>
-              <TabsTrigger value="comparison" disabled={!supplierInvoice} className={`gap-2 text-base ${currentStep === 'comparison' ? 'bg-white' : ''}`}>
-                <Eye className="h-5 w-5" />Compare & Edit
-              </TabsTrigger>
-              <TabsTrigger value="review" disabled={!supplierInvoice} className={`gap-2 text-base ${currentStep === 'review' ? 'bg-white' : ''}`}>
+              <TabsTrigger value="review" className={`gap-2 text-base ${currentStep === 'review' ? 'bg-white' : ''}`}>
                 <CheckSquare className="h-5 w-5" />Final Review
               </TabsTrigger>
             </TabsList>
 
             <div className="flex-1 overflow-hidden">
-              {/* ── Upload Tab ────────────────────────────────────────────── */}
+              {/* ── Upload & Compare Tab ───────────────────────────────────── */}
               <TabsContent value="upload" className="h-full overflow-y-auto p-8 mt-0">
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-12 max-w-7xl mx-auto">
-                  <div className="space-y-8">
-                    <h3 className="text-2xl font-medium text-[#2b2b2b]">Supplier Invoice Upload</h3>
-                    {!supplierInvoice ? (
-                      <div className="space-y-8">
-                        <Card className="bg-blue-50 border-blue-200">
-                          <CardContent className="p-8 space-y-6">
-                            <div>
-                              <h4 className="text-lg font-medium text-blue-900">Auto-fetch from Email</h4>
-                              <p className="text-base text-blue-700 mt-2">PO: BS-{blueSheet.id}</p>
-                            </div>
-                            <Button onClick={handleAutoFetch} disabled={isAutoFetching} className="w-full bg-primary text-white h-14 text-lg gap-3" size="lg">
-                              {isAutoFetching ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Mail className="h-5 w-5" />}
-                              {isAutoFetching ? 'Fetching...' : 'Auto-fetch Invoice'}
-                            </Button>
-                          </CardContent>
-                        </Card>
-
-                        <div className="flex items-center gap-6">
-                          <div className="flex-1 h-px bg-gray-300" />
-                          <span className="text-base text-gray-500 px-4 py-2 rounded-full bg-gray-100">OR</span>
-                          <div className="flex-1 h-px bg-gray-300" />
-                        </div>
-
-                        <Card className="border-dashed border-2 border-gray-300 hover:border-[#00A1FF] transition-colors cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                          <CardContent className="p-12 text-center space-y-6">
-                            <div className="w-24 h-24 bg-gray-100 rounded-xl flex items-center justify-center mx-auto">
-                              <Upload className="h-12 w-12 text-gray-400" />
-                            </div>
-                            <div>
-                              <h4 className="text-lg font-medium">Upload Supplier Invoice</h4>
-                              <p className="text-base text-gray-600 mt-2">PDF, JPG, PNG, or Excel — max 10MB</p>
-                            </div>
-                            <Button onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }} disabled={isUploading} className="gap-3 h-14 text-lg px-8 bg-primary text-white" size="lg">
-                              {isUploading ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
-                              {isUploading ? 'Processing...' : 'Choose File'}
-                            </Button>
-                            <input ref={fileInputRef} type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls" onChange={handleFileUpload} />
-                            {uploadedFile && (
-                              <div className="flex items-center justify-center gap-3 text-green-600">
-                                <CheckSquare className="h-5 w-5" /><span>{uploadedFile.name}</span>
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
+                <div className="max-w-[1800px] mx-auto space-y-8">
+                  {/* Supplier Invoice: compact auto-fetch + upload */}
+                  <div className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+                    <div className="flex flex-wrap items-center gap-4 px-4 py-3 bg-[#f8fafc] border-b border-gray-100">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-[#00A1FF]" />
+                        <span className="text-sm font-semibold text-[#1a1a2e]">Supplier Invoice</span>
                       </div>
-                    ) : (
-                      <Card className="bg-green-50 border-green-200">
-                        <CardContent className="p-8">
-                          <div className="flex items-center gap-3 mb-6">
-                            <CheckSquare className="h-6 w-6 text-green-600" />
-                            <h4 className="text-lg font-medium text-green-900">Supplier Invoice Loaded</h4>
-                          </div>
-                          <div className="grid grid-cols-2 gap-6 text-base mb-6">
-                            <div>
-                              <p><strong>Invoice #:</strong> {supplierInvoice.invoiceNumber}</p>
-                              <p><strong>Supplier:</strong> {supplierInvoice.supplier}</p>
-                            </div>
-                            <div>
-                              <p><strong>Amount:</strong> {formatCurrency(supplierInvoice.amount)}</p>
-                              <p><strong>Items:</strong> {supplierInvoice.materials.length}</p>
-                            </div>
-                          </div>
-                          <Button onClick={() => setCurrentStep('comparison')} className="w-full bg-[#00A1FF] text-white h-14 text-lg gap-3" size="lg">
-                            <ArrowRight className="h-5 w-5" />Proceed to Comparison
+                      <span className="text-xs text-gray-500">Compare with BlueSheet — fetch by PO or upload file</span>
+                    </div>
+                    <div className="p-4">
+                      {!supplierInvoice ? (
+                        <div className="flex flex-wrap items-center gap-3">
+                          <Button
+                            onClick={handleAutoFetch}
+                            disabled={isAutoFetching}
+                            size="sm"
+                            className="h-9 px-4 gap-2 bg-[#00A1FF] hover:bg-[#0090e6] text-white text-sm"
+                          >
+                            {isAutoFetching ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                            {isAutoFetching ? 'Fetching...' : 'Auto-fetch (PO: BS-' + blueSheet.id + ')'}
                           </Button>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-
-                  <div className="space-y-8">
-                    <h3 className="text-2xl font-medium text-[#2b2b2b]">BlueSheet Overview</h3>
-                    <Card className="bg-white shadow-md border-0">
-                      <CardHeader className="pb-4"><CardTitle className="text-lg">Material Request Summary</CardTitle></CardHeader>
-                      <CardContent className="space-y-6">
-                        <div className="space-y-4 p-6 bg-blue-50 rounded-xl">
-                          <div className="flex items-center gap-3">
-                            <Building className="h-6 w-6 text-[#00A1FF]" />
-                            <div>
-                              <Label className="text-sm text-gray-600">Customer</Label>
-                              <p className="text-lg font-medium text-[#00A1FF]">{blueSheet.job.customer?.customer_name || 'N/A'}</p>
-                            </div>
-                          </div>
+                          <span className="text-xs text-gray-400 font-medium">or</span>
+                          <Button
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isUploading}
+                            variant="outline"
+                            size="sm"
+                            className="h-9 px-4 gap-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-[#00A1FF] hover:text-[#00A1FF]"
+                          >
+                            {isUploading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                            {isUploading ? 'Processing...' : 'Choose File'}
+                          </Button>
+                          <span className="text-xs text-gray-400">PDF only — max 10MB</span>
+                          <input ref={fileInputRef} type="file" className="hidden" accept=".pdf" onChange={handleFileUpload} />
+                          {uploadedFile && (
+                            <span className="text-xs text-emerald-600 flex items-center gap-1">
+                              <CheckSquare className="h-3.5 w-3.5" /> {uploadedFile.name}
+                            </span>
+                          )}
                         </div>
-                        <div className="grid grid-cols-2 gap-6">
-                          <div>
-                            <Label className="text-sm text-gray-600">Job</Label>
-                            <p className="text-lg font-medium">{blueSheet.job.job_title}</p>
-                          </div>
-                          <div>
-                            <Label className="text-sm text-gray-600">PO Number</Label>
-                            <p className="text-lg font-mono">BS-{blueSheet.id}</p>
-                          </div>
+                      ) : (
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-emerald-50 border border-emerald-100">
+                          <CheckSquare className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                          <span className="text-sm font-medium text-emerald-800">Loaded</span>
+                          <span className="text-xs text-emerald-600">{supplierInvoice.invoiceNumber} · {supplierInvoice.supplier} · {formatCurrency(supplierInvoice.amount)}</span>
                         </div>
-                        <div>
-                          <Label className="text-sm text-gray-600">Materials ({blueSheet.material_entries.length})</Label>
-                          <div className="mt-3 space-y-3">
-                            {blueSheet.material_entries.slice(0).map((item: any, index: number) => (
-                              <div key={index} className="flex justify-between text-base p-4 bg-gray-50 rounded-lg">
-                                <div>
-                                  <span className="font-medium">{item.material_name}</span>
-                                  <p className="text-sm text-gray-500">Used Material: {item.material_used} × {formatCurrency(item.unit_cost)}</p>
-                                </div>
-                                <span className="text-lg font-medium">{formatCurrency(item.total_cost || item.material_used * item.unit_cost)}</span>
-                              </div>
-                            ))}
-
-                          </div>
-                        </div>
-                        {(() => {
-                          // Material entries se directly calculate karo
-                          const materialTotal = blueSheet.material_entries.reduce(
-                            (sum: number, item: any) => sum + (item.total_cost || item.material_used * item.unit_cost || 0),
-                            0
-                          )
-
-                          const grandTotal = selectedBlueSheets.length > 0
-                            ? selectedBlueSheets.reduce((sum, bs) => {
-                              const bsTotal = (bs.material_entries?.length > 0)
-                                ? bs.material_entries.reduce(
-                                  (s: number, item: any) => s + (item.total_cost || item.material_used * item.unit_cost || 0),
-                                  0
-                                )
-                                : (bs.total_cost || 0)
-                              return sum + bsTotal
-                            }, 0)
-                            : materialTotal
-
-                          return (
-                            <div className="flex items-center justify-between text-xl font-medium pt-6 border-t">
-                              <span>Total {selectedBlueSheets.length > 1 ? `(${selectedBlueSheets.length} BluSheets)` : ''}:</span>
-                              <span className="text-[#00A1FF]">{formatCurrency(grandTotal)}</span>
-                            </div>
-                          )
-                        })()}
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
-              </TabsContent>
-
-              {/* ── Comparison Tab ────────────────────────────────────────── */}
-              <TabsContent value="comparison" className="h-full overflow-y-auto p-6 mt-0">
-                <div className="space-y-6 max-w-[1600px] mx-auto">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-semibold text-[#1a1a2e]">Material Comparison & Editing</h3>
-                    <div className="flex gap-2">
-                      <Button onClick={handleBlueSheetEdit} variant={isBlueSheetEditMode ? 'default' : 'outline'} size="sm"
-                        className={isBlueSheetEditMode ? 'bg-orange-500 hover:bg-orange-600 h-9 text-sm' : 'h-9 text-sm border-gray-300'}>
-                        <Edit className="h-3.5 w-3.5 mr-1.5" />{isBlueSheetEditMode ? 'Exit BS Edit' : 'Edit BlueSheet'}
-                      </Button>
-                      <Button onClick={handleSupplierEdit} variant={isSupplierEditMode ? 'default' : 'outline'} size="sm"
-                        className={isSupplierEditMode ? 'bg-orange-500 hover:bg-orange-600 h-9 text-sm' : 'h-9 text-sm border-gray-300'}>
-                        <Edit className="h-3.5 w-3.5 mr-1.5" />{isSupplierEditMode ? 'Exit Supplier Edit' : 'Edit Supplier'}
-                      </Button>
+                      )}
                     </div>
                   </div>
 
-                  {/* Stats */}
-                  <div className="grid grid-cols-5 gap-3">
-                    {[
-                      { label: 'Perfect Matches', value: comparisons.filter(c => c.status === 'match').length, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-100' },
-                      { label: 'With Differences', value: comparisons.filter(c => c.status === 'price_diff' || c.status === 'quantity_diff').length, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-100' },
-                      { label: 'Missing in Supplier', value: comparisons.filter(c => c.status === 'missing_in_supplier').length, color: 'text-red-600', bg: 'bg-red-50 border-red-100' },
-                      { label: 'Extra in Supplier', value: comparisons.filter(c => c.status === 'missing_in_bluesheet').length, color: 'text-blue-600', bg: 'bg-blue-50 border-blue-100' },
-                      { label: 'Total Discrepancy', value: formatCurrency(totalDiscrepancyAmount), color: 'text-violet-600', bg: 'bg-violet-50 border-violet-100' },
-                    ].map((stat, i) => (
-                      <div key={i} className={`${stat.bg} border rounded-lg px-4 py-3 text-center`}>
-                        <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{stat.label}</p>
-                      </div>
-                    ))}
-                  </div>
+                  {/* When no supplier: section title */}
+                  {!supplierInvoice && (
+                    <div className="flex items-center justify-between flex-wrap gap-3">
+                      <h3 className="text-xl font-semibold text-[#1a1a2e]">BlueSheet Materials</h3>
+                      <Button onClick={handleBlueSheetEdit} variant={isBlueSheetEditMode ? 'default' : 'outline'} size="sm" className={isBlueSheetEditMode ? 'bg-orange-500 hover:bg-orange-600' : 'border-gray-300'}>
+                        <Edit className="h-3.5 w-3.5 mr-1.5" />{isBlueSheetEditMode ? 'Exit BS Edit' : 'Edit BlueSheet'}
+                      </Button>
+                    </div>
+                  )}
 
-                  {/* Comparison Table */}
-                  <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="bg-[#1a1a2e] text-white">
-                          <th className="px-3 py-3 text-center font-medium w-10">Qty</th>
-                          <th className="px-3 py-3 text-left font-medium">
-                            <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-[#00A1FF]" />BlueSheet Item</div>
-                          </th>
-                          <th className="px-3 py-3 text-right font-medium w-24">Unit Price</th>
-                          <th className="px-3 py-3 text-right font-medium w-20">Total</th>
-                          <th className="px-2 py-3 text-center font-medium w-28 bg-gray-800">Match</th>
-                          <th className="px-3 py-3 text-center font-medium w-10">Qty</th>
-                          <th className="px-3 py-3 text-left font-medium">
-                            <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-400" />Supplier Item</div>
-                          </th>
-                          <th className="px-3 py-3 text-right font-medium w-24">Unit Price</th>
-                          <th className="px-3 py-3 text-right font-medium w-20">Total</th>
-                          {(isBlueSheetEditMode || isSupplierEditMode) && <th className="w-8" />}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(() => {
-                          const bsItems = currentBlueSheet.material_entries
-                          const supItems = currentSupplierInvoice?.materials || []
-                          const usedSupIdx = new Set<number>()
-                          const pairs: Array<{ bs?: any; bsIdx?: number; sup?: any; supIdx?: number }> = []
+                  {/* Tables: left table | Reconciliation Status (center) | right table when supplier exists */}
+                  {supplierInvoice ? (
+                    <Card className="border border-gray-200 bg-gray-100/80 shadow-none overflow-hidden rounded-xl">
+                      <CardContent className="p-0">
+                        {/* Dashboard section on top of tables (same card like invoice) */}
+                        <div className="p-6 bg-gray-100/60 border-b border-gray-200">
+                          <div className="flex flex-wrap items-start justify-between gap-4">
+                            <div className="min-w-[280px]">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <h2 className="text-base font-bold uppercase tracking-wider text-gray-700">Comparison Dashboard</h2>
+                                  <p className="text-xs text-gray-500 mt-0.5">Invoice Reconciliation · INVREC-{blueSheet.id}</p>
+                                </div>
+                                {/* Only BlueSheet is editable from here */}
+                                <div className="flex gap-2">
+                                  <Button onClick={handleBlueSheetEdit} variant={isBlueSheetEditMode ? 'default' : 'outline'} size="sm" className={isBlueSheetEditMode ? 'bg-orange-500 hover:bg-orange-600' : 'border-gray-300 bg-white'}>
+                                    <Edit className="h-3.5 w-3.5 mr-1.5" />Edit BlueSheet
+                                  </Button>
+                                </div>
+                              </div>
 
-                          bsItems.forEach((bsItem: any, bsIdx: number) => {
-                            let matchedSupIdx = -1, score = 0
-                            supItems.forEach((supItem: any, supIdx: number) => {
-                              if (usedSupIdx.has(supIdx)) return
-                              const exact = bsItem.material_name?.toLowerCase() === supItem.name?.toLowerCase()
-                              const partial =
-                                bsItem.material_name?.toLowerCase().includes(supItem.name?.toLowerCase()) ||
-                                supItem.name?.toLowerCase().includes(bsItem.material_name?.toLowerCase())
-                              if (exact && score < 100) { matchedSupIdx = supIdx; score = 100 }
-                              else if (partial && score < 80) { matchedSupIdx = supIdx; score = 80 }
-                            })
-                            if (matchedSupIdx >= 0) {
-                              usedSupIdx.add(matchedSupIdx)
-                              pairs.push({ bs: bsItem, bsIdx, sup: supItems[matchedSupIdx], supIdx: matchedSupIdx })
-                            } else {
-                              pairs.push({ bs: bsItem, bsIdx })
-                            }
-                          })
-                          supItems.forEach((sup: any, supIdx: number) => {
-                            if (!usedSupIdx.has(supIdx)) pairs.push({ sup, supIdx })
-                          })
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 text-sm">
+                                <div className="p-3 rounded-lg bg-white border border-gray-200">
+                                  <p className="text-xs font-semibold uppercase text-gray-400 mb-1">Bill To</p>
+                                  <p className="font-small text-[#1a1a2e]">BlueSheet: PO BS-{blueSheet.id}</p>
+                                  <p className="text-gray-600">({blueSheet.job.customer?.customer_name || blueSheet.job.contractor?.contractor_name || 'N/A'})</p>
+                                </div>
+                                <div className="p-3 rounded-lg bg-white border border-gray-200">
+                                  <p className="text-xs font-semibold uppercase text-gray-400 mb-1">From</p>
+                                  <p className="font-small text-[#1a1a2e]">Supplier Invoice: {currentSupplierInvoice?.invoiceNumber}</p>
+                                  <p className="text-gray-600">({currentSupplierInvoice?.supplier || '—'})</p>
+                                </div>
+                              </div>
+                            </div>
 
-                          return pairs.map((pair, rowIdx) => {
-                            const { bs, bsIdx, sup, supIdx } = pair
-                            const hasBS = !!bs, hasSup = !!sup
-                            const nameMatch = hasBS && hasSup && (
-                              bs.material_name?.toLowerCase() === sup.name?.toLowerCase() ||
-                              bs.material_name?.toLowerCase().includes(sup.name?.toLowerCase()) ||
-                              sup.name?.toLowerCase().includes(bs.material_name?.toLowerCase())
-                            )
-                            const qtyMatch = hasBS && hasSup && bs.total_ordered === sup.quantity
-                            const fullMatch = nameMatch && qtyMatch
-                            const rowBg = !hasSup ? 'bg-red-50/50' : !hasBS ? 'bg-blue-50/50' : fullMatch ? 'bg-emerald-50/30' : 'bg-amber-50/40'
+                            {/* Right side removed: Total Reconciliation Discrepancy box */}
+                          </div>
 
-                            return (
-                              <tr key={rowIdx} className={`border-t border-gray-100 ${rowBg} transition-colors`}>
-                                {/* BS Qty */}
-                                <td className="px-3 py-2.5 text-center">
-                                  {bs ? (
-                                    isBlueSheetEditMode ? (
-                                      <Input type="number" value={bs.material_used}
-                                        onChange={(e) => handleBlueSheetMaterialChange(bsIdx!, 'material_used', parseFloat(e.target.value) || 0)}
-                                        className="h-7 text-center text-xs w-12 mx-auto px-1" min="0" />
-                                    ) : (
-                                      <span className={`font-semibold ${!qtyMatch && hasSup ? 'text-amber-600' : 'text-gray-700'}`}>{bs.material_used}</span>
-                                    )
-                                  ) : <span className="text-gray-300">—</span>}
-                                </td>
+                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-6">
+                            {[
+                              { label: 'Matches', value: comparisons.filter(c => c.status === 'match').length, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-100' },
+                              { label: 'Differences', value: comparisons.filter(c => c.status === 'price_diff' || c.status === 'quantity_diff').length, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-100' },
+                              { label: 'Missing in Supplier', value: comparisons.filter(c => c.status === 'missing_in_supplier').length, color: 'text-red-600', bg: 'bg-red-50 border-red-100' },
+                              { label: 'Extra in Supplier', value: comparisons.filter(c => c.status === 'missing_in_bluesheet').length, color: 'text-blue-600', bg: 'bg-blue-50 border-blue-100' },
+                              { label: 'Discrepancy', value: formatCurrency(totalDiscrepancyAmount), color: 'text-violet-600', bg: 'bg-violet-50 border-violet-100' },
+                            ].map((stat, i) => (
+                              <div key={i} className={`${stat.bg} border rounded-lg px-3 py-2 text-center`}>
+                                <p className={`text-lg font-bold ${stat.color}`}>{stat.value}</p>
+                                <p className="text-xs text-gray-500">{stat.label}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
 
-                                {/* BS Item Name — with product search dropdown */}
-                                <td className="px-3 py-2.5">
-                                  {bs ? (
-                                    isBlueSheetEditMode ? (
-                                      <div className="relative">
-                                        <Input
-                                          value={editedBlueSheet?.material_entries[bsIdx!]?.material_name || ''}
-                                          onChange={(e) => {
-                                            handleBlueSheetMaterialChange(bsIdx!, 'material_name', e.target.value)
-                                            handleProductSearch(e.target.value, bsIdx!)
-                                          }}
-                                          onBlur={() => setTimeout(() => { setActiveRow(null); setFilteredProducts([]) }, 200)}
-                                          onFocus={() => {
-                                            const name = editedBlueSheet?.material_entries[bsIdx!]?.material_name
-                                            if (name && name.length >= 2) handleProductSearch(name, bsIdx!)
-                                          }}
-                                          className="h-8 text-xs"
-                                          placeholder="Search product..."
-                                        />
-                                        {activeRow === bsIdx && filteredProducts.length > 0 && (
-                                          <div className="absolute z-50 bg-white border w-full max-h-40 overflow-y-auto shadow-md rounded-md"
-                                            onMouseDown={(e) => e.preventDefault()}>
-                                            {filteredProducts.map((product: any) => (
-                                              <div key={product.id}
-                                                className="px-2 py-1.5 text-xs hover:bg-blue-50 cursor-pointer border-b border-gray-50"
-                                                onMouseDown={(e) => {
-                                                  e.preventDefault()
-                                                  handleBlueSheetMaterialUpdateAll(bsIdx!, product)
-                                                }}>
-                                                <div className="font-medium">{product.product_name}</div>
-                                                <div className="text-gray-400 text-[10px]">{product.jdp_sku} · {formatCurrency(product.jdp_price || 0)}</div>
+                        {/* Tables inside same invoice card */}
+                        <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto_1fr] gap-0 bg-gray-100/80 p-3">
+                      {/* Left: BlueSheet table — same top design as reference */}
+                      <Card className="border-0 rounded-none border-r border-gray-200 shadow-none">
+                        <CardHeader className="bg-[#1a2f3d] text-white py-3 px-4 rounded-none">
+                          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-[#00A1FF]" /> BlueSheet Materials
+                          </CardTitle>
+                          {/* <p className="text-xs text-white/80 mt-0.5">PO: BS-{blueSheet.id} · {blueSheet.job.job_title}</p>
+                          <p className="text-xs text-white/70">{blueSheet.job.customer?.customer_name || 'N/A'}</p> */}
+                        </CardHeader>
+                        <CardContent className="p-0">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm border-collapse">
+                              <thead>
+                                <tr className="bg-[#162f3d] text-white text-xs">
+                                  <th className="text-left py-2.5 px-3 font-medium border-r border-white/20">#</th>
+                                  <th className="text-left py-2.5 px-3 font-medium border-r border-white/20">Description</th>
+                                  <th className="text-center py-2.5 px-2 w-14 border-r border-white/20">Qty</th>
+                                  <th className="text-right py-2.5 px-3 w-24 border-r border-white/20">JDP Price</th>
+                                  <th className="text-right py-2.5 px-3 w-28 border-r border-white/20">Total Amount</th>
+                                  {(isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1) && <th className="w-8 border-r border-white/20" />}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {comparisonPairs.map((pair, rowIdx) => {
+                                  const { bs, bsIdx } = pair
+                                  if (!bs) return (
+                                    <tr key={rowIdx} className="border-t border-gray-200 bg-blue-50/30 h-11">
+                                      <td colSpan={isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1 ? 6 : 5} className="py-2 px-3 text-gray-400 text-center border-r border-gray-200 align-middle">—</td>
+                                    </tr>
+                                  )
+                                  return (
+                                    <tr key={rowIdx} className="border-t border-gray-200 hover:bg-gray-50/50 h-11">
+                                      <td className="py-2 px-3 text-gray-500 border-r border-gray-200 align-middle">{rowIdx + 1}</td>
+                                      <td className="py-2 px-3 border-r border-gray-200 align-middle">
+                                        {isBlueSheetEditMode ? (
+                                          <div className="relative">
+                                            <Input
+                                              value={editedBlueSheet?.material_entries[bsIdx!]?.material_name || ''}
+                                              onChange={(e) => { handleBlueSheetMaterialChange(bsIdx!, 'material_name', e.target.value); handleProductSearch(e.target.value, bsIdx!) }}
+                                              onBlur={() => setTimeout(() => { setActiveRow(null); setFilteredProducts([]) }, 200)}
+                                              onFocus={() => { const n = editedBlueSheet?.material_entries[bsIdx!]?.material_name; if (n && n.length >= 2) handleProductSearch(n, bsIdx!) }}
+                                              className="h-8 text-xs"
+                                              placeholder="Search product..."
+                                            />
+                                            {activeRow === bsIdx && filteredProducts.length > 0 && (
+                                              <div className="absolute z-50 bg-white border w-full max-h-36 overflow-y-auto shadow-lg rounded-md mt-0.5" onMouseDown={(e) => e.preventDefault()}>
+                                                {filteredProducts.map((product: any) => (
+                                                  <div key={product.id} className="px-2 py-1.5 text-xs hover:bg-blue-50 cursor-pointer border-b border-gray-50"
+                                                    onMouseDown={(e) => { e.preventDefault(); handleBlueSheetMaterialUpdateAll(bsIdx!, product) }}>
+                                                    <div className="font-medium">{product.product_name}</div>
+                                                    <div className="text-gray-400 text-[10px]">{product.jdp_sku} · {formatCurrency(product.jdp_price || 0)}</div>
+                                                  </div>
+                                                ))}
                                               </div>
-                                            ))}
+                                            )}
                                           </div>
-                                        )}
-                                        {/* Show linked product badge */}
-                                        {editedBlueSheet?.material_entries[bsIdx!]?.product_id && (
-                                          <div className="mt-0.5 flex items-center gap-1">
-                                            <span className="text-[9px] text-emerald-600 bg-emerald-50 px-1 rounded">
-                                              ID: {editedBlueSheet.material_entries[bsIdx!].product_id}
-                                            </span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    ) : (
-                                      <span className="font-medium text-[#1a1a2e]">{bs.material_name}</span>
-                                    )
-                                  ) : <span className="text-blue-400 italic text-[10px]">Not in BlueSheet</span>}
-                                </td>
-
-                                {/* BS Unit Price */}
-                                <td className="px-3 py-2.5 text-right">
-                                  {bs ? (
-                                    isBlueSheetEditMode ? (
-                                      <Input type="number" step="0.01" value={bs.unit_cost}
-                                        onChange={(e) => handleBlueSheetMaterialChange(bsIdx!, 'unit_cost', parseFloat(e.target.value) || 0)}
-                                        className="h-7 text-xs text-right" min="0" />
-                                    ) : <span className="text-gray-600">{formatCurrency(bs.unit_cost)}</span>
-                                  ) : <span className="text-gray-300">—</span>}
-                                </td>
-
-                                {/* BS Total */}
-                                <td className="px-3 py-2.5 text-right">
-                                  {bs ? (
-                                    <span className="font-bold text-[#00A1FF]">
-                                      {formatCurrency(bs.total_cost || bs.material_used * bs.unit_cost)}
-                                    </span>
-                                  ) : <span className="text-gray-300">—</span>}
-                                </td>
-
-                                {/* Match Status */}
-                                <td className="px-2 py-2.5 text-center bg-white/70 border-x border-gray-200">
-                                  {!hasBS ? (
-                                    <div className="flex flex-col items-center gap-0.5">
-                                      <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center"><Plus className="w-3 h-3 text-blue-600" /></div>
-                                      <span className="text-[9px] text-blue-600 font-semibold leading-tight text-center">Extra in<br />Supplier</span>
-                                    </div>
-                                  ) : !hasSup ? (
-                                    <div className="flex flex-col items-center gap-0.5">
-                                      <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center"><X className="w-3 h-3 text-red-600" /></div>
-                                      <span className="text-[9px] text-red-600 font-semibold leading-tight text-center">Missing in<br />Supplier</span>
-                                    </div>
-                                  ) : fullMatch ? (
-                                    <div className="flex flex-col items-center gap-0.5">
-                                      <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center"><Check className="w-3 h-3 text-emerald-600" /></div>
-                                      <span className="text-[9px] text-emerald-600 font-semibold">Match</span>
-                                    </div>
-                                  ) : (
-                                    <div className="flex flex-col items-center gap-0.5">
-                                      <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center"><AlertTriangle className="w-3 h-3 text-amber-600" /></div>
-                                      {!nameMatch && <span className="text-[9px] text-amber-700 font-semibold leading-tight text-center">Name<br />differs</span>}
-                                      {!qtyMatch && <span className="text-[9px] text-amber-700 font-semibold leading-tight text-center">Qty<br />{bs?.material_used}≠{sup?.quantity}</span>}
-                                    </div>
-                                  )}
-                                </td>
-
-                                {/* Sup Qty */}
-                                <td className="px-3 py-2.5 text-center">
-                                  {sup ? (
-                                    isSupplierEditMode ? (
-                                      <Input type="number" value={sup.quantity}
-                                        onChange={(e) => handleSupplierMaterialChange(supIdx!, 'quantity', parseFloat(e.target.value) || 0)}
-                                        className="h-7 text-center text-xs w-12 mx-auto px-1" min="0" />
-                                    ) : <span className={`font-semibold ${!qtyMatch && hasBS ? 'text-amber-600' : 'text-gray-700'}`}>{sup.quantity}</span>
-                                  ) : <span className="text-gray-300">—</span>}
-                                </td>
-
-                                {/* Sup Item */}
-                                <td className="px-3 py-2.5">
-                                  {sup ? (
-                                    isSupplierEditMode ? (
-                                      <Input value={sup.name} onChange={(e) => handleSupplierMaterialChange(supIdx!, 'name', e.target.value)} className="h-7 text-xs" />
-                                    ) : <span className="font-medium text-[#1a1a2e]">{sup.name}</span>
-                                  ) : <span className="text-red-400 italic text-[10px]">Not in Supplier</span>}
-                                </td>
-
-                                {/* Sup Unit Price */}
-                                <td className="px-3 py-2.5 text-right">
-                                  {sup ? (
-                                    isSupplierEditMode ? (
-                                      <Input type="number" step="0.01" value={sup.unitPrice}
-                                        onChange={(e) => handleSupplierMaterialChange(supIdx!, 'unitPrice', parseFloat(e.target.value) || 0)}
-                                        className="h-7 text-xs text-right" min="0" />
-                                    ) : <span className="text-gray-600">{formatCurrency(sup.unitPrice)}</span>
-                                  ) : <span className="text-gray-300">—</span>}
-                                </td>
-
-                                {/* Sup Total */}
-                                <td className="px-3 py-2.5 text-right">
-                                  {sup ? <span className="font-bold text-emerald-600">{formatCurrency(sup.total)}</span> : <span className="text-gray-300">—</span>}
-                                </td>
-
-                                {/* Delete buttons */}
-                                {(isBlueSheetEditMode || isSupplierEditMode) && (
-                                  <td className="px-1 py-2 text-center">
-                                    <div className="flex flex-col gap-1 items-center">
-                                      {isBlueSheetEditMode && bs && currentBlueSheet.material_entries.length > 1 && (
-                                        <button onClick={() => removeBlueSheetMaterial(bsIdx!)} className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded p-0.5" title="Remove from BlueSheet">
-                                          <X className="h-3 w-3" />
-                                        </button>
+                                        ) : <span className="font-small text-[#1a1a2e]">{bs.material_name}</span>}
+                                      </td>
+                                      <td className="py-2 px-2 text-center border-r border-gray-200 align-middle">
+                                        {isBlueSheetEditMode ? (
+                                          <Input type="number" value={bs.material_used} onChange={(e) => handleBlueSheetMaterialChange(bsIdx!, 'material_used', parseFloat(e.target.value) || 0)} className="h-7 text-center text-xs w-12 mx-auto" min="0" />
+                                        ) : <span className="font-medium">{bs.material_used}</span>}
+                                      </td>
+                                      <td className="py-2 px-3 text-right border-r border-gray-200 align-middle">
+                                        {isBlueSheetEditMode ? (
+                                          <Input type="number" step="0.01" value={bs.unit_cost} onChange={(e) => handleBlueSheetMaterialChange(bsIdx!, 'unit_cost', parseFloat(e.target.value) || 0)} className="h-7 text-xs text-right" min="0" />
+                                        ) : formatCurrency(bs.unit_cost)}
+                                      </td>
+                                      <td className="py-2 px-3 text-right font-semibold text-[#00A1FF] border-r border-gray-200 align-middle">{formatCurrency(bs.total_cost || bs.material_used * bs.unit_cost)}</td>
+                                      {isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1 && (
+                                        <td className="py-1 border-r border-gray-200 align-middle">
+                                          <button onClick={() => removeBlueSheetMaterial(bsIdx!)} className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded p-0.5" title="Remove"><X className="h-3 w-3" /></button>
+                                        </td>
                                       )}
-                                      {isSupplierEditMode && sup && currentSupplierInvoice && currentSupplierInvoice.materials.length > 1 && (
-                                        <button onClick={() => removeSupplierMaterial(supIdx!)} className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded p-0.5" title="Remove from Supplier">
-                                          <X className="h-3 w-3" />
-                                        </button>
-                                      )}
-                                    </div>
-                                  </td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                              <tfoot>
+                                <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold h-[44px]">
+                                  <td colSpan={2} className="py-3 px-3 text-right border-r border-gray-200">Total</td>
+                                  <td className="py-3 px-2 border-r border-gray-200" />
+                                  <td className="py-3 px-3 border-r border-gray-200" />
+                                  <td className="py-3 px-3 text-right text-[#00A1FF] border-r border-gray-200">{formatCurrency(currentBlueSheet.material_entries.reduce((s: number, i: any) => s + (i.total_cost || i.material_used * i.unit_cost || 0), 0))}</td>
+                                  {(isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1) && <td className="border-r border-gray-200" />}
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Center: Reconciliation Status column */}
+                      <div className="min-w-[160px]   flex flex-col border-x border-gray-200">
+                        {/* Spacer to match table CardHeader height */}
+                        <div className="bg-[#2d3748] text-white px-3 text-sm font-semibold border-b border-white/10 h-[55px] flex items-center justify-center">
+                          Reconciliation
+                        </div>
+                        {/* Header to match table THEAD height */}
+                        <div className="bg-gray-700 text-white text-xs font-semibold px-3 text-center border-b border-white/10 h-[55px] flex items-center justify-center">
+                          Reconciliation Status
+                        </div>
+                        <div className="flex-1 bg-gray-100/80">
+                          {comparisonPairs.map((pair, rowIdx) => {
+                            const { bs, sup } = pair
+                            const hasBS = !!bs
+                            const hasSup = !!sup
+                            let status: 'match' | 'price_diff' | 'quantity_diff' | 'missing_in_supplier' | 'missing_in_bluesheet' = 'match'
+                            if (!hasSup) status = 'missing_in_supplier'
+                            else if (!hasBS) status = 'missing_in_bluesheet'
+                            else {
+                              const priceDiff = Math.abs((bs!.unit_cost || 0) - (sup!.unitPrice || 0)) > 0.01
+                              const qtyDiff = (bs!.total_ordered ?? bs!.material_used) !== (sup!.quantity ?? 0)
+                              if (priceDiff) status = 'price_diff'
+                              else if (qtyDiff) status = 'quantity_diff'
+                            }
+                            const rowBg = !hasSup ? 'bg-red-50' : !hasBS ? 'bg-blue-50' : status === 'match' ? 'bg-emerald-50' : 'bg-amber-50'
+                            return (
+                              <div key={rowIdx} className={`px-2 border-b border-gray-200 h-11 flex items-center justify-center ${rowBg}`}>
+                                {status === 'match' && (
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center"><Check className="h-3.5 w-3.5 text-emerald-600" /></div>
+                                    <span className="text-[10px] font-medium text-emerald-700">Match</span>
+                                  </div>
                                 )}
-                              </tr>
+                                {status === 'price_diff' && (
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center"><AlertTriangle className="h-3.5 w-3.5 text-amber-600" /></div>
+                                    <span className="text-[10px] font-medium text-amber-700 text-center leading-tight">Rate Discrepancy</span>
+                                  </div>
+                                )}
+                                {status === 'quantity_diff' && (
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center"><AlertTriangle className="h-3.5 w-3.5 text-amber-600" /></div>
+                                    <span className="text-[10px] font-medium text-amber-700 text-center leading-tight">Qty diff</span>
+                                  </div>
+                                )}
+                                {status === 'missing_in_supplier' && (
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center"><X className="h-3.5 w-3.5 text-red-600" /></div>
+                                    <span className="text-[10px] font-medium text-red-700 text-center leading-tight">No Data</span>
+                                  </div>
+                                )}
+                                {status === 'missing_in_bluesheet' && (
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center"><Plus className="h-3.5 w-3.5 text-blue-600" /></div>
+                                    <span className="text-[10px] font-medium text-blue-700 text-center leading-tight">Extra in Supplier</span>
+                                  </div>
+                                )}
+                              </div>
                             )
-                          })
-                        })()}
+                          })}
+                        </div>
+                        {/* Footer spacer to match table footer row */}
+                        {/* <div className="bg-gray-100 border-t border-gray-200 h-[44px]" /> */}
+                      </div>
 
-                        {/* Totals Row */}
-                        <tr className="border-t-2 border-gray-300 bg-gray-50">
-                          <td colSpan={3} className="px-3 py-3 text-right text-xs font-semibold text-gray-600">BlueSheet Total:</td>
-                          <td className="px-3 py-3 text-right font-bold text-[#00A1FF] text-sm">
-                            {formatCurrency(
-                              currentBlueSheet.material_entries.reduce(
-                                (sum: number, item: any) => sum + (item.total_cost || item.material_used * item.unit_cost || 0),
-                                0
-                              )
-                            )}
-                          </td>
-                          <td className="px-2 py-3 bg-white/70 border-x border-gray-200" />
-                          <td colSpan={3} className="px-3 py-3 text-right text-xs font-semibold text-gray-600">Supplier Total:</td>
-                          <td className="px-3 py-3 text-right font-bold text-emerald-600 text-sm">
-                            {currentSupplierInvoice ? formatCurrency(currentSupplierInvoice.amount) : '—'}
-                          </td>
-                          {(isBlueSheetEditMode || isSupplierEditMode) && <td />}
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+                      {/* Right: Supplier Invoice table — same top design as reference */}
+                      <Card className="border-0 rounded-none shadow-none">
+                        <CardHeader className="bg-[#0f2d1f] text-white py-3 px-4 rounded-none">
+                          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-emerald-400" /> Supplier Materials
+                          </CardTitle>
+                          {/* <p className="text-xs text-white/80 mt-0.5">{currentSupplierInvoice?.invoiceNumber} · {currentSupplierInvoice?.supplier}</p> */}
+                        </CardHeader>
+                        <CardContent className="p-0">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm border-collapse">
+                              <thead>
+                                <tr className="bg-[#134422] text-white text-xs">
+                                  <th className="text-left py-2.5 px-3 font-medium border-r border-white/20">#</th>
+                                  <th className="text-left py-2.5 px-3 font-medium border-r border-white/20">Description</th>
+                                  <th className="text-center py-2.5 px-2 w-14 border-r border-white/20">Qty</th>
+                                  <th className="text-right py-2.5 px-3 w-28 border-r border-white/20">Supplier Price</th>
+                                  <th className="text-right py-2.5 px-3 w-28 border-r border-white/20">Total Amount</th>
+                                  {(isSupplierEditMode && currentSupplierInvoice && currentSupplierInvoice.materials.length > 1) && <th className="w-8" />}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {comparisonPairs.map((pair, rowIdx) => {
+                                  const { sup, supIdx } = pair
+                                  if (!sup) return (
+                                    <tr key={rowIdx} className="border-t border-gray-200 bg-gray-50 h-11">
+                                      <td className="py-2 px-3 text-gray-400 border-r border-gray-200 align-middle">—</td>
+                                      <td className="py-2 px-3 text-gray-400 border-r border-gray-200 align-middle">No Data in Supplier</td>
+                                      <td className="py-2 px-2 text-center border-r border-gray-200 align-middle">—</td>
+                                      <td className="py-2 px-3 text-right border-r border-gray-200 align-middle">—</td>
+                                      <td className="py-2 px-3 text-right border-r border-gray-200 align-middle">—</td>
+                                      {(isSupplierEditMode && currentSupplierInvoice && currentSupplierInvoice.materials.length > 1) && <td className="border-r border-gray-200 align-middle" />}
+                                    </tr>
+                                  )
+                                  return (
+                                    <tr key={rowIdx} className="border-t border-gray-200 hover:bg-gray-50/50 h-11">
+                                      <td className="py-2 px-3 text-gray-500 border-r border-gray-200 align-middle">{rowIdx + 1}</td>
+                                      <td className="py-2 px-3 border-r border-gray-200 align-middle">
+                                        {isSupplierEditMode ? <Input value={sup.name} onChange={(e) => handleSupplierMaterialChange(supIdx!, 'name', e.target.value)} className="h-8 text-xs" /> : <span className="font-small text-[#1a1a2e]">{sup.name}</span>}
+                                      </td>
+                                      <td className="py-2 px-2 text-center border-r border-gray-200 align-middle">
+                                        {isSupplierEditMode ? <Input type="number" value={sup.quantity} onChange={(e) => handleSupplierMaterialChange(supIdx!, 'quantity', parseFloat(e.target.value) || 0)} className="h-7 text-center text-xs w-12 mx-auto" min="0" /> : <span className="font-medium">{sup.quantity}</span>}
+                                      </td>
+                                      <td className="py-2 px-3 text-right border-r border-gray-200 align-middle">
+                                        {isSupplierEditMode ? <Input type="number" step="0.01" value={sup.unitPrice} onChange={(e) => handleSupplierMaterialChange(supIdx!, 'unitPrice', parseFloat(e.target.value) || 0)} className="h-7 text-xs text-right" min="0" /> : formatCurrency(sup.unitPrice)}
+                                      </td>
+                                      <td className="py-2 px-3 text-right font-semibold text-emerald-600 border-r border-gray-200 align-middle">{formatCurrency(sup.total)}</td>
+                                      {isSupplierEditMode && currentSupplierInvoice && currentSupplierInvoice.materials.length > 1 && (
+                                        <td className="py-1 border-r border-gray-200 align-middle">
+                                          <button onClick={() => removeSupplierMaterial(supIdx!)} className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded p-0.5" title="Remove"><X className="h-3 w-3" /></button>
+                                        </td>
+                                      )}
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                              <tfoot>
+                                <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold h-[44px]">
+                                  <td colSpan={2} className="py-3 px-3 text-right border-r border-gray-200">Total</td>
+                                  <td className="py-3 px-2 border-r border-gray-200" />
+                                  <td className="py-3 px-3 border-r border-gray-200" />
+                                  <td className="py-3 px-3 text-right text-emerald-600 border-r border-gray-200">{currentSupplierInvoice ? formatCurrency(currentSupplierInvoice.amount) : '—'}</td>
+                                  {(isSupplierEditMode && currentSupplierInvoice && currentSupplierInvoice.materials.length > 1) && <td className="border-r border-gray-200" />}
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                      {/* Left: BlueSheet table (same design) */}
+                      <Card className="border border-[#00A1FF]/30 shadow-md overflow-hidden">
+                        <CardHeader className="bg-[#1a2f3d] text-white py-4 px-5">
+                          <CardTitle className="text-base font-semibold flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-[#00A1FF]" /> BlueSheet Materials
+                          </CardTitle>
+                          {/* <p className="text-xs text-white/80 mt-1">PO: BS-{blueSheet.id} · {blueSheet.job.job_title} · {blueSheet.job.customer?.customer_name || 'N/A'}</p> */}
+                        </CardHeader>
+                        <CardContent className="p-0">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="bg-[#162f3d] text-white text-xs">
+                                  <th className="text-left py-2.5 px-3 font-medium">#</th>
+                                  <th className="text-left py-2.5 px-3 font-medium">Description</th>
+                                  <th className="text-center py-2.5 px-2 w-14">Qty</th>
+                                  <th className="text-right py-2.5 px-3 w-24">Rate</th>
+                                  <th className="text-right py-2.5 px-3 w-24">Amount</th>
+                                  {(isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1) && <th className="w-8" />}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {currentBlueSheet.material_entries.map((item: any, idx: number) => (
+                                  <tr key={idx} className="border-t border-gray-100 hover:bg-gray-50/50">
+                                    <td className="py-2 px-3 text-gray-500">{idx + 1}</td>
+                                    <td className="py-2 px-3">
+                                      {isBlueSheetEditMode ? (
+                                        <div className="relative">
+                                          <Input
+                                            value={editedBlueSheet?.material_entries[idx]?.material_name || ''}
+                                            onChange={(e) => { handleBlueSheetMaterialChange(idx, 'material_name', e.target.value); handleProductSearch(e.target.value, idx) }}
+                                            onBlur={() => setTimeout(() => { setActiveRow(null); setFilteredProducts([]) }, 200)}
+                                            onFocus={() => { const n = editedBlueSheet?.material_entries[idx]?.material_name; if (n && n.length >= 2) handleProductSearch(n, idx) }}
+                                            className="h-8 text-xs"
+                                            placeholder="Search product..."
+                                          />
+                                          {activeRow === idx && filteredProducts.length > 0 && (
+                                            <div className="absolute z-50 bg-white border w-full max-h-36 overflow-y-auto shadow-lg rounded-md mt-0.5" onMouseDown={(e) => e.preventDefault()}>
+                                              {filteredProducts.map((product: any) => (
+                                                <div key={product.id} className="px-2 py-1.5 text-xs hover:bg-blue-50 cursor-pointer border-b border-gray-50"
+                                                  onMouseDown={(e) => { e.preventDefault(); handleBlueSheetMaterialUpdateAll(idx, product) }}>
+                                                  <div className="font-medium">{product.product_name}</div>
+                                                  <div className="text-gray-400 text-[10px]">{product.jdp_sku} · {formatCurrency(product.jdp_price || 0)}</div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      ) : <span className="font-small text-[#1a1a2e]">{item.material_name}</span>}
+                                    </td>
+                                    <td className="py-2 px-2 text-center">
+                                      {isBlueSheetEditMode ? <Input type="number" value={item.material_used} onChange={(e) => handleBlueSheetMaterialChange(idx, 'material_used', parseFloat(e.target.value) || 0)} className="h-7 text-center text-xs w-12 mx-auto" min="0" /> : <span className="font-medium">{item.material_used}</span>}
+                                    </td>
+                                    <td className="py-2 px-3 text-right">
+                                      {isBlueSheetEditMode ? <Input type="number" step="0.01" value={item.unit_cost} onChange={(e) => handleBlueSheetMaterialChange(idx, 'unit_cost', parseFloat(e.target.value) || 0)} className="h-7 text-xs text-right" min="0" /> : formatCurrency(item.unit_cost)}
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-semibold text-[#00A1FF]">{formatCurrency(item.total_cost || item.material_used * item.unit_cost)}</td>
+                                    {isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1 && (
+                                      <td className="py-1"><button onClick={() => removeBlueSheetMaterial(idx)} className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded p-0.5" title="Remove"><X className="h-3 w-3" /></button></td>
+                                    )}
+                                  </tr>
+                                ))}
+                              </tbody>
+                              <tfoot>
+                                <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
+                                  <td colSpan={2} className="py-3 px-3 text-right">Total</td>
+                                  <td className="py-3 px-2" />
+                                  <td className="py-3 px-3" />
+                                  <td className="py-3 px-3 text-right text-[#00A1FF]">{formatCurrency(currentBlueSheet.material_entries.reduce((s: number, i: any) => s + (i.total_cost || i.material_used * i.unit_cost || 0), 0))}</td>
+                                  {(isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1) && <td />}
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                        </CardContent>
+                      </Card>
 
-                  {/* Add/Save buttons */}
+                      {/* Right: Supplier-style table area with single message row */}
+                      <Card className="border border-gray-200 bg-white shadow-sm overflow-hidden rounded-xl">
+                        <CardHeader className="bg-[#0f2d1f] text-white py-4 px-5">
+                          <CardTitle className="text-base font-semibold flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-emerald-400" /> Supplier Materials
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="bg-[#134422] text-white text-xs">
+                                  <th className="text-left py-2.5 px-3 font-medium">#</th>
+                                  <th className="text-left py-2.5 px-3 font-medium">Description</th>
+                                  <th className="text-center py-2.5 px-2 w-14">Qty</th>
+                                  <th className="text-right py-2.5 px-3 w-28">Supplier Price</th>
+                                  <th className="text-right py-2.5 px-3 w-28">Total Amount</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr className="border-t border-gray-200 bg-gray-50">
+                                  <td className="py-2 px-3 text-gray-400">—</td>
+                                  <td className="py-2 px-3 text-gray-600 font-medium">No supplier invoice data found</td>
+                                  <td className="py-2 px-2 text-center text-gray-400">—</td>
+                                  <td className="py-2 px-3 text-right text-gray-400">—</td>
+                                  <td className="py-2 px-3 text-right text-gray-400">—</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
+
+                  {/* Add row / Save / Proceed */}
                   {(isBlueSheetEditMode || isSupplierEditMode) && (
-                    <div className="flex gap-2 flex-wrap items-center">
+                    <div className="flex flex-wrap gap-2 items-center">
                       {isBlueSheetEditMode && (
-                        <Button size="sm" onClick={addBlueSheetMaterial} variant="outline" className="h-7 text-xs px-3 border-dashed border-[#00A1FF] text-[#00A1FF]">
+                        <Button size="sm" onClick={addBlueSheetMaterial} variant="outline" className="border-dashed border-[#00A1FF] text-[#00A1FF] hover:bg-[#E6F6FF]">
                           <Plus className="h-3 w-3 mr-1" />Add BlueSheet Row
                         </Button>
                       )}
                       {isSupplierEditMode && (
-                        <Button size="sm" onClick={addSupplierMaterial} variant="outline" className="h-7 text-xs px-3 border-dashed border-emerald-500 text-emerald-600">
+                        <Button size="sm" onClick={addSupplierMaterial} variant="outline" className="border-dashed border-emerald-500 text-emerald-600 hover:bg-emerald-50">
                           <Plus className="h-3 w-3 mr-1" />Add Supplier Row
                         </Button>
                       )}
-                      <div className="ml-auto flex gap-2">
-                        {isBlueSheetEditMode && (
-                          <Button size="sm" onClick={handleBlueSheetSave} className="h-7 text-xs px-3 bg-emerald-600 hover:bg-emerald-700 text-white">
-                            <Save className="h-3 w-3 mr-1" />Save BlueSheet
-                          </Button>
-                        )}
-                        {isSupplierEditMode && (
-                          <Button size="sm" onClick={handleSupplierSave} className="h-7 text-xs px-3 bg-emerald-600 hover:bg-emerald-700 text-white">
-                            <Save className="h-3 w-3 mr-1" />Save Supplier
-                          </Button>
-                        )}
-                      </div>
+                      {isBlueSheetEditMode && <Button size="sm" onClick={handleBlueSheetSave} className="bg-emerald-600 hover:bg-emerald-700 text-white"><Save className="h-3 w-3 mr-1" />Save BlueSheet</Button>}
+                      {isSupplierEditMode && <Button size="sm" onClick={handleSupplierSave} className="bg-emerald-600 hover:bg-emerald-700 text-white"><Save className="h-3 w-3 mr-1" />Save Supplier</Button>}
                     </div>
                   )}
-
                   <div className="flex justify-end pt-2">
-                    <Button onClick={handleProceedToReview} disabled={isBlueSheetEditMode || isSupplierEditMode}
-                      className="bg-[#00A1FF] text-white hover:bg-[#0090e6] gap-2 h-10 text-sm px-6">
-                      <ArrowRight className="h-4 w-4" />Proceed to Final Review
+                    <Button onClick={handleProceedToReview} disabled={isBlueSheetEditMode || isSupplierEditMode || isProceedingToReview} className="bg-[#00A1FF] hover:bg-[#0090e6] text-white gap-2 h-10 text-sm px-6">
+                      {isProceedingToReview ? <RefreshCw className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+                      {isProceedingToReview ? 'Approving...' : 'Proceed to Final Review'}
                     </Button>
                   </div>
                 </div>
@@ -1364,7 +1425,7 @@ export function BlueSheetApprovalDialog({
                       <Card className="bg-green-50 border-green-200">
                         <CardContent className="p-8 text-center">
                           <CheckSquare className="h-10 w-10 text-green-600 mx-auto mb-3" />
-                          <h4 className="text-lg font-medium text-green-900">Supplier Invoice</h4>
+                          <h4 className="text-lg font-medium text-green-900">Supplier Materials</h4>
                           <p className="text-3xl font-medium text-green-600">{formatCurrency(currentSupplierInvoice.amount)}</p>
                           <p className="text-base text-green-700">{currentSupplierInvoice.materials.length} materials</p>
                         </CardContent>
@@ -1421,7 +1482,7 @@ export function BlueSheetApprovalDialog({
                       <div className="bg-gray-50 p-6 rounded-xl">
                         <h5 className="text-lg font-medium mb-4">Last Minute Edits</h5>
                         <div className="flex gap-4">
-                          <Button variant="outline" size="lg" onClick={() => setCurrentStep('comparison')} className="gap-2 h-12">
+                          <Button variant="outline" size="lg" onClick={() => setCurrentStep('upload')} className="gap-2 h-12">
                             <Edit className="h-4 w-4" />Edit Materials
                           </Button>
                         </div>
@@ -1430,7 +1491,7 @@ export function BlueSheetApprovalDialog({
                   </Card>
 
                   <div className="flex items-center justify-between">
-                    <Button variant="outline" onClick={() => setCurrentStep('comparison')} className="gap-2 h-14 text-lg px-6" size="lg">
+                    <Button variant="outline" onClick={() => setCurrentStep('upload')} className="gap-2 h-14 text-lg px-6" size="lg">
                       <ArrowLeft className="h-5 w-5" />Back
                     </Button>
                     <div className="flex gap-6">

@@ -1353,18 +1353,10 @@ export function CustomersPage() {
                                               variant="ghost"
                                               size="sm"
                                               title='Change Order'
-                                              className="h-8 w-8 px-2 text-xs text-blue-600 hover:text-blue-800  hover:bg-blue-100"
+                                              className="  px-2 text-xs text-blue-600 hover:text-blue-800 bg-blue-100"
                                               onClick={(e) => handleChangeOrderClick(job, customer.id.toString(), e)}
                                             >
-                                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                <path d="M6 2H14L20 8V22H6V2Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-                                                <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-                                                <path d="M9 14C9 12.9 9.9 12 11 12H15L13.5 10.5M15 12L13.5 13.5"
-                                                  stroke="currentColor"
-                                                  stroke-width="2"
-                                                  stroke-linecap="round"
-                                                  stroke-linejoin="round" />
-                                              </svg>
+                                              Change Order
                                             </Button>
                                           </div>
                                         </div>

@@ -6,12 +6,14 @@ import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Textarea } from './ui/textarea'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog'
 import { Checkbox } from './ui/checkbox'
 import { Badge } from './ui/badge'
 import { toast } from 'sonner'
 import { AutoScrollSelect } from './ui/AutoScrollSelect'
 import { AutoScrollMultiSelect } from './ui/AutoScrollMultiSelect'
 import { apiClient } from '../utils/api'
+import { globalApiCall } from '../utils/globalApiHandler'
 import Autocomplete from 'react-google-autocomplete'
 
 // Extend Window interface for Google Maps
@@ -94,6 +96,21 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
   const [selectedLaborNames, setSelectedLaborNames] = useState<string[]>([])
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [isCreatingJob, setIsCreatingJob] = useState(false)
+
+  // Shared add-entity (customer/contractor) modal
+  const [isAddEntityOpen, setIsAddEntityOpen] = useState(false)
+  const [addEntityType, setAddEntityType] = useState<'customer' | 'contractor' | null>(null)
+  const [addEntityLoading, setAddEntityLoading] = useState(false)
+  const [entityForm, setEntityForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    company: '',
+    address: ''
+  })
+  const [entityErrors, setEntityErrors] = useState<{ name?: string; email?: string; phone?: string }>({})
+  const [customerRefreshKey, setCustomerRefreshKey] = useState(0)
+  const [contractorRefreshKey, setContractorRefreshKey] = useState(0)
 
   const [formData, setFormData] = useState({
     // Step 1: Job Type
@@ -335,6 +352,121 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
       toast.error(error instanceof Error ? error.message : 'Failed to create job')
     } finally {
       setIsCreatingJob(false)
+    }
+  }
+
+  const openAddEntityModal = (type: 'customer' | 'contractor') => {
+    setAddEntityType(type)
+    setEntityForm({
+      name: '',
+      email: '',
+      phone: '',
+      company: '',
+      address: ''
+    })
+    setEntityErrors({})
+    setIsAddEntityOpen(true)
+  }
+
+  const handleCreateEntity = async () => {
+    if (!addEntityType) return
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+    if (!apiBaseUrl) {
+      toast.error('API base URL not configured')
+      return
+    }
+
+    const newErrors: typeof entityErrors = {}
+    if (!entityForm.name.trim()) {
+      newErrors.name = 'Name is required'
+    }
+    if (!entityForm.email.trim()) {
+      newErrors.email = 'Email is required'
+    } else if (!validateEmail(entityForm.email)) {
+      newErrors.email = 'Please enter a valid email'
+    }
+    if (!entityForm.phone.trim()) {
+      newErrors.phone = 'Phone is required'
+    } else if (!validatePhone(entityForm.phone)) {
+      newErrors.phone = 'Phone must be exactly 10 digits'
+    }
+    setEntityErrors(newErrors)
+    if (Object.keys(newErrors).length > 0) {
+      return
+    }
+
+    setAddEntityLoading(true)
+    try {
+      // Get system IP
+      const ipResponse = await fetch('https://api.ipify.org?format=json')
+      const ipData = await ipResponse.json()
+      const system_ip = ipData?.ip || 'unknown'
+
+      if (addEntityType === 'customer') {
+        const payload = {
+          customer_name: entityForm.name,
+          company_name: entityForm.company || '',
+          email: entityForm.email.toLowerCase(),
+          phone: entityForm.phone || '',
+          contact_person: '',
+          address: entityForm.address || '',
+          status: 'active',
+          system_ip
+        }
+        const response = await globalApiCall(`${apiBaseUrl}/customer/createCustomer`, {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        })
+        const data = await response.json()
+        if (!data.success) {
+          throw new Error(data.message || 'Failed to create customer')
+        }
+        toast.success('Customer created successfully!')
+        // refresh dropdown and preselect if id returned
+        if (data.data?.id) {
+          const newId = String(data.data.id)
+          const name = payload.customer_name
+          setFormData(prev => ({ ...prev, customer: newId, customerName: name }))
+          setSelectedCustomerName(name)
+        }
+        setCustomerRefreshKey(prev => prev + 1)
+      } else {
+        const payload = {
+          contractor_name: entityForm.name,
+          company_name: entityForm.company || '',
+          email: entityForm.email.toLowerCase(),
+          phone: entityForm.phone || '',
+          address: entityForm.address || '',
+          status: 'active',
+          system_ip
+        }
+        const response = await globalApiCall(`${apiBaseUrl}/contractor/createContractor`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        })
+        const data = await response.json()
+        if (!data.success) {
+          throw new Error(data.message || 'Failed to create contractor')
+        }
+        toast.success('Contractor created successfully!')
+        if (data.data?.id) {
+          const newId = String(data.data.id)
+          const name = payload.contractor_name
+          setFormData(prev => ({ ...prev, contractor: newId, contractorName: name }))
+          setSelectedContractorName(name)
+        }
+        setContractorRefreshKey(prev => prev + 1)
+      }
+
+      setIsAddEntityOpen(false)
+    } catch (error) {
+      console.error('Error creating entity:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to create record')
+    } finally {
+      setAddEntityLoading(false)
     }
   }
 
@@ -618,8 +750,17 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
           {/* Customer field only for service-based jobs, Contractor field for contract-based */}
           {formData.type === 'service-based' ? (
-            <div className="space-y-2">
-              <Label htmlFor="customer">Customer *</Label>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between mb-1">
+                <Label htmlFor="customer">Customer *</Label>
+                <button
+                  type="button"
+                  className="px-0 text-xs text-[#00A1FF] cursor-pointer hover:underline"
+                  onClick={() => openAddEntityModal('customer')}
+                >
+                  + Add Customer
+                </button>
+              </div>
               <AutoScrollSelect
                 value={formData.customer}
                 onValueChange={(value, item) => {
@@ -633,6 +774,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                 fetchData={apiClient.getCustomers}
                 displayField="name"
                 valueField="id"
+                refreshKey={customerRefreshKey}
                 className={validationErrors.customer ? 'border-red-500' : ''}
               />
               {validationErrors.customer && (
@@ -640,8 +782,17 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               )}
             </div>
           ) : (
-            <div className="space-y-2">
-              <Label htmlFor="contractor">Contractor *</Label>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between mb-1">
+                <Label htmlFor="contractor">Contractor *</Label>
+                <button
+                  type="button"
+                  className="px-0 text-xs text-[#00A1FF] cursor-pointer hover:underline"
+                  onClick={() => openAddEntityModal('contractor')}
+                >
+                  + Add Contractor
+                </button>
+              </div>
               <AutoScrollSelect
                 value={formData.contractor}
                 onValueChange={(value, item) => {
@@ -655,6 +806,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                 fetchData={apiClient.getContractors}
                 displayField="name"
                 valueField="id"
+                refreshKey={contractorRefreshKey}
                 className={validationErrors.contractor ? 'border-red-500' : ''}
               />
               {validationErrors.contractor && (
@@ -1138,6 +1290,104 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
           </Button>
         )}
       </div>
+
+      {/* Shared Add Customer / Contractor modal */}
+      <Dialog open={isAddEntityOpen} onOpenChange={(open) => setIsAddEntityOpen(open)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {addEntityType === 'customer' ? 'Add New Customer' : 'Add New Contractor'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 md:grid-cols-2 gap-4 pt-2">
+            <div>
+              <Label className="mb-1 block">Name *</Label>
+              <Input
+                value={entityForm.name}
+                onChange={(e) => {
+                  setEntityForm({ ...entityForm, name: e.target.value })
+                  if (entityErrors.name) {
+                    setEntityErrors(prev => ({ ...prev, name: undefined }))
+                  }
+                }}
+                placeholder={addEntityType === 'customer' ? 'Customer name' : 'Contractor name'}
+              />
+              {entityErrors.name && (
+                <p className="mt-1 text-xs text-red-500">{entityErrors.name}</p>
+              )}
+            </div>
+            <div>
+              <Label className="mb-1 block">Email *</Label>
+              <Input
+                type="email"
+                value={entityForm.email}
+                onChange={(e) => {
+                  setEntityForm({ ...entityForm, email: e.target.value })
+                  if (entityErrors.email) {
+                    setEntityErrors(prev => ({ ...prev, email: undefined }))
+                  }
+                }}
+                placeholder="Email address"
+              />
+              {entityErrors.email && (
+                <p className="mt-1 text-xs text-red-500">{entityErrors.email}</p>
+              )}
+            </div>
+            <div>
+              <Label className="mb-1 block">Phone *</Label>
+              <Input
+                type="number"
+                value={entityForm.phone}
+                onChange={(e) => {
+                  const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 10)
+                  setEntityForm({ ...entityForm, phone: onlyDigits })
+                  if (entityErrors.phone) {
+                    setEntityErrors(prev => ({ ...prev, phone: undefined }))
+                  }
+                }}
+                placeholder="10-digit phone"
+              />
+              {entityErrors.phone && (
+                <p className="mt-1 text-xs text-red-500">{entityErrors.phone}</p>
+              )}
+            </div>
+            <div>
+              <Label className="mb-1 block">Company</Label>
+              <Input
+                value={entityForm.company}
+                onChange={(e) => setEntityForm({ ...entityForm, company: e.target.value })}
+                placeholder="Company name"
+              />
+            </div>
+            <div>
+              <Label className="mb-1 block">Address</Label>
+              <Input
+                value={entityForm.address}
+                onChange={(e) => setEntityForm({ ...entityForm, address: e.target.value })}
+                placeholder="Address"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsAddEntityOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleCreateEntity}
+              disabled={addEntityLoading || !addEntityType}
+            >
+              {addEntityLoading
+                ? addEntityType === 'customer' ? 'Saving customer...' : 'Saving contractor...'
+                : addEntityType === 'customer' ? 'Save Customer' : 'Save Contractor'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

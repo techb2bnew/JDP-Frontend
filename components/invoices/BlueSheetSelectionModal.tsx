@@ -8,17 +8,6 @@ import {
     Clock, CheckSquare, X, Building, User,
     ChevronLeft, ChevronRight, Eye, FileText, Upload
 } from 'lucide-react'
-import {
-    AlertDialog,
-    AlertDialogContent,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogAction,
-    AlertDialogCancel,
-} from '../ui/alert-dialog'
-import { apiClient } from '../../utils/api'
 
 interface ApiBlueSheetItem {
     id: number
@@ -70,15 +59,9 @@ export function BlueSheetSelectionModal({
 }: BlueSheetSelectionModalProps) {
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
     const [currentPage, setCurrentPage] = useState(1)
-    const [approveTarget, setApproveTarget] = useState<ApiBlueSheetItem | null>(null)
-    const [isConfirmOpen, setIsConfirmOpen] = useState(false)
-    const [isApproving, setIsApproving] = useState(false)
-    const [blueSheetss, setBlueSheets] = useState<ApiBlueSheetItem[]>([])
-    const [isBulkApproving, setIsBulkApproving] = useState(false)
     React.useEffect(() => {
         if (isOpen) { setSelectedIds(new Set()); setCurrentPage(1) }
     }, [isOpen])
-    console.log('blueSheets in modal:', blueSheets)
     const totalPages = Math.max(1, Math.ceil(blueSheets.length / PAGE_SIZE))
     const paginated = blueSheets.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
     const allOnPageSelected = paginated.length > 0 && paginated.every(b => selectedIds.has(b.id))
@@ -90,17 +73,12 @@ export function BlueSheetSelectionModal({
 
     const togglePageAll = () => setSelectedIds(prev => {
         const next = new Set(prev)
-        const eligible = paginated.filter(b => !b.materials_invoiced)  // ← ADD
-        const allEligibleSelected = eligible.every(b => next.has(b.id))
-        allEligibleSelected
-            ? eligible.forEach(b => next.delete(b.id))
-            : eligible.forEach(b => next.add(b.id))
+        const allSelected = paginated.every(b => next.has(b.id))
+        allSelected ? paginated.forEach(b => next.delete(b.id)) : paginated.forEach(b => next.add(b.id))
         return next
     })
 
-    const selectAll = () => setSelectedIds(
-        new Set(blueSheets.filter(b => !b.materials_invoiced).map(b => b.id))  // ← ADD
-    )
+    const selectAll = () => setSelectedIds(new Set(blueSheets.map(b => b.id)))
     const clearAll = () => setSelectedIds(new Set())
 
     const formatCurrency = (amount: number) =>
@@ -137,67 +115,6 @@ export function BlueSheetSelectionModal({
     const handleSubmit = () => {
         if (selectedIds.size === 0) return
         onSubmitSelected(blueSheets.filter(b => selectedIds.has(b.id)))
-        console.log('Submitted blue sheets for approval:', blueSheets.filter(b => selectedIds.has(b.id)))
-    }
-
-    const handleApproveClick = (blueSheet: ApiBlueSheetItem) => {
-        setApproveTarget(blueSheet)
-        setIsConfirmOpen(true)
-    }
-
-    const handleBulkApprove = async () => {
-        if (selectedIds.size === 0) return
-        setIsConfirmOpen(true)
-    }
-
-    const confirmApprove = async () => {
-        // Single approve — row ke Approve button se
-        if (approveTarget && selectedIds.size === 0) {
-            if (approveTarget.status === 'approved') {  // ← ADD
-                setIsConfirmOpen(false)
-                setApproveTarget(null)
-                return
-            }
-            try {
-                setIsApproving(true)
-                await apiClient.approveBulkBluesheet([approveTarget.id], 'approved')
-                onSubmitSelected(blueSheets.filter(b => b.id === approveTarget.id))
-            } catch (error) {
-                console.error('Error approving bluesheet:', error)
-            } finally {
-                setIsApproving(false)
-                setIsConfirmOpen(false)
-                setApproveTarget(null)
-            }
-            return
-        }
-
-        // Bulk approve — selected saari IDs ek call mein
-        const selectedIdsArray = Array.from(selectedIds)  // [66, 65, 67]
-        const selectedSheets = blueSheets.filter(b => selectedIds.has(b.id))
-
-        const pendingSheets = selectedSheets.filter(b => b.status !== 'approved')
-        const pendingIds = pendingSheets.map(b => b.id)
-        if (pendingIds.length === 0) {
-            onSubmitSelected(selectedSheets)
-            setIsConfirmOpen(false)
-            setApproveTarget(null)
-            clearAll()
-            return
-        }
-
-        try {
-            setIsApproving(true)
-            await apiClient.approveBulkBluesheet(selectedIdsArray, 'approved')
-            onSubmitSelected(selectedSheets)
-        } catch (error) {
-            console.error('Bulk approve error:', error)
-        } finally {
-            setIsApproving(false)
-            setIsConfirmOpen(false)
-            setApproveTarget(null)
-            clearAll()  // selection clear karo
-        }
     }
 
     return (
@@ -290,32 +207,26 @@ export function BlueSheetSelectionModal({
                                     <TableHead className="text-white font-medium">Amount</TableHead>
                                     {/* <TableHead className="text-white font-medium">Supplier Invoice</TableHead> */}
                                     <TableHead className="text-white font-medium">Status</TableHead>
-                                    <TableHead className="text-white font-medium">Action</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {paginated.map((blueSheet, index) => {
                                     const isSelected = selectedIds.has(blueSheet.id)
-                                    const isInvoiced = blueSheet.materials_invoiced === true
                                     return (
                                         <TableRow
                                             key={blueSheet.id}
-                                            onClick={() => !isInvoiced && toggleItem(blueSheet.id)}
-                                            className={`transition-colors ${isInvoiced
-                                                ? 'opacity-50 cursor-not-allowed bg-gray-50'   // ← invoiced = disabled look
-                                                : isSelected
-                                                    ? 'bg-[#E6F6FF] hover:bg-[#d4eeff] cursor-pointer'
-                                                    : index % 2 === 1
-                                                        ? 'bg-[#eff4fa] hover:bg-[#e2ecf7] cursor-pointer'
-                                                        : 'hover:bg-[#f8fafc] cursor-pointer'
-                                                }`}
+                                            onClick={() => toggleItem(blueSheet.id)}
+                                            className={`transition-colors ${isSelected
+                                                ? 'bg-[#E6F6FF] hover:bg-[#d4eeff] cursor-pointer'
+                                                : index % 2 === 1
+                                                    ? 'bg-[#eff4fa] hover:bg-[#e2ecf7] cursor-pointer'
+                                                    : 'hover:bg-[#f8fafc] cursor-pointer'
+                                            }`}
                                         >
                                             <TableCell className="pl-5" onClick={e => e.stopPropagation()}>
                                                 <Checkbox
                                                     checked={isSelected}
-                                                    disabled={isInvoiced}
-                                                    onCheckedChange={() => !isInvoiced && toggleItem(blueSheet.id)}
-
+                                                    onCheckedChange={() => toggleItem(blueSheet.id)}
                                                     className="border-gray-300 data-[state=checked]:bg-[#00A1FF] data-[state=checked]:border-[#00A1FF]"
                                                 />
                                             </TableCell>
@@ -372,20 +283,7 @@ export function BlueSheetSelectionModal({
                                                 </Badge>
                                             </TableCell> */}
 
-                                            <TableCell>{getStatusBadge(blueSheet)}</TableCell>
-                                            <TableCell className="pr-5">
-                                                {blueSheet.status === 'pending' && (
-                                                    <>
-                                                        <Button
-                                                            size="sm"
-                                                            onClick={() => handleApproveClick(blueSheet)}
-                                                            className="bg-primary text-white hover:bg-[#0090e6] gap-1"
-                                                        >
-                                                            Approve
-                                                        </Button>
-                                                    </>
-                                                )}
-                                            </TableCell>
+                                            <TableCell className="pr-5">{getStatusBadge(blueSheet)}</TableCell>
                                         </TableRow>
                                     )
                                 })}
@@ -439,41 +337,21 @@ export function BlueSheetSelectionModal({
                         <X className="h-4 w-4" />Cancel
                     </Button>
                     <Button
-                        onClick={handleBulkApprove}
-                        disabled={selectedIds.size === 0 || isApproving}
+                        onClick={handleSubmit}
+                        disabled={selectedIds.size === 0}
                         className="bg-[#00A1FF] hover:bg-[#0090e6] text-white gap-2 min-w-[180px]"
                     >
-                        {isApproving ? (
-                            <>Processing...</>
-                        ) : (
-                            <>
-                                <CheckSquare className="h-4 w-4" />
-                                Approve Selected
-                                {selectedIds.size > 0 && (
-                                    <Badge className="bg-white/20 text-white border-0 text-xs ml-1 h-5 px-1.5">
-                                        {selectedIds.size}
-                                    </Badge>
-                                )}
-                            </>
+                        <CheckSquare className="h-4 w-4" />
+                        Preview & Submit
+                        {selectedIds.size > 0 && (
+                            <Badge className="bg-white/20 text-white border-0 text-xs ml-1 h-5 px-1.5">
+                                {selectedIds.size}
+                            </Badge>
                         )}
                     </Button>
                 </div>
 
             </DialogContent>
-            <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Approve this Blue Sheet?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure you want to approve this bluesheet?
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isApproving} onClick={() => setIsConfirmOpen(false)}>No</AlertDialogCancel>
-                        <AlertDialogAction disabled={isApproving} onClick={confirmApprove}>Yes</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </Dialog>
 
 

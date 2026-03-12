@@ -4,6 +4,7 @@ import { Badge } from './badge'
 import { Button } from './button'
 import { LoadingSpinner } from '../common/LoadingSpinner'
 import { ChevronDown, X } from 'lucide-react'
+import { Input } from './input'
 
 interface AutoScrollMultiSelectProps {
   selectedValues: any[];
@@ -39,6 +40,7 @@ export function AutoScrollMultiSelect({
   const [hasMore, setHasMore] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedItems, setSelectedItems] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -140,6 +142,16 @@ export function AutoScrollMultiSelect({
     return itemId;
   };
 
+  const filteredItems = items.filter(item => {
+    const label =
+      item[displayField] ||
+      item.name ||
+      item.user?.full_name ||
+      item.labor_code ||
+      ''
+    return label.toString().toLowerCase().includes(searchTerm.toLowerCase())
+  });
+
   return (
     <div className="space-y-2">
       {/* Selected items */}
@@ -182,11 +194,21 @@ export function AutoScrollMultiSelect({
         </Button>
 
         {isOpen && (
-          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-hidden">
+          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-72 overflow-hidden">
+            {/* Search input */}
+            <div className="p-2 pb-1 border-b border-gray-100">
+              <Input
+                placeholder="Search..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-8 text-xs"
+              />
+            </div>
+
             <div
               ref={scrollContainerRef}
               onScroll={handleScroll}
-              className="max-h-60 overflow-y-auto"
+              className="max-h-64 overflow-y-auto"
             >
               {isLoading ? (
                 <div className="flex items-center justify-center p-4">
@@ -194,7 +216,7 @@ export function AutoScrollMultiSelect({
                 </div>
               ) : (
                 <>
-                  {items.map((item) => {
+                  {filteredItems.map((item) => {
                     const itemId = item[valueField]?.toString();
                     const isSelected = selectedValues.includes(itemId);
                     return (
@@ -216,7 +238,7 @@ export function AutoScrollMultiSelect({
                       <LoadingSpinner />
                     </div>
                   )}
-                  {!hasMore && items.length > 0 && (
+                  {!hasMore && filteredItems.length > 0 && (
                     <div className="text-center text-sm text-gray-500 p-2">
                       No more items
                     </div>
