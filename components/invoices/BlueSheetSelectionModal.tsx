@@ -343,7 +343,7 @@ export function BlueSheetSelectionModal({
                         className="bg-[#00A1FF] hover:bg-[#0090e6] text-white gap-2 min-w-[180px]"
                     >
                         <CheckSquare className="h-4 w-4" />
-                        Preview & Submit
+                          Submit
                         {selectedIds.size > 0 && (
                             <Badge className="bg-white/20 text-white border-0 text-xs ml-1 h-5 px-1.5">
                                 {selectedIds.size}

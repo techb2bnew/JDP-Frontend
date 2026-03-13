@@ -212,7 +212,11 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
         created_by: sheet.created_by ?? sheet.submitted_by?.id ?? 0,
         created_by_user: sheet.created_by_user ?? sheet.submitted_by ?? { id: 0, email: '', full_name: 'N/A' },
         labor_entries: sheet.labor_entries ?? [],
-        material_entries: sheet.material_entries ?? [],
+        material_entries: (sheet.material_entries ?? []).map((m: any) => ({
+          ...m,
+          // attach source bluesheet id for downstream UI
+          job_bluesheet_id: m.job_bluesheet_id ?? m.bluesheet_id ?? m.bluesheetId ?? sheet.id,
+        })),
         materials_invoiced: sheet.materials_invoiced,
         total_labor_hours: sheet.total_labor_hours ?? totalLaborHours ?? null, 
         created_at: sheet.created_at ?? '',

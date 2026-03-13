@@ -1316,7 +1316,7 @@ export function CustomersPage() {
                             <div key={job.id} className="mb-1">
                               <div className="flex items-start">
                                 <Minus className="h-4 w-4 text-primary/40 mt-2 mr-2" />
-                                <div className="flex-1">
+                                <div className="flex-1 border-l border-gray-200 pl-3">
                                   <Collapsible
                                     open={isJobExpanded}
                                     onOpenChange={() => toggleJob(job.id.toString())}
@@ -1353,7 +1353,7 @@ export function CustomersPage() {
                                               variant="ghost"
                                               size="sm"
                                               title='Change Order'
-                                              className="  px-2 text-xs text-blue-600 hover:text-blue-800 bg-blue-100"
+                                              className="h-6  pl-2 pr-2 text-[10px] text-blue-600 hover:text-blue-800 bg-blue-100"
                                               onClick={(e) => handleChangeOrderClick(job, customer.id.toString(), e)}
                                             >
                                               Change Order
@@ -1373,7 +1373,7 @@ export function CustomersPage() {
                                               <Minus className="h-3 w-3 text-primary/30 mt-1.5 mr-2" />
                                               <Button
                                                 variant="ghost"
-                                                className={`flex-1 justify-start p-1.5 text-left h-auto text-xs hover:bg-blue-50 ${isSubJobSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
+                                                className={`flex-1 justify-start p-1.5 text-left h-auto text-xs hover:bg-blue-50 border-l border-gray-200 pl-3 ${isSubJobSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
                                                   }`}
                                                 onClick={() => selectSubJob(subJob.id.toString(), job.id.toString(), customer.id.toString())}
                                               >

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -21,15 +21,12 @@ import { Logo } from '../common/Logo'
 import Image from 'next/image'
 // import { formatCurrency, formatDate } from '../../utils/invoiceUtils'
 
-interface NewInvoiceDialogProps {
+interface CustomInvoiceDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSave: (invoice: Partial<Invoice>) => void
-  jobs: any[];
-  jobId?: number;
-  onInvoiceSaved?: (invoice: any) => void;
-  isViewMode?: boolean;
-  viewInvoiceData?: any;
+  blueSheet: any
+  totalLaborHours?: string | null
+  onInvoiceSaved?: (invoice: any) => void
 }
 
 
@@ -106,14 +103,86 @@ interface ProductFormData {
 
 
 
-export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onInvoiceSaved, isViewMode = false, viewInvoiceData }: NewInvoiceDialogProps) => {
-  console.log('trsting jobs', jobs);
+export const CustomInvoiceDialog = ({ open, onOpenChange, blueSheet, totalLaborHours, onInvoiceSaved }: CustomInvoiceDialogProps) => {
+  // Derive viewInvoiceData and job list from blueSheet (custom invoice from bluesheet)
+  const viewInvoiceData = useMemo(() => {
+    if (!blueSheet) return null
+    const job = blueSheet.job || {}
+    const products = (blueSheet.material_entries || []).map((item: any, index: number) => ({
+      id: item.product?.id || index,
+      product_name: item.material_name,
+      description: item.product?.description || item.material_name,
+      jdp_price: item.unit_cost || 0,
+      unit_cost: item.unit_cost || 0,
+      total_cost: item.total_cost ?? (item.material_used || 0) * (item.unit_cost || 0),
+      stock_quantity: item.material_used || 0,
+      supplier_id: item.product?.supplier_id ?? item.product?.suppliers?.id ?? 1,
+    }))
+    const normalizedLabor = (totalLaborHours || '').toString().trim().toLowerCase()
+    const isZeroLabor = !normalizedLabor || /^0+$/.test(normalizedLabor) || /^0+h0*m*$/.test(normalizedLabor) || /^0+m$/.test(normalizedLabor)
+    if (totalLaborHours && !isZeroLabor) {
+      products.push({
+        id: 'labor-total',
+        product_name: `Labor total hours (${totalLaborHours})`,
+        description: '',
+        jdp_price: 0,
+        unit_cost: 0,
+        total_cost: 0,
+        stock_quantity: 0,
+        supplier_id: 1,
+        isCustomProduct: true,
+      } as any)
+    }
+    const customerId = job.customer?.id ?? job.customer_id ?? (blueSheet as any).customer_id ?? null
+    const contractorId = job.contractor?.id ?? job.contractor_id ?? (blueSheet as any).contractor_id ?? null
+    return {
+      id: blueSheet.id,
+      job_id: blueSheet.job_id,
+      job,
+      customer: job.customer,
+      contractor: job.contractor,
+      estimate_title: job.job_title || '',
+      invoice_number: `BS-${blueSheet.id}`,
+      bill_to_address: job.bill_to_address || job.customer?.address || job.contractor?.address || '',
+      po_number: `BS-${blueSheet.id}`,
+      notes: blueSheet.notes || '',
+      service_type: job.job_type,
+      products,
+      estimate_date: new Date().toISOString().split('T')[0],
+      customer_id: customerId != null ? Number(customerId) : undefined,
+      contractor_id: contractorId != null ? Number(contractorId) : undefined,
+      rep: (job as any).rep ?? '',
+      due_date: (job as any).due_date ?? '',
+      payment_credits: (job as any).payment_credits ?? 0,
+      balance_due: (job as any).balance_due ?? '',
+      invoice_type: job.job_type === 'contract_based' ? 'contract_based' : 'service_based',
+      email_address: job.customer?.email || job.bill_to_email || (job as any).email || '',
+    }
+  }, [blueSheet, totalLaborHours])
+
+  const jobId = blueSheet?.job_id
+  const jobs = useMemo(() => {
+    if (!viewInvoiceData) return []
+    const j = blueSheet?.job || {}
+    return [{
+      ...j,
+      id: blueSheet.job_id,
+      title: j.job_title,
+      customer_id: viewInvoiceData.customer_id ?? j.customer?.id ?? j.customer_id,
+      contractor_id: viewInvoiceData.contractor_id ?? j.contractor?.id ?? j.contractor_id,
+      type: j.job_type || j.type,
+      email: j.customer?.email || j.bill_to_email || j.email,
+    }]
+  }, [blueSheet, viewInvoiceData])
+
+  const isViewMode = false
+
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [savingDraft, setSavingDraft] = useState(false)
   const [sendingInvoice, setSendingInvoice] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [localJobs, setLocalJobs] = useState<any[]>(jobs || []);
+  const [localJobs, setLocalJobs] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<{
     id: number;
     company_name: string;
@@ -166,8 +235,9 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
     billToAddress: '',
     billToAddressEnabled: true,
     poNumber: '',
-    project: '',
-    jobId: jobId || '',
+    // Pre-fill project with job name from BlueSheet
+    project: blueSheet?.job?.job_title || '',
+    jobId: jobId || blueSheet?.job_id || '',
     rep: '',
     dueDate: '',
     paymentCredits: 0,
@@ -193,8 +263,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
     paymentPercentage: 0,
     estimateTotal: 0,
     paymentHistory: [] as any[]
-  })
-
+  }) 
   // Update form when job is provided
   useEffect(() => {
     if (currentJob) {
@@ -289,7 +358,8 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
               searchQuery: '',
               showSearchResults: false,
               supplierId: product.supplier_id || 1,
-              isCustomProduct: true
+              // only treat true as custom (labor hours line); materials default false
+              is_custom: product.isCustomProduct === true
             })) || [{
               id: Math.random().toString(36).substring(2, 9),
               productId: null,
@@ -338,12 +408,14 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
     }
   }, [viewInvoiceData])
 
-  // Seed jobsList from jobs prop so job appears selected
+  // Seed jobsList and auto-select the only job (CustomInvoice: single job from blueSheet, keep disabled)
   useEffect(() => {
     if (jobs && jobs.length > 0) {
       setJobsList(jobs)
+      setSelectedJob(jobs[0])
+      setInlineInvoiceData(prev => ({ ...prev, jobId: jobs[0].id ?? blueSheet?.job_id }))
     }
-  }, [jobs])
+  }, [jobs, blueSheet?.job_id])
 
 
 
@@ -364,61 +436,18 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
   // Send invoice to customer function
   const sendInvoiceToCustomer = async (invoiceId: number) => {
     try {
-      // Get customer_id or contractor_id from viewInvoiceData if in view mode, otherwise from currentJob
+      // CustomInvoiceDialog: always use viewInvoiceData (from blueSheet) for customer_id/contractor_id
       let customerId: number | null = null;
       let contractorId: number | null = null;
       let isContractBased = false;
-
-      if (isViewMode && viewInvoiceData) {
-        // In view mode, get from viewInvoiceData
+      if (viewInvoiceData) {
         isContractBased = viewInvoiceData.service_type === 'contract_based' ||
           viewInvoiceData.job?.job_type === 'contract_based' ||
-          viewInvoiceData.contractor_id !== null && viewInvoiceData.contractor_id !== undefined;
-
-        // Try multiple ways to get the IDs
-        customerId = viewInvoiceData.customer_id ||
-          viewInvoiceData.customer?.id ||
-          (viewInvoiceData.customer && typeof viewInvoiceData.customer === 'number' ? viewInvoiceData.customer : null) ||
-          null;
-
-        contractorId = viewInvoiceData.contractor_id ||
-          viewInvoiceData.contractor?.id ||
-          (viewInvoiceData.contractor && typeof viewInvoiceData.contractor === 'number' ? viewInvoiceData.contractor : null) ||
-          null;
-
-        console.log('View mode - IDs from viewInvoiceData:', {
-          customer_id: customerId,
-          contractor_id: contractorId,
-          isContractBased: isContractBased,
-          viewInvoiceData: viewInvoiceData
-        });
-      } else {
-        // In create mode, get from currentJob
-        const currentJob = jobsList.find((j: any) => j.id === inlineInvoiceData.jobId)
-        if (!currentJob) {
-          throw new Error('Job not found')
-        }
-
-        isContractBased = currentJob.type === 'contract_based' || currentJob.type === 'contract-based';
-
-        if (isContractBased) {
-          contractorId = currentJob.contractor_id ||
-            (currentJob.contractor && typeof currentJob.contractor === 'number' ? Number(currentJob.contractor) : null) ||
-            (currentJob.contractor && typeof currentJob.contractor === 'string' ? Number(currentJob.contractor) : null) ||
-            null;
-          console.log('Create mode - contractor_id from currentJob:', contractorId);
-        } else {
-          customerId = currentJob.customer_id ||
-            (currentJob.customer && typeof currentJob.customer === 'number' ? currentJob.customer : null) ||
-            (currentJob.customer && typeof currentJob.customer === 'string' ? Number(currentJob.customer) : null) ||
-            Number(currentJob?.customer) ||
-            null;
-          console.log('Create mode - customer_id from currentJob:', customerId);
-        }
+          (viewInvoiceData.contractor_id != null);
+        customerId = viewInvoiceData.customer_id != null ? Number(viewInvoiceData.customer_id) : viewInvoiceData.customer?.id != null ? Number(viewInvoiceData.customer.id) : null;
+        contractorId = viewInvoiceData.contractor_id != null ? Number(viewInvoiceData.contractor_id) : viewInvoiceData.contractor?.id != null ? Number(viewInvoiceData.contractor.id) : null;
       }
-
       if (!customerId && !contractorId) {
-        console.error('Customer/Contractor ID not found');
         toast.error('Customer/Contractor ID is missing. Cannot send invoice.');
         return;
       }
@@ -446,16 +475,8 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
         throw new Error('No authentication token found')
       }
 
-      // Get customer email - from viewInvoiceData in view mode, otherwise from currentJob
-      let customerEmail = 'customer@example.com';
-      if (isViewMode && viewInvoiceData) {
-        customerEmail = viewInvoiceData.customer?.email ||
-          viewInvoiceData.email_address ||
-          'customer@example.com';
-      } else {
-        const currentJob = jobsList.find((j: any) => j.id === inlineInvoiceData.jobId)
-        customerEmail = currentJob?.email || 'customer@example.com';
-      }
+      // Get customer email - CustomInvoiceDialog always has viewInvoiceData from blueSheet
+      let customerEmail = viewInvoiceData?.customer?.email || viewInvoiceData?.email_address || currentJob?.email || 'customer@example.com';
 
       const payload: any = {
         estimateNumber: inlineInvoiceData.estimateNumber || 'Draft',
@@ -776,84 +797,62 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
     // Validation
     const errors: Record<string, string> = {}
 
-    if (!inlineInvoiceData.jobId) {
-      errors.jobId = 'Please select a job first'
-    }
-
-    if (!inlineInvoiceData.project) {
+    // Ensure project uses job title as fallback
+    const effectiveProject = inlineInvoiceData.project || blueSheet?.job?.job_title || ''
+    if (!effectiveProject) {
       errors.project = 'Project field is required'
+    } else if (!inlineInvoiceData.project) {
+      // Sync state so field is no longer logically empty
+      setInlineInvoiceData(prev => ({ ...prev, project: effectiveProject }))
     }
-
-
 
     if (inlineInvoiceData.lineItems.length === 0 || !inlineInvoiceData.lineItems[0].item) {
       errors.lineItems = 'Please add at least one product item'
     }
+    console.log(inlineInvoiceData.jobId, 'inlineInvoiceData.jobId')
 
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors)
       toast.error('Please fix the validation errors')
       return
     }
-
     setValidationErrors({})
     setSavingDraft(true)
     try {
       const subtotal = calculateInvoiceSubtotal()
 
-      const customProducts = inlineInvoiceData.lineItems.map(item => ({
-        product_name: item.item,
-        description: item.description || '',
-        supplier_id: item.supplierId || selectedSupplierId || 1,
-        supplier_sku: item.item.substring(0, 10),
-        jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        stock_quantity: item.qty,
-        unit: 'unit',
-        job_id: Number(inlineInvoiceData.jobId),
-        unit_cost: item.rate,
-        jdp_price: item.rate,
-        estimated_price: item.estimatedPrice || 0,
-        total_cost: item.total
-      }))
+      const customProducts = inlineInvoiceData.lineItems.map(item => {
+        const base: any = {
+          product_name: item.item,
+          description: item.description || '',
+          supplier_id: item.supplierId || selectedSupplierId || 1,
+          supplier_sku: item.item.substring(0, 10),
+          jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          stock_quantity: item.qty,
+          unit: 'unit',
+          job_id: Number(inlineInvoiceData.jobId),
+          unit_cost: item.rate,
+          jdp_price: item.rate,
+          estimated_price: item.estimatedPrice || 0,
+          total_cost: item.total,
+        }
+        // Only send is_custom flag for Labor total hours line
+        if (typeof item.item === 'string' && item.item.startsWith('Labor total hours')) {
+          base.is_custom = true
+        }
+        return base
+      })
 
-      // Get customer_id or contractor_id - from viewInvoiceData if in view mode, otherwise from currentJob
+      // CustomInvoiceDialog: always use viewInvoiceData (from blueSheet) for customer_id/contractor_id
       let customerId: number | null = null;
       let contractorId: number | null = null;
       let isContractBased = false;
-
-      if (isViewMode && viewInvoiceData) {
-        // In view mode, get from viewInvoiceData
+      if (viewInvoiceData) {
         isContractBased = viewInvoiceData.service_type === 'contract_based' ||
-          viewInvoiceData.job?.job_type === 'contract_based' ||
-          (viewInvoiceData.contractor_id !== null && viewInvoiceData.contractor_id !== undefined);
-
-        customerId = viewInvoiceData.customer_id ||
-          viewInvoiceData.customer?.id ||
-          (viewInvoiceData.customer && typeof viewInvoiceData.customer === 'number' ? viewInvoiceData.customer : null) ||
-          null;
-
-        contractorId = viewInvoiceData.contractor_id ||
-          viewInvoiceData.contractor?.id ||
-          (viewInvoiceData.contractor && typeof viewInvoiceData.contractor === 'number' ? viewInvoiceData.contractor : null) ||
-          null;
-      } else {
-        // In create mode, get from currentJob
-        isContractBased = currentJob?.type === 'contract_based' || currentJob?.type === 'contract-based';
-
-        if (isContractBased) {
-          contractorId = currentJob.contractor_id ||
-            (currentJob.contractor && typeof currentJob.contractor === 'number' ? Number(currentJob.contractor) : null) ||
-            (currentJob.contractor && typeof currentJob.contractor === 'string' ? Number(currentJob.contractor) : null) ||
-            null;
-        } else {
-          customerId = currentJob.customer_id ||
-            (currentJob.customer && typeof currentJob.customer === 'number' ? currentJob.customer : null) ||
-            (currentJob.customer && typeof currentJob.customer === 'string' ? Number(currentJob.customer) : null) ||
-            Number(currentJob?.customer) ||
-            null;
-        }
+          viewInvoiceData.job?.job_type === 'contract_based' || (viewInvoiceData.contractor_id != null);
+        customerId = viewInvoiceData.customer_id != null ? Number(viewInvoiceData.customer_id) : viewInvoiceData.customer?.id != null ? Number(viewInvoiceData.customer.id) : null;
+        contractorId = viewInvoiceData.contractor_id != null ? Number(viewInvoiceData.contractor_id) : viewInvoiceData.contractor?.id != null ? Number(viewInvoiceData.contractor.id) : null;
       }
-
       const payload: any = {
         job_id: Number(inlineInvoiceData.jobId),
         estimate_title: inlineInvoiceData.project || currentJob?.title,
@@ -872,13 +871,8 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
         custom_products: customProducts
       }
-
-      // Add customer_id or contractor_id based on job type
-      if (isContractBased && contractorId) {
-        payload.contractor_id = contractorId;
-      } else if (customerId) {
-        payload.customer_id = customerId;
-      }
+      if (isContractBased && contractorId) payload.contractor_id = contractorId;
+      if (customerId) payload.customer_id = customerId;
 
       console.log('Draft invoice payload with IDs:', {
         customer_id: payload.customer_id,
@@ -947,20 +941,19 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
     // Validation
     const errors: Record<string, string> = {}
 
-    if (!inlineInvoiceData.jobId) {
-      errors.jobId = 'Please select a job first'
-    }
-
-    if (!inlineInvoiceData.project) {
+    // Ensure project uses job title as fallback
+    const effectiveProject = inlineInvoiceData.project || blueSheet?.job?.job_title || ''
+    if (!effectiveProject) {
       errors.project = 'Project field is required'
+    } else if (!inlineInvoiceData.project) {
+      setInlineInvoiceData(prev => ({ ...prev, project: effectiveProject }))
     }
-
-
 
     if (inlineInvoiceData.lineItems.length === 0 || !inlineInvoiceData.lineItems[0].item) {
       errors.lineItems = 'Please add at least one product item'
     }
-
+    console.log(inlineInvoiceData.jobId, 'inlineInvoiceData.jobId')
+    console.log(errors, 'errors handlePreviewAndSend')
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors)
       toast.error('Please fix the validation errors')
@@ -972,62 +965,40 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
     try {
       const subtotal = calculateInvoiceSubtotal()
 
-      const customProducts = inlineInvoiceData.lineItems.map(item => ({
-        product_name: item.item,
-        description: item.description || '',
-        supplier_id: item.supplierId || selectedSupplierId || 1,
-        supplier_sku: item.item.substring(0, 10),
-        jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        stock_quantity: item.qty,
-        unit: 'unit',
-        job_id: Number(inlineInvoiceData.jobId),
-        unit_cost: item.rate,
-        jdp_price: item.rate,
-        estimated_price: item.estimatedPrice || 0,
-        total_cost: item.total
-      }))
+      const customProducts = inlineInvoiceData.lineItems.map(item => {
+        const base: any = {
+          product_name: item.item,
+          description: item.description || '',
+          supplier_id: item.supplierId || selectedSupplierId || 1,
+          supplier_sku: item.item.substring(0, 10),
+          jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          stock_quantity: item.qty,
+          unit: 'unit',
+          job_id: Number(inlineInvoiceData.jobId),
+          unit_cost: item.rate,
+          jdp_price: item.rate,
+          estimated_price: item.estimatedPrice || 0,
+          total_cost: item.total,
+        }
+        if (typeof item.item === 'string' && item.item.startsWith('Labor total hours')) {
+          base.is_custom = true
+        }
+        return base
+      })
 
-      // Get customer_id or contractor_id - from viewInvoiceData if in view mode, otherwise from currentJob
+      // CustomInvoiceDialog: always use viewInvoiceData (from blueSheet) for customer_id/contractor_id
       let customerId: number | null = null;
       let contractorId: number | null = null;
       let isContractBased = false;
-
-      if (isViewMode && viewInvoiceData) {
-        // In view mode, get from viewInvoiceData
+      if (viewInvoiceData) {
         isContractBased = viewInvoiceData.service_type === 'contract_based' ||
-          viewInvoiceData.job?.job_type === 'contract_based' ||
-          (viewInvoiceData.contractor_id !== null && viewInvoiceData.contractor_id !== undefined);
-
-        customerId = viewInvoiceData.customer_id ||
-          viewInvoiceData.customer?.id ||
-          (viewInvoiceData.customer && typeof viewInvoiceData.customer === 'number' ? viewInvoiceData.customer : null) ||
-          null;
-
-        contractorId = viewInvoiceData.contractor_id ||
-          viewInvoiceData.contractor?.id ||
-          (viewInvoiceData.contractor && typeof viewInvoiceData.contractor === 'number' ? viewInvoiceData.contractor : null) ||
-          null;
-      } else {
-        // In create mode, get from currentJob
-        isContractBased = currentJob?.type === 'contract_based' || currentJob?.type === 'contract-based';
-
-        if (isContractBased) {
-          contractorId = currentJob.contractor_id ||
-            (currentJob.contractor && typeof currentJob.contractor === 'number' ? Number(currentJob.contractor) : null) ||
-            (currentJob.contractor && typeof currentJob.contractor === 'string' ? Number(currentJob.contractor) : null) ||
-            null;
-        } else {
-          customerId = currentJob.customer_id ||
-            (currentJob.customer && typeof currentJob.customer === 'number' ? currentJob.customer : null) ||
-            (currentJob.customer && typeof currentJob.customer === 'string' ? Number(currentJob.customer) : null) ||
-            Number(currentJob?.customer) ||
-            null;
-        }
+          viewInvoiceData.job?.job_type === 'contract_based' || (viewInvoiceData.contractor_id != null);
+        customerId = viewInvoiceData.customer_id != null ? Number(viewInvoiceData.customer_id) : viewInvoiceData.customer?.id != null ? Number(viewInvoiceData.customer.id) : null;
+        contractorId = viewInvoiceData.contractor_id != null ? Number(viewInvoiceData.contractor_id) : viewInvoiceData.contractor?.id != null ? Number(viewInvoiceData.contractor.id) : null;
       }
-
       const payload: any = {
         job_id: Number(inlineInvoiceData.jobId),
-        estimate_title: inlineInvoiceData.project || currentJob?.title,
+        estimate_title: inlineInvoiceData.project || currentJob?.title || blueSheet?.job?.job_title || '',
         priority: 'medium' as 'low' | 'medium' | 'high',
         service_type: isContractBased ? 'contract_based' : 'service_based',
         email_address: currentJob?.email || 'customer@example.com',
@@ -1043,13 +1014,8 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
         custom_products: customProducts
       }
-
-      // Add customer_id or contractor_id based on job type
-      if (isContractBased && contractorId) {
-        payload.contractor_id = contractorId;
-      } else if (customerId) {
-        payload.customer_id = customerId;
-      }
+      if (isContractBased && contractorId) payload.contractor_id = contractorId;
+      if (customerId) payload.customer_id = customerId;
 
       console.log('Send invoice payload with IDs:', {
         customer_id: payload.customer_id,
@@ -1434,9 +1400,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
     fetchJobsList();
   }, []);
 
-
-
-
+  if (!blueSheet || !viewInvoiceData) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1532,33 +1496,24 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
                 </div>
               </div>
 
-              {/* Job Selection */}
+              {/* Job Selection - auto-selected from blueSheet, disabled */}
               <div className="mb-6">
-                <Label className="block bg-gray-600 text-white px-3 py-2 mb-0 text-sm font-semibold">Select Job</Label>
+                <Label className="block bg-gray-600 text-white px-3 py-2 mb-0 text-sm font-semibold">Job</Label>
                 <div className="border border-gray-300 p-4">
                   <Select
-                    value={inlineInvoiceData.jobId?.toString() || ''}
-                    onValueChange={(value) => {
-                      if (!isViewMode) {
-                        handleJobSelection(value)
-                        setValidationErrors(prev => ({ ...prev, jobId: '' }))
-                      }
-                    }}
-                    disabled={isViewMode}
+                    value={String(blueSheet?.job_id || 'job')}
+                    onValueChange={() => {}}
+                    disabled={true}
                   >
-                    <SelectTrigger className={`border-primary/30 focus:border-primary bg-white ${validationErrors.jobId ? 'border-red-500' : ''} ${isViewMode ? 'opacity-50' : ''}`}>
-                      <SelectValue placeholder="Select a job..." />
+                    <SelectTrigger className="border-primary/30 focus:border-primary bg-gray-50 cursor-not-allowed opacity-90">
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {jobsList.length > 0 ? (
-                        jobsList.map((job: any) => (
-                          <SelectItem key={job.id} value={job.id.toString()}>
-                            #{job.id} - {job.title}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="none" disabled>No jobs available</SelectItem>
-                      )}
+                      <SelectItem value={String(blueSheet?.job_id || 'job')}>
+                        {blueSheet
+                          ? `#${blueSheet.job_id} - ${blueSheet.job?.job_title || 'Job'}`
+                          : 'Job'}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   {validationErrors.jobId && (
@@ -1665,13 +1620,18 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
                       readOnly={isViewMode}
                     />
                   </div>
-                  <Input
-                    value={inlineInvoiceData.project || ''}
-                    onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, project: e.target.value }))}
-                    className="px-3 py-2 text-sm rounded-none border-t-0"
-                    placeholder="Project"
-                    readOnly={isViewMode}
-                  />
+                  <div>
+                    <Input
+                      value={inlineInvoiceData.project || blueSheet?.job?.job_title || ''}
+                      onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, project: e.target.value }))}
+                      className={`px-3 py-2 text-sm rounded-none border-t-0 ${validationErrors.project ? 'border-red-500' : ''}`}
+                      placeholder="Project"
+                      readOnly={isViewMode}
+                    />
+                    {validationErrors.project && (
+                      <p className="text-xs text-red-500 mt-1">{validationErrors.project}</p>
+                    )}
+                  </div>
                   <Input
                     value={inlineInvoiceData.rep}
                     onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, rep: e.target.value }))}
@@ -1800,8 +1760,8 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
                                             {product.description}
                                           </div>
                                           <div className="text-xs text-primary mt-2">
-                                            {product.jdpSKU} • ${product.jdpPrice.toFixed(2)}
-                                            {product.estimatedPrice && product.estimatedPrice > 0 && ` • Est: $${product.estimatedPrice.toFixed(2)}`}
+                                            {product.jdpSKU} â€¢ ${product.jdpPrice.toFixed(2)}
+                                            {product.estimatedPrice && product.estimatedPrice > 0 && ` â€¢ Est: $${product.estimatedPrice.toFixed(2)}`}
                                           </div>
                                         </div>
                                       ))
@@ -1833,7 +1793,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
                             onChange={(e) => {
                               updateInvoiceLineItem(item.id, 'description', e.target.value)
                             }}
-                            className="border-0 p-2  w-full"
+                            className="border-0 p-2   w-full"
                             placeholder="Enter product description"
                             rows={4}
                             readOnly={isViewMode}
@@ -2036,7 +1996,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
                     Cancel
                   </Button>
                   <div className="flex gap-3">
-                    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                    {/* <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                       <Button
                         onClick={handleSaveInvoiceAsDraft}
                         variant="outline"
@@ -2047,7 +2007,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
                         <FileText className="h-5 w-5 mr-2" />
                         {savingDraft ? 'Saving...' : 'Save as Draft'}
                       </Button>
-                    </motion.div>
+                    </motion.div> */}
 
                     <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                       <Button
@@ -2057,7 +2017,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
                         disabled={savingDraft || sendingInvoice}
                       >
                         <Eye className="h-5 w-5 mr-2" />
-                        {sendingInvoice ? 'Sending...' : 'Preview & Send to Customer'}
+                        {sendingInvoice ? 'Sending...' : 'Send to Customer'}
                       </Button>
                     </motion.div>
                   </div>
@@ -2169,7 +2129,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
                             <p className="text-sm text-muted-foreground mt-2">
                               Estimate Total: ${inlineInvoiceData.estimateTotal?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                               {inlineInvoiceData.paymentHistory && inlineInvoiceData.paymentHistory.length > 0 && (
-                                <> • Previous Payments: ${inlineInvoiceData.paymentHistory.reduce((sum, p) => sum + p.amount, 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</>
+                                <> â€¢ Previous Payments: ${inlineInvoiceData.paymentHistory.reduce((sum, p) => sum + p.amount, 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</>
                               )}
                             </p>
                           )}

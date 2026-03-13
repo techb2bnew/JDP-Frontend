@@ -11,6 +11,7 @@ import { Separator } from '../ui/separator'
 import { Textarea } from '../ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { toast } from 'sonner'
+import { CustomInvoiceDialog } from './CustomInvoiceDialog'
 import {
   Upload,
   FileText,
@@ -139,6 +140,7 @@ export function BlueSheetApprovalDialog({
   const [isApproving, setIsApproving] = useState(false)
   const [isApprovingCustomer, setIsApprovingCustomer] = useState(false)
   const [isProceedingToReview, setIsProceedingToReview] = useState(false)
+  const [isCustomInvoiceOpen, setIsCustomInvoiceOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [filteredProducts, setFilteredProducts] = useState<any[]>([])
   const [activeRow, setActiveRow] = useState<number | null>(null)
@@ -735,150 +737,8 @@ export function BlueSheetApprovalDialog({
   // ──────────────────────────────────────────────────────────────────────────
 
 
-  const handleSendCustomInvoice = async () => {
-    const finalBlueSheet = editedBlueSheet || blueSheet
-    if (!finalBlueSheet) return
-
-    try {
-      setIsApprovingCustomer(true)
-
-      const customProducts = finalBlueSheet.material_entries.map((item: any) => ({
-        ...(item.product?.id ? { id: item.product.id } : {}),
-        job_id: finalBlueSheet.job_id,
-        product_name: item.material_name,
-        description: item.product?.description || item.material_name,
-        supplier_id: item.product?.supplier_id ?? item.product?.suppliers?.id ?? 1,
-        supplier_sku: item.product?.supplier_sku || '',
-        jdp_sku: item.product?.jdp_sku || item.jdp_sku || '',
-        unit: item.unit || 'piece',
-        stock_quantity: item.total_ordered || 0,
-        unit_cost: item.unit_cost || 0,
-        estimated_price: item.unit_cost || 0,
-        total_cost: item.total_cost ?? (item.total_ordered || 0) * (item.unit_cost || 0),
-        jdp_price: item.unit_cost || 0,
-        total_ordered: item.total_ordered || 0,
-        material_used: item.material_used || 0,
-        is_custom: false,
-      }))
-
-      const bluesheetIds = selectedBlueSheets.length > 0
-        ? selectedBlueSheets.map(bs => bs.id)
-        : [finalBlueSheet.id]
-
-      const today = new Date().toISOString().split('T')[0]
-      const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-
-      const estimatePayload = {
-        job_id: finalBlueSheet.job_id,
-        estimate_title: `BlueSheet #${finalBlueSheet.id} — ${finalBlueSheet.job.job_title}`,
-        priority: (finalBlueSheet.job.priority as 'low' | 'medium' | 'high') || 'medium',
-        service_type: finalBlueSheet.job.job_type === 'contract_based' ? 'contract_based' : 'service_based',
-        invoice_type: 'estimate',
-        status: 'draft',
-        estimate_date: today,
-        due_date: thirtyDaysLater,
-        invoice_number: `INV-BS-${finalBlueSheet.id}-${Date.now().toString().slice(-6)}`,
-        issue_date: today,
-        email_address: finalBlueSheet.job.customer?.email || finalBlueSheet.job.bill_to_email || '',
-        bill_to_address: finalBlueSheet.job.bill_to_address || finalBlueSheet.job.customer?.address || '',
-        customer_id: finalBlueSheet.job.customer?.id ?? 0,
-        po_number: `BS-${finalBlueSheet.id}`,
-        rep: finalBlueSheet.created_by_user?.full_name || '',
-        notes: finalBlueSheet.notes || '',
-        total_amount: finalBlueSheet.total_cost + (finalBlueSheet.additional_charges ?? 0),
-        location: finalBlueSheet.job.bill_to_address || finalBlueSheet.job.customer?.address || '',
-        bluesheet_ids: bluesheetIds,
-        valid_until: thirtyDaysLater,
-        description: finalBlueSheet.notes || '',
-        custom_products: customProducts,
-        invoice_source: 'custom',
-      }
-
-      const estimateResponse = await apiClient.createEstimate(estimatePayload)
-      const estimateId = estimateResponse?.data?.id
-      if (!estimateId) throw new Error('Estimate ID not returned from API')
-
-      toast.success('Estimate created!')
-
-      const getAuthToken = (): string | null => {
-        if (typeof window !== 'undefined') {
-          const savedAuth = localStorage.getItem('jdp_auth')
-          if (savedAuth) {
-            try {
-              const authData = JSON.parse(savedAuth)
-              if (authData.token && authData.expires > Date.now()) return authData.token
-            } catch { }
-          }
-        }
-        return null
-      }
-
-      const token = getAuthToken()
-      if (!token) throw new Error('No authentication token found')
-
-      const todayDate = new Date()
-      const customerEmail = finalBlueSheet.job.customer?.email || finalBlueSheet.job.bill_to_email || ''
-      const customerId = finalBlueSheet.job.customer?.id ?? 0
-
-      const isContractBased = finalBlueSheet.job.job_type === 'contract_based'
-      const contractorId = finalBlueSheet.job.contractor?.id ?? null
-
-      const sendPayload: any = {
-        estimateNumber: `INV-BS-${finalBlueSheet.id}`,
-        estimateDate: todayDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }),
-        customerName: finalBlueSheet.job.customer?.customer_name || finalBlueSheet.job.contractor?.contractor_name || '',
-        customerEmail: customerEmail,
-        customerAddress: finalBlueSheet.job.customer?.address || finalBlueSheet.job.contractor?.address || '',
-        billToAddress: finalBlueSheet.job.bill_to_address || '',
-        poNumber: `BS-${finalBlueSheet.id}`,
-        project: finalBlueSheet.job.job_title || '',
-        rep: finalBlueSheet.created_by_user?.full_name || '',
-        notes: finalBlueSheet.notes || '',
-        signatureText: 'ACCEPTED BY________________DATE_____',
-        invoiceType: 'Estimate',
-        lineItems: finalBlueSheet.material_entries.map((item: any) => ({
-          qty: item.material_used || item.total_ordered || 0,
-          item: item.material_name,
-          description: item.material_name,
-          rate: item.unit_cost || 0,
-          total: item.total_cost || 0,
-        })),
-        subtotal: finalBlueSheet.total_cost,
-        total: finalBlueSheet.total_cost,
-      }
-
-      if (isContractBased && contractorId) {
-        sendPayload.contractor_id = contractorId
-      } else {
-        sendPayload.customer_id = customerId
-      }
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/invoices/sendInvoiceToCustomer/${estimateId}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify(sendPayload),
-        }
-      )
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`Send failed: ${response.status} — ${errorText}`)
-      }
-
-      toast.success('Invoice sent to customer successfully!')
-      onApprovalComplete(finalBlueSheet)
-      onClose()
-    } catch (error: any) {
-      console.error('Send custom invoice error:', error)
-      toast.error(error?.message || 'Failed to send invoice to customer.')
-    } finally {
-      setIsApprovingCustomer(false)
-    }
+  const handleSendCustomInvoice = () => {
+    setIsCustomInvoiceOpen(true)
   }
 
 
@@ -1059,11 +919,15 @@ export function BlueSheetApprovalDialog({
                               </thead>
                               <tbody>
                                 {comparisonPairs.map((pair, rowIdx) => {
-                                  const { sup, supIdx } = pair
+                                  const { sup, supIdx, bs, bsIdx } = pair
+                                  const bsSourceId = bs?.job_bluesheet_id || bs?.bluesheet_id || bs?.bluesheetId || blueSheet.id
                                   if (!sup) return (
                                     <tr key={rowIdx} className="border-t border-gray-200 bg-gray-50 h-11">
                                       <td className="py-2 px-3 text-gray-400 border-r border-gray-200 align-middle">—</td>
-                                      <td className="py-2 px-3 text-gray-400 border-r border-gray-200 align-middle">No Data in Supplier</td>
+                                      <td className="py-2 px-3 text-gray-400 border-r border-gray-200 align-middle">
+                                        No Data in Supplier
+                                       
+                                      </td>
                                       <td className="py-2 px-2 text-center border-r border-gray-200 align-middle">—</td>
                                       <td className="py-2 px-3 text-right border-r border-gray-200 align-middle">—</td>
                                       <td className="py-2 px-3 text-right border-r border-gray-200 align-middle">—</td>
@@ -1074,7 +938,14 @@ export function BlueSheetApprovalDialog({
                                     <tr key={rowIdx} className="border-t border-gray-200 hover:bg-gray-50/50 h-11">
                                       <td className="py-2 px-3 text-gray-500 border-r border-gray-200 align-middle">{rowIdx + 1}</td>
                                       <td className="py-2 px-3 border-r border-gray-200 align-middle">
-                                        {isSupplierEditMode ? <Input value={sup.name} onChange={(e) => handleSupplierMaterialChange(supIdx!, 'name', e.target.value)} className="h-8 text-xs" /> : <span className="font-small text-[#1a1a2e]">{sup.name}</span>}
+                                        {isSupplierEditMode ? (
+                                          <Input value={sup.name} onChange={(e) => handleSupplierMaterialChange(supIdx!, 'name', e.target.value)} className="h-8 text-xs" />
+                                        ) : (
+                                          <div className="flex items-center justify-between gap-2">
+                                            <span className="font-small text-[#1a1a2e]">{sup.name}</span>
+                                          
+                                          </div>
+                                        )}
                                       </td>
                                       <td className="py-2 px-2 text-center border-r border-gray-200 align-middle">
                                         {isSupplierEditMode ? <Input type="number" value={sup.quantity} onChange={(e) => handleSupplierMaterialChange(supIdx!, 'quantity', parseFloat(e.target.value) || 0)} className="h-7 text-center text-xs w-12 mx-auto" min="0" /> : <span className="font-medium">{sup.quantity}</span>}
@@ -1200,6 +1071,7 @@ export function BlueSheetApprovalDialog({
                                       <td colSpan={isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1 ? 6 : 5} className="py-2 px-3 text-gray-400 text-center border-r border-gray-200 align-middle">—</td>
                                     </tr>
                                   )
+                                  const bsSourceId = bs.job_bluesheet_id || bs.bluesheet_id || bs.bluesheetId || blueSheet.id
                                   return (
                                     <tr key={rowIdx} className="border-t border-gray-200 hover:bg-gray-50/50 h-11">
                                       <td className="py-2 px-3 text-gray-500 border-r border-gray-200 align-middle">{rowIdx + 1}</td>
@@ -1226,7 +1098,14 @@ export function BlueSheetApprovalDialog({
                                               </div>
                                             )}
                                           </div>
-                                        ) : <span className="font-small text-[#1a1a2e]">{bs.material_name}</span>}
+                                        ) : (
+                                          <div className="flex items-center justify-between gap-2">
+                                            <span className="font-small text-[#1a1a2e]">{bs.material_name}</span>
+                                            <span className="ml-2 inline-flex items-center rounded-full border border-dashed border-gray-300 px-2 py-0.5 text-[10px] text-gray-500">
+                                              BS-{bsSourceId} · Row {bsIdx! + 1}
+                                            </span>
+                                          </div>
+                                        )}
                                       </td>
                                       <td className="py-2 px-2 text-center border-r border-gray-200 align-middle">
                                         {isBlueSheetEditMode ? (
@@ -1284,7 +1163,7 @@ export function BlueSheetApprovalDialog({
                       </CardHeader>
                       <CardContent className="p-0">
                         <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
+                          <table className="w-full text-sm border-collapse">
                             <thead>
                               <tr className="bg-[#162f3d] text-white text-xs">
                                 <th className="text-left py-2.5 px-3 font-medium">#</th>
@@ -1304,7 +1183,9 @@ export function BlueSheetApprovalDialog({
                                   {(isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1) && <td />}
                                 </tr>
                               ) : (
-                                currentBlueSheet.material_entries.map((item: any, idx: number) => (
+                                currentBlueSheet.material_entries.map((item: any, idx: number) => {
+                                  const bsSourceId = item.job_bluesheet_id || item.bluesheet_id || item.bluesheetId || currentBlueSheet.id
+                                  return (
                                   <tr key={idx} className="border-t border-gray-100 hover:bg-gray-50/50">
                                     <td className="py-2 px-3 text-gray-500">{idx + 1}</td>
                                     <td className="py-2 px-3">
@@ -1330,7 +1211,14 @@ export function BlueSheetApprovalDialog({
                                             </div>
                                           )}
                                         </div>
-                                      ) : <span className="font-small text-[#1a1a2e]">{item.material_name}</span>}
+                                      ) : (
+                                        <div className="flex items-center justify-between gap-2">
+                                          <span className="font-small text-[#1a1a2e]">{item.material_name}</span>
+                                          <span className="ml-2 inline-flex items-center rounded-full border border-dashed border-gray-300 px-2 py-0.5 text-[10px] text-gray-500">
+                                            BS-{bsSourceId} · Row {idx + 1}
+                                          </span>
+                                        </div>
+                                      )}
                                     </td>
                                     <td className="py-2 px-2 text-center">
                                       {isBlueSheetEditMode ? <Input type="number" value={item.material_used} onChange={(e) => handleBlueSheetMaterialChange(idx, 'material_used', parseFloat(e.target.value) || 0)} className="h-7 text-center text-xs w-12 mx-auto" min="0" /> : <span className="font-medium">{item.material_used}</span>}
@@ -1343,7 +1231,7 @@ export function BlueSheetApprovalDialog({
                                       <td className="py-1"><button onClick={() => removeBlueSheetMaterial(idx)} className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded p-0.5" title="Remove"><X className="h-3 w-3" /></button></td>
                                     )}
                                   </tr>
-                                ))
+                                )})
                               )}
                             </tbody>
                             <tfoot>
@@ -1507,6 +1395,12 @@ export function BlueSheetApprovalDialog({
           </Tabs>
         </div>
       </DialogContent>
+      <CustomInvoiceDialog
+        open={isCustomInvoiceOpen}
+        onOpenChange={setIsCustomInvoiceOpen}
+        blueSheet={currentBlueSheet}
+        totalLaborHours={totalLaborLabel}
+      />
     </Dialog>
   )
 }

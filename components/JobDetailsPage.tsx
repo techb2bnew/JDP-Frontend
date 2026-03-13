@@ -33,6 +33,7 @@ import {
   File,
   MoreVertical
 } from 'lucide-react'
+import { BlueSheetApprovalDialog, type BlueSheetItem as DialogBlueSheetItem } from './invoices/BlueSheetApprovalDialog'
 import {
   Dialog,
   DialogContent,
@@ -299,6 +300,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   // console.log(materials,"testmateris")
   const [materials, setMaterials] = useState<any[]>(job.assignedMaterialsDetails || sampleJobData.materials || []);
   const [bluesheets, setBluesheets] = useState<any[]>(job.bluesheets || []);
+  const [isLoadingBluesheets, setIsLoadingBluesheets] = useState(false);
+  const [selectedBlueSheetForReview, setSelectedBlueSheetForReview] = useState<DialogBlueSheetItem | null>(null);
+  const [isBlueSheetDialogOpen, setIsBlueSheetDialogOpen] = useState(false);
 
   const timeLogs = Array.isArray(job.labor_timesheets) ? job.labor_timesheets : (Array.isArray(sampleJobData.timeLogs) ? sampleJobData.timeLogs : []) // Ensure timeLogs is always an array
   const invoices = sampleJobData.invoices // Keep sample data for now as we don't have invoices API
@@ -321,8 +325,47 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       },
       0
     );
+  
+  // Refresh bluesheets for this job from API whenever jobId changes
+  useEffect(() => {
+    const fetchJobBluesheets = async () => {
+      try {
+        if (!jobId) return;
+        setIsLoadingBluesheets(true);
+        const numericJobId = Number(jobId);
+        const response = await apiClient.getJobBluesheets(numericJobId);
+        const responseData = response.data || response;
+        const blues = responseData?.bluesheets || responseData?.data || responseData || [];
+        const totalLaborHours = responseData?.total_labor_hours;
 
+        const normalized = (Array.isArray(blues) ? blues : []).map((sheet: any) => ({
+          ...sheet,
+          id: sheet.id ?? sheet.latest_bluesheet_id,
+          date: sheet.date ?? sheet.latest_bluesheet_date ?? '',
+          status: sheet.status ?? (sheet.approved_by ? 'approved' : 'pending'),
+          notes: sheet.notes ?? '',
+          additional_charges: sheet.additional_charges ?? 0,
+          created_by: sheet.created_by ?? sheet.submitted_by?.id ?? 0,
+          created_by_user: sheet.created_by_user ?? sheet.submitted_by ?? { id: 0, email: '', full_name: 'N/A' },
+          labor_entries: sheet.labor_entries ?? [],
+          material_entries: sheet.material_entries ?? [],
+          materials_invoiced: sheet.materials_invoiced,
+          total_labor_hours: sheet.total_labor_hours ?? totalLaborHours ?? null,
+          created_at: sheet.created_at ?? '',
+          updated_at: sheet.updated_at ?? '',
+        }));
 
+        setBluesheets(normalized);
+      } catch (error) {
+        console.error('Error fetching job bluesheets:', error);
+        setBluesheets(job.bluesheets || []);
+      } finally {
+        setIsLoadingBluesheets(false);
+      }
+    };
+
+    fetchJobBluesheets();
+  }, [jobId, job.bluesheets]);
 
   job.estimatedCost || 0
   const totalHours = timeLogs.reduce((sum: number, log: any) => sum + log.hoursWorked, 0)
@@ -5322,24 +5365,74 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
         </Card>
 
-
-
-        {/* Material Usage */}
+        {/* Bluesheets Data */}
         <Card>
+          <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Bluesheets Data
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingBluesheets ? (
+              <p className="text-sm text-gray-500 py-4">Loading bluesheets...</p>
+            ) : Array.isArray(bluesheets) && bluesheets.length > 0 ? (
+              <div className="space-y-3">
+                {bluesheets.map((sheet: any) => (
+                  <div
+                    key={sheet.id}
+                    className="flex items-center justify-between p-3 border rounded-md bg-white"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium">Bluesheet #{sheet.id}</span>
+                        <span
+                          className={`px-2 py-0.5 text-xs rounded-full ${
+                            sheet.status === 'approved'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-yellow-100 text-yellow-700'
+                          }`}
+                        >
+                          {sheet.status === 'approved' ? 'Approved' : 'Pending'}
+                        </span>
+                        {sheet.materials_invoiced === true && (
+                          <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
+                            Invoiced
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Date: {sheet.date || sheet.created_at || 'N/A'}
+                      </p> 
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedBlueSheetForReview(sheet as DialogBlueSheetItem);
+                          setIsBlueSheetDialogOpen(true);
+                        }}
+                      >
+                        Review &amp; Approve
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 py-4">No bluesheets found for this job.</p>
+            )}
+          </CardContent>
+        </Card>
+        {/* Material Usage */}
+        {/* <Card>
           <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
             <CardTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
               Product Usage
             </CardTitle>
             <div className="flex items-center gap-4">
-              {/* <span className="text-sm text-gray-600">
-                Total Cost: <span className="font-semibold">{formatCurrency(totalMaterialCost)}</span>
-                {materials.length > 0 && (
-                  <span className="ml-2 text-green-600">
-                    ({materials.length} from Bluesheets)
-              </span>
-                )}
-              </span> */}
               <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowAddMaterialModal(true)}>
                 <Plus className="h-4 w-4" />
                 Add Product
@@ -5374,9 +5467,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                               Bluesheet #{material.bluesheet_id}
                             </span>
                           </div>
-                          {/* <p className="text-xs text-gray-600">
-                          {material.supplier?.company_name || material.supplier} • SKU: {material.supplier_sku || material.jdp_sku} • {material.unit}
-                        </p> */}
+                         
                           <p className="text-xs text-gray-500">
                             Unit Cost: ${material.unit_cost || 0}
                           </p>
@@ -5410,10 +5501,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
             })()}
           </CardContent>
 
-        </Card>
+        </Card> */}
 
         {/* Labour & Time Logs */}
-        <Card>
+        {/* <Card>
           <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
@@ -5422,8 +5513,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
             <div className="flex items-center gap-4">
               <span className="text-sm text-gray-600">
                 Total Hours: <span className="font-bold"> {(() => {
-                  let totalSeconds = 0;
-                  // Only count hours from approved bluesheets
+                  let totalSeconds = 0; 
                   const approvedBluesheets = bluesheets.filter((b: any) => b.status === 'approved');
 
                   approvedBluesheets.forEach((bluesheet: any) => {
@@ -5482,20 +5572,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {/* Show bluesheets labor entries - only for approved bluesheets */}
+            <div className="space-y-4"> 
               {bluesheets && bluesheets.filter((b: any) => b.status === 'approved').length > 0 && (
                 <>
                   {bluesheets.filter((bluesheet: any) => bluesheet.status === 'approved').map((bluesheet: any, bluesheetIndex: number) => (
                     <div key={`bluesheet-${bluesheet.id}`} className="mb-6 ">
-                      {/* <div className="flex justify-between items-center mb-3">
-                        <h5 className="font-medium text-gray-800">
-                          Bluesheet #{bluesheet.id} - {bluesheet.date}
-                        </h5>
-                        <div className="text-sm text-gray-600">
-                          Created by: {bluesheet.created_by_user?.full_name || 'Unknown'}
-                        </div>
-                      </div> */}
+                      
 
                       {bluesheet.labor_entries && bluesheet.labor_entries.length > 0 && (
                         <div className="space-y-3 p-4 bg-gray-50 rounded-lg border">
@@ -5566,8 +5648,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
                 </>
               )}
-
-              {/* Show message if no approved bluesheets or labor at all */}
+ 
               {(!bluesheets || bluesheets.filter((b: any) => b.status === 'approved').length === 0) && (
                 <div className="text-center py-8 text-gray-500">
                   <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
@@ -5578,7 +5659,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
 
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
 
 
         {/* Job Documents */}
@@ -6840,6 +6921,20 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         </DialogContent>
       </Dialog>
 
+      {/* Bluesheet approval dialog (opens from Bluesheets Data card) */}
+      <BlueSheetApprovalDialog
+        isOpen={isBlueSheetDialogOpen}
+        onClose={() => {
+          setIsBlueSheetDialogOpen(false);
+          setSelectedBlueSheetForReview(null);
+        }}
+        blueSheet={selectedBlueSheetForReview}
+        selectedBlueSheets={selectedBlueSheetForReview ? [selectedBlueSheetForReview] : []}
+        onApprovalComplete={() => {
+          setIsBlueSheetDialogOpen(false);
+          setSelectedBlueSheetForReview(null);
+        }}
+      />
 
     </div>
   )
