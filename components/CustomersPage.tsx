@@ -741,22 +741,63 @@ export function CustomersPage() {
     await fetchCustomersWithJobs();
   };
 
-  // Client-side filtering by customer name
+  // Server-side search by customer/job using globalSearch API (handles large data + pagination)
   useEffect(() => {
-    if (!searchTerm.trim()) {
-      // No search term, show all customers
-      setCustomersWithJobs(allCustomersWithJobs);
-    } else {
-      // Filter customers by name (case-insensitive)
-      const filtered = allCustomersWithJobs.filter((customer: any) => {
-        const customerName = (customer.customer_name || customer.name || '').toLowerCase();
-        const searchLower = searchTerm.toLowerCase();
-        return customerName.includes(searchLower);
-      });
+    const runSearch = async () => {
+      const term = searchTerm.trim();
 
-      setCustomersWithJobs(filtered);
-    }
-  }, [searchTerm, allCustomersWithJobs]);
+      // When search is cleared, just use the current page customers
+      if (!term) {
+        setCustomersWithJobs(allCustomersWithJobs);
+        setPaginatedCustomers(allCustomersWithJobs);
+        return;
+      }
+
+      try {
+        setIsLoadingCustomers(true);
+
+        // Use globalSearch API: returns customers + their jobs for the query
+        const response = await apiClient.globalSearch(term, 1, itemsPerPage);
+        const customersFromApi: any[] = response.data?.customers || [];
+
+        const customersFromSearch = customersFromApi.map((entry: any) => {
+          const customer = entry.customer;
+          const jobsForCustomer = entry.jobs || [];
+          return {
+            id: customer.id,
+            customer_name: customer.customer_name || '',
+            name: customer.customer_name || '',
+            email: customer.email || '',
+            phone: customer.phone || '',
+            company_name: customer.company_name || '',
+            address: customer.address || '',
+            created_at: customer.created_at || '',
+            jobs: jobsForCustomer,
+            total_jobs: jobsForCustomer.length,
+          };
+        });
+
+        // If nothing from API, fall back to simple name filter on current page
+        if (customersFromSearch.length === 0) {
+          const searchLower = term.toLowerCase();
+          const fallback = allCustomersWithJobs.filter((customer: any) =>
+            (customer.customer_name || customer.name || '').toLowerCase().includes(searchLower)
+          );
+          setCustomersWithJobs(fallback);
+          setPaginatedCustomers(fallback);
+        } else {
+          setCustomersWithJobs(customersFromSearch);
+          setPaginatedCustomers(customersFromSearch);
+        }
+      } catch (error) {
+        console.error('Error searching customers/jobs:', error);
+      } finally {
+        setIsLoadingCustomers(false);
+      }
+    };
+
+    runSearch();
+  }, [searchTerm, allCustomersWithJobs, itemsPerPage]);
 
   // Server-side pagination - no client-side pagination needed
   const totalPages = Math.ceil(totalCustomers / itemsPerPage);

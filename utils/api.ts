@@ -1304,6 +1304,33 @@ export const apiClient = {
     return response.json();
   },
 
+  // Global search across customers & jobs
+  globalSearch: async (query: string, page = 1, limit = 10) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const url = `${apiBaseUrl}/job/globalSearch?q=${encodeURIComponent(query)}&page=${page}&limit=${limit}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to perform global search");
+    }
+
+    return response.json();
+  },
+
   // Search Jobs by Job Type
   searchJobsByType: async (jobType: any) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;

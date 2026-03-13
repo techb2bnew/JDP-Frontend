@@ -1284,106 +1284,268 @@ export function BlueSheetApprovalDialog({
               </TabsContent>
 
               {/* ── Final Review Tab ──────────────────────────────────────── */}
-              <TabsContent value="review" className="h-full overflow-y-auto p-8 mt-0">
+              <TabsContent value="review" className="h-full overflow-y-auto p-8 mt-0 bg-slate-50/60">
                 <div className="space-y-8 max-w-7xl mx-auto">
+                  {/* Header */}
                   <div className="flex items-center justify-between">
-                    <h3 className="text-2xl font-medium text-[#2b2b2b]">Final Review & Approval</h3>
-                    <Badge className="bg-blue-50 text-blue-600 border-blue-200 px-4 py-2 text-base">
-                      <CheckSquare className="w-5 h-5 mr-2" />Ready for Approval
-                    </Badge>
+                    <div>
+                      <h3 className="text-2xl font-semibold text-slate-900">Final Review &amp; Approval</h3>
+                      <p className="text-sm text-slate-500 mt-1">
+                        Double‑check BlueSheet vs Supplier totals before sending the invoice.
+                      </p>
+                    </div> 
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                    <Card className="bg-blue-50 border-blue-200">
-                      <CardContent className="p-8 text-center">
-                        <FileText className="h-10 w-10 text-blue-600 mx-auto mb-3" />
-                        <h4 className="text-lg font-medium text-blue-900">BlueSheet</h4>
-                        <p className="text-3xl font-medium text-blue-600">{formatCurrency(currentBlueSheet.total_cost)}</p>
-                        <p className="text-base text-blue-700">{currentBlueSheet.material_entries.length} materials</p>
+                  {/* KPI cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 lg:gap-6">
+                    <Card className="bg-blue-50/80 border border-blue-200 shadow-sm">
+                      <CardContent className="p-5 text-left">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-8 w-8 text-blue-600" />
+                            <h4 className="text-sm font-semibold text-blue-900 tracking-wide uppercase">BlueSheet</h4>
+                          </div>
+                          <span className="text-[11px] font-medium text-blue-700 bg-white/70 px-2 py-0.5 rounded-full">
+                            BS-{currentBlueSheet.id}
+                          </span>
+                        </div>
+                        <p className="text-2xl font-semibold text-blue-700">
+                          {formatCurrency(currentBlueSheet.total_cost)}
+                        </p>
+                        <p className="text-xs text-blue-800 mt-1">
+                          {currentBlueSheet.material_entries.length} materials
+                          {totalLaborLabel && (
+                            <span className="ml-2">· Labor {totalLaborLabel}</span>
+                          )}
+                        </p>
                       </CardContent>
                     </Card>
+
                     {currentSupplierInvoice && (
-                      <Card className="bg-green-50 border-green-200">
-                        <CardContent className="p-8 text-center">
-                          <CheckSquare className="h-10 w-10 text-green-600 mx-auto mb-3" />
-                          <h4 className="text-lg font-medium text-green-900">Supplier Materials</h4>
-                          <p className="text-3xl font-medium text-green-600">{formatCurrency(currentSupplierInvoice.amount)}</p>
-                          <p className="text-base text-green-700">{currentSupplierInvoice.materials.length} materials</p>
+                      <Card className="bg-emerald-50/80 border border-emerald-200 shadow-sm">
+                        <CardContent className="p-5 text-left">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <CheckSquare className="h-8 w-8 text-emerald-600" />
+                              <h4 className="text-sm font-semibold text-emerald-900 tracking-wide uppercase">
+                                Supplier Materials
+                              </h4>
+                            </div>
+                           
+                          </div>
+                          <p className="text-2xl font-semibold text-emerald-700">
+                            {formatCurrency(currentSupplierInvoice.amount)}
+                          </p>
+                          <p className="text-xs text-emerald-800 mt-1">
+                            {currentSupplierInvoice.materials.length} materials from supplier
+                          </p>
                         </CardContent>
                       </Card>
                     )}
-                    <Card className="bg-purple-50 border-purple-200">
-                      <CardContent className="p-8 text-center">
-                        <DollarSign className="h-10 w-10 text-purple-600 mx-auto mb-3" />
-                        <h4 className="text-lg font-medium text-purple-900">Difference</h4>
-                        <p className="text-3xl font-medium text-purple-600">
-                          {formatCurrency(currentSupplierInvoice ? Math.abs(currentBlueSheet.total_cost - currentSupplierInvoice.amount) : 0)}
+
+                    <Card className="bg-violet-50/80 border border-violet-200 shadow-sm">
+                      <CardContent className="p-5 text-left">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="h-8 w-8 text-violet-600" />
+                            <h4 className="text-sm font-semibold text-violet-900 tracking-wide uppercase">
+                              Difference
+                            </h4>
+                          </div>
+                        </div>
+                        <p className="text-2xl font-semibold text-violet-700">
+                          {formatCurrency(
+                            currentSupplierInvoice
+                              ? Math.abs(currentBlueSheet.total_cost - currentSupplierInvoice.amount)
+                              : 0
+                          )}
                         </p>
-                        <p className="text-base text-purple-700">
-                          {currentSupplierInvoice ? `${((Math.abs(currentBlueSheet.total_cost - currentSupplierInvoice.amount) / currentBlueSheet.total_cost) * 100).toFixed(1)}% variance` : 'N/A'}
+                        <p className="text-xs text-violet-800 mt-1">
+                          {currentSupplierInvoice && currentBlueSheet.total_cost
+                            ? `${(
+                                (Math.abs(currentBlueSheet.total_cost - currentSupplierInvoice.amount) /
+                                  (currentBlueSheet.total_cost || 1)) *
+                                100
+                              ).toFixed(1)}% variance`
+                            : 'No supplier invoice'}
                         </p>
                       </CardContent>
                     </Card>
-                    <Card className="bg-orange-50 border-orange-200">
-                      <CardContent className="p-8 text-center">
-                        <AlertTriangle className="h-10 w-10 text-orange-600 mx-auto mb-3" />
-                        <h4 className="text-lg font-medium text-orange-900">Discrepancies</h4>
-                        <p className="text-3xl font-medium text-orange-600">{comparisons.filter(c => c.differences.length > 0).length}</p>
-                        <p className="text-base text-orange-700">items with differences</p>
+
+                    <Card className="bg-amber-50/80 border border-amber-200 shadow-sm">
+                      <CardContent className="p-5 text-left">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="h-8 w-8 text-amber-600" />
+                            <h4 className="text-sm font-semibold text-amber-900 tracking-wide uppercase">
+                              Discrepancies
+                            </h4>
+                          </div>
+                        </div>
+                        <p className="text-2xl font-semibold text-amber-700">
+                          {comparisons.filter(c => c.differences.length > 0).length}
+                        </p>
+                        <p className="text-xs text-amber-800 mt-1">items with price / qty differences</p>
                       </CardContent>
                     </Card>
                   </div>
 
-                  <Card className="bg-white shadow-md border-0">
-                    <CardHeader><CardTitle className="text-xl">Review Summary</CardTitle></CardHeader>
+                  {/* Review Summary */}
+                  <Card className="bg-white shadow-sm border border-slate-200/80">
+                    <CardHeader>
+                      <CardTitle className="text-lg font-semibold text-slate-900">
+                        Review Summary
+                      </CardTitle>
+                    </CardHeader>
                     <CardContent className="space-y-8">
-                      <div className="grid grid-cols-2 gap-8">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
-                          <Label className="text-base text-gray-600">Customer</Label>
-                          <p className="text-xl font-medium text-[#00A1FF]">{currentBlueSheet.job.customer?.customer_name || 'N/A'}</p>
+                          <Label className="text-xs font-semibold uppercase text-slate-500">
+                            Customer
+                          </Label>
+                          <p className="text-base font-medium text-[#00A1FF] mt-1">
+                            {currentBlueSheet.job.customer?.customer_name || 'N/A'}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {currentBlueSheet.job.customer?.email || currentBlueSheet.job.bill_to_email || '—'}
+                          </p>
                         </div>
                         <div>
-                          <Label className="text-base text-gray-600">Job</Label>
-                          <p className="text-xl font-medium">{currentBlueSheet.job.job_title}</p>
+                          <Label className="text-xs font-semibold uppercase text-slate-500">
+                            Job
+                          </Label>
+                          <p className="text-base font-medium mt-1">
+                            {currentBlueSheet.job.job_title}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {currentBlueSheet.job.job_type === 'contract_based' ? 'Contract Based' : 'Service Based'} ·{' '}
+                            {currentBlueSheet.job.status}
+                          </p>
                         </div>
                         <div>
-                          <Label className="text-base text-gray-600">PO Number</Label>
-                          <p className="text-xl font-mono">BS-{currentBlueSheet.id}</p>
+                          <Label className="text-xs font-semibold uppercase text-slate-500">
+                            PO / BlueSheet
+                          </Label>
+                          <p className="text-base font-mono mt-1">BS-{currentBlueSheet.id}</p>
+                          <p className="text-xs text-slate-500">
+                            Created on {new Date(currentBlueSheet.created_at).toLocaleDateString()}
+                          </p>
                         </div>
                         <div>
-                          <Label className="text-base text-gray-600">Submitted By</Label>
-                          <p className="text-xl font-medium">{currentBlueSheet.created_by_user.full_name}</p>
+                          <Label className="text-xs font-semibold uppercase text-slate-500">
+                            Submitted By
+                          </Label>
+                          <p className="text-base font-medium mt-1">
+                            {currentBlueSheet.created_by_user.full_name}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {currentBlueSheet.created_by_user.email}
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-xs font-semibold uppercase text-slate-500">
+                            Bill To
+                          </Label>
+                          <p className="text-sm mt-1 text-slate-800">
+                            {currentBlueSheet.job.bill_to_address ||
+                              currentBlueSheet.job.customer?.address ||
+                              '—'}
+                          </p>
+                          {currentBlueSheet.job.bill_to_city_zip && (
+                            <p className="text-xs text-slate-500">
+                              {currentBlueSheet.job.bill_to_city_zip}
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <Label className="text-xs font-semibold uppercase text-slate-500">
+                            Labor
+                          </Label>
+                          <p className="text-base font-medium mt-1">
+                            {totalLaborLabel || 'No labor hours'}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {currentBlueSheet.labor_entries?.length || 0} labor entries
+                          </p>
                         </div>
                       </div>
+
                       <Separator />
-                      <div>
-                        <Label className="text-base text-gray-600">Notes</Label>
-                        <Textarea placeholder="Add final notes or instructions..." className="mt-3 h-24 text-base" rows={5} />
-                      </div>
-                      <div className="bg-gray-50 p-6 rounded-xl">
-                        <h5 className="text-lg font-medium mb-4">Last Minute Edits</h5>
-                        <div className="flex gap-4">
-                          <Button variant="outline" size="lg" onClick={() => setCurrentStep('upload')} className="gap-2 h-12">
-                            <Edit className="h-4 w-4" />Edit Materials
-                          </Button>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div>
+                          <Label className="text-xs font-semibold uppercase text-slate-500">
+                            Notes
+                          </Label>
+                          <Textarea
+                            placeholder="Add any final notes or internal instructions for this approval..."
+                            className="mt-3 h-28 text-sm"
+                            rows={5}
+                          />
+                        </div>
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 flex flex-col justify-between">
+                          <div>
+                            <h5 className="text-sm font-semibold text-slate-800 mb-2">
+                              Last Minute Edits
+                            </h5>
+                            <p className="text-xs text-slate-500 mb-4">
+                              Need to tweak materials before sending the invoice? Jump back to the
+                              comparison view and adjust quantities or pricing.
+                            </p>
+                          </div>
+                          <div className="flex gap-3">
+                            <Button
+                              variant="outline"
+                              size="lg"
+                              onClick={() => setCurrentStep('upload')}
+                              className="gap-2 h-10 text-sm border-slate-300"
+                            >
+                              <Edit className="h-4 w-4" />
+                              Edit Materials
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
 
-                  <div className="flex items-center justify-between">
-                    <Button variant="outline" onClick={() => setCurrentStep('upload')} className="gap-2 h-14 text-lg px-6" size="lg">
-                      <ArrowLeft className="h-5 w-5" />Back
+                  {/* Footer actions */}
+                  <div className="flex items-center justify-between pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentStep('upload')}
+                      className="gap-2 h-11 text-sm px-5 border-slate-300"
+                      size="lg"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                      Back to Comparison
                     </Button>
-                    <div className="flex gap-6">
-                      <Button variant="outline" onClick={onClose} className="h-14 text-lg px-6" size="lg">Cancel</Button>
-                      <div className='flex gap-3'>
-                        <Button onClick={handleSendCustomInvoice} disabled={isApprovingCustomer || isApproving} className="bg-primary text-white hover:bg-green-700 gap-3 h-14 text-lg px-8" size="lg">
-                          <Send className="h-5 w-5" />
+                    <div className="flex gap-4 items-center">
+                      <Button
+                        variant="outline"
+                        onClick={onClose}
+                        className="h-11 text-sm px-5 border-slate-300"
+                        size="lg"
+                      >
+                        Cancel
+                      </Button>
+                      <div className="flex gap-3">
+                        <Button
+                          onClick={handleSendCustomInvoice}
+                          disabled={isApprovingCustomer || isApproving}
+                          className="bg-[#00A1FF] text-white hover:bg-[#0089d4] gap-2 h-11 text-sm px-6 rounded-lg shadow-sm"
+                          size="lg"
+                        >
+                          <Send className="h-4 w-4" />
                           {isApprovingCustomer ? 'Approving...' : 'Send Custom Invoice'}
                         </Button>
-                        <Button onClick={handleFinalApproval} disabled={isApproving || isApprovingCustomer} className="bg-primary text-white hover:bg-green-700 gap-3 h-14 text-lg px-8" size="lg">
-                          <Send className="h-5 w-5" />
+                        <Button
+                          onClick={handleFinalApproval}
+                          disabled={isApproving || isApprovingCustomer}
+                          className="bg-emerald-600 text-white hover:bg-emerald-700 gap-2 h-11 text-sm px-6 rounded-lg shadow-sm"
+                          size="lg"
+                        >
+                          <Send className="h-4 w-4" />
                           {isApproving ? 'Approving...' : 'Send Quickbook Invoice'}
                         </Button>
                       </div>

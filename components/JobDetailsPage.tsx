@@ -6658,7 +6658,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         <DialogContent className="min-w-[80%] max-h-[90vh] overflow-y-auto p-0">
           <div className="bg-gray-100 p-6">
             {/* Print-ready Invoice Design */}
-            <div id="invoice-preview-print" className="bg-white p-8 shadow-lg" style={{ width: '14.5in', margin: '0 auto' }}>
+            <div id="invoice-preview-print" className="bg-white p-8 shadow-lg"  >
               {/* Header */}
               <div className="flex justify-between items-start mb-8">
                 <div>

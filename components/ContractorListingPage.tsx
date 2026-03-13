@@ -985,16 +985,11 @@ export function ContractorListingPage() {
     }
   }
 
-  // Filter and sort contractors (client-side for search and status filter)
+  // Filter and sort contractors (status + sort only; search is server-side via globalSearch)
   const filteredContractors = contractors
     .filter(contractor => {
-      const matchesSearch = contractor.contractor_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        contractor.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        contractor.company_name?.toLowerCase().includes(searchTerm.toLowerCase())
-
       const matchesStatus = statusFilter === 'all' || contractor.status === statusFilter
-
-      return matchesSearch && matchesStatus
+      return matchesStatus
     })
     .sort((a, b) => {
       if (!sortBy) return 0
@@ -1027,6 +1022,55 @@ export function ContractorListingPage() {
   useEffect(() => {
     fetchContractorsData()
   }, [currentPage])
+
+  // Server-side search for contractors or their jobs using globalSearch API
+  useEffect(() => {
+    const runSearch = async () => {
+      const term = searchTerm.trim()
+
+      // If search cleared, reload current page contractors
+      if (!term) {
+        fetchContractorsData()
+        return
+      }
+
+      try {
+        setIsLoadingContractors(true)
+
+        // Global search returns both customers and contractors; here we care about contractors array
+        const response = await apiClient.globalSearch(term, 1, itemsPerPage)
+        const contractorsFromApi: any[] = response.data?.contractors || []
+
+        const mappedContractors = contractorsFromApi.map((entry: any) => {
+          const contractor = entry.contractor || entry // depending on backend shape
+          const jobsForContractor = entry.jobs || contractor.jobs || []
+          return {
+            id: contractor.id,
+            contractor_name: contractor.contractor_name || contractor.name || '',
+            company_name: contractor.company_name || '',
+            email: contractor.email || '',
+            phone: contractor.phone || '',
+            status: contractor.status || 'active',
+            created_at: contractor.created_at || '',
+            jobs: jobsForContractor,
+            total_jobs: jobsForContractor.length,
+            active_jobs: contractor.active_jobs ?? 0,
+            completed_jobs: contractor.completed_jobs ?? 0,
+          } as Contractor
+        })
+
+        setContractors(mappedContractors)
+        setTotalContractors(mappedContractors.length)
+      } catch (error) {
+        console.error('Error searching contractors/jobs:', error)
+      } finally {
+        setIsLoadingContractors(false)
+      }
+    }
+
+    runSearch()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, itemsPerPage])
 
   // Fetch contractor by ID for editing
   const fetchContractorById = async (contractorId: string) => {
