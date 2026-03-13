@@ -25,7 +25,8 @@ interface CustomInvoiceDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   blueSheet: any
-  totalLaborHours?: string | null
+  // Optional explicit labor cost from caller (e.g. JobDetails)
+  totalLaborCost?: number | null
   onInvoiceSaved?: (invoice: any) => void
 }
 
@@ -103,7 +104,13 @@ interface ProductFormData {
 
 
 
-export const CustomInvoiceDialog = ({ open, onOpenChange, blueSheet, totalLaborHours, onInvoiceSaved }: CustomInvoiceDialogProps) => {
+export const CustomInvoiceDialog = ({
+  open,
+  onOpenChange,
+  blueSheet,
+  totalLaborCost,
+  onInvoiceSaved,
+}: CustomInvoiceDialogProps) => {
   // Derive viewInvoiceData and job list from blueSheet (custom invoice from bluesheet)
   const viewInvoiceData = useMemo(() => {
     if (!blueSheet) return null
@@ -118,17 +125,24 @@ export const CustomInvoiceDialog = ({ open, onOpenChange, blueSheet, totalLaborH
       stock_quantity: item.material_used || 0,
       supplier_id: item.product?.supplier_id ?? item.product?.suppliers?.id ?? 1,
     }))
-    const normalizedLabor = (totalLaborHours || '').toString().trim().toLowerCase()
-    const isZeroLabor = !normalizedLabor || /^0+$/.test(normalizedLabor) || /^0+h0*m*$/.test(normalizedLabor) || /^0+m$/.test(normalizedLabor)
-    if (totalLaborHours && !isZeroLabor) {
+    const laborLabel = (blueSheet.total_labor_hours || '').toString().trim()
+    const laborCost = Number(totalLaborCost ?? blueSheet.total_labor_cost ?? 0)
+    const normalizedLabor = laborLabel.toLowerCase()
+    const isZeroLabor =
+      !normalizedLabor ||
+      /^0+$/.test(normalizedLabor) ||
+      /^0+h0*m*$/.test(normalizedLabor) ||
+      /^0+m$/.test(normalizedLabor)
+
+    if (laborLabel && !isZeroLabor && laborCost > 0) {
       products.push({
         id: 'labor-total',
-        product_name: `Labor total hours (${totalLaborHours})`,
+        product_name: `Labor total hours (${laborLabel})`,
         description: '',
-        jdp_price: 0,
-        unit_cost: 0,
-        total_cost: 0,
-        stock_quantity: 0,
+        jdp_price: laborCost,
+        unit_cost: laborCost,
+        total_cost: laborCost,
+        stock_quantity: 1,
         supplier_id: 1,
         isCustomProduct: true,
       } as any)
@@ -155,10 +169,11 @@ export const CustomInvoiceDialog = ({ open, onOpenChange, blueSheet, totalLaborH
       due_date: (job as any).due_date ?? '',
       payment_credits: (job as any).payment_credits ?? 0,
       balance_due: (job as any).balance_due ?? '',
+      labor_total_cost: laborCost,
       invoice_type: job.job_type === 'contract_based' ? 'contract_based' : 'service_based',
       email_address: job.customer?.email || job.bill_to_email || (job as any).email || '',
     }
-  }, [blueSheet, totalLaborHours])
+  }, [blueSheet, totalLaborCost])
 
   const jobId = blueSheet?.job_id
   const jobs = useMemo(() => {
@@ -996,6 +1011,9 @@ export const CustomInvoiceDialog = ({ open, onOpenChange, blueSheet, totalLaborH
         customerId = viewInvoiceData.customer_id != null ? Number(viewInvoiceData.customer_id) : viewInvoiceData.customer?.id != null ? Number(viewInvoiceData.customer.id) : null;
         contractorId = viewInvoiceData.contractor_id != null ? Number(viewInvoiceData.contractor_id) : viewInvoiceData.contractor?.id != null ? Number(viewInvoiceData.contractor.id) : null;
       }
+      const bluesheetIds = blueSheet.length > 0
+        ? blueSheet.map((bs: any) => bs.job_bluesheet_id || bs.bluesheet_id || bs.bluesheetId || bs.id)
+        : [blueSheet.job_bluesheet_id || blueSheet.bluesheet_id || blueSheet.bluesheetId || blueSheet.id]
       const payload: any = {
         job_id: Number(inlineInvoiceData.jobId),
         estimate_title: inlineInvoiceData.project || currentJob?.title || blueSheet?.job?.job_title || '',
@@ -1003,6 +1021,7 @@ export const CustomInvoiceDialog = ({ open, onOpenChange, blueSheet, totalLaborH
         service_type: isContractBased ? 'contract_based' : 'service_based',
         email_address: currentJob?.email || 'customer@example.com',
         estimate_date: inlineInvoiceData.date,
+        bluesheet_ids: bluesheetIds,
         po_number: inlineInvoiceData.poNumber || '',
         rep: inlineInvoiceData.rep || '',
         due_date: inlineInvoiceData.dueDate || '',
@@ -1012,6 +1031,7 @@ export const CustomInvoiceDialog = ({ open, onOpenChange, blueSheet, totalLaborH
         notes: inlineInvoiceData.notes || '',
         status: 'sent',
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
+        invoice_source: "custom",
         custom_products: customProducts
       }
       if (isContractBased && contractorId) payload.contractor_id = contractorId;
@@ -1403,9 +1423,8 @@ export const CustomInvoiceDialog = ({ open, onOpenChange, blueSheet, totalLaborH
   if (!blueSheet || !viewInvoiceData) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent key={viewInvoiceData?.id || 'new-invoice'} className="sm:max-w-[80%] max-w-[80%] w-[80%] max-h-[90vh] overflow-auto">
-        <DialogHeader>
+    <div key={viewInvoiceData?.id || 'new-invoice'} className="w-full">
+      <DialogHeader>
           <DialogTitle>Create New Invoice</DialogTitle>
           <DialogDescription>
             Create a comprehensive invoice for your project
@@ -1857,7 +1876,16 @@ export const CustomInvoiceDialog = ({ open, onOpenChange, blueSheet, totalLaborH
                   </tbody>
                 </table>
                 <div className="flex justify-end mt-4">
-                  <div className="text-right min-w-[200px]">
+                  <div className="text-right min-w-[220px] space-y-1">
+                    {typeof (viewInvoiceData as any).labor_total_cost === 'number' &&
+                      (viewInvoiceData as any).labor_total_cost > 0 && (
+                        <div className="flex justify-between mb-1">
+                          <span className="text-sm text-gray-700">Labor total cost:</span>
+                          <span className="text-sm text-gray-700">
+                            ${(viewInvoiceData as any).labor_total_cost.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
                     <div className="flex justify-between mb-2">
                       <span className="text-sm text-gray-700">Payments / Credits:</span>
                       <span className="text-sm text-gray-700">
@@ -2135,9 +2163,6 @@ export const CustomInvoiceDialog = ({ open, onOpenChange, blueSheet, totalLaborH
                           )}
                         </div>
                       )} */}
-
-
-      </DialogContent>
-    </Dialog>
+    </div>
   )
 }

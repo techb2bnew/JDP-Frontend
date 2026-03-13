@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import { Checkbox } from './ui/checkbox'
 import { addInvoice } from '@/redux/slices/jobsSlice'
 import {
   ArrowLeft,
@@ -303,6 +304,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const [isLoadingBluesheets, setIsLoadingBluesheets] = useState(false);
   const [selectedBlueSheetForReview, setSelectedBlueSheetForReview] = useState<DialogBlueSheetItem | null>(null);
   const [isBlueSheetDialogOpen, setIsBlueSheetDialogOpen] = useState(false);
+  const [selectedBluesheetIds, setSelectedBluesheetIds] = useState<number[]>([]);
 
   const timeLogs = Array.isArray(job.labor_timesheets) ? job.labor_timesheets : (Array.isArray(sampleJobData.timeLogs) ? sampleJobData.timeLogs : []) // Ensure timeLogs is always an array
   const invoices = sampleJobData.invoices // Keep sample data for now as we don't have invoices API
@@ -336,7 +338,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
         const response = await apiClient.getJobBluesheets(numericJobId);
         const responseData = response.data || response;
         const blues = responseData?.bluesheets || responseData?.data || responseData || [];
-        const totalLaborHours = responseData?.total_labor_hours;
+        const totalLaborCost = responseData?.total_labor_cost;
 
         const normalized = (Array.isArray(blues) ? blues : []).map((sheet: any) => ({
           ...sheet,
@@ -350,7 +352,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           labor_entries: sheet.labor_entries ?? [],
           material_entries: sheet.material_entries ?? [],
           materials_invoiced: sheet.materials_invoiced,
-          total_labor_hours: sheet.total_labor_hours ?? totalLaborHours ?? null,
+          total_labor_hours: sheet.total_labor_hours ?? null,
+          total_labor_cost: sheet.total_labor_cost ?? totalLaborCost ?? 0,
           created_at: sheet.created_at ?? '',
           updated_at: sheet.updated_at ?? '',
         }));
@@ -5372,6 +5375,66 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
               <Package className="h-5 w-5" />
               Bluesheets Data
             </CardTitle>
+            <div className="flex items-center gap-3">
+              {selectedBluesheetIds.length > 0 && (
+                <p className="text-xs text-gray-600">
+                  {selectedBluesheetIds.length} selected
+                </p>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={selectedBluesheetIds.length === 0}
+                className="gap-2"
+                onClick={() => {
+                  const selectedSheets = bluesheets.filter(
+                    (s: any) => selectedBluesheetIds.includes(s.id)
+                  );
+                  if (selectedSheets.length === 0) return;
+                  const firstSheet = selectedSheets[0];
+                  const mergedMaterials = selectedSheets.flatMap(
+                    (sheet: any) =>
+                      (sheet.material_entries ?? []).map((m: any) => ({
+                        ...m,
+                        // preserve or attach source bluesheet id so the dialog can show correct BS-XX
+                        job_bluesheet_id:
+                          m.job_bluesheet_id ?? m.bluesheet_id ?? m.bluesheetId ?? sheet.id,
+                      }))
+                  );
+                  const mergedLabor = selectedSheets.flatMap(
+                    (sheet: any) => sheet.labor_entries ?? []
+                  );
+                  const mergedTotalCost = selectedSheets.reduce(
+                    (sum: number, sheet: any) => sum + (sheet.total_cost ?? 0),
+                    0
+                  );
+                  const mergedNotes = selectedSheets
+                    .map((sheet: any) => sheet.notes)
+                    .filter(Boolean)
+                    .join(' | ');
+
+                  const dialogSheet: DialogBlueSheetItem = {
+                    ...(firstSheet as any),
+                    id: firstSheet.id ?? firstSheet.latest_bluesheet_id ?? 0,
+                    date: firstSheet.date ?? firstSheet.latest_bluesheet_date ?? '',
+                    notes: mergedNotes || firstSheet.notes || '',
+                    additional_charges: selectedSheets.reduce(
+                      (sum: number, s: any) => sum + (s.additional_charges ?? 0),
+                      0
+                    ),
+                    total_cost: mergedTotalCost,
+                    labor_entries: mergedLabor,
+                    material_entries: mergedMaterials,
+                    total_labor_hours: firstSheet.total_labor_hours ?? null,
+                  };
+
+                  setSelectedBlueSheetForReview(dialogSheet);
+                  setIsBlueSheetDialogOpen(true);
+                }}
+              >
+                Review Selected
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {isLoadingBluesheets ? (
@@ -5383,27 +5446,40 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                     key={sheet.id}
                     className="flex items-center justify-between p-3 border rounded-md bg-white"
                   >
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium">Bluesheet #{sheet.id}</span>
-                        <span
-                          className={`px-2 py-0.5 text-xs rounded-full ${
-                            sheet.status === 'approved'
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-yellow-100 text-yellow-700'
-                          }`}
-                        >
-                          {sheet.status === 'approved' ? 'Approved' : 'Pending'}
-                        </span>
-                        {sheet.materials_invoiced === true && (
-                          <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
-                            Invoiced
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        checked={selectedBluesheetIds.includes(sheet.id)}
+                        onCheckedChange={(checked) => {
+                          setSelectedBluesheetIds((prev) =>
+                            checked
+                              ? [...prev, sheet.id]
+                              : prev.filter((id) => id !== sheet.id)
+                          );
+                        }}
+                        className="mt-1"
+                      />
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium">Bluesheet #{sheet.id}</span>
+                          <span
+                            className={`px-2 py-0.5 text-xs rounded-full ${
+                              sheet.status === 'approved'
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-yellow-100 text-yellow-700'
+                            }`}
+                          >
+                            {sheet.status === 'approved' ? 'Approved' : 'Pending'}
                           </span>
-                        )}
+                          {sheet.materials_invoiced === true && (
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
+                              Invoiced
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Date: {sheet.date || sheet.created_at || 'N/A'}
+                        </p>
                       </div>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Date: {sheet.date || sheet.created_at || 'N/A'}
-                      </p> 
                     </div>
                     <div className="flex items-center gap-2">
                       <Button

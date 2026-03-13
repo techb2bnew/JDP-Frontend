@@ -39,6 +39,7 @@ interface ApiBlueSheetItem {
     labor_entries: Array<any>
     material_entries: Array<any>
     total_labor_hours: number
+    invoice_submitted_at?: string | null
 }
 
 interface BlueSheetSelectionModalProps {
@@ -206,7 +207,7 @@ export function BlueSheetSelectionModal({
                                     <TableHead className="text-white font-medium">Submitted By</TableHead>
                                     <TableHead className="text-white font-medium">Date</TableHead>
                                     <TableHead className="text-white font-medium">Amount</TableHead>
-                                    {/* <TableHead className="text-white font-medium">Supplier Invoice</TableHead> */}
+                                    <TableHead className="text-white font-medium">Invoice Submitted</TableHead>
                                     <TableHead className="text-white font-medium">Status</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -278,11 +279,9 @@ export function BlueSheetSelectionModal({
                                                 </span>
                                             </TableCell>
 
-                                            {/* <TableCell>
-                                                <Badge className="bg-gray-50 text-gray-600 border-gray-200 text-xs">
-                                                    <Upload className="w-3 h-3 mr-1" />Pending
-                                                </Badge>
-                                            </TableCell> */}
+                                            <TableCell>
+                                            {blueSheet.invoice_submitted_at ? formatDate(blueSheet.invoice_submitted_at) : 'N/A'}
+                                            </TableCell>
 
                                             <TableCell className="pr-5">{getStatusBadge(blueSheet)}</TableCell>
                                         </TableRow>
