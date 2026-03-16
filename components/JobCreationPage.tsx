@@ -940,7 +940,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
+              <Label htmlFor="phone">Phone *</Label>
               <PhoneInput
                 id="phone"
                 value={formData.phone}
@@ -968,7 +968,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">Email *</Label>
               <Input
                 id="email"
                 type="email"

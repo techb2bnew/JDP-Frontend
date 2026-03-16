@@ -148,7 +148,7 @@ export const CustomInvoiceDialog = ({
     if (laborLabel && !isZeroLabor && laborCost > 0) {
       products.push({
         id: 'labor-total',
-        product_name: `Labor total hours (${laborLabel})`,
+        product_name: `Labor total cost`,
         description: '',
         jdp_price: laborCost,
         unit_cost: laborCost,
@@ -873,7 +873,7 @@ export const CustomInvoiceDialog = ({
           total_cost: item.total,
         }
         // Only send is_custom flag for Labor total hours line
-        if (typeof item.item === 'string' && item.item.startsWith('Labor total hours')) {
+        if (typeof item.item === 'string' && item.item.startsWith('Labor total cost')) {
           base.is_custom = true
         }
         return base
@@ -1053,7 +1053,7 @@ export const CustomInvoiceDialog = ({
             estimated_price: item.estimatedPrice || 0,
             total_cost: item.total,
           }
-          if (typeof item.item === 'string' && item.item.startsWith('Labor total hours')) {
+          if (typeof item.item === 'string' && item.item.startsWith('Labor total cost')) {
             base.is_custom = true
           }
           return base
