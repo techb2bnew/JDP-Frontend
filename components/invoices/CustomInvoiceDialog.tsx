@@ -28,6 +28,10 @@ interface CustomInvoiceDialogProps {
   // Optional explicit labor cost from caller (e.g. JobDetails)
   totalLaborCost?: number | null
   onInvoiceSaved?: (invoice: any) => void
+  // Allow parent (BlueSheetApprovalDialog) to trigger "preview & send" flow
+  registerPreviewAndSend?: (fn: () => Promise<void>) => void
+  // Optional callback when preview+send completes successfully
+  onDone?: () => void
 }
 
 
@@ -110,6 +114,8 @@ export const CustomInvoiceDialog = ({
   blueSheet,
   totalLaborCost,
   onInvoiceSaved,
+  registerPreviewAndSend,
+  onDone,
 }: CustomInvoiceDialogProps) => {
   // Derive viewInvoiceData and job list from blueSheet (custom invoice from bluesheet)
   const viewInvoiceData = useMemo(() => {
@@ -126,7 +132,12 @@ export const CustomInvoiceDialog = ({
       supplier_id: item.product?.supplier_id ?? item.product?.suppliers?.id ?? 1,
     }))
     const laborLabel = (blueSheet.total_labor_hours || '').toString().trim()
-    const laborCost = Number(totalLaborCost ?? blueSheet.total_labor_cost ?? 0)
+    // Derive labor cost from labor_entries so it reflects merged selections
+    const laborEntriesTotalCost = (blueSheet.labor_entries ?? []).reduce(
+      (sum: number, entry: any) => sum + (entry.total_cost || 0),
+      0,
+    )
+    const laborCost = Number(totalLaborCost ?? laborEntriesTotalCost ?? blueSheet.total_labor_cost ?? 0)
     const normalizedLabor = laborLabel.toLowerCase()
     const isZeroLabor =
       !normalizedLabor ||
@@ -174,6 +185,16 @@ export const CustomInvoiceDialog = ({
       email_address: job.customer?.email || job.bill_to_email || (job as any).email || '',
     }
   }, [blueSheet, totalLaborCost])
+
+  // Reuse computed labor total from BlueSheet labor_entries outside the memo
+  const laborEntriesTotalFromBlueSheet = useMemo(
+    () =>
+      (blueSheet?.labor_entries ?? []).reduce(
+        (sum: number, entry: any) => sum + (entry.total_cost || 0),
+        0,
+      ),
+    [blueSheet],
+  )
 
   const jobId = blueSheet?.job_id
   const jobs = useMemo(() => {
@@ -858,6 +879,25 @@ export const CustomInvoiceDialog = ({
         return base
       })
 
+      // Also add a dedicated custom product for total labor cost (from BlueSheet labor entries)
+      if (laborEntriesTotalFromBlueSheet > 0) {
+        customProducts.push({
+          product_name: 'Labor total cost',
+          description: 'Total labor cost from BlueSheet labor entries',
+          supplier_id: selectedSupplierId || 1,
+          supplier_sku: 'LABOR_TOTAL',
+          jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          stock_quantity: 1,
+          unit: 'unit',
+          job_id: Number(inlineInvoiceData.jobId),
+          unit_cost: laborEntriesTotalFromBlueSheet,
+          jdp_price: laborEntriesTotalFromBlueSheet,
+          estimated_price: laborEntriesTotalFromBlueSheet,
+          total_cost: laborEntriesTotalFromBlueSheet,
+          is_custom: true,
+        })
+      }
+
       // CustomInvoiceDialog: always use viewInvoiceData (from blueSheet) for customer_id/contractor_id
       let customerId: number | null = null;
       let contractorId: number | null = null;
@@ -904,6 +944,9 @@ export const CustomInvoiceDialog = ({
       }
 
       onOpenChange(false)
+      if (onDone) {
+        onDone()
+      }
 
       // Reset form
       setInlineInvoiceData({
@@ -964,7 +1007,16 @@ export const CustomInvoiceDialog = ({
       setInlineInvoiceData(prev => ({ ...prev, project: effectiveProject }))
     }
 
-    if (inlineInvoiceData.lineItems.length === 0 || !inlineInvoiceData.lineItems[0].item) {
+    // Consider either explicit invoice line items OR existing BlueSheet materials as valid "items"
+    const hasInvoiceLineItems =
+      inlineInvoiceData.lineItems.length > 0 &&
+      inlineInvoiceData.lineItems.some(item => !!item.item)
+
+    const hasBlueSheetMaterials =
+      Array.isArray(blueSheet?.material_entries) &&
+      blueSheet.material_entries.length > 0
+
+    if (!hasInvoiceLineItems && !hasBlueSheetMaterials) {
       errors.lineItems = 'Please add at least one product item'
     }
     console.log(inlineInvoiceData.jobId, 'inlineInvoiceData.jobId')
@@ -980,26 +1032,69 @@ export const CustomInvoiceDialog = ({
     try {
       const subtotal = calculateInvoiceSubtotal()
 
-      const customProducts = inlineInvoiceData.lineItems.map(item => {
-        const base: any = {
-          product_name: item.item,
-          description: item.description || '',
-          supplier_id: item.supplierId || selectedSupplierId || 1,
-          supplier_sku: item.item.substring(0, 10),
+      // Build customProducts from either explicit invoice line items (with item filled)
+      // or, if none, from existing BlueSheet material entries so products are not empty.
+      const nonEmptyLineItems = inlineInvoiceData.lineItems.filter(item => !!item.item)
+
+      let customProducts: any[]
+      if (nonEmptyLineItems.length > 0) {
+        customProducts = nonEmptyLineItems.map(item => {
+          const base: any = {
+            product_name: item.item,
+            description: item.description || '',
+            supplier_id: item.supplierId || selectedSupplierId || 1,
+            supplier_sku: String(item.item).substring(0, 10),
+            jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            stock_quantity: item.qty,
+            unit: 'unit',
+            job_id: Number(inlineInvoiceData.jobId),
+            unit_cost: item.rate,
+            jdp_price: item.rate,
+            estimated_price: item.estimatedPrice || 0,
+            total_cost: item.total,
+          }
+          if (typeof item.item === 'string' && item.item.startsWith('Labor total hours')) {
+            base.is_custom = true
+          }
+          return base
+        })
+      } else {
+        // Fallback: map from BlueSheet material_entries
+        const materials = Array.isArray(blueSheet?.material_entries) ? blueSheet.material_entries : []
+        customProducts = materials.map((m: any) => ({
+          product_name: m.material_name,
+          description: m.product?.description || m.material_name || '',
+          supplier_id: m.product?.supplier_id ?? m.product?.suppliers?.id ?? 1,
+          supplier_sku: m.product?.supplier_sku || '',
+          jdp_sku: m.product?.jdp_sku || `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          stock_quantity: m.material_used || m.total_ordered || 1,
+          unit: m.unit || 'unit',
+          job_id: Number(inlineInvoiceData.jobId),
+          unit_cost: m.unit_cost || 0,
+          jdp_price: m.unit_cost || 0,
+          estimated_price: m.unit_cost || 0,
+          total_cost: m.total_cost ?? (m.material_used || 0) * (m.unit_cost || 0),
+        }))
+      }
+
+      // Also add a dedicated custom product for total labor cost (from BlueSheet labor entries)
+      if (laborEntriesTotalFromBlueSheet > 0) {
+        customProducts.push({
+          product_name: 'Labor total cost',
+          description: 'Total labor cost from BlueSheet labor entries',
+          supplier_id: selectedSupplierId || 1,
+          supplier_sku: 'LABOR_TOTAL',
           jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          stock_quantity: item.qty,
+          stock_quantity: 1,
           unit: 'unit',
           job_id: Number(inlineInvoiceData.jobId),
-          unit_cost: item.rate,
-          jdp_price: item.rate,
-          estimated_price: item.estimatedPrice || 0,
-          total_cost: item.total,
-        }
-        if (typeof item.item === 'string' && item.item.startsWith('Labor total hours')) {
-          base.is_custom = true
-        }
-        return base
-      })
+          unit_cost: laborEntriesTotalFromBlueSheet,
+          jdp_price: laborEntriesTotalFromBlueSheet,
+          estimated_price: laborEntriesTotalFromBlueSheet,
+          total_cost: laborEntriesTotalFromBlueSheet,
+          is_custom: true,
+        })
+      }
 
       // CustomInvoiceDialog: always use viewInvoiceData (from blueSheet) for customer_id/contractor_id
       let customerId: number | null = null;
@@ -1102,6 +1197,13 @@ export const CustomInvoiceDialog = ({
       setSendingInvoice(false)
     }
   }
+
+  // Expose handlePreviewAndSend to parent (e.g. BlueSheetApprovalDialog)
+  useEffect(() => {
+    if (registerPreviewAndSend) {
+      registerPreviewAndSend(handlePreviewAndSend)
+    }
+  }, [registerPreviewAndSend])
 
 
 
@@ -2051,16 +2153,8 @@ export const CustomInvoiceDialog = ({
                       </Button>
                     </motion.div> */}
 
-                    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                      <Button
-                        onClick={handlePreviewAndSend}
-                        size="lg"
-                        className="bg-primary hover:bg-primary/90 text-white"
-                        disabled={savingDraft || sendingInvoice}
-                      >
-                        <Eye className="h-5 w-5 mr-2" />
-                        {sendingInvoice ? 'Sending...' : 'Send to Customer'}
-                      </Button>
+      <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                      {/* Send button moved to BlueSheetApprovalDialog */}
                     </motion.div>
                   </div>
                 </div>

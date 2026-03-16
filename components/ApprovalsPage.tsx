@@ -201,6 +201,7 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
       const sheetsArray = Array.isArray(bluesheets) ? bluesheets : []
 
       const totalLaborHours = responseData?.total_labor_hours 
+      const totalLaborCost = responseData?.total_labor_cost
 
       const sheetsForModal = sheetsArray.map((sheet: any) => ({
         ...sheet,
@@ -218,6 +219,7 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
           job_bluesheet_id: m.job_bluesheet_id ?? m.bluesheet_id ?? m.bluesheetId ?? sheet.id,
         })),
         materials_invoiced: sheet.materials_invoiced,
+        total_labor_cost: sheet.total_labor_cost ?? totalLaborCost ?? 0,
         total_labor_hours: sheet.total_labor_hours ?? totalLaborHours ?? null, 
         created_at: sheet.created_at ?? '',
         updated_at: sheet.updated_at ?? '',
@@ -246,6 +248,9 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
     const mergedMaterials = selectedSheets.flatMap(sheet => sheet.material_entries ?? [])
     const mergedLabor = selectedSheets.flatMap(sheet => sheet.labor_entries ?? [])
     const mergedTotalCost = selectedSheets.reduce((sum, sheet) => sum + (sheet.total_cost ?? 0), 0)
+    // Use API-level aggregated total_labor_cost (already computed on backend),
+    // or fall back to the first sheet's value – don't re-sum here.
+    const mergedTotalLaborCost = selectedSheets[0]?.total_labor_cost ?? 0
     const mergedNotes = selectedSheets.map(sheet => sheet.notes).filter(Boolean).join(' | ')
 
     const dialogSheet = {
@@ -257,12 +262,14 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
       additional_charges: selectedSheets.reduce((sum, s) => sum + (s.additional_charges ?? 0), 0),
       total_cost: mergedTotalCost,
       status: (firstSheet.status ?? 'pending') as 'pending' | 'approved' | 'rejected',
+      total_labor_cost: mergedTotalLaborCost,
       created_at: firstSheet.created_at ?? '',
       updated_at: firstSheet.updated_at ?? '',
       job: firstSheet.job,
       created_by_user: firstSheet.created_by_user ?? firstSheet.submitted_by ?? { id: 0, email: '', full_name: 'N/A' },
       labor_entries: mergedLabor,
       material_entries: mergedMaterials,
+      
       // total labor hours string passed directly from API (e.g. "58h34m")
       total_labor_hours: firstSheet.total_labor_hours ?? null,
     }

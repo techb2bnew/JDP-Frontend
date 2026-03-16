@@ -21,6 +21,8 @@ import {
   Download
 } from 'lucide-react'
 import { globalApiCall, getAuthToken, handleTokenRevocation } from '../utils/globalApiHandler'
+import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input'
+import 'react-phone-number-input/style.css'
 
 interface Staff {
   id: string
@@ -184,8 +186,8 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       case 'phone':
         if (!value.trim()) {
           errors.phone = 'Phone number is required'
-        } else if (value.replace(/\D/g, '').length !== 10) {
-          errors.phone = 'Phone number must be exactly 10 digits'
+        } else if (!isValidPhoneNumber(value)) {
+          errors.phone = 'Please enter a valid phone number for the selected country'
         } else {
           delete errors.phone
         }
@@ -508,10 +510,31 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       }
     };
     
+    // Normalize phone to E.164 so react-phone-number-input can infer country/flag
+    const rawPhone = staffMember.phone || ''
+    let normalizedPhone = ''
+    if (rawPhone.startsWith('+')) {
+      normalizedPhone = rawPhone
+    } else {
+      const digits = rawPhone.replace(/\D/g, '')
+      if (!digits) {
+        normalizedPhone = ''
+      } else if (digits.length === 11 && digits.startsWith('1')) {
+        // Already has US country code, just add '+'
+        normalizedPhone = `+${digits}`
+      } else if (digits.length === 10) {
+        // Assume US local number, prefix +1
+        normalizedPhone = `+1${digits}`
+      } else {
+        // Fallback: just prefix '+'
+        normalizedPhone = `+${digits}`
+      }
+    }
+
     setFormData({
       name: staffMember.name,
       email: staffMember.email,
-      phone: staffMember.phone,
+      phone: normalizedPhone,
       dob: formatDateForInput(staffMember.dob),
       address: staffMember.address,
       position: staffMember.position,
@@ -550,8 +573,8 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
     if (!formData.phone.trim()) {
       errors.phone = 'Phone is required'
       isValid = false
-    } else if (!/^\d{10}$/.test(formData.phone)) {
-      errors.phone = 'Phone must be exactly 10 digits'
+    } else if (!isValidPhoneNumber(formData.phone)) {
+      errors.phone = 'Please enter a valid phone number for the selected country'
       isValid = false
     }
 
@@ -1293,17 +1316,17 @@ useEffect(() => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-phone">Phone Number *</Label>
-              <Input
+              <PhoneInput
                 id="edit-phone"
+                international
+                defaultCountry="US"
                 value={formData.phone}
-                onChange={(e) => {
-                  // Only allow digits and limit to 10 characters
-                  const value = e.target.value.replace(/\D/g, '').slice(0, 10)
-                  setFormData({...formData, phone: value})
-                  validateField('phone', value)
+                onChange={(value) => {
+                  const safeValue = value || ''
+                  setFormData({ ...formData, phone: safeValue })
+                  validateField('phone', safeValue)
                 }}
-                placeholder="Enter 10-digit phone number"
-                className={validationErrors.phone ? 'border-red-500' : ''}
+                className={validationErrors.phone ? 'border border-red-500 rounded-md px-3 py-2' : 'border border-gray-300 rounded-md px-3 py-2'}
               />
               {validationErrors.phone && (
                 <p className="text-sm text-red-500 mt-1">{validationErrors.phone}</p>

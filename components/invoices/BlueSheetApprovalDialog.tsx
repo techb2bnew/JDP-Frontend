@@ -147,6 +147,8 @@ export function BlueSheetApprovalDialog({
   const [filteredProducts, setFilteredProducts] = useState<any[]>([])
   const [activeRow, setActiveRow] = useState<number | null>(null)
   const searchDebounceRef = useRef<NodeJS.Timeout>()
+  // Reference to CustomInvoiceDialog's "preview & send" handler
+  const previewAndSendRef = useRef<(() => Promise<void>) | null>(null)
 
   // ─── Reset when dialog opens ───────────────────────────────────────────────
   useEffect(() => {
@@ -734,22 +736,23 @@ export function BlueSheetApprovalDialog({
     return sum
   }, 0)
 
-  // Labor and material totals
+  // Labor, material and overall totals
   const totalLaborLabel = currentBlueSheet.total_labor_hours || null
   const materialTotal = currentBlueSheet.material_entries.reduce(
     (s: number, i: any) => s + (i.total_cost || i.material_used * i.unit_cost || 0),
     0,
   )
-  const laborTotalCost = currentBlueSheet.total_labor_cost || 0
+  // Derive total labor cost from labor_entries so it reflects merged selections
+  const laborEntriesTotalCost = (currentBlueSheet.labor_entries ?? []).reduce(
+    (sum: number, entry: any) => sum + (entry.total_cost || 0),
+    0,
+  )
   // ──────────────────────────────────────────────────────────────────────────
 
 
   const handleSendCustomInvoice = () => {
     setIsCustomInvoiceOpen(true)
   }
-
-
-
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -1134,7 +1137,7 @@ export function BlueSheetApprovalDialog({
                                           {isFirstOfGroup && (
                                             <td
                                               rowSpan={rowSpan}
-                                              className="py-2 px-3 border-r border-black border-b border-black align-middle text-[11px] font-semibold text-gray-800"
+                                              className="py-2 px-3 border-r border-black border-b border-black align-middle text-[11px] font-semibold text-gray-800 w-10"
                                             >
                                               BS-{bsSourceId}
                                             </td>
@@ -1255,20 +1258,20 @@ export function BlueSheetApprovalDialog({
                                       </td>
                                       {(isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1) && <td className="border-r border-gray-200" />}
                                     </tr>
-                                    {( laborTotalCost > 0) && (
+                                    {( laborEntriesTotalCost > 0) && (
                                       <tr className="  text-xs text-gray-700">
                                         <td colSpan={3} className="py-2 px-3 text-right font-bold text-[#00A1FF] text-[15px]">Labor Total Cost</td>
-                                        <td colSpan={2} className="py-2 px-3 text-right font-bold text-[15px] text-blue-700">{formatCurrency(laborTotalCost)}</td>
+                                        <td colSpan={2} className="py-2 px-3 text-right font-bold text-[15px] text-blue-700">{formatCurrency(laborEntriesTotalCost)}</td>
                                         {(isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1) && <td />}
                                       </tr>
                                     )}
-                                    {( laborTotalCost > 0) && (
+                                    {( laborEntriesTotalCost > 0) && (
                                       <tr className="  text-xs text-gray-800">
                                         <td colSpan={3} className="py-2 px-3 text-right font-bold text-[15px] text-emerald-600">
                                           Total Material + Labor
                                         </td>
                                         <td colSpan={2} className="py-2 px-3 text-right font-bold text-[15px] text-emerald-700">
-                                          {formatCurrency(materialTotal + laborTotalCost)}
+                                          {formatCurrency(materialTotal + laborEntriesTotalCost)}
                                         </td>
                                         {(isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1) && <td />}
                                       </tr>
@@ -1343,7 +1346,7 @@ export function BlueSheetApprovalDialog({
                                     <tr key={idx} className="border-t border-gray-100 hover:bg-gray-50/50">
                                       {isFirstOfGroup && (
                                         <td
-                                          className="py-2 px-3 border-r border-black border-b border-black"
+                                          className="py-2 px-3 border-r border-black border-b border-black w-10"
                                           rowSpan={rowSpan}
                                         >
                                           <span className="text-[11px] font-semibold text-gray-800">
@@ -1468,23 +1471,23 @@ export function BlueSheetApprovalDialog({
                                 </td>
                                 {(isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1) && <td />}
                               </tr>
-                              {( laborTotalCost > 0) && (
+                              {( laborEntriesTotalCost > 0) && (
                                 <tr className="text-xs text-gray-700">
                                   <td colSpan={3} className="py-2 px-3 text-right font-bold text-[15px] text-blue-700">
                                     Labor Total Cost
                                   </td>
                                   <td colSpan={2} className="py-2 px-3 text-right font-bold text-[15px] text-blue-700">
-                                    {formatCurrency(laborTotalCost)}
+                                    {formatCurrency(laborEntriesTotalCost)}
                                   </td>
                                 </tr>
                               )}
-                              {(laborTotalCost > 0) && (
+                              {(laborEntriesTotalCost > 0) && (
                                 <tr className=" text-xs text-gray-800">
                                   <td colSpan={3} className="py-2 px-3 text-right font-bold text-[15px] text-emerald-600">
                                     Total Material + Labor
                                   </td>
                                   <td colSpan={2} className="py-2 px-3 text-right font-bold text-[15px] text-emerald-700">
-                                    {formatCurrency(materialTotal + laborTotalCost)}
+                                    {formatCurrency(materialTotal + laborEntriesTotalCost)}
                                   </td>
                                   {(isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1) && <td />}
                                 </tr>
@@ -1631,18 +1634,27 @@ export function BlueSheetApprovalDialog({
 
                   {/* Review Summary */}
                   <Card className="bg-white shadow-sm border border-slate-200/80">
-                    <CardHeader className="flex items-center justify-between">
+                    <CardHeader className="flex items-center justify-between pb-4">
                       <CardTitle className="text-lg font-semibold text-slate-900">
                         Review Summary
                       </CardTitle>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs text-blue-600 hover:text-blue-800"
+                      <button
+                        type="button"
                         onClick={() => setIsReviewSummaryOpen((prev: any) => !prev)}
+                        className={`
+                          relative inline-flex h-5 w-9 items-center rounded-full
+                          transition-colors duration-200
+                          ${isReviewSummaryOpen ? 'bg-blue-500' : 'bg-gray-300'}
+                        `}
                       >
-                        {isReviewSummaryOpen ? 'Hide' : 'Show'}
-                      </Button>
+                        <span
+                          className={`
+                            inline-block h-4 w-4 transform rounded-full bg-white shadow
+                            transition-transform duration-200
+                            ${isReviewSummaryOpen ? 'translate-x-4' : 'translate-x-1'}
+                          `}
+                        />
+                      </button>
                     </CardHeader>
                     {isReviewSummaryOpen && (
                       <CardContent className="space-y-8">
@@ -1765,7 +1777,11 @@ export function BlueSheetApprovalDialog({
                       open={true}
                       onOpenChange={() => setIsCustomInvoiceOpen(false)}
                       blueSheet={currentBlueSheet}
-                      totalLaborCost={currentBlueSheet.total_labor_cost as any}
+                      // Let CustomInvoiceDialog derive labor cost from labor_entries
+                      registerPreviewAndSend={(fn) => {
+                        previewAndSendRef.current = fn
+                      }}
+                      onDone={onClose}
                     />
                   </div>
 
@@ -1806,7 +1822,20 @@ export function BlueSheetApprovalDialog({
                           size="lg"
                         >
                           <Send className="h-4 w-4" />
-                          {isApproving ? 'Approving...' : 'Send Quickbook Invoice'}
+                          {isApproving ? 'Approving...' : 'Send Invoice From Quickbook'}
+                        </Button>
+                        <Button 
+                          onClick={async () => {
+                            if (previewAndSendRef.current) {
+                              await previewAndSendRef.current()
+                            }
+                          }}
+                          disabled={isApproving || isApprovingCustomer}
+                          className="bg-emerald-600 text-white hover:bg-emerald-700 gap-2 h-11 text-sm px-6 rounded-lg shadow-sm"
+                          size="lg"
+                        >
+                          <Send className="h-4 w-4" />
+                          {isApproving ? 'Approving...' : 'Send Invoice Directly'}
                         </Button>
                       </div>
                     </div>
