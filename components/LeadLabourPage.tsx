@@ -35,6 +35,8 @@ import {
 } from 'lucide-react'
 import Image from 'next/image'
 import { apiClient } from '@/utils/api'
+import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input'
+import 'react-phone-number-input/style.css'
 
 interface LeadLabour {
   id: string | number
@@ -291,12 +293,11 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       return;
     }
 
-    // Phone number validation (exactly 10 digits)
-    const phoneRegex = /^\d{10}$/;
-    if (!phoneRegex.test(formData.phone)) {
-      const errors = { ...validationErrors, phone: 'Phone number must be exactly 10 digits' };
+    // Phone number validation (country-aware)
+    if (!isValidPhoneNumber(formData.phone || '')) {
+      const errors = { ...validationErrors, phone: 'Please enter a valid phone number' };
       setValidationErrors(errors);
-      toast.error('Phone number must be exactly 10 digits');
+      toast.error('Please enter a valid phone number');
       return;
     }
 
@@ -484,12 +485,11 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       return;
     }
 
-    // Phone number validation (exactly 10 digits)
-    const phoneRegex = /^\d{10}$/;
-    if (!phoneRegex.test(formData.phone)) {
-      const errors = { ...validationErrors, phone: 'Phone number must be exactly 10 digits' };
+    // Phone number validation (country-aware)
+    if (!isValidPhoneNumber(formData.phone || '')) {
+      const errors = { ...validationErrors, phone: 'Please enter a valid phone number' };
       setValidationErrors(errors);
-      toast.error('Phone number must be exactly 10 digits');
+      toast.error('Please enter a valid phone number');
       return;
     }
 
@@ -1315,19 +1315,24 @@ useEffect(() => {
           </div>
           <div className="space-y-2">
             <Label htmlFor="phone">Phone Number *</Label>
-            <Input
+            <PhoneInput
               id="phone"
+              international
+              defaultCountry="US"
               value={formData.phone}
-              onChange={(e) => {
-                // Only allow digits and limit to 10 characters
-                const value = e.target.value.replace(/\D/g, '').slice(0, 10);
-                setFormData({ ...formData, phone: value })
+              onChange={(value) => {
+                const safeValue = value || ''
+                setFormData({ ...formData, phone: safeValue })
                 if (validationErrors.phone) {
                   setValidationErrors({ ...validationErrors, phone: '' })
                 }
               }}
-              placeholder="Enter 10-digit phone number"
-              className={validationErrors.phone ? 'border-red-500' : ''}
+              placeholder="Enter phone number"
+              className={
+                validationErrors.phone
+                  ? 'border border-red-500 rounded-md px-2 py-2'
+                  : 'border border-gray-300 rounded-md px-2 py-2'
+              }
             />
             {validationErrors.phone && (
               <p className="text-sm text-red-500 mt-1">{validationErrors.phone}</p>

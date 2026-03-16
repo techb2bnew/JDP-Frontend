@@ -14,6 +14,8 @@ import { AutoScrollSelect } from './ui/AutoScrollSelect'
 import { AutoScrollMultiSelect } from './ui/AutoScrollMultiSelect'
 import { apiClient } from '../utils/api'
 import { globalApiCall } from '../utils/globalApiHandler'
+import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input'
+import 'react-phone-number-input/style.css'
 import Autocomplete from 'react-google-autocomplete'
 
 // Extend Window interface for Google Maps
@@ -173,8 +175,8 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
   }
 
   const validatePhone = (phone: string): boolean => {
-    const phoneRegex = /^\d{10}$/
-    return phoneRegex.test(phone.replace(/\D/g, ''))
+    if (!phone) return false
+    return isValidPhoneNumber(phone)
   }
 
   const validateStep2 = (): boolean => {
@@ -388,7 +390,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     if (!entityForm.phone.trim()) {
       newErrors.phone = 'Phone is required'
     } else if (!validatePhone(entityForm.phone)) {
-      newErrors.phone = 'Phone must be exactly 10 digits'
+      newErrors.phone = 'Please enter a valid phone number'
     }
     setEntityErrors(newErrors)
     if (Object.keys(newErrors).length > 0) {
@@ -939,19 +941,26 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
             <div className="space-y-2">
               <Label htmlFor="phone">Phone</Label>
-              <Input
+              <PhoneInput
                 id="phone"
                 value={formData.phone}
-                onChange={(e) => {
-                  const newFormData = {...formData, phone: e.target.value}
+                onChange={(value) => {
+                  const safeValue = value || ''
+                  const newFormData = { ...formData, phone: safeValue }
                   if (formData.sameAsAddress) {
-                    newFormData.billToPhone = e.target.value
+                    newFormData.billToPhone = safeValue
                   }
                   setFormData(newFormData)
                   clearValidationError('phone')
                 }}
-                placeholder="Phone number (10 digits)"
-                className={validationErrors.phone ? 'border-red-500' : ''}
+                international
+                defaultCountry="US"
+                placeholder="Phone number"
+                className={
+                  validationErrors.phone
+                    ? 'border border-red-500 rounded-md px-2 py-2'
+                    : 'border border-gray-300 rounded-md px-2 py-2'
+                }
               />
               {validationErrors.phone && (
                 <p className="text-red-500 text-sm">{validationErrors.phone}</p>
@@ -981,7 +990,53 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             </div>
           </div>
         </div>
+        <div className="space-y-4 bg-white shadow-lg p-3">
+          <div className="flex items-center gap-2 mb-4">
+            <UserCheck className="h-5 w-5 text-[#00A1FF]" /> 
+            <h3 className="font-bold text-[#2b2b2b]  text-lg">Assigned Lead Labor & Labor</h3>
+          </div>
+        <div>
+          <Label className="flex items-center gap-2 mb-2">
+            {/* <UserCheck className="h-4 w-4 text-[#00A1FF]" /> */}
+            Assigned Lead Labor
+          </Label>
 
+          <AutoScrollMultiSelect
+            selectedValues={formData.assignedLeadLabor}
+            onSelectionChange={(selectedIds) => {
+              setFormData(prev => ({
+                ...prev,
+                assignedLeadLabor: selectedIds,
+              }))
+            }}
+            placeholder="Select lead labor"
+            fetchData={apiClient.getLeadLabor}
+            displayField="name"
+            valueField="id"
+          />
+        </div>
+
+        <div>
+          <Label className="flex items-center gap-2 mb-2">
+            {/* <Users className="h-4 w-4 text-[#00A1FF]" /> */}
+            Assigned Labor
+          </Label>
+
+          <AutoScrollMultiSelect
+            selectedValues={formData.assignedLabor}
+            onSelectionChange={(selectedIds) => {
+              setFormData(prev => ({
+                ...prev,
+                assignedLabor: selectedIds,
+              }))
+            }}
+            placeholder="Select labor"
+            fetchData={apiClient.getLabor}
+            displayField="name"
+            valueField="id"
+          />
+        </div>
+        </div>
         {/* Bill To Section */}
         <div className="space-y-4 bg-white shadow-lg p-3">
           <div className="flex items-center gap-2 mb-4">
@@ -1335,17 +1390,19 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             </div>
             <div>
               <Label className="mb-1 block">Phone *</Label>
-              <Input
-                type="number"
+              <PhoneInput
                 value={entityForm.phone}
-                onChange={(e) => {
-                  const onlyDigits = e.target.value.replace(/\D/g, '').slice(0, 10)
-                  setEntityForm({ ...entityForm, phone: onlyDigits })
+                onChange={(value) => {
+                  const safeValue = value || ''
+                  setEntityForm({ ...entityForm, phone: safeValue })
                   if (entityErrors.phone) {
                     setEntityErrors(prev => ({ ...prev, phone: undefined }))
                   }
                 }}
-                placeholder="10-digit phone"
+                international
+                defaultCountry="US"
+                placeholder="Phone number"
+                className="border border-gray-300 rounded-md px-2 py-1"
               />
               {entityErrors.phone && (
                 <p className="mt-1 text-xs text-red-500">{entityErrors.phone}</p>

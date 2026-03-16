@@ -434,6 +434,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
     uploadJobDocument: (params: { jobId: number; title: string; file: File }) => Promise<any>;
     deleteJobDocument: (documentId: number) => Promise<any>;
   };
+  const [showReinvoiceAlert, setShowReinvoiceAlert] = useState(false);
+  const [pendingReviewSheets, setPendingReviewSheets] = useState<any[] | null>(null);
 
   const extractDocumentFileName = (fileUrl: string | null): string => {
     if (!fileUrl) return 'Document';
@@ -4007,10 +4009,18 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
       const originalJob = changeOrderJob;
 
       // Prepare payload for NEW JOB (Change Order)
+      // Normalize job type to API expected values
+      const normalizedJobType =
+        originalJob.job_type === 'service_based' || originalJob.job_type === 'contract_based'
+          ? originalJob.job_type
+          : originalJob.type === 'contract-based'
+            ? 'contract_based'
+            : 'service_based';
+
       // Copy most fields from original job but with new title
       const payload: any = {
         job_title: changeOrderTitle, // New title
-        job_type: originalJob.job_type || originalJob.type || 'service_based',
+        job_type: normalizedJobType,
         description: originalJob.description || '',
         priority: originalJob.priority || 'medium',
         address: originalJob.address || '',
@@ -4257,17 +4267,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                   <FileText className="h-5 w-5" />
                   Job Details
                 </CardTitle>
-                <div className="flex items-center gap-2">
-                  {!isEditing && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="gap-2 text-blue-600"
-                      onClick={() => setShowJobDetails((prev) => !prev)}
-                    >
-                      {showJobDetails ? 'Hide Details' : 'Show Details'}
-                    </Button>
-                  )}
+                <div className="flex items-center gap-3">
+                  
                   {!isEditing && (
                     <Button
                       variant="outline"
@@ -4288,6 +4289,26 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                   >
                     Complete Job
                   </Button>
+                  {!isEditing && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-600">
+                        {showJobDetails ? 'Details On' : 'Details Off'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowJobDetails(prev => !prev)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          showJobDetails ? 'bg-[#0EA5E9]' : 'bg-gray-300'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                            showJobDetails ? 'translate-x-5' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </CardHeader>
               {(isEditing || showJobDetails) && (
@@ -5613,6 +5634,15 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                     (s: any) => selectedBluesheetIds.includes(s.id)
                   );
                   if (selectedSheets.length === 0) return;
+
+                  // If any selected sheet is already invoiced, show confirmation first
+                  const hasInvoiced = selectedSheets.some((s: any) => s.materials_invoiced);
+                  if (hasInvoiced) {
+                    setPendingReviewSheets(selectedSheets);
+                    setShowReinvoiceAlert(true);
+                    return;
+                  }
+
                   const firstSheet = selectedSheets[0];
                   const mergedMaterials = selectedSheets.flatMap(
                     (sheet: any) =>
@@ -5707,6 +5737,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                         variant="outline"
                         size="sm"
                         onClick={() => {
+                          // If this sheet is already invoiced, show confirmation alert first
+                          if (sheet.materials_invoiced) {
+                            setPendingReviewSheets([sheet]);
+                            setShowReinvoiceAlert(true);
+                            return;
+                          }
                           setSelectedBlueSheetForReview(sheet as DialogBlueSheetItem);
                           setIsBlueSheetDialogOpen(true);
                         }}
@@ -5722,6 +5758,91 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
             )}
           </CardContent>
         </Card>
+        <AlertDialog open={showReinvoiceAlert} onOpenChange={setShowReinvoiceAlert}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Invoice already submitted</AlertDialogTitle>
+              <AlertDialogDescription>
+                One or more selected BlueSheets are already marked as invoiced. Are you sure you
+                want to review and invoice these BlueSheets again?
+                {pendingReviewSheets && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {pendingReviewSheets
+                      .filter((b: any) => b.materials_invoiced)
+                      .map((b: any) => (
+                        <Badge
+                          key={b.id}
+                          variant="outline"
+                          className="text-xs bg-purple-50 text-purple-700 border-purple-200"
+                        >
+                          BS-{b.id} — {b.job?.job_title || job.job_title}
+                        </Badge>
+                      ))}
+                  </div>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel
+                onClick={() => {
+                  setShowReinvoiceAlert(false);
+                  setPendingReviewSheets(null);
+                }}
+              >
+                No
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (pendingReviewSheets && pendingReviewSheets.length > 0) {
+                    const selectedSheets = pendingReviewSheets;
+                    const firstSheet = selectedSheets[0];
+                    const mergedMaterials = selectedSheets.flatMap(
+                      (sheet: any) =>
+                        (sheet.material_entries ?? []).map((m: any) => ({
+                          ...m,
+                          job_bluesheet_id:
+                            m.job_bluesheet_id ?? m.bluesheet_id ?? m.bluesheetId ?? sheet.id,
+                        }))
+                    );
+                    const mergedLabor = selectedSheets.flatMap(
+                      (sheet: any) => sheet.labor_entries ?? []
+                    );
+                    const mergedTotalCost = selectedSheets.reduce(
+                      (sum: number, sheet: any) => sum + (sheet.total_cost ?? 0),
+                      0
+                    );
+                    const mergedNotes = selectedSheets
+                      .map((sheet: any) => sheet.notes)
+                      .filter(Boolean)
+                      .join(' | ');
+
+                    const dialogSheet: DialogBlueSheetItem = {
+                      ...(firstSheet as any),
+                      id: firstSheet.id ?? firstSheet.latest_bluesheet_id ?? 0,
+                      date: firstSheet.date ?? firstSheet.latest_bluesheet_date ?? '',
+                      notes: mergedNotes || firstSheet.notes || '',
+                      additional_charges: selectedSheets.reduce(
+                        (sum: number, s: any) => sum + (s.additional_charges ?? 0),
+                        0
+                      ),
+                      total_cost: mergedTotalCost,
+                      labor_entries: mergedLabor,
+                      material_entries: mergedMaterials,
+                      total_labor_hours: firstSheet.total_labor_hours ?? null,
+                    };
+
+                    setSelectedBlueSheetForReview(dialogSheet);
+                    setIsBlueSheetDialogOpen(true);
+                  }
+                  setShowReinvoiceAlert(false);
+                  setPendingReviewSheets(null);
+                }}
+              >
+                Yes
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         {/* Material Usage */}
         {/* <Card>
           <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">

@@ -8,6 +8,16 @@ import {
     Clock, CheckSquare, X, Building, User,
     ChevronLeft, ChevronRight, Eye, FileText, Upload
 } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog'
 
 interface ApiBlueSheetItem {
     id: number
@@ -61,6 +71,8 @@ export function BlueSheetSelectionModal({
 }: BlueSheetSelectionModalProps) {
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
     const [currentPage, setCurrentPage] = useState(1)
+    const [showReinvoiceAlert, setShowReinvoiceAlert] = useState(false)
+    const [pendingSubmitSheets, setPendingSubmitSheets] = useState<ApiBlueSheetItem[] | null>(null)
     React.useEffect(() => {
         if (isOpen) { setSelectedIds(new Set()); setCurrentPage(1) }
     }, [isOpen])
@@ -116,7 +128,16 @@ export function BlueSheetSelectionModal({
 
     const handleSubmit = () => {
         if (selectedIds.size === 0) return
-        onSubmitSelected(blueSheets.filter(b => selectedIds.has(b.id)))
+        const selectedSheets = blueSheets.filter(b => selectedIds.has(b.id))
+        const hasInvoiced = selectedSheets.some(b => b.materials_invoiced)
+
+        if (hasInvoiced) {
+            setPendingSubmitSheets(selectedSheets)
+            setShowReinvoiceAlert(true)
+            return
+        }
+
+        onSubmitSelected(selectedSheets)
     }
 
     return (
@@ -350,6 +371,54 @@ export function BlueSheetSelectionModal({
                         )}
                     </Button>
                 </div>
+
+                <AlertDialog open={showReinvoiceAlert} onOpenChange={setShowReinvoiceAlert}>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Invoice already submitted</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Selected BlueSheets are already marked as invoiced. Are you sure you want
+                        to submit an invoice again for these BlueSheets?
+                        {pendingSubmitSheets && (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {pendingSubmitSheets
+                              .filter(b => b.materials_invoiced)
+                              .map(b => (
+                                <Badge
+                                  key={b.id}
+                                  variant="outline"
+                                  className="text-xs bg-purple-50 text-purple-700 border-purple-200"
+                                >
+                                  BS-{b.id} — {b.job.job_title}
+                                </Badge>
+                              ))}
+                          </div>
+                        )}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel
+                        onClick={() => {
+                          setShowReinvoiceAlert(false)
+                          setPendingSubmitSheets(null)
+                        }}
+                      >
+                        No
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => {
+                          if (pendingSubmitSheets && pendingSubmitSheets.length > 0) {
+                            onSubmitSelected(pendingSubmitSheets)
+                          }
+                          setShowReinvoiceAlert(false)
+                          setPendingSubmitSheets(null)
+                        }}
+                      >
+                        Yes
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
 
             </DialogContent>
         </Dialog>
