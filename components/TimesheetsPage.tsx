@@ -54,42 +54,7 @@ interface TimesheetItem {
   weekly_payment?: number | null;
 }
 
-
-const timesheetData = [
-  {
-    id: 1,
-    employee: 'John Smith',
-    job: 'Electrical Panel Installation',
-    jobCode: 'JOB-2025-001',
-    week: 'Jan 20 - Jan 26',
-    hours: { mon: 8, tue: 8, wed: 8, thu: 7, fri: 0, sat: 0, sun: 0 },
-    total: 37,
-    billable: 37,
-    status: 'Submitted'
-  },
-  {
-    id: 2,
-    employee: 'David Wilson',
-    job: 'Electrical Panel Installation',
-    jobCode: 'JOB-2025-001',
-    week: 'Jan 20 - Jan 26',
-    hours: { mon: 6, tue: 7, wed: 5, thu: 8, fri: 0, sat: 0, sun: 0 },
-    total: 32,
-    billable: 30,
-    status: 'Approved'
-  },
-  {
-    id: 3,
-    employee: 'Sarah Johnson',
-    job: 'Office Lighting Maintenance',
-    jobCode: 'JOB-2025-002',
-    week: 'Jan 20 - Jan 26',
-    hours: { mon: 8, tue: 8, wed: 8, thu: 8, fri: 8, sat: 4, sun: 0 },
-    total: 44,
-    billable: 40,
-    status: 'Draft'
-  }
-]
+ 
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -634,7 +599,7 @@ const fetchTimesheetsByDateRange = async () => {
   if (showTimesheetDetail && selectedTimesheet) {
     // Use API data if available, otherwise use fallback
     const employeeName = timesheetViewData?.employee_name || selectedTimesheet.employee;
-    const hourlyRate = timesheetViewData?.hourly_rate || selectedTimesheet.hourly_rate || 35;
+    const hourlyRate = timesheetViewData?.hourly_rate || selectedTimesheet.hourly_rate;
     const weekRange = timesheetViewData?.period?.week_range || selectedTimesheet.week;
     const formattedWeek = formatWeekRange(weekRange);
     const weekTotal = timesheetViewData?.week_total;
@@ -989,7 +954,7 @@ const fetchTimesheetsByDateRange = async () => {
                 {filteredTimesheets.length > 0 ? (
                   filteredTimesheets.map((item: any, index: number) => {
                     const totalHours = parseHours(item.total);
-                    const hourlyRate = item.hourly_rate || 35; // Use API value or default
+                    const hourlyRate = item.hourly_rate; // Use API value or default
                     const totalPay = item.weekly_payment || (totalHours * hourlyRate);
                     const isPaid = item.status.toLowerCase() === 'approved';
                     const paymentDate = isPaid ? format(new Date(), 'MMM d, yyyy') : '-';
@@ -1024,7 +989,7 @@ const fetchTimesheetsByDateRange = async () => {
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
-                          {formatCurrency(item.hourly_rate || 35)}/hr
+                          {formatCurrency(item.hourly_rate)}/hr
                         </TableCell>
                         <TableCell className="text-center font-medium">
                           {formatCurrency(totalPay)}

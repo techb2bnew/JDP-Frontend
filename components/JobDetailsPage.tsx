@@ -206,6 +206,7 @@ interface JobDetailsPageProps {
   onBack: () => void
   jobs: any[]
   setJobs: (jobs: any[]) => void
+  onJobsRefresh?: () => void
 }
 
 type JobDocumentItem = {
@@ -285,7 +286,7 @@ interface CompleteBluesheetPayload {
   material_entries: MaterialEntry[];
 }
 
-export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageProps) {
+export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: JobDetailsPageProps) {
 
 
 
@@ -305,6 +306,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const [selectedBlueSheetForReview, setSelectedBlueSheetForReview] = useState<DialogBlueSheetItem | null>(null);
   const [isBlueSheetDialogOpen, setIsBlueSheetDialogOpen] = useState(false);
   const [selectedBluesheetIds, setSelectedBluesheetIds] = useState<number[]>([]);
+
+  const [showChangeOrderModal, setShowChangeOrderModal] = useState(false);
+  const [changeOrderJob, setChangeOrderJob] = useState<any>(null);
+  const [changeOrderTitle, setChangeOrderTitle] = useState('');
+  const [isUpdatingChangeOrder, setIsUpdatingChangeOrder] = useState(false);
+  const [changeOrderErrors, setChangeOrderErrors] = useState<Record<string, string>>({});
+  const [changeOrderEstimate, setChangeOrderEstimate] = useState<number | string>('');
 
   const timeLogs = Array.isArray(job.labor_timesheets) ? job.labor_timesheets : (Array.isArray(sampleJobData.timeLogs) ? sampleJobData.timeLogs : []) // Ensure timeLogs is always an array
   const invoices = sampleJobData.invoices // Keep sample data for now as we don't have invoices API
@@ -327,7 +335,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
       },
       0
     );
-  
+
   // Refresh bluesheets for this job from API whenever jobId changes
   useEffect(() => {
     const fetchJobBluesheets = async () => {
@@ -385,6 +393,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   const [showAddInvoiceModal, setShowAddInvoiceModal] = useState(false);
   const [showAddMaterialModal, setShowAddMaterialModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [showJobDetails, setShowJobDetails] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [suppliers, setSuppliers] = useState<{
     id: number;
@@ -862,6 +871,68 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
     } catch (error) {
       console.error('Error updating job:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to update job');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCompleteJob = async () => {
+    if (job.status === 'completed') {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+
+      const updatedJob = {
+        ...job,
+        status: 'completed',
+      };
+
+      await apiClient.updateJob(jobId, {
+        job_title: updatedJob.title,
+        job_type: updatedJob.type === 'service-based' ? 'service_based' : 'contract_based',
+        ...(updatedJob.type === 'contract-based'
+          ? { contractor_id: job.contractor ? Number(job.contractor) : undefined }
+          : { customer_id: job.customer ? Number(job.customer?.id || job.customer) : undefined }
+        ),
+        description: updatedJob.description,
+        priority: updatedJob.priority.toLowerCase(),
+        address: updatedJob.address || job.address || '',
+        city_zip: updatedJob.cityZip || job.cityZip || '',
+        phone: job.phone || undefined,
+        email: job.email || undefined,
+        bill_to_address: job.billToAddress || undefined,
+        bill_to_city_zip: job.billToCityZip || undefined,
+        bill_to_phone: job.billToPhone || undefined,
+        bill_to_email: job.billToEmail || undefined,
+        same_as_address: job.sameAsAddress || false,
+        due_date: job.dueDate || '',
+        estimated_hours: job.estimatedHours || undefined,
+        estimated_cost: job.estimatedCost || undefined,
+        assigned_labor_ids: (updatedJob.assignedLabor || []).length > 0
+          ? JSON.stringify(updatedJob.assignedLabor.map((labor: any) => labor.id))
+          : undefined,
+        assigned_lead_labor_ids: (updatedJob.assignedLeadLabor || []).length > 0
+          ? JSON.stringify(updatedJob.assignedLeadLabor.map((labor: any) => labor.id))
+          : undefined,
+        assigned_material_ids: job.materials && job.materials.length > 0
+          ? JSON.stringify(job.materials)
+          : undefined,
+        status: updatedJob.status,
+      });
+
+      const updatedJobs = jobs.map((j: any) =>
+        j.id === jobId ? updatedJob : j
+      );
+      setJobs(updatedJobs);
+
+      toast.success('Job marked as completed');
+    } catch (error) {
+      console.error('Error completing job:', error);
+      toast.error('Failed to complete job', {
+        description: error instanceof Error ? error.message : 'Failed to complete job',
+      });
     } finally {
       setIsSaving(false);
     }
@@ -3903,6 +3974,115 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
   }
 
 
+  // Change order
+  const handleChangeOrderClick = (job: any, customerId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent job selection
+    setChangeOrderJob({
+      ...job,  // Store the entire job object
+      customerId: customerId,
+      originalId: job.id // Store original ID for reference
+    });
+    // Set default title as "Change Order - [Original Title]"
+    setChangeOrderTitle(`${''}`);
+    setChangeOrderEstimate(job.estimated_cost || job.estimatedCost || '');
+    setChangeOrderErrors({});
+    setShowChangeOrderModal(true);
+  };
+
+  const handleChangeOrderSave = async () => {
+    // Validate
+    const errors: Record<string, string> = {};
+    if (!changeOrderTitle.trim()) {
+      errors.title = 'Job title is required';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setChangeOrderErrors(errors);
+      return;
+    }
+
+    setIsUpdatingChangeOrder(true);
+    try {
+      // Original job data
+      const originalJob = changeOrderJob;
+
+      // Prepare payload for NEW JOB (Change Order)
+      // Copy most fields from original job but with new title
+      const payload: any = {
+        job_title: changeOrderTitle, // New title
+        job_type: originalJob.job_type || originalJob.type || 'service_based',
+        description: originalJob.description || '',
+        priority: originalJob.priority || 'medium',
+        address: originalJob.address || '',
+        city_zip: originalJob.city_zip || originalJob.cityZip || '',
+        phone: originalJob.phone || '',
+        email: originalJob.email || '',
+        bill_to_address: originalJob.bill_to_address || originalJob.billToAddress || '',
+        bill_to_city_zip: originalJob.bill_to_city_zip || originalJob.billToCityZip || '',
+        bill_to_phone: originalJob.bill_to_phone || originalJob.billToPhone || '',
+        bill_to_email: originalJob.bill_to_email || originalJob.billToEmail || '',
+        same_as_address: originalJob.same_as_address || originalJob.sameAsAddress || false,
+        due_date: originalJob.due_date || originalJob.dueDate || '',
+        // estimated_hours: originalJob.estimated_hours || originalJob.estimatedHours || 0,
+        estimated_cost: Number(changeOrderEstimate),
+
+        status: 'pending', // New job starts as pending
+
+        // Copy assigned labor if exists
+        assigned_lead_labor_ids: originalJob.assigned_lead_labor_ids ||
+          (originalJob.assignedLeadLabor ? JSON.stringify(originalJob.assignedLeadLabor) : undefined),
+        assigned_labor_ids: originalJob.assigned_labor_ids ||
+          (originalJob.assignedLabor ? JSON.stringify(originalJob.assignedLabor) : undefined),
+
+      };
+
+      // Add customer_id or contractor_id based on job type
+      if (originalJob.job_type === 'service_based' || originalJob.type === 'service-based') {
+        payload.customer_id = originalJob.customer_id || originalJob.customer;
+      } else {
+        payload.contractor_id = originalJob.contractor_id || originalJob.contractor;
+      }
+
+      console.log('Creating change order with payload:', payload);
+
+      // Call API to CREATE NEW JOB (not update)
+      const response = await apiClient.createJob(payload); // Remove changeOrderJob.id
+      console.log('Change order creation response:', response);
+
+      // Get the newly created job from response
+      const newJob = response.data || response;
+
+      // Update local jobs state - add the new change order job
+      setJobs([
+        ...jobs,
+        {
+          ...newJob,
+          id: newJob.id,
+          job_title: changeOrderTitle,
+          estimated_cost: Number(changeOrderEstimate),
+          title: changeOrderTitle,
+          isChangeOrder: true,
+          originalJobId: originalJob.id
+        }
+      ]);
+
+      // Ask parent (CustomersPage) to refresh listing so sub-jobs appear
+      if (onJobsRefresh) {
+        onJobsRefresh();
+      }
+
+      toast.success('Change order created successfully!');
+      setShowChangeOrderModal(false);
+      setChangeOrderJob(null);
+      setChangeOrderTitle('');
+    } catch (error) {
+      console.error('Error creating change order:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to create change order');
+    } finally {
+      setIsUpdatingChangeOrder(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="mx-auto space-y-6">
@@ -3916,6 +4096,25 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           </div>
 
           <div className="flex items-center gap-3">
+            <div onClick={(e) => e.stopPropagation()}>
+              <Button
+                variant="ghost"
+                size="sm"
+                title='Change Order'
+                className="  pl-2 pr-2 bg-primary text-white"
+                onClick={(e) =>
+                  handleChangeOrderClick(
+                    job,
+                    job.type === 'contract-based'
+                      ? (job.contractor?.toString?.() || job.contractor_id?.toString?.() || '')
+                      : (job.customer?.toString?.() || job.customer_id?.toString?.() || ''),
+                    e
+                  )
+                }
+              >
+                Change Order
+              </Button>
+            </div>
             {/* <Button variant="outline" className="gap-2">
               <FileText className="h-4 w-4" />
               Generate Invoice
@@ -4058,18 +4257,40 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                   <FileText className="h-5 w-5" />
                   Job Details
                 </CardTitle>
-                {!isEditing && (
+                <div className="flex items-center gap-2">
+                  {!isEditing && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-2 text-blue-600"
+                      onClick={() => setShowJobDetails((prev) => !prev)}
+                    >
+                      {showJobDetails ? 'Hide Details' : 'Show Details'}
+                    </Button>
+                  )}
+                  {!isEditing && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => setIsEditing(true)}
+                    >
+                      <Edit className="h-4 w-4" />
+                      Edit
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
                     className="gap-2"
-                    onClick={() => setIsEditing(true)}
+                    onClick={handleCompleteJob}
+                    disabled={isSaving || job.status === 'completed'}
                   >
-                    <Edit className="h-4 w-4" />
-                    Edit
+                    Complete Job
                   </Button>
-                )}
+                </div>
               </CardHeader>
+              {(isEditing || showJobDetails) && (
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
@@ -4475,6 +4696,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                   </div>
                 )} */}
               </CardContent>
+              )}
               <CardFooter>
                 {isEditing && (
                   <div className="flex gap-2">
@@ -5462,11 +5684,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium">Bluesheet #{sheet.id}</span>
                           <span
-                            className={`px-2 py-0.5 text-xs rounded-full ${
-                              sheet.status === 'approved'
+                            className={`px-2 py-0.5 text-xs rounded-full ${sheet.status === 'approved'
                                 ? 'bg-green-100 text-green-700'
                                 : 'bg-yellow-100 text-yellow-700'
-                            }`}
+                              }`}
                           >
                             {sheet.status === 'approved' ? 'Approved' : 'Pending'}
                           </span>
@@ -7011,6 +7232,104 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs }: JobDetailsPageP
           setSelectedBlueSheetForReview(null);
         }}
       />
+
+      {/* Change Order Modal */}
+      <Dialog open={showChangeOrderModal} onOpenChange={setShowChangeOrderModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Change Order</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Job ID Display */}
+            <div className="space-y-2">
+              <Label className="text-sm text-gray-500">Job ID</Label>
+              <div className="bg-gray-50 p-2 rounded-md border border-gray-200">
+                <p className="text-sm font-medium">{changeOrderJob?.id || 'N/A'}</p>
+              </div>
+            </div>
+
+            {/* New Job Title Input */}
+            <div className="space-y-2">
+              <Label htmlFor="changeOrderTitle" className="text-sm font-medium">
+                Job Title <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="changeOrderTitle"
+                value={changeOrderTitle}
+                onChange={(e) => {
+                  setChangeOrderTitle(e.target.value);
+                  if (changeOrderErrors.title) {
+                    setChangeOrderErrors({ ...changeOrderErrors, title: '' });
+                  }
+                }}
+                placeholder="Enter new job title"
+                className={changeOrderErrors.title ? 'border-red-500' : ''}
+                autoFocus
+              />
+              {changeOrderErrors.title && (
+                <p className="text-red-500 text-xs mt-1">{changeOrderErrors.title}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="changeOrderEstimate" className="text-sm font-medium">
+                Estimate Amount ($) <span className="text-red-500">*</span>
+              </Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                <Input
+                  id="changeOrderEstimate"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={changeOrderEstimate}
+                  onChange={(e) => {
+                    setChangeOrderEstimate(e.target.value);
+                    if (changeOrderErrors.estimate) {
+                      setChangeOrderErrors({ ...changeOrderErrors, estimate: '' });
+                    }
+                  }}
+                  placeholder="0.00"
+                  className={`pl-7 ${changeOrderErrors.estimate ? 'border-red-500' : ''}`}
+                />
+              </div>
+              {changeOrderErrors.estimate && (
+                <p className="text-red-500 text-xs mt-1">{changeOrderErrors.estimate}</p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowChangeOrderModal(false);
+                setChangeOrderJob(null);
+                setChangeOrderTitle('');
+                setChangeOrderErrors({});
+              }}
+              disabled={isUpdatingChangeOrder}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleChangeOrderSave}
+              disabled={isUpdatingChangeOrder || !changeOrderTitle.trim()}
+              className="bg-primary text-white hover:bg-primary/90"
+            >
+              {isUpdatingChangeOrder ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Submitting...
+                </>
+              ) : (
+                'Submit Change Order'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </div>
   )

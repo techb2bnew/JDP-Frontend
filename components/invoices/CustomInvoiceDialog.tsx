@@ -1424,12 +1424,12 @@ export const CustomInvoiceDialog = ({
 
   return (
     <div key={viewInvoiceData?.id || 'new-invoice'} className="w-full">
-      <DialogHeader>
+      {/* <DialogHeader>
           <DialogTitle>Create New Invoice</DialogTitle>
           <DialogDescription>
             Create a comprehensive invoice for your project
           </DialogDescription>
-        </DialogHeader>
+        </DialogHeader> */}
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -1865,7 +1865,7 @@ export const CustomInvoiceDialog = ({
                         </td>
                       </tr>
                     ))}
-                    {/* Subtotal Row */}
+                    {/* Subtotal / Labor / Combined totals */}
                     <tr>
                       <td colSpan={5} className="border border-gray-300 p-2"></td>
                       <td className="border border-gray-300 p-2 text-right font-bold">
@@ -1873,19 +1873,33 @@ export const CustomInvoiceDialog = ({
                       </td>
                       <td className="border border-gray-300 p-1"></td>
                     </tr>
+                    {typeof (viewInvoiceData as any).labor_total_cost === 'number' &&
+                      (viewInvoiceData as any).labor_total_cost > 0 && (
+                      <>
+                        <tr>
+                          <td colSpan={5} className="border border-gray-300 p-2 text-right font-medium text-sm text-gray-700">
+                            Labor total cost:
+                          </td>
+                          <td className="border border-gray-300 p-2 text-right font-medium text-sm text-gray-700">
+                            ${(viewInvoiceData as any).labor_total_cost.toFixed(2)}
+                          </td>
+                          <td className="border border-gray-300 p-1"></td>
+                        </tr>
+                        <tr>
+                          <td colSpan={5} className="border border-gray-300 p-2 text-right font-bold text-sm text-emerald-700">
+                            Total Material + Labor:
+                          </td>
+                          <td className="border border-gray-300 p-2 text-right font-bold text-sm text-emerald-700">
+                            ${(calculateInvoiceSubtotal() + (viewInvoiceData as any).labor_total_cost).toFixed(2)}
+                          </td>
+                          <td className="border border-gray-300 p-1"></td>
+                        </tr>
+                      </>
+                    )}
                   </tbody>
                 </table>
                 <div className="flex justify-end mt-4">
                   <div className="text-right min-w-[220px] space-y-1">
-                    {typeof (viewInvoiceData as any).labor_total_cost === 'number' &&
-                      (viewInvoiceData as any).labor_total_cost > 0 && (
-                        <div className="flex justify-between mb-1">
-                          <span className="text-sm text-gray-700">Labor total cost:</span>
-                          <span className="text-sm text-gray-700">
-                            ${(viewInvoiceData as any).labor_total_cost.toFixed(2)}
-                          </span>
-                        </div>
-                      )}
                     <div className="flex justify-between mb-2">
                       <span className="text-sm text-gray-700">Payments / Credits:</span>
                       <span className="text-sm text-gray-700">
@@ -2012,7 +2026,7 @@ export const CustomInvoiceDialog = ({
             {!isViewMode && (
               <div className="border-t bg-gray-50 px-8 py-6">
                 <div className="flex items-center justify-between">
-                  <Button
+                  {/* <Button
                     variant="outline"
                     onClick={() => {
                       onOpenChange(false)
@@ -2022,7 +2036,7 @@ export const CustomInvoiceDialog = ({
                   >
                     <X className="h-4 w-4 mr-2" />
                     Cancel
-                  </Button>
+                  </Button> */}
                   <div className="flex gap-3">
                     {/* <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                       <Button
@@ -2057,14 +2071,14 @@ export const CustomInvoiceDialog = ({
             {isViewMode && (
               <div className="border-t bg-gray-50 px-8 py-6">
                 <div className="flex items-center justify-between">
-                  <Button
+                  {/* <Button
                     variant="outline"
                     onClick={() => onOpenChange(false)}
                     className="border-gray-300"
                   >
                     <X className="h-4 w-4 mr-2" />
                     Close
-                  </Button>
+                  </Button> */}
                   <div className="flex gap-3">
                     <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                       <Button

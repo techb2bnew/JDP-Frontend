@@ -2286,123 +2286,6 @@ export function ContractorListingPage() {
 
 
 
-  // Change order
-  const handleChangeOrderClick = (job: any, contractorId: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent job selection
-    setChangeOrderJob({
-      ...job,  // Store the entire job object
-      contractorId: contractorId,
-      originalId: job.id // Store original ID for reference
-    });
-    // Set default title as "Change Order - [Original Title]"
-    setChangeOrderTitle(`${''}`);
-    setChangeOrderEstimate(job.estimated_cost || job.estimatedCost || '');
-    setChangeOrderErrors({});
-    setShowChangeOrderModal(true);
-  };
-
-  const handleChangeOrderSave = async () => {
-    // Validate
-    const errors: Record<string, string> = {};
-    if (!changeOrderTitle.trim()) {
-      errors.title = 'Job title is required';
-    }
-
-    if (Object.keys(errors).length > 0) {
-      setChangeOrderErrors(errors);
-      return;
-    }
-
-    setIsUpdatingChangeOrder(true);
-    try {
-      // Original job data
-      const originalJob = changeOrderJob;
-
-      // Prepare payload for NEW JOB (Change Order)
-      // Copy most fields from original job but with new title
-      const payload: any = {
-        job_title: changeOrderTitle, // New title
-        job_type: originalJob.job_type || originalJob.type || 'service_based',
-        description: originalJob.description || '',
-        priority: originalJob.priority || 'medium',
-        address: originalJob.address || '',
-        city_zip: originalJob.city_zip || originalJob.cityZip || '',
-        phone: originalJob.phone || '',
-        email: originalJob.email || '',
-        bill_to_address: originalJob.bill_to_address || originalJob.billToAddress || '',
-        bill_to_city_zip: originalJob.bill_to_city_zip || originalJob.billToCityZip || '',
-        bill_to_phone: originalJob.bill_to_phone || originalJob.billToPhone || '',
-        bill_to_email: originalJob.bill_to_email || originalJob.billToEmail || '',
-        same_as_address: originalJob.same_as_address || originalJob.sameAsAddress || false,
-        due_date: originalJob.due_date || originalJob.dueDate || '',
-        // estimated_hours: originalJob.estimated_hours || originalJob.estimatedHours || 0, 
-        estimated_cost: Number(changeOrderEstimate),
-        status: 'pending', // New job starts as pending
-
-        // Copy assigned labor if exists
-        assigned_lead_labor_ids: originalJob.assigned_lead_labor_ids ||
-          (originalJob.assignedLeadLabor ? JSON.stringify(originalJob.assignedLeadLabor) : undefined),
-        assigned_labor_ids: originalJob.assigned_labor_ids ||
-          (originalJob.assignedLabor ? JSON.stringify(originalJob.assignedLabor) : undefined),
-
-      };
-
-      // Add customer_id or contractor_id based on job type
-      if (originalJob.job_type === 'service_based' || originalJob.type === 'service-based') {
-        payload.customer_id = originalJob.customer_id || originalJob.customer;
-      } else {
-        payload.contractor_id = originalJob.contractor_id || originalJob.contractor;
-      }
-
-      console.log('Creating change order with payload:', payload);
-
-      // Call API to CREATE NEW JOB (not update)
-      const response = await apiClient.createJob(payload); // Remove changeOrderJob.id
-      console.log('Change order creation response:', response);
-
-      // Get the newly created job from response
-      const newJob = response.data || response;
-
-      // Update Local State - Add the new job to the list
-      setCustomersWithJobs(prevCustomers => {
-        return prevCustomers.map(customer => {  
-          if (customer.id.toString() === changeOrderJob.customerId) {
-            // Add the new job to the customer's jobs list
-            const updatedJobs = [...(customer.jobs || [])];
-
-            // Check if this job should be a subjob of the original
-            // For now, add as a main job
-            updatedJobs.push({
-              ...newJob,
-              id: newJob.id,
-              job_title: changeOrderTitle,
-              estimated_cost: Number(changeOrderEstimate),
-              title: changeOrderTitle,
-              isChangeOrder: true,
-              originalJobId: originalJob.id
-            });
-
-            return {
-              ...customer,
-              jobs: updatedJobs
-            };
-          }
-          return customer;
-        });
-      });
-
-      toast.success('Change order created successfully!');
-      fetchContractorsData();
-      setShowChangeOrderModal(false);
-      setChangeOrderJob(null);
-      setChangeOrderTitle('');
-    } catch (error) {
-      console.error('Error creating change order:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to create change order');
-    } finally {
-      setIsUpdatingChangeOrder(false);
-    }
-  };
 
 
   const selectedContractorData = selectedContractor ? contractors.find(c => c.id.toString() === selectedContractor) : null
@@ -2875,7 +2758,7 @@ export function ContractorListingPage() {
                     open={isExpanded}
                     onOpenChange={() => toggleContractor(contractor.id.toString())}
                   >
-                    <CollapsibleTrigger asChild>
+                    <CollapsibleTrigger asChild className="border-b border-gray-200 pb-2 w-full">
                       <Button
                         variant="ghost"
                         className={`w-full justify-start p-3 text-left h-auto hover:bg-blue-50 ${isSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
@@ -2970,17 +2853,7 @@ export function ContractorListingPage() {
                                             </div>
                                           </div>
                                         </div>
-                                        <div onClick={(e) => e.stopPropagation()}>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            title='Change Order'
-                                            className="h-6  pl-2 pr-2 text-[10px] text-blue-600 hover:text-blue-800 bg-blue-100"
-                                            onClick={(e) => handleChangeOrderClick(job, contractor.id.toString(), e)}
-                                          >
-                                            Change Order
-                                          </Button>
-                                        </div>
+
                                       </div>
                                     </Button>
                                   </CollapsibleTrigger>
@@ -2991,12 +2864,12 @@ export function ContractorListingPage() {
                                         const isSubJobSelected = selectedSubJob === subJob.id.toString()
 
                                         return (
-                                          <div key={subJob.id} className="flex items-start mb-1">
+                                          <div key={subJob.id} className="flex items-center mb-1">
                                             <Minus className="h-3 w-3 text-primary/30 mt-1.5 mr-2" />
                                             <Button
                                               variant="ghost"
                                               className={`flex-1 justify-start p-1.5 text-left h-auto text-xs hover:bg-blue-50 border-l border-gray-200 pl-3 ${isSubJobSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
-                                              }`}
+                                                }`}
                                               onClick={() => selectSubJob(subJob.id.toString(), job.id.toString(), contractor.id.toString())}
                                             >
                                               <div className="flex items-center gap-2 w-full">
@@ -3011,6 +2884,12 @@ export function ContractorListingPage() {
                                                 </div>
                                               </div>
                                             </Button>
+                                            <div
+                                              title="Change Order"
+                                              className="h-4 rounded-md  pl-2 pr-2 text-[10px] text-blue-600 hover:text-blue-800 bg-blue-100 ml-1"
+                                            >
+                                              Change Order
+                                            </div>
                                           </div>
                                         )
                                       })}
@@ -3292,6 +3171,7 @@ export function ContractorListingPage() {
                         onBack={() => setSelectedSubJob(null)}
                         jobs={allJobs}
                         setJobs={handleSetJobs}
+                        onJobsRefresh={fetchContractorsData}
                       />
                     )
                   })
@@ -3380,6 +3260,7 @@ export function ContractorListingPage() {
                         onBack={() => setSelectedJob(null)}
                         jobs={allJobs}
                         setJobs={handleSetJobs}
+                        onJobsRefresh={fetchContractorsData}
                       />
                     )
                   })()
@@ -3433,102 +3314,6 @@ export function ContractorListingPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Change Order Modal */}
-      <Dialog open={showChangeOrderModal} onOpenChange={setShowChangeOrderModal}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Change Order</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            {/* Job ID Display */}
-            <div className="space-y-2">
-              <Label className="text-sm text-gray-500">Job ID</Label>
-              <div className="bg-gray-50 p-2 rounded-md border border-gray-200">
-                <p className="text-sm font-medium">{changeOrderJob?.id || 'N/A'}</p>
-              </div>
-            </div>
-
-            {/* New Job Title Input */}
-            <div className="space-y-2">
-              <Label htmlFor="changeOrderTitle" className="text-sm font-medium">
-                Job Title <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="changeOrderTitle"
-                value={changeOrderTitle}
-                onChange={(e) => {
-                  setChangeOrderTitle(e.target.value);
-                  if (changeOrderErrors.title) {
-                    setChangeOrderErrors({ ...changeOrderErrors, title: '' });
-                  }
-                }}
-                placeholder="Enter new job title"
-                className={changeOrderErrors.title ? 'border-red-500' : ''}
-                autoFocus
-              />
-              {changeOrderErrors.title && (
-                <p className="text-red-500 text-xs mt-1">{changeOrderErrors.title}</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="changeOrderEstimate" className="text-sm font-medium">
-                Estimate Amount ($) <span className="text-red-500">*</span>
-              </Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                <Input
-                  id="changeOrderEstimate"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={changeOrderEstimate}
-                  onChange={(e) => {
-                    setChangeOrderEstimate(e.target.value);
-                    if (changeOrderErrors.estimate) {
-                      setChangeOrderErrors({ ...changeOrderErrors, estimate: '' });
-                    }
-                  }}
-                  placeholder="0.00"
-                  className={`pl-7 ${changeOrderErrors.estimate ? 'border-red-500' : ''}`}
-                />
-              </div>
-              {changeOrderErrors.estimate && (
-                <p className="text-red-500 text-xs mt-1">{changeOrderErrors.estimate}</p>
-              )}
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowChangeOrderModal(false);
-                setChangeOrderJob(null);
-                setChangeOrderTitle('');
-                setChangeOrderErrors({});
-              }}
-              disabled={isUpdatingChangeOrder}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleChangeOrderSave}
-              disabled={isUpdatingChangeOrder || !changeOrderTitle.trim()}
-              className="bg-primary text-white hover:bg-primary/90"
-            >
-              {isUpdatingChangeOrder ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Submitting...
-                </>
-              ) : (
-                'Submit Change Order'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
 
       {/* Create Contract Modal */}
