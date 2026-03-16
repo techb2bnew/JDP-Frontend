@@ -891,7 +891,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
 
       await apiClient.updateJob(jobId, {
         job_title: updatedJob.title,
-        job_type: updatedJob.type === 'service-based' ? 'service_based' : 'contract_based',
+        job_type: updatedJob.type === 'service_based' ? 'service_based' : 'contract_based',
         ...(updatedJob.type === 'contract-based'
           ? { contractor_id: job.contractor ? Number(job.contractor) : undefined }
           : { customer_id: job.customer ? Number(job.customer?.id || job.customer) : undefined }
@@ -4037,7 +4037,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
       };
 
       // Add customer_id or contractor_id based on job type
-      if (originalJob.job_type === 'service_based' || originalJob.type === 'service-based') {
+      if (originalJob.job_type === 'service_based' || originalJob.type === 'service_based') {
         payload.customer_id = originalJob.customer_id || originalJob.customer;
       } else {
         payload.contractor_id = originalJob.contractor_id || originalJob.contractor;
