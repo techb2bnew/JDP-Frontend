@@ -785,9 +785,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
         : 'draft';
       const updatePayload = {
         job_title: editedJob.title,
-        job_type: editedJob.type === 'service-based' ? 'service_based' : 'contract_based',
+        job_type: editedJob.type === 'service_based' ? 'service_based' : 'contract_based',
         // Only send customer_id for service-based jobs, contractor_id for contract-based jobs
-        ...(editedJob.type === 'contract-based'
+        ...(editedJob.type === 'contract_based'
           ? { contractor_id: job.contractor ? Number(job.contractor) : undefined }
           : { customer_id: job.customer ? Number(job.customer?.id || job.customer) : undefined }
         ),
