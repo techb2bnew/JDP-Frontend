@@ -1159,6 +1159,29 @@ export const apiClient = {
 
     return response.json();
   },
+   getActivityLogsByJob: async (jobId: string) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const response = await fetch(`${apiBaseUrl}/job/getJobActivity/${jobId}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to fetch estimates by job");
+    }
+
+    return response.json();
+  },
 
   // Get All Timesheets
   getAllTimesheets: async () => {
