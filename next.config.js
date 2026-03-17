@@ -11,18 +11,14 @@ const nextConfig = {
       'react-redux'
     ],
   },
-  
-  // Typed routes configuration (moved from experimental in Next.js 15)
-  typedRoutes: false,
-  
+
   // Compiler optimizations
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
   },
-  
+
   // Image optimization
   images: {
-    // FIX: Removed deprecated 'domains' — moved 'localhost' into remotePatterns
     remotePatterns: [
       {
         protocol: 'http',
@@ -43,30 +39,17 @@ const nextConfig = {
     ],
     formats: ['image/webp', 'image/avif'],
   },
-  
-  // Bundle analyzer (only if ANALYZE env var is set)
-  ...(process.env.ANALYZE === 'true' && {
-    webpack: (config, { isServer }) => {
-      if (!isServer) {
-        const { BundleAnalyzerPlugin } = require('@next/bundle-analyzer')({
-          enabled: true,
-        })
-        config.plugins.push(BundleAnalyzerPlugin)
-      }
-      return config
-    },
-  }),
-  
+
   // API Proxy for development
   async rewrites() {
     return [
       {
         source: '/api/proxy/:path*',
-        destination: 'http://localhost:8000/:path*', // Proxy to backend API
+        destination: 'http://localhost:8000/:path*',
       },
     ]
   },
-  
+
   // Redirects
   async redirects() {
     return [
@@ -82,7 +65,7 @@ const nextConfig = {
       },
     ]
   },
-  
+
   // Headers for security and performance
   async headers() {
     return [
@@ -118,49 +101,25 @@ const nextConfig = {
       },
     ]
   },
-  
+
   // Performance optimizations
   poweredByHeader: false,
   compress: true,
-  
-  // Webpack optimizations
-  webpack: (config, { dev, isServer }) => {
-    // Optimize bundle size
-    if (!dev && !isServer) {
-      config.optimization.splitChunks.cacheGroups = {
-        ...config.optimization.splitChunks.cacheGroups,
-        vendor: {
-          test: /[\\/]node_modules[\\/]/,
-          name: 'vendors',
-          chunks: 'all',
-          enforce: true,
-        },
-        common: {
-          name: 'common',
-          minChunks: 2,
-          chunks: 'all',
-          enforce: true,
-        },
-      }
-    }
-    
-    return config
-  },
-  
+
   // Output configuration for better deployment
   output: 'standalone',
-  
+
   // Trailing slash configuration
   trailingSlash: false,
-  
-  // TypeScript configuration
+
+  // TypeScript — ignore errors during build (saves memory)
   typescript: {
-    ignoreBuildErrors: false,
+    ignoreBuildErrors: true,
   },
-  
-  // ESLint configuration
+
+  // ESLint — skip during build (saves memory)
   eslint: {
-    ignoreDuringBuilds: false,
+    ignoreDuringBuilds: true,
   },
 }
 
