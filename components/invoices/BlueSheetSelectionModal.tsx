@@ -377,8 +377,8 @@ export function BlueSheetSelectionModal({
                     <AlertDialogHeader>
                       <AlertDialogTitle>Invoice already submitted</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Selected BlueSheets are already marked as invoiced. Are you sure you want
-                        to submit an invoice again for these BlueSheets?
+                      One or more selected BlueSheets are already marked as invoiced. Are you sure you
+                      want to review and invoice these BlueSheets again?
                         {pendingSubmitSheets && (
                           <div className="mt-3 flex flex-wrap gap-2">
                             {pendingSubmitSheets
@@ -406,6 +406,7 @@ export function BlueSheetSelectionModal({
                         No
                       </AlertDialogCancel>
                       <AlertDialogAction
+                      className="bg-primary text-white hover:bg-primary/90"
                         onClick={() => {
                           if (pendingSubmitSheets && pendingSubmitSheets.length > 0) {
                             onSubmitSelected(pendingSubmitSheets)
