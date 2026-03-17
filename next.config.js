@@ -36,6 +36,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'jdp-backend.s3.us-east-2.amazonaws.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'jdp.nyc3.digitaloceanspaces.com',
+      },
     ],
     formats: ['image/webp', 'image/avif'],
   },

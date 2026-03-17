@@ -241,8 +241,9 @@ const getAvailabilityBadge = (availability: string) => {
       return;
     }
 
-    // Phone number validation (country-aware)
-    if (!isValidPhoneNumber(formData.phone || '')) {
+    // Phone number validation (length-based, allow more formats)
+    const phoneDigitsCreate = (formData.phone || '').replace(/\D/g, '');
+    if (phoneDigitsCreate.length < 7 || phoneDigitsCreate.length > 15) {
       const errors = { ...validationErrors, phone: 'Please enter a valid phone number' };
       setValidationErrors(errors);
       toast.error('Please enter a valid phone number');
@@ -258,11 +259,32 @@ const getAvailabilityBadge = (availability: string) => {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
+      // Normalize phone with "-" after country code for payload
+      const normalizePhoneForPayload = (raw: string): string => {
+        if (!raw) return ''
+        const digits = raw.replace(/[^\d+]/g, '')
+        if (!digits.startsWith('+')) return raw
+
+        // Special-case North America: +1XXXXXXXXXX -> +1-XXXXXXXXXX
+        if (digits.startsWith('+1') && digits.length > 2) {
+          const country = '1'
+          const rest = digits.slice(2)
+          return rest ? `+${country}-${rest}` : `+${country}`
+        }
+
+        // Other countries: treat 2–3 digits after "+" as country code (e.g. +91, +213)
+        const match = digits.match(/^\+(\d{2,3})(\d*)$/)
+        if (!match) return raw
+        const country = match[1]
+        const rest = match[2]
+        return rest ? `+${country}-${rest}` : `+${country}`
+      }
+
       // Prepare payload according to API requirements
       const payload = {
         full_name: formData.full_name,
         email: formData.email.toLowerCase(),
-        phone: formData.phone,
+        phone: normalizePhoneForPayload(formData.phone),
         dob: formData.dob,
         address: formData.address,
         date_of_joining: formData.date_of_joining,
@@ -355,8 +377,9 @@ const getAvailabilityBadge = (availability: string) => {
       return;
     }
 
-    // Phone number validation (country-aware)
-    if (!isValidPhoneNumber(formData.phone || '')) {
+    // Phone number validation (length-based, allow more formats)
+    const phoneDigitsUpdate = (formData.phone || '').replace(/\D/g, '');
+    if (phoneDigitsUpdate.length < 7 || phoneDigitsUpdate.length > 15) {
       const errors = { ...validationErrors, phone: 'Please enter a valid phone number' };
       setValidationErrors(errors);
       toast.error('Please enter a valid phone number');
@@ -372,11 +395,32 @@ const getAvailabilityBadge = (availability: string) => {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
+      // Normalize phone with "-" after country code for payload
+      const normalizePhoneForPayload = (raw: string): string => {
+        if (!raw) return ''
+        const digits = raw.replace(/[^\d+]/g, '')
+        if (!digits.startsWith('+')) return raw
+
+        // Special-case North America: +1XXXXXXXXXX -> +1-XXXXXXXXXX
+        if (digits.startsWith('+1') && digits.length > 2) {
+          const country = '1'
+          const rest = digits.slice(2)
+          return rest ? `+${country}-${rest}` : `+${country}`
+        }
+
+        // Other countries: treat 2–3 digits after "+" as country code (e.g. +91, +213)
+        const match = digits.match(/^\+(\d{2,3})(\d*)$/)
+        if (!match) return raw
+        const country = match[1]
+        const rest = match[2]
+        return rest ? `+${country}-${rest}` : `+${country}`
+      }
+
       // Prepare payload according to API requirements
       const payload = {
         full_name: formData.full_name,
         email: formData.email.toLowerCase(),
-        phone: formData.phone,
+        phone: normalizePhoneForPayload(formData.phone),
         dob: formData.dob,
         address: formData.address,
         date_of_joining: formData.date_of_joining,
