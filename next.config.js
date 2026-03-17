@@ -22,8 +22,12 @@ const nextConfig = {
   
   // Image optimization
   images: {
-    domains: ['localhost'],
+    // FIX: Removed deprecated 'domains' — moved 'localhost' into remotePatterns
     remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+      },
       {
         protocol: 'https',
         hostname: 'unsplash.com',
@@ -151,13 +155,11 @@ const nextConfig = {
   
   // TypeScript configuration
   typescript: {
-    // Ignore type errors during build (not recommended for production)
     ignoreBuildErrors: false,
   },
   
   // ESLint configuration
   eslint: {
-    // Run ESLint during build
     ignoreDuringBuilds: false,
   },
 }
