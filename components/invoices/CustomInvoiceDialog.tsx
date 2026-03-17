@@ -173,6 +173,8 @@ export const CustomInvoiceDialog = ({
       notes: blueSheet.notes || '',
       service_type: job.job_type,
       products,
+      // allow upstream caller to pass custom_products (e.g. parsed from email)
+      custom_products: (blueSheet as any).custom_products ?? undefined,
       estimate_date: new Date().toISOString().split('T')[0],
       customer_id: customerId != null ? Number(customerId) : undefined,
       contractor_id: contractorId != null ? Number(contractorId) : undefined,
@@ -382,21 +384,27 @@ export const CustomInvoiceDialog = ({
                 viewInvoiceData.invoice_type === 'proposal_invoice' ? 'Rough Invoice' :
                   viewInvoiceData.invoice_type === 'progressive_invoice' ? 'Progressive Invoice' :
                     viewInvoiceData.invoice_type === 'final_invoice' ? 'Final Invoice' : 'Estimate',
-            lineItems: viewInvoiceData.products?.map((product: any, index: number) => ({
-              id: `item-${index}`,
-              productId: product.id,
-              qty: product.stock_quantity || 1,
-              item: product.product_name || '',
-              description: product.description,
-              rate: product.jdp_price || product.unit_cost || 0,
-              estimatedPrice: product.estimated_price || 0,
-              total: product.total_cost || 0,
-              searchQuery: '',
-              showSearchResults: false,
-              supplierId: product.supplier_id || 1,
-              // only treat true as custom (labor hours line); materials default false
-              is_custom: product.isCustomProduct === true
-            })) || [{
+            // Prefer custom_products (new API, not typed) and fall back to products (old API)
+            lineItems: (((viewInvoiceData as any).custom_products) ?? viewInvoiceData.products)?.map((product: any, index: number) => {
+              const qty = Number(product.stock_quantity) || 1
+              const rate = Number(product.jdp_price || product.unit_cost || product.estimated_price || product.total_cost || 0)
+              const total = Number(product.total_cost || rate * qty || 0)
+              return {
+                id: `item-${index}`,
+                productId: product.id,
+                qty,
+                item: product.product_name || product.name || '',
+                description: product.description || '',
+                rate,
+                estimatedPrice: Number(product.estimated_price || 0),
+                total,
+                searchQuery: '',
+                showSearchResults: false,
+                supplierId: product.supplier_id || 1,
+                // backend flag is is_custom; keep boolean and map to frontend key
+                isCustomProduct: product.is_custom === true
+              }
+            }) || [{
               id: Math.random().toString(36).substring(2, 9),
               productId: null,
               qty: 1,
@@ -470,7 +478,7 @@ export const CustomInvoiceDialog = ({
   }
 
   // Send invoice to customer function
-  const sendInvoiceToCustomer = async (invoiceId: number) => {
+  const sendInvoiceToCustomer = async (invoiceId: number, lineItemsOverride?: { qty: number; item: string; description: string; rate: number; total: number }[]) => {
     try {
       // CustomInvoiceDialog: always use viewInvoiceData (from blueSheet) for customer_id/contractor_id
       let customerId: number | null = null;
@@ -514,24 +522,92 @@ export const CustomInvoiceDialog = ({
       // Get customer email - CustomInvoiceDialog always has viewInvoiceData from blueSheet
       let customerEmail = viewInvoiceData?.customer?.email || viewInvoiceData?.email_address || currentJob?.email || 'customer@example.com';
 
+      // For email payload, build line items with this priority:
+      // 1) explicit override from caller (built from customProducts in handlePreviewAndSend)
+      // 2) viewInvoiceData.custom_products (when dialog opened from existing estimate)
+      // 3) inlineInvoiceData.lineItems as last fallback
+      let lineItemsSource: { qty: number; item: string; description: string; rate: number; total: number }[] = []
+      console.log('lineItemsOverride:11111111111', lineItemsOverride)
+      if (lineItemsOverride && lineItemsOverride.length > 0) {
+        lineItemsSource = lineItemsOverride
+      } else {
+        const customProducts = (viewInvoiceData as any)?.custom_products as any[] | undefined
+        console.log('customProducts:11111111111', customProducts)
+        if (customProducts && customProducts.length > 0) {
+          lineItemsSource = customProducts.map((p: any) => {
+            const qty = Number(p.stock_quantity) || 1
+            const rate = Number(p.jdp_price || p.unit_cost || p.estimated_price || p.total_cost || 0)
+            const total = Number(p.total_cost || rate * qty || 0)
+            return {
+              qty,
+              item: p.product_name || p.name || '',
+              description: p.description || '',
+              rate,
+              total,
+            }
+          })
+        } else {
+          lineItemsSource = inlineInvoiceData.lineItems.map((item) => ({
+            qty: item.qty,
+            item: item.item || '',
+            description: item.description || '',
+            rate: item.rate || 0,
+            total: item.total || 0,
+          }))
+        }
+      }
+
       const payload: any = {
-        estimateNumber: inlineInvoiceData.estimateNumber || 'Draft',
-        estimateDate: new Date(inlineInvoiceData.date).toLocaleDateString('en-US', {
-          month: '2-digit',
-          day: '2-digit',
-          year: 'numeric'
-        }),
-        customerName: inlineInvoiceData.customerName || 'Customer',
+        estimateNumber: inlineInvoiceData.estimateNumber || viewInvoiceData?.invoice_number || 'Draft',
+        estimateDate: new Date(inlineInvoiceData.date || viewInvoiceData?.estimate_date || new Date().toISOString())
+          .toLocaleDateString('en-US', {
+            month: '2-digit',
+            day: '2-digit',
+            year: 'numeric'
+          }),
+        customerName:
+          inlineInvoiceData.customerName ||
+          viewInvoiceData?.contractor?.contractor_name ||
+          viewInvoiceData?.customer?.customer_name ||
+          'Customer',
         customerEmail: customerEmail,
-        customerAddress: inlineInvoiceData.customerAddress || '',
-        billToAddress: inlineInvoiceData.billToAddressEnabled ? inlineInvoiceData.billToAddress || '' : '',
-        poNumber: inlineInvoiceData.poNumber || '',
-        project: inlineInvoiceData.project || '',
-        rep: inlineInvoiceData.rep || '',
-        dueDate: inlineInvoiceData.dueDate || '',
-        paymentCredits: inlineInvoiceData.paymentCredits || 0,
-        balanceDue: inlineInvoiceData.balanceDue || '',
-        lineItems: inlineInvoiceData.lineItems.map(item => ({
+        customerAddress:
+          inlineInvoiceData.customerAddress ||
+          viewInvoiceData?.contractor?.address ||
+          viewInvoiceData?.customer?.address ||
+          '',
+        billToAddress: inlineInvoiceData.billToAddressEnabled
+          ? (inlineInvoiceData.billToAddress ||
+            viewInvoiceData?.bill_to_address ||
+            inlineInvoiceData.customerAddress ||
+            '')
+          : '',
+        poNumber: inlineInvoiceData.poNumber || viewInvoiceData?.po_number || '',
+        project:
+          inlineInvoiceData.project ||
+          viewInvoiceData?.estimate_title ||
+          currentJob?.title ||
+          blueSheet?.job?.job_title ||
+          '',
+        rep: inlineInvoiceData.rep || viewInvoiceData?.rep || '',
+        // If no explicit due date, default to issue date + 14 days
+        dueDate: inlineInvoiceData.dueDate ||
+          viewInvoiceData?.due_date ||
+          (() => {
+            const base = new Date(inlineInvoiceData.date || viewInvoiceData?.estimate_date || new Date().toISOString())
+            base.setDate(base.getDate() + 14)
+            return base.toISOString().split('T')[0]
+          })(),
+        paymentCredits: inlineInvoiceData.paymentCredits || viewInvoiceData?.payment_credits || 0,
+        // If no explicit balance due from UI or source, compute from subtotal - paymentCredits
+        balanceDue:
+          inlineInvoiceData.balanceDue ||
+          viewInvoiceData?.balance_due ||
+          String(
+            (lineItemsSource.reduce((sum, i) => sum + (Number(i.total) || 0), 0) -
+              (inlineInvoiceData.paymentCredits || viewInvoiceData?.payment_credits || 0)).toFixed(2)
+          ),
+        lineItems: lineItemsSource.map(item => ({
           qty: item.qty,
           item: item.item,
           description: item.description,
@@ -553,7 +629,7 @@ export const CustomInvoiceDialog = ({
       }
 
       console.log('Sending invoice to customer with ID:', invoiceId)
-      console.log('Payload:', payload)
+      console.log('Payload:11111111111', payload)
       console.log('isContractBased:', isContractBased, 'customerId:', customerId, 'contractorId:', contractorId)
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/invoices/sendInvoiceToCustomer/${invoiceId}`, {
@@ -1141,15 +1217,28 @@ export const CustomInvoiceDialog = ({
       const response = await apiClient.createEstimate(payload as any)
       toast.success('Invoice created successfully!')
 
-      // Send invoice to customer using estimate ID
-      await sendInvoiceToCustomer(response.data.id)
+      // Build line items for email from the same customProducts we just sent to backend
+      const emailLineItems = customProducts.map(p => ({
+        qty: p.stock_quantity || 1,
+        item: p.product_name || '',
+        description: p.description || '',
+        rate: p.jdp_price || p.unit_cost || 0,
+        total: p.total_cost || 0,
+      }))
+
+      // Send invoice to customer using estimate ID, with full material lines
+      await sendInvoiceToCustomer(response.data.id, emailLineItems)
 
       // Refresh the estimates list
       if (onInvoiceSaved) {
         onInvoiceSaved(payload)
       }
 
+      // Close this dialog and parent (BlueSheetApprovalDialog) via onDone
       onOpenChange(false)
+      if (onDone) {
+        onDone()
+      }
 
       // Reset form
       setInlineInvoiceData({

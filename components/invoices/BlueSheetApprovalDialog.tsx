@@ -271,13 +271,24 @@ export function BlueSheetApprovalDialog({
     const newMaterials = [...editedBlueSheet.material_entries]
     const currentMaterial = newMaterials[index]
 
-    const totalOrdered = currentMaterial.total_ordered || 1
+    // Default quantity to 1 when selecting a product if it's missing or zero.
+    // The UI quantity column uses material_used, so make sure that is set.
+    const qty =
+      (currentMaterial.material_used && currentMaterial.material_used > 0
+        ? currentMaterial.material_used
+        : null) ??
+      (currentMaterial.total_ordered && currentMaterial.total_ordered > 0
+        ? currentMaterial.total_ordered
+        : 1)
+
     const unitCost = product.jdp_price || product.unit_cost || 0
-    const totalCost = totalOrdered * unitCost
+    const totalCost = qty * unitCost
 
     newMaterials[index] = {
       ...currentMaterial,
       material_name: product.product_name,
+      material_used: qty,
+      total_ordered: qty,
       unit_cost: unitCost,
       total_cost: totalCost,
       product_id: Number(product.id),                          // ✅ primary field
@@ -1826,8 +1837,12 @@ export function BlueSheetApprovalDialog({
                         </Button>
                         <Button 
                           onClick={async () => {
-                            if (previewAndSendRef.current) {
+                            if (!previewAndSendRef.current) return
+                            try {
+                              setIsApprovingCustomer(true)
                               await previewAndSendRef.current()
+                            } finally {
+                              setIsApprovingCustomer(false)
                             }
                           }}
                           disabled={isApproving || isApprovingCustomer}
@@ -1835,7 +1850,7 @@ export function BlueSheetApprovalDialog({
                           size="lg"
                         >
                           <Send className="h-4 w-4" />
-                          {isApproving ? 'Approving...' : 'Send Invoice Directly'}
+                          {isApprovingCustomer ? 'Approving...' : 'Send Invoice Directly'}
                         </Button>
                       </div>
                     </div>
