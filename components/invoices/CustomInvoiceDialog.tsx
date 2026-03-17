@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -262,6 +262,12 @@ export const CustomInvoiceDialog = ({
   const [selectedJob, setSelectedJob] = useState<any>(null)
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
 
+  // Refs to ensure we always read the latest typed values from the inputs
+  const dueDateRef = useRef<HTMLInputElement | null>(null)
+  const balanceDueRef = useRef<HTMLInputElement | null>(null)
+  const repRef = useRef<HTMLInputElement | null>(null)
+  const paymentCreditsRef = useRef<HTMLInputElement | null>(null)
+
   const currentJob = selectedJob || jobs?.find((j: any) => j.id === jobId)
 
   // Inline Invoice Data State
@@ -302,6 +308,10 @@ export const CustomInvoiceDialog = ({
     estimateTotal: 0,
     paymentHistory: [] as any[]
   }) 
+
+ useEffect(() => {
+  console.log('inlineInvoiceData:11111111111', inlineInvoiceData)
+ }, [inlineInvoiceData])
   // Update form when job is provided
   useEffect(() => {
     if (currentJob) {
@@ -375,9 +385,18 @@ export const CustomInvoiceDialog = ({
             project: project,
             jobId: viewInvoiceData.job_id || '',
             rep: viewInvoiceData.rep || '',
-            dueDate: viewInvoiceData.due_date || '',
-            paymentCredits: viewInvoiceData.payment_credits || 0,
-            balanceDue: viewInvoiceData.balance_due || '',
+            // Preserve user-edited values; only fall back to viewInvoiceData/defaults
+            dueDate: prev.dueDate ||
+              viewInvoiceData.due_date ||
+              '',
+            paymentCredits:
+              prev.paymentCredits !== undefined && prev.paymentCredits !== null
+                ? prev.paymentCredits
+                : (viewInvoiceData.payment_credits || 0),
+            balanceDue:
+              prev.balanceDue !== '' && prev.balanceDue != null
+                ? prev.balanceDue
+                : (viewInvoiceData.balance_due || ''),
             notes: viewInvoiceData.notes || 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
             invoiceType: viewInvoiceData.invoice_type === 'estimate' ? 'Estimate' :
               viewInvoiceData.invoice_type === 'down_payment' ? 'Downpayment Invoice' :
@@ -477,185 +496,7 @@ export const CustomInvoiceDialog = ({
     return inlineInvoiceData.lineItems.reduce((sum, item) => sum + item.total, 0)
   }
 
-  // Send invoice to customer function
-  const sendInvoiceToCustomer = async (invoiceId: number, lineItemsOverride?: { qty: number; item: string; description: string; rate: number; total: number }[]) => {
-    try {
-      // CustomInvoiceDialog: always use viewInvoiceData (from blueSheet) for customer_id/contractor_id
-      let customerId: number | null = null;
-      let contractorId: number | null = null;
-      let isContractBased = false;
-      if (viewInvoiceData) {
-        isContractBased = viewInvoiceData.service_type === 'contract_based' ||
-          viewInvoiceData.job?.job_type === 'contract_based' ||
-          (viewInvoiceData.contractor_id != null);
-        customerId = viewInvoiceData.customer_id != null ? Number(viewInvoiceData.customer_id) : viewInvoiceData.customer?.id != null ? Number(viewInvoiceData.customer.id) : null;
-        contractorId = viewInvoiceData.contractor_id != null ? Number(viewInvoiceData.contractor_id) : viewInvoiceData.contractor?.id != null ? Number(viewInvoiceData.contractor.id) : null;
-      }
-      if (!customerId && !contractorId) {
-        toast.error('Customer/Contractor ID is missing. Cannot send invoice.');
-        return;
-      }
-
-      // Get token properly
-      const getAuthToken = (): string | null => {
-        if (typeof window !== "undefined") {
-          const savedAuth = localStorage.getItem("jdp_auth");
-          if (savedAuth) {
-            try {
-              const authData = JSON.parse(savedAuth);
-              if (authData.token && authData.expires > Date.now()) {
-                return authData.token;
-              }
-            } catch (error) {
-              console.error("Error parsing auth data:", error);
-            }
-          }
-        }
-        return null;
-      };
-
-      const token = getAuthToken()
-      if (!token) {
-        throw new Error('No authentication token found')
-      }
-
-      // Get customer email - CustomInvoiceDialog always has viewInvoiceData from blueSheet
-      let customerEmail = viewInvoiceData?.customer?.email || viewInvoiceData?.email_address || currentJob?.email || 'customer@example.com';
-
-      // For email payload, build line items with this priority:
-      // 1) explicit override from caller (built from customProducts in handlePreviewAndSend)
-      // 2) viewInvoiceData.custom_products (when dialog opened from existing estimate)
-      // 3) inlineInvoiceData.lineItems as last fallback
-      let lineItemsSource: { qty: number; item: string; description: string; rate: number; total: number }[] = []
-      console.log('lineItemsOverride:11111111111', lineItemsOverride)
-      if (lineItemsOverride && lineItemsOverride.length > 0) {
-        lineItemsSource = lineItemsOverride
-      } else {
-        const customProducts = (viewInvoiceData as any)?.custom_products as any[] | undefined
-        console.log('customProducts:11111111111', customProducts)
-        if (customProducts && customProducts.length > 0) {
-          lineItemsSource = customProducts.map((p: any) => {
-            const qty = Number(p.stock_quantity) || 1
-            const rate = Number(p.jdp_price || p.unit_cost || p.estimated_price || p.total_cost || 0)
-            const total = Number(p.total_cost || rate * qty || 0)
-            return {
-              qty,
-              item: p.product_name || p.name || '',
-              description: p.description || '',
-              rate,
-              total,
-            }
-          })
-        } else {
-          lineItemsSource = inlineInvoiceData.lineItems.map((item) => ({
-            qty: item.qty,
-            item: item.item || '',
-            description: item.description || '',
-            rate: item.rate || 0,
-            total: item.total || 0,
-          }))
-        }
-      }
-
-      const payload: any = {
-        estimateNumber: inlineInvoiceData.estimateNumber || viewInvoiceData?.invoice_number || 'Draft',
-        estimateDate: new Date(inlineInvoiceData.date || viewInvoiceData?.estimate_date || new Date().toISOString())
-          .toLocaleDateString('en-US', {
-            month: '2-digit',
-            day: '2-digit',
-            year: 'numeric'
-          }),
-        customerName:
-          inlineInvoiceData.customerName ||
-          viewInvoiceData?.contractor?.contractor_name ||
-          viewInvoiceData?.customer?.customer_name ||
-          'Customer',
-        customerEmail: customerEmail,
-        customerAddress:
-          inlineInvoiceData.customerAddress ||
-          viewInvoiceData?.contractor?.address ||
-          viewInvoiceData?.customer?.address ||
-          '',
-        billToAddress: inlineInvoiceData.billToAddressEnabled
-          ? (inlineInvoiceData.billToAddress ||
-            viewInvoiceData?.bill_to_address ||
-            inlineInvoiceData.customerAddress ||
-            '')
-          : '',
-        poNumber: inlineInvoiceData.poNumber || viewInvoiceData?.po_number || '',
-        project:
-          inlineInvoiceData.project ||
-          viewInvoiceData?.estimate_title ||
-          currentJob?.title ||
-          blueSheet?.job?.job_title ||
-          '',
-        rep: inlineInvoiceData.rep || viewInvoiceData?.rep || '',
-        // If no explicit due date, default to issue date + 14 days
-        dueDate: inlineInvoiceData.dueDate ||
-          viewInvoiceData?.due_date ||
-          (() => {
-            const base = new Date(inlineInvoiceData.date || viewInvoiceData?.estimate_date || new Date().toISOString())
-            base.setDate(base.getDate() + 14)
-            return base.toISOString().split('T')[0]
-          })(),
-        paymentCredits: inlineInvoiceData.paymentCredits || viewInvoiceData?.payment_credits || 0,
-        // If no explicit balance due from UI or source, compute from subtotal - paymentCredits
-        balanceDue:
-          inlineInvoiceData.balanceDue ||
-          viewInvoiceData?.balance_due ||
-          String(
-            (lineItemsSource.reduce((sum, i) => sum + (Number(i.total) || 0), 0) -
-              (inlineInvoiceData.paymentCredits || viewInvoiceData?.payment_credits || 0)).toFixed(2)
-          ),
-        lineItems: lineItemsSource.map(item => ({
-          qty: item.qty,
-          item: item.item,
-          description: item.description,
-          rate: item.rate,
-          total: item.total
-        })),
-        notes: inlineInvoiceData.notes || '',
-        signatureText: inlineInvoiceData.signatureText || '',
-        invoiceType: inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType,
-        subtotal: calculateInvoiceSubtotal(),
-        total: calculateInvoiceSubtotal()
-      }
-
-      // Add customer_id or contractor_id based on job type
-      if (isContractBased && contractorId) {
-        payload.contractor_id = contractorId;
-      } else if (customerId) {
-        payload.customer_id = customerId;
-      }
-
-      console.log('Sending invoice to customer with ID:', invoiceId)
-      console.log('Payload:11111111111', payload)
-      console.log('isContractBased:', isContractBased, 'customerId:', customerId, 'contractorId:', contractorId)
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/invoices/sendInvoiceToCustomer/${invoiceId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      })
-
-      console.log('Response status:', response.status)
-      console.log('Response:', response)
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Error response:', errorText)
-        throw new Error(`Failed to send invoice to customer: ${response.status}`)
-      }
-
-      toast.success('Invoice sent successfully to customer!')
-    } catch (error) {
-      console.error('Error sending invoice to customer:', error)
-      toast.error(`Failed to send invoice to customer: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    }
-  }
+  
 
   const updateInvoiceLineItem = (itemId: string, field: string, value: any) => {
     setInlineInvoiceData(prev => ({
@@ -849,239 +690,39 @@ export const CustomInvoiceDialog = ({
     }
   }
 
-  const handleJobSelection = (jobId: string) => {
-    const job = jobsList.find((j: any) => j.id === jobId)
-    if (job) {
-      setSelectedJob(job)
-
-      // Determine if it's contract-based
-      const isContractBased = job.type === 'contract_based' || job.type === 'contract-based';
-
-      // Get customer/contractor name and address
-      let customerName = '';
-      let customerAddress = '';
-
-      if (isContractBased) {
-        customerName = job.contractorName ||
-          job.contractor?.contractor_name ||
-          job.contractor?.name ||
-          job.contractor?.full_name ||
-          '';
-        customerAddress = job.contractorAddress ||
-          job.contractor?.address ||
-          job.location ||
-          job.address ||
-          '';
-      } else {
-        customerName = job.customerName ||
-          job.customer?.customer_name ||
-          job.customer?.name ||
-          '';
-        customerAddress = job.location ||
-          job.address ||
-          job.customer?.address ||
-          '';
-      }
-
-      setInlineInvoiceData(prev => ({
-        ...prev,
-        jobId: job.id,
-        customerName: customerName,
-        customerAddress: customerAddress,
-        billToAddress: job.billToAddress || '',
-        project: job.title || ''
-      }))
-
-      console.log('Selected job:', job);
-      console.log('isContractBased:', isContractBased);
-      console.log('customerName:', customerName);
-      console.log('customerAddress:', customerAddress);
-      console.log('Updated inlineInvoiceData:', {
-        jobId: job.id,
-        customerName: customerName,
-        customerAddress: customerAddress,
-        project: job.title
-      });
-    }
-  }
-
-  const handleSaveInvoiceAsDraft = async () => {
-    // Validation
-    const errors: Record<string, string> = {}
-
-    // Ensure project uses job title as fallback
-    const effectiveProject = inlineInvoiceData.project || blueSheet?.job?.job_title || ''
-    if (!effectiveProject) {
-      errors.project = 'Project field is required'
-    } else if (!inlineInvoiceData.project) {
-      // Sync state so field is no longer logically empty
-      setInlineInvoiceData(prev => ({ ...prev, project: effectiveProject }))
-    }
-
-    if (inlineInvoiceData.lineItems.length === 0 || !inlineInvoiceData.lineItems[0].item) {
-      errors.lineItems = 'Please add at least one product item'
-    }
-    console.log(inlineInvoiceData.jobId, 'inlineInvoiceData.jobId')
-
-    if (Object.keys(errors).length > 0) {
-      setValidationErrors(errors)
-      toast.error('Please fix the validation errors')
-      return
-    }
-    setValidationErrors({})
-    setSavingDraft(true)
-    try {
-      const subtotal = calculateInvoiceSubtotal()
-
-      const customProducts = inlineInvoiceData.lineItems.map(item => {
-        const base: any = {
-          product_name: item.item,
-          description: item.description || '',
-          supplier_id: item.supplierId || selectedSupplierId || 1,
-          supplier_sku: item.item.substring(0, 10),
-          jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          stock_quantity: item.qty,
-          unit: 'unit',
-          job_id: Number(inlineInvoiceData.jobId),
-          unit_cost: item.rate,
-          jdp_price: item.rate,
-          estimated_price: item.estimatedPrice || 0,
-          total_cost: item.total,
-        }
-        // Only send is_custom flag for Labor total hours line
-        if (typeof item.item === 'string' && item.item.startsWith('Labor total cost')) {
-          base.is_custom = true
-        }
-        return base
-      })
-
-      // Also add a dedicated custom product for total labor cost (from BlueSheet labor entries)
-      if (laborEntriesTotalFromBlueSheet > 0) {
-        customProducts.push({
-          product_name: 'Labor total cost',
-          description: 'Total labor cost from BlueSheet labor entries',
-          supplier_id: selectedSupplierId || 1,
-          supplier_sku: 'LABOR_TOTAL',
-          jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          stock_quantity: 1,
-          unit: 'unit',
-          job_id: Number(inlineInvoiceData.jobId),
-          unit_cost: laborEntriesTotalFromBlueSheet,
-          jdp_price: laborEntriesTotalFromBlueSheet,
-          estimated_price: laborEntriesTotalFromBlueSheet,
-          total_cost: laborEntriesTotalFromBlueSheet,
-          is_custom: true,
-        })
-      }
-
-      // CustomInvoiceDialog: always use viewInvoiceData (from blueSheet) for customer_id/contractor_id
-      let customerId: number | null = null;
-      let contractorId: number | null = null;
-      let isContractBased = false;
-      if (viewInvoiceData) {
-        isContractBased = viewInvoiceData.service_type === 'contract_based' ||
-          viewInvoiceData.job?.job_type === 'contract_based' || (viewInvoiceData.contractor_id != null);
-        customerId = viewInvoiceData.customer_id != null ? Number(viewInvoiceData.customer_id) : viewInvoiceData.customer?.id != null ? Number(viewInvoiceData.customer.id) : null;
-        contractorId = viewInvoiceData.contractor_id != null ? Number(viewInvoiceData.contractor_id) : viewInvoiceData.contractor?.id != null ? Number(viewInvoiceData.contractor.id) : null;
-      }
-      const payload: any = {
-        job_id: Number(inlineInvoiceData.jobId),
-        estimate_title: inlineInvoiceData.project || currentJob?.title,
-        priority: 'medium' as 'low' | 'medium' | 'high',
-        service_type: isContractBased ? 'contract_based' : 'service_based',
-        email_address: currentJob?.email || 'customer@example.com',
-        estimate_date: inlineInvoiceData.date,
-        po_number: inlineInvoiceData.poNumber || '',
-        rep: inlineInvoiceData.rep || '',
-        due_date: inlineInvoiceData.dueDate || '',
-        payment_credits: inlineInvoiceData.paymentCredits || 0,
-        balance_due: inlineInvoiceData.balanceDue || '',
-        bill_to_address: inlineInvoiceData.billToAddressEnabled ? inlineInvoiceData.billToAddress || '' : '',
-        notes: inlineInvoiceData.notes || '',
-        status: 'draft',
-        invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
-        custom_products: customProducts
-      }
-      if (isContractBased && contractorId) payload.contractor_id = contractorId;
-      if (customerId) payload.customer_id = customerId;
-
-      console.log('Draft invoice payload with IDs:', {
-        customer_id: payload.customer_id,
-        contractor_id: payload.contractor_id,
-        isContractBased: isContractBased
-      });
-
-      await apiClient.createEstimate(payload as any)
-      toast.success('Invoice saved as draft!')
-
-      // Refresh the estimates list
-      if (onInvoiceSaved) {
-        onInvoiceSaved(payload)
-      }
-
-      onOpenChange(false)
-      if (onDone) {
-        onDone()
-      }
-
-      // Reset form
-      setInlineInvoiceData({
-        date: new Date().toISOString().split('T')[0],
-        estimateNumber: '',
-        customerName: '',
-        customerAddress: '',
-        billToAddress: '',
-        billToAddressEnabled: true,
-        poNumber: '',
-        project: '',
-        jobId: jobId || '',
-        rep: '',
-        dueDate: '',
-        paymentCredits: 0,
-        balanceDue: '',
-        lineItems: [{
-          id: Math.random().toString(36).substring(2, 9),
-          productId: null,
-          qty: 1,
-          item: '',
-          description: '',
-          rate: 0,
-          estimatedPrice: 0,
-          total: 0,
-          searchQuery: '',
-          showSearchResults: false,
-          supplierId: 1,
-          isCustomProduct: false
-        }],
-        notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
-        signatureText: 'ACCEPTED BY________________DATE_____',
-        invoiceType: 'Estimate',
-        customInvoiceType: '',
-        paymentPercentage: 0,
-        estimateTotal: 0,
-        paymentHistory: []
-      })
-      setSelectedJob(null)
-      setValidationErrors({})
-    } catch (error) {
-      console.error('Error saving invoice:', error)
-      toast.error('Failed to save invoice')
-    } finally {
-      setSavingDraft(false)
-    }
-  }
+   
 
   const handlePreviewAndSend = async () => {
     // Validation
     const errors: Record<string, string> = {}
-
+    
     // Ensure project uses job title as fallback
     const effectiveProject = inlineInvoiceData.project || blueSheet?.job?.job_title || ''
+    console.log('effectiveProject:11111111111', effectiveProject)
     if (!effectiveProject) {
       errors.project = 'Project field is required'
-    } else if (!inlineInvoiceData.project) {
-      setInlineInvoiceData(prev => ({ ...prev, project: effectiveProject }))
     }
+
+    // Read the very latest values from inputs (in case state is slightly behind)
+    const latestDueDate = dueDateRef.current?.value ?? inlineInvoiceData.dueDate
+    const latestBalanceDue = balanceDueRef.current?.value ?? inlineInvoiceData.balanceDue
+    const latestRep = repRef.current?.value ?? inlineInvoiceData.rep
+    const latestPaymentCreditsRaw = paymentCreditsRef.current?.value
+    const latestPaymentCredits =
+      latestPaymentCreditsRaw !== undefined && latestPaymentCreditsRaw !== null && latestPaymentCreditsRaw !== ''
+        ? parseFloat(latestPaymentCreditsRaw) || 0
+        : inlineInvoiceData.paymentCredits
+    // Use an "effective" invoice data snapshot so we don't depend on async state updates
+    const effectiveInlineInvoiceData = {
+      ...inlineInvoiceData,
+      project: effectiveProject || inlineInvoiceData.project || '',
+      dueDate: latestDueDate,
+      balanceDue: latestBalanceDue,
+      rep: latestRep,
+      paymentCredits: latestPaymentCredits,
+    }
+
+    console.log('effectiveInlineInvoiceData?>>>', effectiveInlineInvoiceData)
 
     // Consider either explicit invoice line items OR existing BlueSheet materials as valid "items"
     const hasInvoiceLineItems =
@@ -1110,7 +751,7 @@ export const CustomInvoiceDialog = ({
 
       // Build customProducts from either explicit invoice line items (with item filled)
       // or, if none, from existing BlueSheet material entries so products are not empty.
-      const nonEmptyLineItems = inlineInvoiceData.lineItems.filter(item => !!item.item)
+      const nonEmptyLineItems = effectiveInlineInvoiceData.lineItems.filter(item => !!item.item)
 
       let customProducts: any[]
       if (nonEmptyLineItems.length > 0) {
@@ -1123,7 +764,7 @@ export const CustomInvoiceDialog = ({
             jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             stock_quantity: item.qty,
             unit: 'unit',
-            job_id: Number(inlineInvoiceData.jobId),
+            job_id: Number(effectiveInlineInvoiceData.jobId),
             unit_cost: item.rate,
             jdp_price: item.rate,
             estimated_price: item.estimatedPrice || 0,
@@ -1145,7 +786,7 @@ export const CustomInvoiceDialog = ({
           jdp_sku: m.product?.jdp_sku || `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
           stock_quantity: m.material_used || m.total_ordered || 1,
           unit: m.unit || 'unit',
-          job_id: Number(inlineInvoiceData.jobId),
+          job_id: Number(effectiveInlineInvoiceData.jobId),
           unit_cost: m.unit_cost || 0,
           jdp_price: m.unit_cost || 0,
           estimated_price: m.unit_cost || 0,
@@ -1163,7 +804,7 @@ export const CustomInvoiceDialog = ({
           jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
           stock_quantity: 1,
           unit: 'unit',
-          job_id: Number(inlineInvoiceData.jobId),
+          job_id: Number(effectiveInlineInvoiceData.jobId),
           unit_cost: laborEntriesTotalFromBlueSheet,
           jdp_price: laborEntriesTotalFromBlueSheet,
           estimated_price: laborEntriesTotalFromBlueSheet,
@@ -1186,22 +827,23 @@ export const CustomInvoiceDialog = ({
         ? blueSheet.map((bs: any) => bs.job_bluesheet_id || bs.bluesheet_id || bs.bluesheetId || bs.id)
         : [blueSheet.job_bluesheet_id || blueSheet.bluesheet_id || blueSheet.bluesheetId || blueSheet.id]
       const payload: any = {
-        job_id: Number(inlineInvoiceData.jobId),
-        estimate_title: inlineInvoiceData.project || currentJob?.title || blueSheet?.job?.job_title || '',
+        job_id: Number(effectiveInlineInvoiceData.jobId),
+        // Always use the effective project (from inline or job title fallback)
+        estimate_title: effectiveInlineInvoiceData.project || currentJob?.title || blueSheet?.job?.job_title || '',
         priority: 'medium' as 'low' | 'medium' | 'high',
         service_type: isContractBased ? 'contract_based' : 'service_based',
         email_address: currentJob?.email || 'customer@example.com',
-        estimate_date: inlineInvoiceData.date,
+        estimate_date: effectiveInlineInvoiceData.date,
         bluesheet_ids: bluesheetIds,
-        po_number: inlineInvoiceData.poNumber || '',
-        rep: inlineInvoiceData.rep || '',
-        due_date: inlineInvoiceData.dueDate || '',
-        payment_credits: inlineInvoiceData.paymentCredits || 0,
-        balance_due: inlineInvoiceData.balanceDue || '',
-        bill_to_address: inlineInvoiceData.billToAddressEnabled ? inlineInvoiceData.billToAddress || '' : '',
-        notes: inlineInvoiceData.notes || '',
+        po_number: effectiveInlineInvoiceData.poNumber || '',
+        rep: effectiveInlineInvoiceData.rep || '',
+        due_date: effectiveInlineInvoiceData.dueDate || '',
+        payment_credits: effectiveInlineInvoiceData.paymentCredits || 0,
+        balance_due: effectiveInlineInvoiceData.balanceDue || '',
+        bill_to_address: effectiveInlineInvoiceData.billToAddressEnabled ? effectiveInlineInvoiceData.billToAddress || '' : '',
+        notes: effectiveInlineInvoiceData.notes || '',
         status: 'sent',
-        invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
+        invoice_type: mapInvoiceTypeToAPI(effectiveInlineInvoiceData.invoiceType),
         invoice_source: "custom",
         custom_products: customProducts
       }
@@ -1225,9 +867,9 @@ export const CustomInvoiceDialog = ({
         rate: p.jdp_price || p.unit_cost || 0,
         total: p.total_cost || 0,
       }))
-
-      // Send invoice to customer using estimate ID, with full material lines
-      await sendInvoiceToCustomer(response.data.id, emailLineItems)
+      console.log('3444444', inlineInvoiceData)
+      // Send invoice to customer using estimate ID, with full material lines and the same inline snapshot
+      await sendInvoiceToCustomer(response.data.id, emailLineItems, effectiveInlineInvoiceData)
 
       // Refresh the estimates list
       if (onInvoiceSaved) {
@@ -1240,43 +882,7 @@ export const CustomInvoiceDialog = ({
         onDone()
       }
 
-      // Reset form
-      setInlineInvoiceData({
-        date: new Date().toISOString().split('T')[0],
-        estimateNumber: '',
-        customerName: '',
-        customerAddress: '',
-        billToAddress: '',
-        billToAddressEnabled: true,
-        poNumber: '',
-        project: '',
-        jobId: jobId || '',
-        rep: '',
-        dueDate: '',
-        paymentCredits: 0,
-        balanceDue: '',
-        lineItems: [{
-          id: Math.random().toString(36).substring(2, 9),
-          productId: null,
-          qty: 1,
-          item: '',
-          description: '',
-          rate: 0,
-          estimatedPrice: 0,
-          total: 0,
-          searchQuery: '',
-          showSearchResults: false,
-          supplierId: 1,
-          isCustomProduct: false
-        }],
-        notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
-        signatureText: 'ACCEPTED BY________________DATE_____',
-        invoiceType: 'Estimate',
-        customInvoiceType: '',
-        paymentPercentage: 0,
-        estimateTotal: 0,
-        paymentHistory: []
-      })
+     
       setSelectedJob(null)
       setValidationErrors({})
     } catch (error) {
@@ -1287,6 +893,191 @@ export const CustomInvoiceDialog = ({
     }
   }
 
+
+  // Send invoice to customer function
+  const sendInvoiceToCustomer = async (
+    invoiceId: number,
+    lineItemsOverride?: { qty: number; item: string; description: string; rate: number; total: number }[],
+    inlineInvoiceOverride?: any
+  ) => {
+    try {
+      // CustomInvoiceDialog: always use viewInvoiceData (from blueSheet) for customer_id/contractor_id
+      let customerId: number | null = null;
+      let contractorId: number | null = null;
+      let isContractBased = false;
+      if (viewInvoiceData) {
+        isContractBased = viewInvoiceData.service_type === 'contract_based' ||
+          viewInvoiceData.job?.job_type === 'contract_based' ||
+          (viewInvoiceData.contractor_id != null);
+        customerId = viewInvoiceData.customer_id != null ? Number(viewInvoiceData.customer_id) : viewInvoiceData.customer?.id != null ? Number(viewInvoiceData.customer.id) : null;
+        contractorId = viewInvoiceData.contractor_id != null ? Number(viewInvoiceData.contractor_id) : viewInvoiceData.contractor?.id != null ? Number(viewInvoiceData.contractor.id) : null;
+      }
+      if (!customerId && !contractorId) {
+        toast.error('Customer/Contractor ID is missing. Cannot send invoice.');
+        return;
+      }
+      
+      // Prefer the latest snapshot passed from caller; otherwise derive from current state
+      const baseInline = inlineInvoiceOverride || inlineInvoiceData;
+      const effectiveInlineInvoiceData = {
+        ...baseInline,
+        project:
+          baseInline.project ||
+          viewInvoiceData?.estimate_title ||
+          currentJob?.title ||
+          blueSheet?.job?.job_title ||
+          '',
+      };
+
+      // Get token properly
+      const getAuthToken = (): string | null => {
+        if (typeof window !== "undefined") {
+          const savedAuth = localStorage.getItem("jdp_auth");
+          if (savedAuth) {
+            try {
+              const authData = JSON.parse(savedAuth);
+              if (authData.token && authData.expires > Date.now()) {
+                return authData.token;
+              }
+            } catch (error) {
+              console.error("Error parsing auth data:", error);
+            }
+          }
+        }
+        return null;
+      };
+
+      const token = getAuthToken()
+      if (!token) {
+        throw new Error('No authentication token found')
+      } 
+      let customerEmail = viewInvoiceData?.customer?.email || viewInvoiceData?.email_address || currentJob?.email || 'customer@example.com';
+ 
+      let lineItemsSource: { qty: number; item: string; description: string; rate: number; total: number }[] = []
+      console.log('lineItemsOverride:11111111111', lineItemsOverride)
+      if (lineItemsOverride && lineItemsOverride.length > 0) {
+        lineItemsSource = lineItemsOverride
+      } else {
+        const customProducts = (viewInvoiceData as any)?.custom_products as any[] | undefined
+        console.log('customProducts:11111111111', customProducts)
+        if (customProducts && customProducts.length > 0) {
+          lineItemsSource = customProducts.map((p: any) => {
+            const qty = Number(p.stock_quantity) || 1
+            const rate = Number(p.jdp_price || p.unit_cost || p.estimated_price || p.total_cost || 0)
+            const total = Number(p.total_cost || rate * qty || 0)
+            return {
+              qty,
+              item: p.product_name || p.name || '',
+              description: p.description || '',
+              rate,
+              total,
+            }
+          })
+        } else {
+          lineItemsSource = effectiveInlineInvoiceData.lineItems.map((item: any) => ({
+            qty: item.qty,
+            item: item.item || '',
+            description: item.description || '',
+            rate: item.rate || 0,
+            total: item.total || 0,
+          }))
+        }
+      }
+
+      const payload: any = {
+        // Header details
+        estimateNumber: effectiveInlineInvoiceData.estimateNumber || viewInvoiceData?.invoice_number || 'Draft',
+        estimateDate: new Date(effectiveInlineInvoiceData.date || viewInvoiceData?.estimate_date || new Date().toISOString())
+          .toLocaleDateString('en-US', {
+            month: '2-digit',
+            day: '2-digit',
+            year: 'numeric',
+          }),
+        customerName:
+          effectiveInlineInvoiceData.customerName ||
+          viewInvoiceData?.contractor?.contractor_name ||
+          viewInvoiceData?.customer?.customer_name ||
+          'Customer',
+        customerEmail: customerEmail,
+        customerAddress:
+          effectiveInlineInvoiceData.customerAddress ||
+          viewInvoiceData?.contractor?.address ||
+          viewInvoiceData?.customer?.address ||
+          '',
+        billToAddress: effectiveInlineInvoiceData.billToAddressEnabled
+          ? (effectiveInlineInvoiceData.billToAddress ||
+            viewInvoiceData?.bill_to_address ||
+            effectiveInlineInvoiceData.customerAddress ||
+            '')
+          : '',
+        poNumber: effectiveInlineInvoiceData.poNumber || viewInvoiceData?.po_number || '',
+        project:
+          effectiveInlineInvoiceData.project ||
+          viewInvoiceData?.estimate_title ||
+          currentJob?.title ||
+          blueSheet?.job?.job_title ||
+          '',
+        rep: effectiveInlineInvoiceData.rep || viewInvoiceData?.rep || '',
+
+        // ✅ Always use current inlineInvoiceData values
+        dueDate: effectiveInlineInvoiceData.dueDate,
+        paymentCredits: effectiveInlineInvoiceData.paymentCredits,
+        balanceDue: effectiveInlineInvoiceData.balanceDue,
+
+        lineItems: lineItemsSource.map((item) => ({
+          qty: item.qty,
+          item: item.item,
+          description: item.description,
+          rate: item.rate,
+          total: item.total,
+        })),
+        notes: effectiveInlineInvoiceData.notes || '',
+        signatureText: effectiveInlineInvoiceData.signatureText || '',
+        invoiceType:
+          effectiveInlineInvoiceData.invoiceType === 'Custom'
+            ? effectiveInlineInvoiceData.customInvoiceType
+            : effectiveInlineInvoiceData.invoiceType,
+      
+        // Summary numbers backend ko handle karne do
+        subtotal: 0,
+        total: 0,
+      }
+
+      // Add customer_id or contractor_id based on job type
+      if (isContractBased && contractorId) {
+        payload.contractor_id = contractorId;
+      } else if (customerId) {
+        payload.customer_id = customerId;
+      }
+
+      console.log('Sending invoice to customer with ID:', invoiceId)
+      console.log('Payload:11111111111', payload)
+      console.log('isContractBased:', isContractBased, 'customerId:', customerId, 'contractorId:', contractorId)
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/invoices/sendInvoiceToCustomer/${invoiceId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      })
+
+      console.log('Response status:', response.status)
+      console.log('Response:', response)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Error response:', errorText)
+        throw new Error(`Failed to send invoice to customer: ${response.status}`)
+      }
+
+      toast.success('Invoice sent successfully to customer!')
+    } catch (error) {
+      console.error('Error sending invoice to customer:', error)
+      toast.error(`Failed to send invoice to customer: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
   // Expose handlePreviewAndSend to parent (e.g. BlueSheetApprovalDialog)
   useEffect(() => {
     if (registerPreviewAndSend) {
@@ -1843,6 +1634,7 @@ export const CustomInvoiceDialog = ({
                     )}
                   </div>
                   <Input
+                    ref={repRef}
                     value={inlineInvoiceData.rep}
                     onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, rep: e.target.value }))}
                     className="px-3 py-2 text-sm rounded-none border-t-0"
@@ -1862,6 +1654,7 @@ export const CustomInvoiceDialog = ({
                   <div>
                     <Input
                       type="date"
+                      ref={dueDateRef}
                       value={inlineInvoiceData.dueDate}
                       onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, dueDate: e.target.value }))}
                       className="px-3 py-2 text-sm rounded-none border-t-0"
@@ -1869,6 +1662,7 @@ export const CustomInvoiceDialog = ({
                     />
                   </div>
                   <Input
+                    ref={paymentCreditsRef}
                     value={inlineInvoiceData.paymentCredits}
                     onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, paymentCredits: parseFloat(e.target.value) || 0 }))}
                     className="px-3 py-2 text-sm rounded-none border-t-0"
@@ -1876,6 +1670,7 @@ export const CustomInvoiceDialog = ({
                     readOnly={isViewMode}
                   />
                   <Input
+                    ref={balanceDueRef}
                     value={inlineInvoiceData.balanceDue}
                     onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, balanceDue: e.target.value }))}
                     className="px-3 py-2 text-sm rounded-none border-t-0"
@@ -2248,49 +2043,7 @@ export const CustomInvoiceDialog = ({
                   </div>
                 </div>
               </div>
-            )}
-
-            {/* View Mode - Only Close Button */}
-            {isViewMode && (
-              <div className="border-t bg-gray-50 px-8 py-6">
-                <div className="flex items-center justify-between">
-                  {/* <Button
-                    variant="outline"
-                    onClick={() => onOpenChange(false)}
-                    className="border-gray-300"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Close
-                  </Button> */}
-                  <div className="flex gap-3">
-                    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                      <Button
-                        onClick={handleSaveInvoiceAsDraft}
-                        variant="outline"
-                        size="lg"
-                        className="border-primary text-primary hover:bg-primary/5"
-                        disabled={savingDraft || sendingInvoice}
-                      >
-                        <FileText className="h-5 w-5 mr-2" />
-                        {savingDraft ? 'Saving...' : 'Save as Draft'}
-                      </Button>
-                    </motion.div>
-
-                    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                      <Button
-                        onClick={handlePreviewAndSend}
-                        size="lg"
-                        className="bg-primary hover:bg-primary/90 text-white"
-                        disabled={savingDraft || sendingInvoice}
-                      >
-                        <Eye className="h-5 w-5 mr-2" />
-                        {sendingInvoice ? 'Sending...' : 'Preview & Send to Customer'}
-                      </Button>
-                    </motion.div>
-                  </div>
-                </div>
-              </div>
-            )}
+            )} 
           </Card>
         </motion.div>
         {/* <div className="mb-6">

@@ -293,8 +293,9 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       return;
     }
 
-    // Phone number validation (country-aware)
-    if (!isValidPhoneNumber(formData.phone || '')) {
+    // Phone number validation (length-based, allow more formats)
+    const phoneDigitsCreate = (formData.phone || '').replace(/\D/g, '');
+    if (phoneDigitsCreate.length < 7 || phoneDigitsCreate.length > 15) {
       const errors = { ...validationErrors, phone: 'Please enter a valid phone number' };
       setValidationErrors(errors);
       toast.error('Please enter a valid phone number');
@@ -309,11 +310,32 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
+      // Normalize phone with "-" after country code for payload
+      const normalizePhoneForPayload = (raw: string): string => {
+        if (!raw) return ''
+        const digits = raw.replace(/[^\d+]/g, '')
+        if (!digits.startsWith('+')) return raw
+
+        // Special-case North America: +1XXXXXXXXXX -> +1-XXXXXXXXXX
+        if (digits.startsWith('+1') && digits.length > 2) {
+          const country = '1'
+          const rest = digits.slice(2)
+          return rest ? `+${country}-${rest}` : `+${country}`
+        }
+
+        // Other countries: treat 2–3 digits after "+" as country code (e.g. +91, +213)
+        const match = digits.match(/^\+(\d{2,3})(\d*)$/)
+        if (!match) return raw
+        const country = match[1]
+        const rest = match[2]
+        return rest ? `+${country}-${rest}` : `+${country}`
+      }
+
       // Prepare FormData payload
       const formDataPayload = new FormData();
       formDataPayload.append('full_name', formData.name);
       formDataPayload.append('email', formData.email.toLowerCase());
-      formDataPayload.append('phone', formData.phone);
+      formDataPayload.append('phone', normalizePhoneForPayload(formData.phone));
       formDataPayload.append('status', formData.status);
       formDataPayload.append('labor_code', generateLeadLabourId());
       formDataPayload.append('dob', formData.dob);
@@ -485,8 +507,9 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       return;
     }
 
-    // Phone number validation (country-aware)
-    if (!isValidPhoneNumber(formData.phone || '')) {
+    // Phone number validation (length-based, allow more formats)
+    const phoneDigitsUpdate = (formData.phone || '').replace(/\D/g, '');
+    if (phoneDigitsUpdate.length < 7 || phoneDigitsUpdate.length > 15) {
       const errors = { ...validationErrors, phone: 'Please enter a valid phone number' };
       setValidationErrors(errors);
       toast.error('Please enter a valid phone number');
@@ -501,11 +524,32 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
+      // Normalize phone with "-" after country code for payload
+      const normalizePhoneForPayload = (raw: string): string => {
+        if (!raw) return ''
+        const digits = raw.replace(/[^\d+]/g, '')
+        if (!digits.startsWith('+')) return raw
+
+        // Special-case North America: +1XXXXXXXXXX -> +1-XXXXXXXXXX
+        if (digits.startsWith('+1') && digits.length > 2) {
+          const country = '1'
+          const rest = digits.slice(2)
+          return rest ? `+${country}-${rest}` : `+${country}`
+        }
+
+        // Other countries: treat 2–3 digits after "+" as country code (e.g. +91, +213)
+        const match = digits.match(/^\+(\d{2,3})(\d*)$/)
+        if (!match) return raw
+        const country = match[1]
+        const rest = match[2]
+        return rest ? `+${country}-${rest}` : `+${country}`
+      }
+
       // Prepare FormData payload
       const formDataPayload = new FormData();
       formDataPayload.append('full_name', formData.name);
       formDataPayload.append('email', formData.email.toLowerCase());
-      formDataPayload.append('phone', formData.phone);
+      formDataPayload.append('phone', normalizePhoneForPayload(formData.phone));
       formDataPayload.append('status', formData.status);
       formDataPayload.append('dob', formData.dob);
       formDataPayload.append('address', formData.address);

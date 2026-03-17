@@ -146,7 +146,7 @@ export function BlueSheetApprovalDialog({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [filteredProducts, setFilteredProducts] = useState<any[]>([])
   const [activeRow, setActiveRow] = useState<number | null>(null)
-  const searchDebounceRef = useRef<NodeJS.Timeout>()
+  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null)
   // Reference to CustomInvoiceDialog's "preview & send" handler
   const previewAndSendRef = useRef<(() => Promise<void>) | null>(null)
 
@@ -693,6 +693,41 @@ export function BlueSheetApprovalDialog({
         material_used: item.material_used || 0,
         is_custom: false,
       }))
+
+      // Also push a dedicated custom product for total labor cost from labor_entries (if any)
+      const laborEntriesTotalCost = (finalBlueSheet.labor_entries ?? []).reduce(
+        (sum: number, entry: any) => sum + (entry.total_cost || 0),
+        0,
+      )
+      if (laborEntriesTotalCost > 0) {
+        customProducts.push({
+          job_id: finalBlueSheet.job_id,
+          product_name: 'Labor total cost',
+          description: 'Total labor cost from BlueSheet labor entries',
+          supplier_id: 1,
+          supplier_sku: 'LABOR_TOTAL',
+          jdp_sku: `LABOR-TOTAL-${Date.now().toString(36)}`,
+          unit: 'unit',
+          stock_quantity: 1,
+          unit_cost: laborEntriesTotalCost,
+          estimated_price: laborEntriesTotalCost,
+          total_cost: laborEntriesTotalCost,
+          jdp_price: laborEntriesTotalCost,
+          total_ordered: 1,
+          material_used: 0,
+          is_custom: true,
+        })
+      }
+
+      // Recalculate total_amount correctly: material total (from entries) + labor total + any additional charges
+      const materialTotalForEstimate = (finalBlueSheet.material_entries ?? []).reduce(
+        (sum: number, item: any) =>
+          sum + (item.total_cost || (item.total_ordered || 0) * (item.unit_cost || 0) || 0),
+        0,
+      )
+      const totalAmountForEstimate =
+        materialTotalForEstimate + laborEntriesTotalCost + (finalBlueSheet.additional_charges ?? 0)
+
       const bluesheetIds = selectedBlueSheets.length > 0
         ? selectedBlueSheets.map(bs => bs.id)
         : [finalBlueSheet.id]
@@ -716,7 +751,8 @@ export function BlueSheetApprovalDialog({
         po_number: `BS-${finalBlueSheet.id}`,
         rep: finalBlueSheet.created_by_user?.full_name || '',
         notes: finalBlueSheet.notes || '',
-        total_amount: finalBlueSheet.total_cost + (finalBlueSheet.additional_charges ?? 0),
+        // Use recalculated material + labor + additional charges total
+        total_amount: totalAmountForEstimate,
         location: finalBlueSheet.job.bill_to_address || finalBlueSheet.job.customer?.address || '',
         bluesheet_ids: bluesheetIds,
         valid_until: thirtyDaysLater,

@@ -186,3 +186,6 @@ body{
 .react-timerange-picker__wrapper { 
   border: none !important;
 }
+:focus-visible {
+  outline: none !important;
+}
