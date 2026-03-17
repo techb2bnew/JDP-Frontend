@@ -94,8 +94,8 @@ export default function CommonEntityListing({
   footer,
 }: CommonEntityListingProps) {
   return (
-    <ScrollArea className="min-w-0  flex-1 h-full overflow-hidden border border-sky-100 bg-gradient-to-b from-white via-sky-50/40 to-blue-50/40 shadow-[0_8px_22px_rgba(59,130,246,0.08)]">
-      <div className={`p-3 ${!isLoading ? 'max-h-[700px] overflow-y-scroll' : ''}`}>
+    <ScrollArea className="h-[700px] min-w-0  flex-1 overflow-hidden border border-sky-100 bg-gradient-to-b from-white via-sky-50/40 to-blue-50/40 shadow-[0_8px_22px_rgba(59,130,246,0.08)]">
+      <div className={`p-3 `}>
         {isLoading ? (
           <div className="flex items-center justify-center py-10">
             <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-sky-500"></div>
