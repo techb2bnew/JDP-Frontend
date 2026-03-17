@@ -5793,7 +5793,6 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                 No
               </AlertDialogCancel>
               <AlertDialogAction
-              className="bg-primary text-white hover:bg-primary/90"
                 onClick={() => {
                   if (pendingReviewSheets && pendingReviewSheets.length > 0) {
                     const selectedSheets = pendingReviewSheets;
@@ -7453,7 +7452,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
           </DialogFooter>
         </DialogContent>
       </Dialog>
-        <ActivityLogs />
+        <ActivityLogs jobId={jobId} />
     </div>
   )
 }

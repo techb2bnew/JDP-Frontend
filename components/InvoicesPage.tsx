@@ -895,13 +895,6 @@ export function InvoicesPage() {
   }, [statusFilter, invoiceTypeFilter, searchTerm]);
 
 
-
-
-
-
-
-
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -923,7 +916,7 @@ export function InvoicesPage() {
 
       {/* Tabs Navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1 h-auto">
+        <TabsList className="grid w-full grid-cols-2 bg-gray-100 p-1 h-auto">
           {tabItems.map((item) => {
             const Icon = item.icon
             return (
