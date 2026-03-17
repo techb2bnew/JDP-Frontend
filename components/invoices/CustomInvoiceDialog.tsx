@@ -145,19 +145,11 @@ export const CustomInvoiceDialog = ({
       /^0+h0*m*$/.test(normalizedLabor) ||
       /^0+m$/.test(normalizedLabor)
 
-    if (laborLabel && !isZeroLabor && laborCost > 0) {
-      products.push({
-        id: 'labor-total',
-        product_name: `Labor total cost`,
-        description: '',
-        jdp_price: laborCost,
-        unit_cost: laborCost,
-        total_cost: laborCost,
-        stock_quantity: 1,
-        supplier_id: 1,
-        isCustomProduct: true,
-      } as any)
-    }
+    // NOTE: Labor total cost is handled separately for payloads and
+    // the "Total Material + Labor" display. We deliberately do NOT
+    // push a "Labor total cost" product into the products list here
+    // so that the main material line items and subtotal only reflect
+    // material items, not labor.
     const customerId = job.customer?.id ?? job.customer_id ?? (blueSheet as any).customer_id ?? null
     const contractorId = job.contractor?.id ?? job.contractor_id ?? (blueSheet as any).contractor_id ?? null
     return {
@@ -1872,12 +1864,12 @@ export const CustomInvoiceDialog = ({
                           <td className="border border-gray-300 p-1"></td>
                         </tr>
                         <tr>
-                          <td colSpan={5} className="border border-gray-300 p-2 text-right font-bold text-sm text-emerald-700">
-                            Total Material + Labor:
-                          </td>
-                          <td className="border border-gray-300 p-2 text-right font-bold text-sm text-emerald-700">
-                            ${(calculateInvoiceSubtotal() + (viewInvoiceData as any).labor_total_cost).toFixed(2)}
-                          </td>
+                            <td colSpan={5} className="border border-gray-300 p-2 text-right font-bold text-sm text-emerald-700">
+                              Total Material + Labor:
+                            </td>
+                            <td className="border border-gray-300 p-2 text-right font-bold text-sm text-emerald-700">
+                              ${(calculateInvoiceSubtotal() + (viewInvoiceData as any).labor_total_cost).toFixed(2)}
+                            </td>
                           <td className="border border-gray-300 p-1"></td>
                         </tr>
                       </>

@@ -335,6 +335,7 @@ export function BlueSheetApprovalDialog({
     if (!editedBlueSheet) return
 
     try {
+      setIsApproving(true)
       console.log('=== SAVE DEBUG ===')
 
       const materialsForAPI = editedBlueSheet.material_entries.map((item: any) => {
@@ -410,6 +411,8 @@ export function BlueSheetApprovalDialog({
     } catch (error: any) {
       console.error('BlueSheet save error:', error)
       toast.error(error?.message || 'Failed to save BlueSheet changes')
+    } finally {
+      setIsApproving(false)
     }
   }
 
@@ -1550,7 +1553,13 @@ export function BlueSheetApprovalDialog({
                   {(isBlueSheetEditMode || isSupplierEditMode) && (
                     <div className="flex flex-wrap gap-2 items-center">
                       {isBlueSheetEditMode && (
-                        <Button size="sm" onClick={addBlueSheetMaterial} variant="outline" className="border-dashed border-[#00A1FF] text-[#00A1FF] hover:bg-[#E6F6FF]">
+                        <Button
+                          size="sm"
+                          onClick={addBlueSheetMaterial}
+                          variant="outline"
+                          className="border-dashed border-[#00A1FF] text-[#00A1FF] hover:bg-[#E6F6FF]"
+                          disabled={isApproving}
+                        >
                           <Plus className="h-3 w-3 mr-1" />Add BlueSheet Row
                         </Button>
                       )}
@@ -1559,7 +1568,26 @@ export function BlueSheetApprovalDialog({
                           <Plus className="h-3 w-3 mr-1" />Add Supplier Row
                         </Button>
                       )}
-                      {isBlueSheetEditMode && <Button size="sm" onClick={handleBlueSheetSave} className="bg-emerald-600 hover:bg-emerald-700 text-white"><Save className="h-3 w-3 mr-1" />Save BlueSheet</Button>}
+                      {isBlueSheetEditMode && (
+                        <Button
+                          size="sm"
+                          onClick={handleBlueSheetSave}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1"
+                          disabled={isApproving}
+                        >
+                          {isApproving ? (
+                            <>
+                              <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="h-3 w-3 mr-1" />
+                              Save BlueSheet
+                            </>
+                          )}
+                        </Button>
+                      )}
                       {isSupplierEditMode && <Button size="sm" onClick={handleSupplierSave} className="bg-emerald-600 hover:bg-emerald-700 text-white"><Save className="h-3 w-3 mr-1" />Save Supplier</Button>}
                     </div>
                   )}
