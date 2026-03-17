@@ -57,6 +57,7 @@ import {
   Eye,
   Plus
 } from 'lucide-react'
+import CommonEntityListing from './common/CommonEntityListing'
 
 interface Job {
   id: number
@@ -2250,7 +2251,7 @@ export function ContractorListingPage() {
     }
   }
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status?: string) => {
     switch (status) {
       case 'complete':
         return <CheckCircle className="h-3 w-3 text-green-600" />
@@ -2745,211 +2746,63 @@ export function ContractorListingPage() {
         </div>
 
         {/* Contractor Listings */}
-        <ScrollArea className="flex-1 bg-white">
-          <div className="p-2">
-            {filteredContractors.map((contractor) => {
-              const contractorJobs = contractor.jobs || []
-              const isExpanded = expandedContractors.has(contractor.id.toString())
-              const isSelected = selectedContractor === contractor.id.toString() && !selectedJob
+           <CommonEntityListing
+              data={filteredContractors}
+              emptyText="No contractors found"
+              expandedParents={expandedContractors}
+              expandedJobs={expandedJobs}
+              selectedParent={selectedContractor}
+              selectedJob={selectedJob}
+              selectedSubJob={selectedSubJob}
+              onToggleParent={toggleContractor}
+              onToggleJob={toggleJob}
+              onSelectParent={selectContractor}
+              onSelectJob={(jobId, contractorId) => selectJob(jobId, contractorId)}
+              onSelectSubJob={(subJobId, jobId, contractorId) =>
+                selectSubJob(subJobId, jobId, contractorId)
+              }
+              onEditParent={(contractor) =>
+                handleEditContractor(contractor.id.toString())
+              }
+              onDeleteParent={(contractor) => handleDeleteContractor(contractor)}
+              hasEditPermission={hasPermission("contractors", "edit")}
+              hasDeletePermission={hasPermission("contractors", "delete")}
+              getParentName={(contractor) => contractor.contractor_name || ""}
+              getParentJobCount={(contractor) =>
+                contractor.total_jobs || contractor.jobs?.length || 0
+              }
+              getStatusIcon={getStatusIcon}
+              footer={
+                <div className="mx-auto text-center">
+                  <div className="mb-3 text-sm text-slate-600">
+                    Showing {displayContractors.length} of {totalContractors} contractors •
+                    Page {currentPage} of {totalPages}
+                  </div>
 
-              return (
-                <div key={contractor.id} className="mb-2">
-                  <Collapsible
-                    open={isExpanded}
-                    onOpenChange={() => toggleContractor(contractor.id.toString())}
-                  >
-                    <CollapsibleTrigger asChild className="border-b border-gray-200 pb-2 w-full">
-                      <Button
-                        variant="ghost"
-                        className={`w-full justify-start p-3 text-left h-auto hover:bg-blue-50 ${isSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
-                          }`}
-                        onClick={() => selectContractor(contractor.id.toString())}
-                      >
-                        <div className=" w-full">
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-2">
-                              {isExpanded ? (
-                                <ChevronDown className="h-4 w-4 text-primary" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4 text-primary" />
-                              )}
-                              <User className="h-4 w-4 text-primary" />
-                            </div>
-                            <div>
-                              <div className="font-medium text-gray-900">{contractor.contractor_name}</div>
-                              <div className="text-xs text-gray-500">{contractor.total_jobs} jobs</div>
-                            </div>
-                          </div>
-                          <div className="flex justify-end items-center gap-1">
-                            {hasPermission('contractors', 'edit') && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 hover:bg-blue-100"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditContractor(contractor.id.toString());
-                                }}
-                              >
-                                <Edit className="h-4 w-4 text-blue-600" />
-                              </Button>
-                            )}
-                            {hasPermission('contractors', 'delete') && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 hover:bg-red-100"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteContractor(contractor);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 text-red-600" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </Button>
-                    </CollapsibleTrigger>
-
-                    <CollapsibleContent className="ml-6 mt-1">
-                      {contractorJobs.map((job: Job) => {
-                        const hasSubJobs = job.subJobs && job.subJobs.length > 0
-                        const isJobExpanded = expandedJobs.has(job.id.toString())
-                        const isJobSelected = selectedJob === job.id.toString() && !selectedSubJob
-
-                        return (
-                          <div key={job.id} className="mb-1">
-                            <div className="flex items-start">
-                              <Minus className="h-4 w-4 text-primary/40 mt-2 mr-2" />
-                              <div className="flex-1 border-l border-gray-200 pl-3">
-                                <Collapsible
-                                  open={isJobExpanded}
-                                  onOpenChange={() => toggleJob(job.id.toString())}
-                                >
-                                  <CollapsibleTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      className={`w-full justify-start p-2 text-left h-auto text-sm hover:bg-blue-50 ${isJobSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
-                                        }`}
-                                      onClick={() => selectJob(job.id.toString(), contractor.id.toString())}
-                                    >
-                                      <div className="flex items-center justify-between w-full">
-                                        <div className="flex items-center gap-2">
-                                          {hasSubJobs && (
-                                            isJobExpanded ? (
-                                              <ChevronDown className="h-3 w-3 text-primary" />
-                                            ) : (
-                                              <ChevronRight className="h-3 w-3 text-primary" />
-                                            )
-                                          )}
-                                          {getStatusIcon(job.status)}
-                                          <div className="flex-1 min-w-0">
-                                            <div className="text-xs font-medium text-gray-800 truncate">
-                                              {job.job_title}
-                                            </div>
-                                            <div className="text-xs text-gray-500">
-                                              {job.status}
-                                            </div>
-                                          </div>
-                                        </div>
-
-                                      </div>
-                                    </Button>
-                                  </CollapsibleTrigger>
-
-                                  {hasSubJobs && (
-                                    <CollapsibleContent className="ml-4 mt-1">
-                                      {job.subJobs?.map((subJob) => {
-                                        const isSubJobSelected = selectedSubJob === subJob.id.toString()
-
-                                        return (
-                                          <div key={subJob.id} className="flex items-center mb-1">
-                                            <Minus className="h-3 w-3 text-primary/30 mt-1.5 mr-2" />
-                                            <Button
-                                              variant="ghost"
-                                              className={`flex-1 justify-start p-1.5 text-left h-auto text-xs hover:bg-blue-50 border-l border-gray-200 pl-3 ${isSubJobSelected ? 'bg-blue-50 shadow-sm border border-blue-200' : ''
-                                                }`}
-                                              onClick={() => selectSubJob(subJob.id.toString(), job.id.toString(), contractor.id.toString())}
-                                            >
-                                              <div className="flex items-center gap-2 w-full">
-                                                {getStatusIcon(subJob.status)}
-                                                <div className="flex-1 min-w-0">
-                                                  <div className="text-xs text-gray-700 truncate">
-                                                    {subJob.job_title}
-                                                  </div>
-                                                  <div className="text-xs text-gray-500">
-                                                    {subJob.status}
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            </Button>
-                                            <div
-                                              title="Change Order"
-                                              className="h-4 rounded-md  pl-2 pr-2 text-[10px] text-blue-600 hover:text-blue-800 bg-blue-100 ml-1"
-                                            >
-                                              Change Order
-                                            </div>
-                                          </div>
-                                        )
-                                      })}
-                                    </CollapsibleContent>
-                                  )}
-                                </Collapsible>
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </CollapsibleContent>
-                  </Collapsible>
-                </div>
-              )
-            })}
-          </div>
-          <div className=" bg-white border-t border-gray-200">
-            <div className="m-auto text-center">
-              <div className="text-sm text-gray-600 mb-3 mt-4">
-                Showing {displayContractors.length} of {totalContractors} contractors • Page {currentPage} of {totalPages}
-              </div>
-              <div className="flex justify-center items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="h-8 w-8 p-0"
-                >
-                  <ChevronDown className="h-4 w-4 rotate-90" />
-                </Button>
-
-                {/* <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <div className="flex justify-center items-center gap-2">
                     <Button
-                      key={page}
-                      variant={currentPage === page ? "default" : "outline"}
+                      variant="outline"
                       size="sm"
-                      onClick={() => setCurrentPage(page)}
-                      className="h-8 w-8 p-0 text-sm"
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="h-9 w-9 rounded-full border-sky-100 bg-white p-0 text-sky-600 shadow-sm hover:bg-sky-50"
                     >
-                      {page}
+                      <ChevronDown className="h-4 w-4 rotate-90" />
                     </Button>
-                  ))}
-                </div> */}
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="h-8 w-8 p-0"
-                >
-                  <ChevronDown className="h-4 w-4 -rotate-90" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        </ScrollArea>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="h-9 w-9 rounded-full border-sky-100 bg-white p-0 text-sky-600 shadow-sm hover:bg-sky-50"
+                    >
+                      <ChevronDown className="h-4 w-4 -rotate-90" />
+                    </Button>
+                  </div>
+                </div>
+              }
+            />
 
 
       </div>

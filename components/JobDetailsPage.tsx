@@ -76,6 +76,7 @@ import Image from 'next/image'
 import TimeRangePicker from '@wojtekmaj/react-timerange-picker'
 import '@wojtekmaj/react-timerange-picker/dist/TimeRangePicker.css'
 import Autocomplete from 'react-google-autocomplete'
+import ActivityLogs from './ActivityLogs'
 
 // Sample data structure - replace with your actual data
 const sampleJobData = {
@@ -7451,7 +7452,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
+        <ActivityLogs />
     </div>
   )
 }

@@ -85,6 +85,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "../components/ui/tooltip";
+import CommonEntityListing from "./common/CommonEntityListing";
 // Static customers data removed - now using API data from /customer/getCustomers
 
 const getStatusColor = (status: string) => {
@@ -526,7 +527,7 @@ export function CustomersPage() {
     }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status?: string) => {
     switch (status) {
       case "complete":
       case "completed":
@@ -1285,7 +1286,7 @@ export function CustomersPage() {
   return (
     <div className="h-full flex">
       {/* Left Sidebar - Customer Listings */}
-      <div className="w-80 bg-gray-50 border-r border-gray-200 flex flex-col sticky top-0 h-screen">
+      <div className="w-80 shrink-0  bg-gray-50 border-r border-gray-200 flex flex-col sticky top-0 h-screen">
         {/* Sidebar Header */}
         <div className="p-4 border-b border-gray-200 bg-white">
           <div className="flex items-center gap-3">
@@ -1311,290 +1312,37 @@ export function CustomersPage() {
         </div>
 
         {/* Customer Listings */}
-        <ScrollArea className="flex-1 overflow-y-auto h-full rounded-2xl border border-sky-100 bg-gradient-to-b from-white via-sky-50/40 to-blue-50/40 shadow-[0_8px_22px_rgba(59,130,246,0.08)]">
-          <div className="p-3">
-            {isLoadingCustomers ? (
-              <div className="flex items-center justify-center py-10">
-                <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-sky-500"></div>
-                <span className="ml-2 text-sm text-slate-500">
-                  Loading customers...
-                </span>
-              </div>
-            ) : paginatedCustomers.length === 0 ? (
-              <div className="py-10 text-center text-sm text-slate-500">
-                No customers found
-              </div>
-            ) : (
-              paginatedCustomers.map((customer) => {
-                const customerJobs = customer.jobs || [];
-                const hasCustomerJobs = customerJobs.length > 0;
-                const isExpanded = expandedCustomers.has(
-                  customer.id.toString(),
-                );
-                const isSelected =
-                  selectedCustomer === customer.id.toString() && !selectedJob;
-
-                return (
-                  <div key={customer.id} className="mb-3">
-                    <Collapsible
-                      open={hasCustomerJobs ? isExpanded : false}
-                      onOpenChange={(open) => {
-                        if (!hasCustomerJobs) return;
-                        toggleCustomer(customer.id.toString());
-                      }}
-                      className={`w-[75%] overflow-hidden rounded-[22px] border transition-all duration-300
-    ${
-      isExpanded && hasCustomerJobs
-        ? "border-sky-200 bg-white shadow-[0_10px_24px_rgba(14,165,233,0.08)]"
-        : "border-sky-100 bg-white shadow-[0_4px_14px_rgba(14,165,233,0.05)]"
-    }`}
-                    >
-                      <CollapsibleTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          onClick={() => {
-                            selectCustomer(customer.id.toString());
-                          }}
-                          className="group h-auto w-full justify-start rounded-[20px] p-0 text-left hover:bg-transparent"
-                        >
-                          <div
-                            className={`w-full rounded-[20px] border px-4 py-4 transition-all duration-300
-                      ${
-                        isSelected || (isExpanded && hasCustomerJobs)
-                          ? "border-sky-200 bg-gradient-to-r from-sky-200 via-blue-200 to-cyan-100 text-slate-800 shadow-[0_8px_18px_rgba(59,130,246,0.10)]"
-                          : "border-sky-100 bg-gradient-to-r from-sky-100 via-blue-100 to-cyan-50 text-slate-800 shadow-[0_4px_12px_rgba(59,130,246,0.06)]"
-                      }`}
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex items-center gap-3 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/80 ring-1 ring-sky-100">
-                                    {hasCustomerJobs ? (
-                                      isExpanded ? (
-                                        <ChevronDown className="h-4 w-4 text-sky-600" />
-                                      ) : (
-                                        <ChevronRight className="h-4 w-4 text-sky-600" />
-                                      )
-                                    ) : (
-                                      <ChevronRight className="h-4 w-4 text-sky-300 opacity-40" />
-                                    )}
-                                  </div>
-
-                                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/80 ring-1 ring-sky-100">
-                                    <User className="h-4 w-4 text-sky-600" />
-                                  </div>
-                                </div>
-
-                                <div className="min-w-0">
-                                  <div className="truncate text-[15px] font-semibold text-slate-800">
-                                    {customer.customer_name || customer.name}
-                                  </div>
-                                  <div className="mt-0.5 text-xs text-slate-500">
-                                    {customer.total_jobs || customerJobs.length}{" "}
-                                    jobs
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-1 shrink-0">
-                                {hasPermission("customers", "edit") && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    title="Edit Customer"
-                                    className="h-8 w-8 rounded-full p-0 hover:bg-white/70"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleEditCustomer(customer);
-                                    }}
-                                  >
-                                    <Edit className="h-4 w-4 text-sky-600" />
-                                  </Button>
-                                )}
-
-                                {hasPermission("customers", "delete") && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    title="Delete Customer"
-                                    className="h-8 w-8 rounded-full p-0 hover:bg-red-50"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteCustomerClick(customer);
-                                    }}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-red-500" />
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </Button>
-                      </CollapsibleTrigger>
-
-                      {hasCustomerJobs && (
-                        <CollapsibleContent className="px-3 pb-3 pt-2">
-                          <div className="relative ml-3 border-l-2 border-sky-100 pl-4">
-                            {customerJobs.map((job: any) => {
-                              const hasSubJobs =
-                                job.subJobs && job.subJobs.length > 0;
-                              const isJobExpanded = expandedJobs.has(
-                                job.id.toString(),
-                              );
-                              const isJobSelected =
-                                selectedJob === job.id.toString() &&
-                                !selectedSubJob;
-
-                              return (
-                                <div
-                                  key={job.id}
-                                  className="relative mb-3 last:mb-0"
-                                >
-                                  {/* fixed horizontal connector line for jobs */}
-                                  <span className="absolute -left-[15px] top-5 h-[2px] w-3 rounded-full bg-sky-200" />
-
-                                  <Collapsible
-                                    open={isJobExpanded}
-                                    onOpenChange={() =>
-                                      selectedJob === job.id.toString() &&
-                                      toggleJob(job.id.toString())
-                                    }
-                                  >
-                                    <CollapsibleTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        onClick={() =>
-                                          selectJob(
-                                            job.id.toString(),
-                                            customer.id.toString(),
-                                          )
-                                        }
-                                        className="h-auto w-full justify-start rounded-2xl border p-0 text-left hover:bg-transparent"
-                                      >
-                                        <div
-                                          className={`w-full rounded-2xl border px-4 py-3 transition-all duration-300
-                                    ${
-                                      isJobSelected || isJobExpanded
-                                        ? "border-sky-200 bg-gradient-to-r from-sky-100 via-blue-50 to-cyan-50 shadow-[0_6px_14px_rgba(14,165,233,0.07)]"
-                                        : "border-sky-100 bg-gradient-to-r from-slate-50 via-sky-50 to-cyan-50/60 shadow-[0_3px_10px_rgba(14,165,233,0.04)]"
-                                    }`}
-                                        >
-                                          <div className="flex items-center justify-between gap-3">
-                                            <div className="flex min-w-0 items-center gap-3">
-                                              <div className="flex items-center gap-2">
-                                                {hasSubJobs ? (
-                                                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white ring-1 ring-sky-100">
-                                                    {isJobExpanded ? (
-                                                      <ChevronDown className="h-3.5 w-3.5 text-sky-600" />
-                                                    ) : (
-                                                      <ChevronRight className="h-3.5 w-3.5 text-sky-600" />
-                                                    )}
-                                                  </div>
-                                                ) : (
-                                                  <div className="h-6 w-6" />
-                                                )}
-
-                                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-50 ring-2 ring-amber-300">
-                                                  {getStatusIcon(job.status)}
-                                                </div>
-                                              </div>
-
-                                              <div className="min-w-0">
-                                                <div className="truncate text-sm font-semibold text-slate-700">
-                                                  {job.job_title || job.title}
-                                                </div>
-                                                <div className="text-xs font-medium capitalize text-slate-500">
-                                                  {job.status}
-                                                </div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </Button>
-                                    </CollapsibleTrigger>
-
-                                    {hasSubJobs && (
-                                      <CollapsibleContent className="mt-2 pl-5">
-                                        <div className="relative border-l-2 border-cyan-100 pl-3">
-                                          {job.subJobs?.map((subJob: any) => {
-                                            const isSubJobSelected =
-                                              selectedSubJob ===
-                                              subJob.id.toString();
-
-                                            return (
-                                              <div
-                                                key={subJob.id}
-                                                className="relative mb-2 last:mb-0"
-                                              >
-                                                <span className="absolute -left-[15px] top-5 h-[2px] w-3 rounded-full bg-cyan-100" />
-
-                                                <Button
-                                                  variant="ghost"
-                                                  onClick={() =>
-                                                    selectSubJob(
-                                                      subJob.id.toString(),
-                                                      job.id.toString(),
-                                                      customer.id.toString(),
-                                                    )
-                                                  }
-                                                  className="h-auto w-full justify-start rounded-xl p-0 text-left hover:bg-transparent"
-                                                >
-                                                  <div
-                                                    className={`w-full rounded-xl border px-3 py-2.5 transition-all duration-300
-                                              ${
-                                                isSubJobSelected
-                                                  ? "border-cyan-200 bg-gradient-to-r from-white via-sky-50/70 to-cyan-50/70 shadow-[0_4px_12px_rgba(6,182,212,0.06)]"
-                                                  : "border-slate-100 bg-white hover:border-cyan-100 hover:bg-sky-50/40"
-                                              }`}
-                                                  >
-                                                    <div className="flex items-center gap-2 w-full">
-                                                      {/* reduced circle size for sub-jobs */}
-                                                      <div className="flex h-4 w-4 items-center justify-center rounded-full bg-amber-50 ring-[1.5px] ring-amber-300 shrink-0">
-                                                        <div className="scale-[0.75]">
-                                                          {getStatusIcon(
-                                                            subJob.status,
-                                                          )}
-                                                        </div>
-                                                      </div>
-
-                                                      <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                                                        <div className="truncate text-xs font-medium text-slate-700">
-                                                          {subJob.job_title ||
-                                                            subJob.title}
-                                                        </div>
-
-                                                        <div className="shrink-0 rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-[10px] font-semibold text-sky-600">
-                                                          Change Order
-                                                        </div>
-                                                      </div>
-                                                    </div>
-                                                  </div>
-                                                </Button>
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                      </CollapsibleContent>
-                                    )}
-                                  </Collapsible>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </CollapsibleContent>
-                      )}
-                    </Collapsible>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          <div className="w-[75%] sticky bottom-0 border-t border-sky-100 bg-white/95 backdrop-blur-xl px-3 py-4">
+        <div className="min-w-0 flex-1">
+        <CommonEntityListing
+          data={paginatedCustomers}
+          isLoading={isLoadingCustomers}
+          emptyText="No customers found"
+          expandedParents={expandedCustomers}
+          expandedJobs={expandedJobs}
+          selectedParent={selectedCustomer}
+          selectedJob={selectedJob}
+          selectedSubJob={selectedSubJob}
+          onToggleParent={toggleCustomer}
+          onToggleJob={toggleJob}
+          onSelectParent={selectCustomer}
+          onSelectJob={(jobId, customerId) => selectJob(jobId, customerId)}
+          onSelectSubJob={(subJobId, jobId, customerId) =>
+            selectSubJob(subJobId, jobId, customerId)
+          }
+          onEditParent={(customer) => handleEditCustomer(customer)}
+          onDeleteParent={(customer) => handleDeleteCustomerClick(customer)}
+          hasEditPermission={hasPermission("customers", "edit")}
+          hasDeletePermission={hasPermission("customers", "delete")}
+          getParentName={(customer) => customer.customer_name || customer.name || ""}
+          getParentJobCount={(customer) =>
+            customer.total_jobs || customer.jobs?.length || 0
+          }
+          getStatusIcon={getStatusIcon}
+          footer={
             <div className="mx-auto text-center">
               <div className="mb-3 text-sm text-slate-600">
-                Showing {customersWithJobs.length} of {totalCustomers} Customer
-                • Page {currentPage} of {totalPages}
+                Showing {customersWithJobs.length} of {totalCustomers} Customer • Page{" "}
+                {currentPage} of {totalPages}
               </div>
 
               <div className="flex items-center justify-center gap-2">
@@ -1619,8 +1367,9 @@ export function CustomersPage() {
                 </Button>
               </div>
             </div>
-          </div>
-        </ScrollArea>
+                }
+              />
+         </div>
       </div>
 
       {/* Right Content - Job Details */}
