@@ -1518,7 +1518,7 @@ useEffect(() => {
       </Card>
 
       {/* Pagination */}
-      {totalPages > 0 && (
+      {(totalSuppliers > itemsPerPage) && (
         <div className="flex items-center justify-center gap-2">
           <Button
             variant="outline"

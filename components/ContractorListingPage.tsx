@@ -2757,6 +2757,8 @@ export function ContractorListingPage() {
               onToggleParent={toggleContractor}
               onToggleJob={toggleJob}
               onSelectParent={selectContractor}
+              itemsPerPage={itemsPerPage}
+              totalItems={totalContractors}
               onSelectJob={(jobId, contractorId) => selectJob(jobId, contractorId)}
               onSelectSubJob={(subJobId, jobId, contractorId) =>
                 selectSubJob(subJobId, jobId, contractorId)

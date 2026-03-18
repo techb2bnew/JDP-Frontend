@@ -114,7 +114,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null)
   const [showDetails, setShowDetails] = useState(false)
-  const itemsPerPage = 10
+  const itemsPerPage = 10;
   const [totalStaff, setTotalStaff] = useState(0) 
   const [filteredStaff, setFilteredStaff] = useState<any[]>([]);
 
@@ -1270,7 +1270,7 @@ useEffect(() => {
       </Card>
 
       {/* Pagination */}
-      {totalPages > 0 && (
+      {totalStaff > itemsPerPage  && (
         <div className="flex items-center justify-center gap-2">
           <Button
             variant="outline"

@@ -941,7 +941,7 @@ export function CustomersPage() {
     };
 
     runSearch();
-  }, [searchTerm, allCustomersWithJobs, itemsPerPage]);
+  }, [searchTerm, itemsPerPage]);
 
   // Server-side pagination - no client-side pagination needed
   const totalPages = Math.ceil(totalCustomers / itemsPerPage);
@@ -1355,7 +1355,9 @@ export function CustomersPage() {
           getParentJobCount={(customer) =>
             customer.total_jobs || customer.jobs?.length || 0
           }
+          itemsPerPage={itemsPerPage}
           getStatusIcon={getStatusIcon}
+          totalItems={totalCustomers}
           footer={
             <div className="mx-auto text-center">
               <div className="mb-3 text-sm text-slate-600">

@@ -1737,7 +1737,7 @@ const fetchLaborById = async (id: string) => {
 
       {/* Pagination */}
     
-        <div className="flex items-center justify-center gap-2">
+        {(totalLabor > itemsPerPage) &&  <div className="flex items-center justify-center gap-2">
           <Button
             variant="outline"
             onClick={() => {
@@ -1775,7 +1775,7 @@ const fetchLaborById = async (id: string) => {
           >
             Next
           </Button>
-        </div>
+        </div>}
     
 
       {/* Edit Dialog */}

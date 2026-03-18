@@ -1865,11 +1865,11 @@ const handleAction = (action: ProductAction, product?: Product) => {
       </div>
 
       <div>
-        <Label htmlFor="category" className="flex items-center gap-1 mb-2">
+        {/* <Label htmlFor="category" className="flex items-center gap-1 mb-2">
           Category *
-        </Label>
+        </Label> */}
         <AutoSuggestInput
-          label=""
+          label='Category *'
           value={formData.category}
           onChange={(value) => {
             setFormData(prev => ({ ...prev, category: value }));

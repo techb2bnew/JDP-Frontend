@@ -61,6 +61,8 @@ type CommonEntityListingProps = {
   getStatusIcon: (status?: string) => React.ReactNode;
 
   footer?: React.ReactNode;
+  itemsPerPage?: number;
+  totalItems?: number;
 };
 export default function CommonEntityListing({
   data,
@@ -92,12 +94,22 @@ export default function CommonEntityListing({
 
   getStatusIcon,
   footer,
+  itemsPerPage,
+  totalItems,
 }: CommonEntityListingProps) {
+
+    const shouldShowFooter =
+    !!footer &&
+    !isLoading &&
+    data.length > 0 &&
+    typeof itemsPerPage === "number" &&
+    typeof totalItems === "number" &&
+    totalItems > itemsPerPage;
   return (
-    <ScrollArea className="h-[700px] min-w-0  flex-1 overflow-hidden border border-sky-100 bg-gradient-to-b from-white via-sky-50/40 to-blue-50/40 shadow-[0_8px_22px_rgba(59,130,246,0.08)]">
-      <div className={`p-3 `}>
+    <ScrollArea className="h-[75vh] min-w-0  flex-1 overflow-hidden border border-sky-100 bg-gradient-to-b from-white via-sky-50/40 to-blue-50/40 shadow-[0_8px_22px_rgba(59,130,246,0.08)]">
+      <div className={`p-3 min-h-[64vh]`}>
         {isLoading ? (
-          <div className="flex items-center justify-center py-10">
+          <div className="flex items-center justify-center py-10 min-h-[64vh]">
             <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-sky-500"></div>
             <span className="ml-2 text-sm text-slate-500">Loading...</span>
           </div>
@@ -367,8 +379,8 @@ export default function CommonEntityListing({
         )}
       </div>
 
-      {footer && (
-        <div className="sticky bottom-0  border-t border-sky-100 bg-white/95 backdrop-blur-xl px-3 py-4">
+      {shouldShowFooter && (
+        <div className="sticky bottom-0 border-t border-sky-100 bg-white/95 backdrop-blur-xl px-3 py-4">
           {footer}
         </div>
       )}
