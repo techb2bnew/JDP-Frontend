@@ -475,11 +475,14 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
         paymentCredits: inlineInvoiceData.paymentCredits || 0,
         balanceDue: inlineInvoiceData.balanceDue || '',
         lineItems: inlineInvoiceData.lineItems.map(item => ({
+          id: item.id,
           qty: item.qty,
           item: item.item,
           description: item.description,
           rate: item.rate,
-          total: item.total
+          total: item.total,
+          // Expose whether this line is a manual/custom product
+          is_custom: item.isCustomProduct === true,
         })),
         notes: inlineInvoiceData.notes || '',
         signatureText: inlineInvoiceData.signatureText || '',
@@ -592,13 +595,17 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
           return {
             ...item,
             item: product.name,
+            // Keep line item id intact; store selected product id separately
+            productId: product.id,
             description: product.description || '',
             rate: rate,
             estimatedPrice: estimatedPrice,
             total: (item.qty || 1) * priceToUse,
             showSearchResults: false,
             searchQuery: '',
-            supplierId: product.supplierId || selectedSupplierId || 1
+            supplierId: product.supplierId || selectedSupplierId || 1,
+            // This is a searched/selected catalog product, not manual
+            isCustomProduct: false,
           }
         }
         return item
@@ -801,20 +808,31 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
     try {
       const subtotal = calculateInvoiceSubtotal()
 
-      const customProducts = inlineInvoiceData.lineItems.map(item => ({
-        product_name: item.item,
-        description: item.description || '',
-        supplier_id: item.supplierId || selectedSupplierId || 1,
-        supplier_sku: item.item.substring(0, 10),
-        jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        stock_quantity: item.qty,
-        unit: 'unit',
-        job_id: Number(inlineInvoiceData.jobId),
-        unit_cost: item.rate,
-        jdp_price: item.rate,
-        estimated_price: item.estimatedPrice || 0,
-        total_cost: item.total
-      }))
+      const customProducts = inlineInvoiceData.lineItems.map(item => {
+        const base = {
+          product_name: item.item,
+          description: item.description || '',
+          supplier_id: item.supplierId || selectedSupplierId || 1,
+          supplier_sku: item.item.substring(0, 10),
+          jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          stock_quantity: item.qty,
+          unit: 'unit',
+          job_id: Number(inlineInvoiceData.jobId),
+          unit_cost: item.rate,
+          jdp_price: item.rate,
+          estimated_price: item.estimatedPrice || 0,
+          total_cost: item.total,
+          // Mark whether this row is a manual/custom product
+          is_custom: item.isCustomProduct === true,
+        } as any
+
+        // Include product id only for searched/selected products
+        if (!item.isCustomProduct && item.productId) {
+          base.id = item.productId
+        }
+
+        return base
+      })
 
       // Get customer_id or contractor_id - from viewInvoiceData if in view mode, otherwise from currentJob
       let customerId: number | null = null;
@@ -972,20 +990,31 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
     try {
       const subtotal = calculateInvoiceSubtotal()
 
-      const customProducts = inlineInvoiceData.lineItems.map(item => ({
-        product_name: item.item,
-        description: item.description || '',
-        supplier_id: item.supplierId || selectedSupplierId || 1,
-        supplier_sku: item.item.substring(0, 10),
-        jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        stock_quantity: item.qty,
-        unit: 'unit',
-        job_id: Number(inlineInvoiceData.jobId),
-        unit_cost: item.rate,
-        jdp_price: item.rate,
-        estimated_price: item.estimatedPrice || 0,
-        total_cost: item.total
-      }))
+      const customProducts = inlineInvoiceData.lineItems.map(item => {
+        const base = {
+          product_name: item.item,
+          description: item.description || '',
+          supplier_id: item.supplierId || selectedSupplierId || 1,
+          supplier_sku: item.item.substring(0, 10),
+          jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          stock_quantity: item.qty,
+          unit: 'unit',
+          job_id: Number(inlineInvoiceData.jobId),
+          unit_cost: item.rate,
+          jdp_price: item.rate,
+          estimated_price: item.estimatedPrice || 0,
+          total_cost: item.total,
+          // Mark whether this row is a manual/custom product
+          is_custom: item.isCustomProduct === true,
+        } as any
+
+        // Include product id only for searched/selected products
+        if (!item.isCustomProduct && item.productId) {
+          base.id = item.productId
+        }
+
+        return base
+      })
 
       // Get customer_id or contractor_id - from viewInvoiceData if in view mode, otherwise from currentJob
       let customerId: number | null = null;
@@ -1306,7 +1335,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
           stock_quantity: i.quantity,
           job_id: Number(newInvoice.jobId),
           unit: i.unit ? i.unit.toString() : "1",
-          is_custom: true,
+          is_custom: false,
           unit_cost: i.unitPrice,
         })) || [];
 

@@ -558,13 +558,16 @@ export const CustomInvoiceDialog = ({
           return {
             ...item,
             item: product.name,
+            // Selected from search -> not custom and keep product reference
+            productId: product.id,
             description: product.description || '',
             rate: rate,
             estimatedPrice: estimatedPrice,
             total: (item.qty || 1) * priceToUse,
             showSearchResults: false,
             searchQuery: '',
-            supplierId: product.supplierId || selectedSupplierId || 1
+            supplierId: product.supplierId || selectedSupplierId || 1,
+            isCustomProduct: false,
           }
         }
         return item
@@ -761,29 +764,43 @@ export const CustomInvoiceDialog = ({
             jdp_price: item.rate,
             estimated_price: item.estimatedPrice || 0,
             total_cost: item.total,
+            // manual/custom row -> true, searched/selected row -> false
+            is_custom: item.isCustomProduct === true,
           }
-          if (typeof item.item === 'string' && item.item.startsWith('Labor total cost')) {
-            base.is_custom = true
+
+          // Include product id only for searched/selected products
+          if (item.isCustomProduct !== true && item.productId) {
+            base.id = item.productId
           }
+
           return base
         })
       } else {
         // Fallback: map from BlueSheet material_entries
         const materials = Array.isArray(blueSheet?.material_entries) ? blueSheet.material_entries : []
-        customProducts = materials.map((m: any) => ({
-          product_name: m.material_name,
-          description: m.product?.description || m.material_name || '',
-          supplier_id: m.product?.supplier_id ?? m.product?.suppliers?.id ?? 1,
-          supplier_sku: m.product?.supplier_sku || '',
-          jdp_sku: m.product?.jdp_sku || `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          stock_quantity: m.material_used || m.total_ordered || 1,
-          unit: m.unit || 'unit',
-          job_id: Number(effectiveInlineInvoiceData.jobId),
-          unit_cost: m.unit_cost || 0,
-          jdp_price: m.unit_cost || 0,
-          estimated_price: m.unit_cost || 0,
-          total_cost: m.total_cost ?? (m.material_used || 0) * (m.unit_cost || 0),
-        }))
+        customProducts = materials.map((m: any) => {
+          const base: any = {
+            product_name: m.material_name,
+            description: m.product?.description || m.material_name || '',
+            supplier_id: m.product?.supplier_id ?? m.product?.suppliers?.id ?? 1,
+            supplier_sku: m.product?.supplier_sku || '',
+            jdp_sku: m.product?.jdp_sku || `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            stock_quantity: m.material_used || m.total_ordered || 1,
+            unit: m.unit || 'unit',
+            job_id: Number(effectiveInlineInvoiceData.jobId),
+            unit_cost: m.unit_cost || 0,
+            jdp_price: m.unit_cost || 0,
+            estimated_price: m.unit_cost || 0,
+            total_cost: m.total_cost ?? (m.material_used || 0) * (m.unit_cost || 0),
+            is_custom: false,
+          }
+
+          if (m.product?.id) {
+            base.id = m.product.id
+          }
+
+          return base
+        })
       }
 
       // Also add a dedicated custom product for total labor cost (from BlueSheet labor entries)

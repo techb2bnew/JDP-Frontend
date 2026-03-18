@@ -11,9 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog'
 import { Separator } from './ui/separator'
-import { Calendar } from './ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { usePermissions } from '../contexts/PermissionContext'
+import { Calendar as MultiDateCalendar, DateObject } from "react-multi-date-picker";
 
 import {
   Search,
@@ -161,7 +161,8 @@ export function OrdersPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all')
-  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined })
+  // react-multi-date-picker: multiple + range => array of ranges (each range is [from, to?])
+  const [selectedRanges, setSelectedRanges] = useState<DateObject[][]>([])
   const [sortBy, setSortBy] = useState('all')
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<OrderFormData | null>(null)
@@ -995,51 +996,77 @@ export function OrdersPage() {
               {/* Date Range Filter */}
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-[240px] justify-start text-left font-normal relative">
+                  <Button
+                    variant="outline"
+                    className="w-[260px] justify-start text-left font-normal relative pr-10"
+                  >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange.from ? (
-                      dateRange.to ? (
-                        <>
-                          {format(dateRange.from, "LLL dd, y")} -{" "}
-                          {format(dateRange.to, "LLL dd, y")}
-                        </>
-                      ) : (
-                        format(dateRange.from, "LLL dd, y")
-                      )
-                    ) : (
-                      <span>Pick a date range</span>
-                    )}
-                    {(dateRange.from || dateRange.to) && (
-                      <span
-                        className="absolute right-[-30px] h-4 w-4 flex items-center justify-center cursor-pointer hover:bg-muted rounded-sm"
+                    <span className="flex-1 truncate">
+                      {selectedRanges.length > 0 ? (() => {
+                        const allDates = selectedRanges
+                          .flat()
+                          .map((d) => (d instanceof DateObject ? d.toDate() : new Date(d as any)))
+                          .filter((d) => d instanceof Date && !Number.isNaN(d.getTime()));
+
+                        const sorted = [...allDates].sort((a, b) => a.getTime() - b.getTime());
+                        const from = sorted[0];
+                        const to = sorted[sorted.length - 1];
+                        if (!from) return "Pick dates";
+                        if (sorted.length === 1) return format(from, "LLL dd, y");
+                        return `${format(from, "LLL dd, y")} - ${format(to, "LLL dd, y")} (${selectedRanges.length})`;
+                      })() : (
+                        <span>Pick dates range</span>
+                      )}
+                    </span>
+                    {selectedRanges.length > 0 && (
+                      <button
+                        type="button"
+                        aria-label="Clear date range"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 inline-flex items-center justify-center rounded-sm hover:bg-muted"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setDateRange({ from: undefined, to: undefined });
+                          setSelectedRanges([]);
                           setDateFrom("");
                           setDateTo("");
                         }}
                       >
                         <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                      </span>
+                      </button>
                     )}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={dateRange.from}
-                    selected={dateRange as any}
-                    onSelect={(range: any) => {
-                      setDateRange(range);
+                <PopoverContent
+                  align="start"
+                  className="z-50 w-auto rounded-md border bg-background p-3 shadow-lg"
+                >
+                  <MultiDateCalendar
+                    // Multiple date ranges (pick start/end, then another range)
+                    multiple
+                    range
+                    value={selectedRanges}
+                    onChange={(value) => {
+                      const values = (Array.isArray(value) ? value : value ? [value] : []) as unknown as DateObject[][];
+                      setSelectedRanges(values);
 
-                      if (range?.from) setDateFrom(format(range.from, "yyyy-MM-dd"));
-                      else setDateFrom("");
+                      const allDates = values
+                        .flat()
+                        .map((d) => (d instanceof DateObject ? d.toDate() : new Date(d as any)))
+                        .filter((d) => d instanceof Date && !Number.isNaN(d.getTime()));
 
-                      if (range?.to) setDateTo(format(range.to, "yyyy-MM-dd"));
-                      else setDateTo("");
+                      if (allDates.length === 0) {
+                        setDateFrom("");
+                        setDateTo("");
+                        return;
+                      }
+
+                      const sorted = [...allDates].sort((a, b) => a.getTime() - b.getTime());
+                      setDateFrom(format(sorted[0], "yyyy-MM-dd"));
+                      setDateTo(format(sorted[sorted.length - 1], "yyyy-MM-dd"));
                     }}
                     numberOfMonths={2}
+                    disableMonthPicker={false}
+                    disableYearPicker={false}
+                    className="w-full"
                   />
                 </PopoverContent>
               </Popover>

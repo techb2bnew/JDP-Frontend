@@ -16,6 +16,8 @@ import {
 import { usePermissions } from "../contexts/PermissionContext";
 import { globalApiCall } from "../utils/globalApiHandler";
 import { JobDetailsPage } from "./JobDetailsPage";
+import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 import {
   Collapsible,
   CollapsibleContent,
@@ -47,7 +49,7 @@ import {
   CheckCircle,
   Activity,
   Plus,
-  DollarSign,
+  DollarSign, 
 } from "lucide-react";
 import {
   Dialog,
@@ -67,6 +69,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "./ui/alert-dialog";
+import Link from "next/link";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "./ui/textarea";
 import {
@@ -582,6 +585,19 @@ export function CustomersPage() {
     }
   };
 
+  // Normalize phone to E.164 so react-phone-number-input can infer country/flag
+  const normalizePhoneToE164 = (rawPhone: string) => {
+    const raw = (rawPhone || "").trim();
+    if (!raw) return "";
+    if (raw.startsWith("+")) return raw;
+
+    const digits = raw.replace(/\D/g, "");
+    if (!digits) return "";
+    if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+    if (digits.length === 10) return `+1${digits}`;
+    return `+${digits}`;
+  };
+
   const validateForm = () => {
     const errors: Record<string, string> = {};
 
@@ -596,10 +612,9 @@ export function CustomersPage() {
     if (!customerFormData.phone.trim()) {
       errors.phone = "Phone number is required";
     } else {
-      // Remove all non-digit characters for validation
-      const phoneDigits = customerFormData.phone.replace(/\D/g, "");
-      if (phoneDigits.length !== 10) {
-        errors.phone = "Phone number must be exactly 10 digits";
+      const normalizedPhone = normalizePhoneToE164(customerFormData.phone);
+      if (!normalizedPhone || !isValidPhoneNumber(normalizedPhone)) {
+        errors.phone = "Please enter a valid phone number for the selected country";
       }
     }
     if (!customerFormData.address.trim()) {
@@ -672,7 +687,7 @@ export function CustomersPage() {
         customer_name: customerFormData.name,
         company_name: customerFormData.company || "",
         email: customerFormData.email.toLowerCase(),
-        phone: customerFormData.phone || "",
+        phone: normalizePhoneToE164(customerFormData.phone) || "",
         contact_person: customerFormData.contactPerson || "",
         address: customerFormData.address || "",
         status: customerFormData.status,
@@ -977,6 +992,9 @@ export function CustomersPage() {
     }
 
     try {
+      if (!validateForm()) {
+        return;
+      }
       setIsLoading(true);
 
       // Get system IP address
@@ -997,7 +1015,7 @@ export function CustomersPage() {
         customer_name: customerFormData.name,
         company_name: customerFormData.company || "",
         email: customerFormData.email.toLowerCase(),
-        phone: customerFormData.phone || "",
+        phone: normalizePhoneToE164(customerFormData.phone) || "",
         contact_person: customerFormData.contactPerson || "",
         address: customerFormData.address || "",
         status: customerFormData.status,
@@ -1164,7 +1182,7 @@ export function CustomersPage() {
         const customerData = {
           name: apiCustomer.customer_name || "",
           email: apiCustomer.email || "",
-          phone: apiCustomer.phone || "",
+          phone: normalizePhoneToE164(apiCustomer.phone || ""),
           contactPerson: apiCustomer.contact_person || "",
           address: apiCustomer.address || "",
           company: apiCustomer.company_name || "",
@@ -1674,12 +1692,20 @@ export function CustomersPage() {
                 </h1>
                 <p className="text-lg text-gray-600">Customer Details</p>
               </div>
+              <div className="flex items-center gap-2">
+              <Link href={'/jobs?create=true'}
+              className="flex items-center w-[120px] p-2 justify-center border rounded gap-2"
+            >
+              <Briefcase className="h-4 w-4" />
+              Add Jobs
+            </Link>
               <Badge
                 variant="default"
-                className="px-3 py-1 bg-green-100 text-green-800 border-green-200"
+                className="p-2 bg-green-100 text-green-800 border-green-200"
               >
                 Active
               </Badge>
+              </div>
             </div>
 
             {/* Contact Information Card */}
@@ -2053,20 +2079,24 @@ export function CustomersPage() {
                     <Label className="mb-2" htmlFor="phone">
                       Phone Number *
                     </Label>
-                    <Input
+                    <PhoneInput
                       id="phone"
-                      type="number"
+                      international
+                      defaultCountry="US"
                       value={customerFormData.phone}
-                      onChange={(e) => {
+                      onChange={(value) => {
+                        const safeValue = value || "";
                         setCustomerFormData({
                           ...customerFormData,
-                          phone: e.target.value,
+                          phone: safeValue,
                         });
                         clearValidationError("phone");
                       }}
-                      placeholder="Enter phone number"
-                      className={`mt-1 ${validationErrors.phone ? "border-red-500" : ""}`}
-                      required
+                      className={
+                        validationErrors.phone
+                          ? "mt-1 border border-red-500 rounded-md px-3 py-2"
+                          : "mt-1 border border-gray-300 rounded-md px-3 py-2"
+                      }
                     />
                     {validationErrors.phone && (
                       <p className="text-red-500 text-sm mt-1">

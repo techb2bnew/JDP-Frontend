@@ -32,7 +32,8 @@ import {
   Upload,
   Download,
   File,
-  MoreVertical
+  MoreVertical,
+  Briefcase
 } from 'lucide-react'
 import { BlueSheetApprovalDialog, type BlueSheetItem as DialogBlueSheetItem } from './invoices/BlueSheetApprovalDialog'
 import {
@@ -77,6 +78,7 @@ import TimeRangePicker from '@wojtekmaj/react-timerange-picker'
 import '@wojtekmaj/react-timerange-picker/dist/TimeRangePicker.css'
 import Autocomplete from 'react-google-autocomplete'
 import ActivityLogs from './ActivityLogs'
+import Link from 'next/link'
 
 // Sample data structure - replace with your actual data
 const sampleJobData = {
@@ -2656,7 +2658,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
             total: (item.qty || 1) * (product.estimatedPrice || product.jdpPrice || 0),
             showSearchResults: false,
             searchQuery: '',
-            supplierId: product.supplierId || selectedSupplierId || 1
+            supplierId: product.supplierId || selectedSupplierId || 1,
+            // Searched/selected product => not custom
+            isCustomProduct: false,
           }
         }
         return item
@@ -2682,6 +2686,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
           return {
             ...item,
             item: productName,
+            // Manual/custom product => mark custom and remove any selected product reference
+            productId: null,
+            isCustomProduct: true,
             showSearchResults: false,
             searchQuery: ''
           }
@@ -3361,11 +3368,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
           unit_cost: item.rate,
           jdp_price: item.rate,
           estimated_price: item.estimatedPrice || 0,
-          total_cost: item.total
+          total_cost: item.total,
+          is_custom: item.isCustomProduct === true,
         }
 
-        // Add product ID if editing existing product
-        if (item.productId) {
+        // Add product ID only for searched/selected products
+        if (item.isCustomProduct !== true && item.productId) {
           productPayload.id = item.productId
         }
 
@@ -3504,11 +3512,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
           unit_cost: item.rate,
           jdp_price: item.rate,
           estimated_price: item.estimatedPrice || 0,
-          total_cost: item.total
+          total_cost: item.total,
+          is_custom: item.isCustomProduct === true,
         }
 
-        // Add product ID if editing existing product
-        if (item.productId) {
+        // Add product ID only for searched/selected products
+        if (item.isCustomProduct !== true && item.productId) {
           productPayload.id = item.productId
         }
 
@@ -3677,11 +3686,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
           unit_cost: item.rate,
           jdp_price: item.rate,
           estimated_price: item.estimatedPrice || 0,
-          total_cost: item.total
+          total_cost: item.total,
+          is_custom: item.isCustomProduct === true,
         }
 
-        // Add product ID if editing existing product
-        if (item.productId) {
+        // Add product ID only for searched/selected products
+        if (item.isCustomProduct !== true && item.productId) {
           productPayload.id = item.productId
         }
 
@@ -4107,6 +4117,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
           </div>
 
           <div className="flex items-center gap-3">
+           
             <div onClick={(e) => e.stopPropagation()}>
               <Button
                 variant="ghost"
@@ -4269,7 +4280,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                   Job Details
                 </CardTitle>
                 <div className="flex items-center gap-3">
-                  
+
                   {!isEditing && (
                     <Button
                       variant="outline"
@@ -4298,14 +4309,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                       <button
                         type="button"
                         onClick={() => setShowJobDetails(prev => !prev)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          showJobDetails ? 'bg-[#0EA5E9]' : 'bg-gray-300'
-                        }`}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${showJobDetails ? 'bg-[#0EA5E9]' : 'bg-gray-300'
+                          }`}
                       >
                         <span
-                          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                            showJobDetails ? 'translate-x-5' : 'translate-x-1'
-                          }`}
+                          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${showJobDetails ? 'translate-x-5' : 'translate-x-1'
+                            }`}
                         />
                       </button>
                     </div>
@@ -4313,365 +4322,365 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                 </div>
               </CardHeader>
               {(isEditing || showJobDetails) && (
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className={`flex items-center gap-3 ${!isEditing ? 'bg-[#f2f0f0] p-3 rounded-md' : ''}`}>
-                      {!isEditing && (
-                        <Users className="h-4 w-4 text-black-600" />
-                      )}
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-600"> {isEditing ? "Job Title" : "Customer / Contractor"}</p>
-                        {isEditing ? (
-                          <Input
-                            value={editedJob.title}
-                            onChange={(e) => setEditedJob({ ...editedJob, title: e.target.value })}
-                          />
-                        ) : (
-                          <p className="font-medium">{job.customerName || job.contractorName || 'No customer assigned'}</p>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div className={`flex items-center gap-3 ${!isEditing ? 'bg-[#f2f0f0] p-3 rounded-md' : ''}`}>
+                        {!isEditing && (
+                          <Users className="h-4 w-4 text-black-600" />
                         )}
-                      </div>
-                    </div>
-                    {!isEditing && (
-                      <div className={`flex items-center gap-3 ${!isEditing ? 'bg-[#dae8ff80] p-3 rounded-md' : ''}`}>
-                        <Clock className="h-4 w-4 text-black-600" />
                         <div className="flex-1">
-                          <p className="text-sm text-gray-600">Created At</p>
+                          <p className="text-sm text-gray-600"> {isEditing ? "Job Title" : "Customer / Contractor"}</p>
                           {isEditing ? (
                             <Input
-                              value={editedJob.startDate}
-                              onChange={(e) => setEditedJob({ ...editedJob, startDate: e.target.value })}
+                              value={editedJob.title}
+                              onChange={(e) => setEditedJob({ ...editedJob, title: e.target.value })}
                             />
                           ) : (
-                            <p className="font-medium">{editedJob.startDate}</p>
+                            <p className="font-medium">{job.customerName || job.contractorName || 'No customer assigned'}</p>
                           )}
                         </div>
                       </div>
-                    )}
-                    {!isEditing && (
-                      <div className={`flex items-center gap-3 ${!isEditing ? 'bg-[#bbf7d021] p-3 rounded-md' : ''}`}>
-                        <MapPin className="h-4 w-4 text-black-600" />
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-600">Location</p>
-                          <p className="font-medium">{editedJob.location}</p>
+                      {!isEditing && (
+                        <div className={`flex items-center gap-3 ${!isEditing ? 'bg-[#dae8ff80] p-3 rounded-md' : ''}`}>
+                          <Clock className="h-4 w-4 text-black-600" />
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-600">Created At</p>
+                            {isEditing ? (
+                              <Input
+                                value={editedJob.startDate}
+                                onChange={(e) => setEditedJob({ ...editedJob, startDate: e.target.value })}
+                              />
+                            ) : (
+                              <p className="font-medium">{editedJob.startDate}</p>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className={`flex-1 ${!isEditing ? 'bg-[#dbdaff30] p-3 rounded-md' : ''}`}>
-                      <p className="text-sm text-gray-600">Job Type</p>
-                      {isEditing ? (
-                        <Select
-                          value={editedJob.type}
-                          onValueChange={(value) => setEditedJob({ ...editedJob, type: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select job type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="service-based">Service-based</SelectItem>
-                            <SelectItem value="contract-based">Contract-based</SelectItem>
-                          </SelectContent>
-                        </Select>
-
-                        // <Input
-                        //   value={editedJob.type}
-                        //   onChange={(e) => setEditedJob({ ...editedJob, type: e.target.value })}
-                        // />
-                      ) : (
-                        <p className="font-medium">{editedJob.type}</p>
                       )}
-                    </div>
-                    {!isEditing && (
-                      <div className={`flex-1 ${!isEditing ? 'bg-[#fff7ed8c] p-3 rounded-md' : ''}`}>
-                        <p className="text-sm text-gray-600">Job Estimate</p>
-                        <p className="font-medium">{formatCurrency(job.estimatedCost)}</p>
-                      </div>
-                    )}
-                    {!isEditing && (
-
-                      <div className={`flex-1 ${!isEditing ? 'bg-[#9f6b290d] p-3 rounded-md' : ''}`}>
-                        <p className="text-sm text-gray-600">Job Title</p>
-                        <span className="inline-block  text-black-600 text-xs font-medium  ">
-                          {editedJob.title}
-                        </span>
-                      </div>
-                    )}
-
-                  </div>
-                  <div className="space-y-4">
-                    <div className={`flex-1 ${!isEditing ? 'bg-[#dbdaff30] p-3 rounded-md' : ''}`}>
-                      <p className="text-sm text-gray-600">Status</p>
-                      {isEditing ? (
-                        <Select
-                          value={editedJob.status}
-                          onValueChange={(value) => setEditedJob({ ...editedJob, status: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="draft">Draft</SelectItem>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="in_progress">In-Progress</SelectItem>
-                            <SelectItem value="completed">Completed</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
-                            <SelectItem value="on_hold">On Hold</SelectItem>
-                          </SelectContent>
-                        </Select>
-
-                        // <Input
-                        //   value={editedJob.type}
-                        //   onChange={(e) => setEditedJob({ ...editedJob, type: e.target.value })}
-                        // />
-                      ) : (
-                        <p className="font-medium">{editedJob.status}</p>
+                      {!isEditing && (
+                        <div className={`flex items-center gap-3 ${!isEditing ? 'bg-[#bbf7d021] p-3 rounded-md' : ''}`}>
+                          <MapPin className="h-4 w-4 text-black-600" />
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-600">Location</p>
+                            <p className="font-medium">{editedJob.location}</p>
+                          </div>
+                        </div>
                       )}
                     </div>
 
+                    <div className="space-y-4">
+                      <div className={`flex-1 ${!isEditing ? 'bg-[#dbdaff30] p-3 rounded-md' : ''}`}>
+                        <p className="text-sm text-gray-600">Job Type</p>
+                        {isEditing ? (
+                          <Select
+                            value={editedJob.type}
+                            onValueChange={(value) => setEditedJob({ ...editedJob, type: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select job type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="service-based">Service-based</SelectItem>
+                              <SelectItem value="contract-based">Contract-based</SelectItem>
+                            </SelectContent>
+                          </Select>
+
+                          // <Input
+                          //   value={editedJob.type}
+                          //   onChange={(e) => setEditedJob({ ...editedJob, type: e.target.value })}
+                          // />
+                        ) : (
+                          <p className="font-medium">{editedJob.type}</p>
+                        )}
+                      </div>
+                      {!isEditing && (
+                        <div className={`flex-1 ${!isEditing ? 'bg-[#fff7ed8c] p-3 rounded-md' : ''}`}>
+                          <p className="text-sm text-gray-600">Job Estimate</p>
+                          <p className="font-medium">{formatCurrency(job.estimatedCost)}</p>
+                        </div>
+                      )}
+                      {!isEditing && (
+
+                        <div className={`flex-1 ${!isEditing ? 'bg-[#9f6b290d] p-3 rounded-md' : ''}`}>
+                          <p className="text-sm text-gray-600">Job Title</p>
+                          <span className="inline-block  text-black-600 text-xs font-medium  ">
+                            {editedJob.title}
+                          </span>
+                        </div>
+                      )}
+
+                    </div>
+                    <div className="space-y-4">
+                      <div className={`flex-1 ${!isEditing ? 'bg-[#dbdaff30] p-3 rounded-md' : ''}`}>
+                        <p className="text-sm text-gray-600">Status</p>
+                        {isEditing ? (
+                          <Select
+                            value={editedJob.status}
+                            onValueChange={(value) => setEditedJob({ ...editedJob, status: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="draft">Draft</SelectItem>
+                              <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="in_progress">In-Progress</SelectItem>
+                              <SelectItem value="completed">Completed</SelectItem>
+                              <SelectItem value="cancelled">Cancelled</SelectItem>
+                              <SelectItem value="on_hold">On Hold</SelectItem>
+                            </SelectContent>
+                          </Select>
+
+                          // <Input
+                          //   value={editedJob.type}
+                          //   onChange={(e) => setEditedJob({ ...editedJob, type: e.target.value })}
+                          // />
+                        ) : (
+                          <p className="font-medium">{editedJob.status}</p>
+                        )}
+                      </div>
+
+
+                    </div>
 
                   </div>
+                  {isEditing && (
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-600">Location</p>
+                        <Autocomplete
+                          apiKey="AIzaSyBtb6hSmwJ9_OznDC5e8BcZM90ms4WD_DE"
+                          onPlaceSelected={(place: any) => {
+                            if (!place) return;
 
-                </div>
-                {isEditing && (
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-600">Location</p>
-                      <Autocomplete
-                        apiKey="AIzaSyBtb6hSmwJ9_OznDC5e8BcZM90ms4WD_DE"
-                        onPlaceSelected={(place: any) => {
-                          if (!place) return;
+                            try {
+                              // Parse address components
+                              const addressComponents = place.address_components || [];
+                              let streetNumber = '';
+                              let route = '';
+                              let city = '';
+                              let state = '';
+                              let zipCode = '';
+                              let sublocality = '';
 
-                          try {
-                            // Parse address components
-                            const addressComponents = place.address_components || [];
-                            let streetNumber = '';
-                            let route = '';
-                            let city = '';
-                            let state = '';
-                            let zipCode = '';
-                            let sublocality = '';
+                              addressComponents.forEach((component: any) => {
+                                const types = component.types;
+                                if (types.includes('street_number')) {
+                                  streetNumber = component.long_name;
+                                } else if (types.includes('route')) {
+                                  route = component.long_name;
+                                } else if (types.includes('locality')) {
+                                  city = component.long_name;
+                                } else if (types.includes('sublocality') || types.includes('sublocality_level_1')) {
+                                  sublocality = component.long_name;
+                                } else if (types.includes('administrative_area_level_1')) {
+                                  state = component.short_name;
+                                } else if (types.includes('postal_code')) {
+                                  zipCode = component.long_name;
+                                }
+                              });
 
-                            addressComponents.forEach((component: any) => {
-                              const types = component.types;
-                              if (types.includes('street_number')) {
-                                streetNumber = component.long_name;
-                              } else if (types.includes('route')) {
-                                route = component.long_name;
-                              } else if (types.includes('locality')) {
-                                city = component.long_name;
-                              } else if (types.includes('sublocality') || types.includes('sublocality_level_1')) {
-                                sublocality = component.long_name;
-                              } else if (types.includes('administrative_area_level_1')) {
-                                state = component.short_name;
-                              } else if (types.includes('postal_code')) {
-                                zipCode = component.long_name;
+                              // Use sublocality if city is not available
+                              if (!city && sublocality) {
+                                city = sublocality;
                               }
-                            });
 
-                            // Use sublocality if city is not available
-                            if (!city && sublocality) {
-                              city = sublocality;
-                            }
-
-                            // Build address - use street number + route, or fallback to formatted address
-                            let fullAddress = `${streetNumber} ${route}`.trim();
-                            if (!fullAddress) {
-                              const formattedAddress = place.formatted_address || place.name || '';
-                              const parts = formattedAddress.split(',');
-                              fullAddress = parts[0] || '';
-                            }
-
-                            // Build cityZip - prioritize city, state, zip
-                            let cityZip = '';
-                            if (city && state && zipCode) {
-                              cityZip = `${city}, ${state} ${zipCode}`;
-                            } else if (city && state) {
-                              cityZip = `${city}, ${state}`;
-                            } else if (city) {
-                              cityZip = city;
-                            } else if (place.formatted_address) {
-                              const parts = place.formatted_address.split(',');
-                              if (parts.length > 1) {
-                                cityZip = parts.slice(1).join(',').trim();
+                              // Build address - use street number + route, or fallback to formatted address
+                              let fullAddress = `${streetNumber} ${route}`.trim();
+                              if (!fullAddress) {
+                                const formattedAddress = place.formatted_address || place.name || '';
+                                const parts = formattedAddress.split(',');
+                                fullAddress = parts[0] || '';
                               }
-                            }
 
-                            // Update editedJob with parsed address components
-                            const formattedAddress = place.formatted_address || place.name || fullAddress;
-                            setEditedJob({
-                              ...editedJob,
-                              location: formattedAddress,
-                              address: fullAddress,
-                              cityZip: cityZip,
-                            });
-                          } catch (error) {
-                            console.error('Error parsing place:', error);
-                            // Fallback to formatted address
-                            const address = place.formatted_address || place.name || editedJob.location;
-                            setEditedJob({ ...editedJob, location: address });
-                          }
-                        }}
-                        options={{
-                          types: ['address'],
-                          componentRestrictions: { country: 'us' },
-                        }}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                        placeholder="Start typing address..."
-                        defaultValue={editedJob.location}
-                        onChange={(e: any) => {
-                          setEditedJob({ ...editedJob, location: e.target.value });
-                        }}
+                              // Build cityZip - prioritize city, state, zip
+                              let cityZip = '';
+                              if (city && state && zipCode) {
+                                cityZip = `${city}, ${state} ${zipCode}`;
+                              } else if (city && state) {
+                                cityZip = `${city}, ${state}`;
+                              } else if (city) {
+                                cityZip = city;
+                              } else if (place.formatted_address) {
+                                const parts = place.formatted_address.split(',');
+                                if (parts.length > 1) {
+                                  cityZip = parts.slice(1).join(',').trim();
+                                }
+                              }
+
+                              // Update editedJob with parsed address components
+                              const formattedAddress = place.formatted_address || place.name || fullAddress;
+                              setEditedJob({
+                                ...editedJob,
+                                location: formattedAddress,
+                                address: fullAddress,
+                                cityZip: cityZip,
+                              });
+                            } catch (error) {
+                              console.error('Error parsing place:', error);
+                              // Fallback to formatted address
+                              const address = place.formatted_address || place.name || editedJob.location;
+                              setEditedJob({ ...editedJob, location: address });
+                            }
+                          }}
+                          options={{
+                            types: ['address'],
+                            componentRestrictions: { country: 'us' },
+                          }}
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          placeholder="Start typing address..."
+                          defaultValue={editedJob.location}
+                          onChange={(e: any) => {
+                            setEditedJob({ ...editedJob, location: e.target.value });
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="text-sm text-gray-600 mb-2">Description</p>
+                    {isEditing ? (
+                      <Textarea
+                        value={editedJob.description}
+                        maxLength={30}
+                        onChange={(e) => setEditedJob({ ...editedJob, description: e.target.value })}
                       />
-                    </div>
+                    ) : (
+                      <p className="text-sm bg-gray-100 p-3 rounded-md">{editedJob.description}</p>
+                    )}
                   </div>
-                )}
 
-                <div>
-                  <p className="text-sm text-gray-600 mb-2">Description</p>
-                  {isEditing ? (
-                    <Textarea
-                      value={editedJob.description}
-                      maxLength={30}
-                      onChange={(e) => setEditedJob({ ...editedJob, description: e.target.value })}
-                    />
-                  ) : (
-                    <p className="text-sm bg-gray-100 p-3 rounded-md">{editedJob.description}</p>
-                  )}
-                </div>
+                  <div>
+                    <Label className="flex items-center gap-2 mb-2">
+                      <UserCheck className="h-4 w-4 text-[#00A1FF]" />
+                      Assigned Lead Labor
+                    </Label>
 
-                <div>
-                  <Label className="flex items-center gap-2 mb-2">
-                    <UserCheck className="h-4 w-4 text-[#00A1FF]" />
-                    Assigned Lead Labor
-                  </Label>
+                    {isEditing ? (
+                      <AutoScrollMultiSelect
+                        selectedValues={(() => {
+                          const values = editedJob.assignedLeadLabor?.map((labor: any) => {
+                            // Handle different data structures
+                            if (typeof labor === 'string') return labor;
+                            if (labor.id) return labor.id.toString();
+                            if (labor.user?.id) return labor.user.id.toString();
+                            return labor.toString();
+                          }) || [];
+                          console.log('Lead Labor selectedValues:', values, 'Original data:', editedJob.assignedLeadLabor);
+                          return values;
+                        })()}
+                        selectedObjects={editedJob.assignedLeadLabor?.map((labor: any) => ({
+                          id: labor.id,
+                          name: labor.name || labor.user?.full_name || labor.labor_code || `Labor ${labor.id}`,
+                          labor_code: labor.labor_code,
+                          department: labor.department,
+                          specialization: labor.specialization,
+                          trade: labor.trade
+                        })) || []}
+                        onSelectionChange={(selectedIds, selectedItems) => {
+                          console.log('Lead Labor selection changed:', { selectedIds, selectedItems });
+                          const validSelectedItems = selectedItems.filter((labor: any) => labor !== undefined);
 
-                  {isEditing ? (
-                    <AutoScrollMultiSelect
-                      selectedValues={(() => {
-                        const values = editedJob.assignedLeadLabor?.map((labor: any) => {
-                          // Handle different data structures
-                          if (typeof labor === 'string') return labor;
-                          if (labor.id) return labor.id.toString();
-                          if (labor.user?.id) return labor.user.id.toString();
-                          return labor.toString();
-                        }) || [];
-                        console.log('Lead Labor selectedValues:', values, 'Original data:', editedJob.assignedLeadLabor);
-                        return values;
-                      })()}
-                      selectedObjects={editedJob.assignedLeadLabor?.map((labor: any) => ({
-                        id: labor.id,
-                        name: labor.name || labor.user?.full_name || labor.labor_code || `Labor ${labor.id}`,
-                        labor_code: labor.labor_code,
-                        department: labor.department,
-                        specialization: labor.specialization,
-                        trade: labor.trade
-                      })) || []}
-                      onSelectionChange={(selectedIds, selectedItems) => {
-                        console.log('Lead Labor selection changed:', { selectedIds, selectedItems });
-                        const validSelectedItems = selectedItems.filter((labor: any) => labor !== undefined);
+                          setEditedJob((prev) => ({
+                            ...prev,
+                            assignedLeadLabor: validSelectedItems,
+                          }));
 
-                        setEditedJob((prev) => ({
-                          ...prev,
-                          assignedLeadLabor: validSelectedItems,
-                        }));
-
-                      }}
-                      placeholder="Select lead labor"
-                      fetchData={apiClient.getLeadLabor}
-                      displayField="name"
-                      valueField="id"
-                    />
+                        }}
+                        placeholder="Select lead labor"
+                        fetchData={apiClient.getLeadLabor}
+                        displayField="name"
+                        valueField="id"
+                      />
 
 
-                  ) : (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {(editedJob.assignedLeadLabor || []).map((labor: any, index: number) => (
-                        <span
-                          key={labor.id || `labor-${index}`}
-                          className="bg-blue-50 text-blue-700 text-sm px-2 py-1 rounded-md border border-blue-200"
-                        >
-                          {labor.name || labor.user?.full_name || labor.labor_code}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-
-                <div>
-                  <Label className="flex items-center gap-2 mb-2">
-                    <Users className="h-4 w-4 text-[#00A1FF]" />
-                    Assigned Labor
-                  </Label>
-
-                  {isEditing ? (
-                    <AutoScrollMultiSelect
-                      selectedValues={(() => {
-                        const values = editedJob.assignedLabor?.map((labor: any) => {
-                          // Handle different data structures
-                          if (typeof labor === 'string') return labor;
-                          if (labor.id) return labor.id.toString();
-                          if (labor.user?.id) return labor.user.id.toString();
-                          return labor.toString();
-                        }) || [];
-                        console.log('Labor selectedValues:', values, 'Original data:', editedJob.assignedLabor);
-                        return values;
-                      })()}
-                      selectedObjects={editedJob.assignedLabor?.map((labor: any) => ({
-                        id: labor.id,
-                        name: labor.name || labor.user?.full_name || labor.labor_code || `Labor ${labor.id}`,
-                        labor_code: labor.labor_code,
-                        trade: labor.trade,
-                        experience: labor.experience,
-                        hourly_rate: labor.hourly_rate
-                      })) || []}
-                      onSelectionChange={(selectedIds, selectedItems) => {
-                        console.log('Labor selection changed:', { selectedIds, selectedItems });
-                        const validSelectedItems = selectedItems.filter((labor: any) => labor !== undefined);
-
-                        setEditedJob((prev) => ({
-                          ...prev,
-                          assignedLabor: validSelectedItems,
-                        }));
-
-                      }}
-                      placeholder="Select labor"
-                      fetchData={apiClient.getLabor}
-                      displayField="name"
-                      valueField="id"
-                    />
-
-                  ) : (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {(editedJob.assignedLabor || []).map((labor: any, index: number) => {
-
-                        return (
+                    ) : (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {(editedJob.assignedLeadLabor || []).map((labor: any, index: number) => (
                           <span
                             key={labor.id || `labor-${index}`}
-                            className="bg-orange-50 text-orange-700 text-sm px-2 py-1 rounded-md border border-orange-200"
+                            className="bg-blue-50 text-blue-700 text-sm px-2 py-1 rounded-md border border-blue-200"
                           >
                             {labor.name || labor.user?.full_name || labor.labor_code}
                           </span>
-                        );
-                      })}
-                    </div>
-
-                  )}
-
-
-                </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
 
+                  <div>
+                    <Label className="flex items-center gap-2 mb-2">
+                      <Users className="h-4 w-4 text-[#00A1FF]" />
+                      Assigned Labor
+                    </Label>
+
+                    {isEditing ? (
+                      <AutoScrollMultiSelect
+                        selectedValues={(() => {
+                          const values = editedJob.assignedLabor?.map((labor: any) => {
+                            // Handle different data structures
+                            if (typeof labor === 'string') return labor;
+                            if (labor.id) return labor.id.toString();
+                            if (labor.user?.id) return labor.user.id.toString();
+                            return labor.toString();
+                          }) || [];
+                          console.log('Labor selectedValues:', values, 'Original data:', editedJob.assignedLabor);
+                          return values;
+                        })()}
+                        selectedObjects={editedJob.assignedLabor?.map((labor: any) => ({
+                          id: labor.id,
+                          name: labor.name || labor.user?.full_name || labor.labor_code || `Labor ${labor.id}`,
+                          labor_code: labor.labor_code,
+                          trade: labor.trade,
+                          experience: labor.experience,
+                          hourly_rate: labor.hourly_rate
+                        })) || []}
+                        onSelectionChange={(selectedIds, selectedItems) => {
+                          console.log('Labor selection changed:', { selectedIds, selectedItems });
+                          const validSelectedItems = selectedItems.filter((labor: any) => labor !== undefined);
+
+                          setEditedJob((prev) => ({
+                            ...prev,
+                            assignedLabor: validSelectedItems,
+                          }));
+
+                        }}
+                        placeholder="Select labor"
+                        fetchData={apiClient.getLabor}
+                        displayField="name"
+                        valueField="id"
+                      />
+
+                    ) : (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {(editedJob.assignedLabor || []).map((labor: any, index: number) => {
+
+                          return (
+                            <span
+                              key={labor.id || `labor-${index}`}
+                              className="bg-orange-50 text-orange-700 text-sm px-2 py-1 rounded-md border border-orange-200"
+                            >
+                              {labor.name || labor.user?.full_name || labor.labor_code}
+                            </span>
+                          );
+                        })}
+                      </div>
+
+                    )}
+
+
+                  </div>
 
 
 
 
-                {/* Assigned Labor Section */}
-                {/* {job.assignedLaborDetails && job.assignedLaborDetails.length > 0 && (
+
+
+                  {/* Assigned Labor Section */}
+                  {/* {job.assignedLaborDetails && job.assignedLaborDetails.length > 0 && (
                   <div>
                     <p className="text-sm text-gray-600 mb-2">Assigned Labor</p>
                     <div className="space-y-2">
@@ -4694,8 +4703,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                   </div>
                 )} */}
 
-                {/* Assigned Lead Labor Section */}
-                {/* {job.assignedLeadLaborDetails && job.assignedLeadLaborDetails.length > 0 && (
+                  {/* Assigned Lead Labor Section */}
+                  {/* {job.assignedLeadLaborDetails && job.assignedLeadLaborDetails.length > 0 && (
                   <div>
                     <p className="text-sm text-gray-600 mb-2">Lead Labor</p>
                     <div className="space-y-2">
@@ -4717,7 +4726,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                     </div>
                   </div>
                 )} */}
-              </CardContent>
+                </CardContent>
               )}
               <CardFooter>
                 {isEditing && (
@@ -5502,8 +5511,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                         </div>
                         <div>
                           <div className="flex items-center gap-3 mb-1">
-                            <h4 className="font-semibold text-foreground">{invoice.invoice_type || 'Estimate'}</h4>
-                            <Badge className={`${getInvoiceTypeColor(invoice.invoice_type)} text-xs font-medium`} variant="outline">
+                            <h4 className="font-semibold text-foreground capitalize">{invoice.invoice_type || 'Estimate'}</h4>
+                            <Badge className={`${getInvoiceTypeColor(invoice.invoice_type)} text-xs font-medium capitalize`} variant="outline">
                               {invoice.invoice_type || 'Estimate'}
                             </Badge>
                           </div>
@@ -5716,8 +5725,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                           <span className="font-medium">Bluesheet #{sheet.id}</span>
                           <span
                             className={`px-2 py-0.5 text-xs rounded-full ${sheet.status === 'approved'
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-yellow-100 text-yellow-700'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-yellow-100 text-yellow-700'
                               }`}
                           >
                             {sheet.status === 'approved' ? 'Approved' : 'Pending'}
@@ -7452,7 +7461,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
           </DialogFooter>
         </DialogContent>
       </Dialog>
-        <ActivityLogs jobId={jobId} />
+      <ActivityLogs jobId={jobId} />
     </div>
   )
 }

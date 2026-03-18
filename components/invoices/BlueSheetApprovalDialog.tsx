@@ -1897,7 +1897,7 @@ export function BlueSheetApprovalDialog({
                           size="lg"
                         >
                           <Send className="h-4 w-4" />
-                          {isApproving ? 'Approving...' : 'Send Invoice From Quickbook'}
+                          {isApproving ? 'Sending...' : 'Send Invoice From Quickbook'}
                         </Button>
                         <Button 
                           onClick={async () => {
@@ -1914,7 +1914,7 @@ export function BlueSheetApprovalDialog({
                           size="lg"
                         >
                           <Send className="h-4 w-4" />
-                          {isApprovingCustomer ? 'Approving...' : 'Send Invoice Directly'}
+                          {isApprovingCustomer ? 'Sending...' : 'Send Invoice Directly'}
                         </Button>
                       </div>
                     </div>
