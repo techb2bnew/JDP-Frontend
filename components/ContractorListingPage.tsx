@@ -19,6 +19,9 @@ import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { Textarea } from './ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
+import Autocomplete from "react-google-autocomplete";
+import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 import { toast } from 'sonner'
 import jsPDF from 'jspdf'
 import { globalApiCall } from '../utils/globalApiHandler'
@@ -955,6 +958,58 @@ export function ContractorListingPage() {
 
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 
+  const normalizePhoneToE164 = (rawPhone: string) => {
+    const raw = (rawPhone || "").trim();
+    if (!raw) return "";
+    if (raw.startsWith("+")) return raw;
+
+    const digits = raw.replace(/\D/g, "");
+    if (!digits) return "";
+    if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+    if (digits.length === 10) return `+1${digits}`;
+    return `+${digits}`;
+  };
+
+  // Fix Google Autocomplete dropdown z-index and prevent Dialog close
+  useEffect(() => {
+    if (!showCreateContractModal) return;
+
+    const style = document.createElement("style");
+    style.id = "google-autocomplete-styles-contractor";
+    style.textContent = `
+      .pac-container {
+        z-index: 999999 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+        margin-top: 4px !important;
+        position: absolute !important;
+      }
+      .pac-item { padding: 8px 12px !important; cursor: pointer !important; pointer-events: auto !important; }
+      .pac-item:hover { background-color: #f3f4f6 !important; }
+      .pac-item-selected { background-color: #e5e7eb !important; }
+      body:has(.pac-container:not([style*="display: none"])) [data-radix-dialog-overlay] { pointer-events: none !important; }
+      [data-radix-dialog-content] { pointer-events: auto !important; }
+    `;
+    const existingStyle = document.getElementById("google-autocomplete-styles-contractor");
+    if (existingStyle) document.head.removeChild(existingStyle);
+    document.head.appendChild(style);
+
+    const handleOverlayClick = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target.closest(".pac-container")) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    };
+    document.addEventListener("click", handleOverlayClick, true);
+
+    return () => {
+      document.removeEventListener("click", handleOverlayClick, true);
+      const s = document.getElementById("google-autocomplete-styles-contractor");
+      if (s) document.head.removeChild(s);
+    };
+  }, [showCreateContractModal]);
+
   // Fetch contractors data
   const fetchContractorsData = async () => {
     try {
@@ -1088,7 +1143,7 @@ export function ContractorListingPage() {
         setContractFormData({
           contractor_name: contractorData.contractor_name || '',
           email: contractorData.email || '',
-          phone: contractorData.phone || '',
+          phone: normalizePhoneToE164(contractorData.phone || ''),
           address: contractorData.address || '',
           note: '',
           company_name: contractorData.company_name || '',
@@ -1317,8 +1372,11 @@ export function ContractorListingPage() {
 
     if (!contractFormData.phone.trim()) {
       errors.phone = 'Phone number is required'
-    } else if (!/^\d{10}$/.test(contractFormData.phone.replace(/\D/g, ''))) {
-      errors.phone = 'Phone number must be exactly 10 digits'
+    } else {
+      const normalized = normalizePhoneToE164(contractFormData.phone)
+      if (!normalized || !isValidPhoneNumber(normalized)) {
+        errors.phone = 'Please enter a valid phone number'
+      }
     }
 
     setValidationErrors(errors)
@@ -1363,7 +1421,7 @@ export function ContractorListingPage() {
         contractor_name: contractFormData.contractor_name,
         company_name: contractFormData.company_name,
         email: contractFormData.email.toLowerCase(),
-        phone: contractFormData.phone,
+        phone: normalizePhoneToE164(contractFormData.phone) || '',
         address: contractFormData.address,
         status: contractFormData.status,
         system_ip: system_ip
@@ -3173,7 +3231,21 @@ export function ContractorListingPage() {
 
       {/* Create Contract Modal */}
       <Dialog open={showCreateContractModal} onOpenChange={setShowCreateContractModal}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent
+          className="max-w-2xl"
+          onInteractOutside={(e) => {
+            const target = e.target as HTMLElement | null;
+            if (target?.closest?.(".pac-container")) e.preventDefault();
+          }}
+          onPointerDownOutside={(e) => {
+            const target = e.target as HTMLElement | null;
+            if (target?.closest?.(".pac-container")) e.preventDefault();
+          }}
+          onFocusOutside={(e) => {
+            const target = e.target as HTMLElement | null;
+            if (target?.closest?.(".pac-container")) e.preventDefault();
+          }}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {isViewMode ? 'View Contractor' : isEditMode ? 'Edit Contractor' : 'Create New Contractor'}
@@ -3227,13 +3299,15 @@ export function ContractorListingPage() {
                 <Label htmlFor="phone" className="text-sm font-medium">
                   Phone Number *
                 </Label>
-                <Input
+                <PhoneInput
                   id="phone"
+                  international
+                  defaultCountry="US"
                   value={contractFormData.phone}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
-                  placeholder="Enter 10-digit phone number"
+                  onChange={(value) => handleInputChange('phone', value || '')}
+                  placeholder="Enter phone number"
                   disabled={isViewMode}
-                  className={validationErrors.phone ? 'border-red-500 focus:border-red-500' : ''}
+                  className={validationErrors.phone ? 'border-red-500 focus:border-red-500 rounded-md px-2 py-2' : 'border border-gray-300 rounded-md px-2 py-2'}
                 />
                 {validationErrors.phone && (
                   <p className="text-sm text-red-600">{validationErrors.phone}</p>
@@ -3257,13 +3331,56 @@ export function ContractorListingPage() {
               <Label htmlFor="address" className="text-sm font-medium">
                 Address
               </Label>
-              <Textarea
-                id="address"
+              <Autocomplete
+                apiKey="AIzaSyBtb6hSmwJ9_OznDC5e8BcZM90ms4WD_DE"
+                onPlaceSelected={(place: any) => {
+                  if (place) {
+                    // Keep overlay disabled during selection to prevent modal close
+                    const overlay = document.querySelector(
+                      "[data-radix-dialog-overlay]",
+                    );
+                    if (overlay) {
+                      (overlay as HTMLElement).style.pointerEvents = "none";
+                    }
+
+                    const address =
+                      place.formatted_address || place.name || "";
+                    if (address) {
+                      handleInputChange("address", address);
+                    }
+
+                    // Re-enable overlay after a short delay
+                    setTimeout(() => {
+                      const pacContainer =
+                        document.querySelector(".pac-container");
+                      if (
+                        overlay &&
+                        (!pacContainer ||
+                          window.getComputedStyle(pacContainer).display ===
+                            "none")
+                      ) {
+                        (overlay as HTMLElement).style.pointerEvents =
+                          "auto";
+                      }
+                    }, 300);
+                  }
+                }}
+                options={{
+                  types: ["address"],
+                  componentRestrictions: { country: "us" },
+                }}
                 value={contractFormData.address}
-                onChange={(e) => handleInputChange('address', e.target.value)}
+                onChange={(e: any) => {
+                  const value = e.target.value;
+                  handleInputChange("address", value);
+                }}
                 placeholder="Enter contractor's address"
                 disabled={isViewMode}
-                rows={3}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent mt-1 ${
+                  validationErrors.address
+                    ? "border-red-500"
+                    : "border-gray-300"
+                }`}
               />
             </div>
 

@@ -1212,7 +1212,7 @@ const fetchLaborById = async (id: string) => {
         <Label htmlFor="address">Address *</Label>
         <Autocomplete
           apiKey={
-            process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
+            process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 
             "AIzaSyBtb6hSmwJ9_OznDC5e8BcZM90ms4WD_DE"
           }
           onPlaceSelected={(place: any) => {

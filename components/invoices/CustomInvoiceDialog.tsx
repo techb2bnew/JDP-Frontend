@@ -1075,7 +1075,7 @@ export const CustomInvoiceDialog = ({
             effectiveInlineInvoiceData.customerAddress ||
             viewInvoiceData?.contractor?.address ||
             viewInvoiceData?.customer?.address ||
-            '')
+            '') 
           : '',
         poNumber: effectiveInlineInvoiceData.poNumber || viewInvoiceData?.po_number || '',
         project:

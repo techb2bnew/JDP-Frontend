@@ -1788,7 +1788,7 @@ export function BlueSheetApprovalDialog({
                                 '—'}
                             </p>
                             {currentBlueSheet.job.bill_to_city_zip && (
-                              <p className="text-xs text-slate-500">
+                              <p className="text-xs text-slate-500"> 
                                 {currentBlueSheet.job.bill_to_city_zip}
                               </p>
                             )}

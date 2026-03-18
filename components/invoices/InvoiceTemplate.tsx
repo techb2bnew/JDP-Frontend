@@ -226,6 +226,6 @@ export const InvoiceTemplate = ({ invoice, invoiceId }: InvoiceTemplateProps) =>
         <p>Payment is due within 14 days of invoice date. Late payments may be subject to a 1.5% monthly service charge.</p>
         <p className="mt-2">Thank you for your business!</p>
       </div>
-    </div>
+    </div> 
   );
 };

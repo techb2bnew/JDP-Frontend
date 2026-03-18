@@ -592,7 +592,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
           // Use estimated price if available, otherwise use rate
           const priceToUse = estimatedPrice > 0 ? estimatedPrice : rate
 
-          return {
+          return { 
             ...item,
             item: product.name,
             // Keep line item id intact; store selected product id separately

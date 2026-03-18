@@ -176,7 +176,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen bg-background transition-colors duration-300">
+    <div className="flex bg-background transition-colors duration-300">
       <Sidebar currentPath={pathname} onLogout={handleLogout} />
       <div className="flex-1 flex flex-col w-[80%]">
         <Header

@@ -1315,7 +1315,7 @@ useEffect(() => {
       {/* Unified Staff Modal */}
       <Dialog open={isStaffDialogOpen} onOpenChange={setIsStaffDialogOpen}>
         <DialogContent
-          className="max-w-2xl bg-white"
+          className="max-w-2xl bg-white" 
           onInteractOutside={(e) => {
             const target = e.target as HTMLElement | null;
             if (target?.closest?.(".pac-container")) {

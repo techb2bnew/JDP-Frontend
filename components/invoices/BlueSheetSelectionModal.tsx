@@ -74,7 +74,7 @@ export function BlueSheetSelectionModal({
     const [showReinvoiceAlert, setShowReinvoiceAlert] = useState(false)
     const [pendingSubmitSheets, setPendingSubmitSheets] = useState<ApiBlueSheetItem[] | null>(null)
     React.useEffect(() => {
-        if (isOpen) { setSelectedIds(new Set()); setCurrentPage(1) }
+        if (isOpen) { setSelectedIds(new Set()); setCurrentPage(1) } 
     }, [isOpen])
     const totalPages = Math.max(1, Math.ceil(blueSheets.length / PAGE_SIZE))
     const paginated = blueSheets.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
