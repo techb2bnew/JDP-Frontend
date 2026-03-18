@@ -37,6 +37,7 @@ import Image from 'next/image'
 import { apiClient } from '@/utils/api'
 import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
+import Autocomplete from "react-google-autocomplete";
 
 interface LeadLabour {
   id: string | number
@@ -159,6 +160,69 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
   const [isImporting, setIsImporting] = useState(false)
 
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+
+  // Fix Google Autocomplete dropdown z-index and pointer events for Dialog
+  useEffect(() => {
+    if (!isCreateDialogOpen && !isEditDialogOpen) return;
+
+    const style = document.createElement("style");
+    style.id = "google-autocomplete-styles-leadlabour";
+    style.textContent = `
+      .pac-container {
+        z-index: 999999 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+        margin-top: 4px !important;
+        position: absolute !important;
+      }
+      .pac-item {
+        padding: 8px 12px !important;
+        cursor: pointer !important;
+        pointer-events: auto !important;
+      }
+      .pac-item:hover { background-color: #f3f4f6 !important; }
+      .pac-item-selected { background-color: #e5e7eb !important; }
+      /* Disable DialogOverlay when pac-container is visible */
+      .pac-container:not([style*="display: none"]) ~ * [data-radix-dialog-overlay],
+      body:has(.pac-container:not([style*="display: none"])) [data-radix-dialog-overlay] {
+        pointer-events: none !important;
+      }
+      /* Re-enable DialogContent */
+      [data-radix-dialog-content] { pointer-events: auto !important; }
+    `;
+
+    const existingStyle = document.getElementById("google-autocomplete-styles-leadlabour");
+    if (existingStyle) document.head.removeChild(existingStyle);
+    document.head.appendChild(style);
+
+    // Prevent dialog close when clicking autocomplete dropdown
+    const handleOverlayClick = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target.closest(".pac-container")) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    };
+
+    const observer = new MutationObserver(() => {
+      const pacContainer = document.querySelector(".pac-container");
+      const overlay = document.querySelector("[data-radix-dialog-overlay]");
+      if (pacContainer && overlay) {
+        const isVisible = window.getComputedStyle(pacContainer).display !== "none";
+        (overlay as HTMLElement).style.pointerEvents = isVisible ? "none" : "auto";
+      }
+    });
+
+    document.addEventListener("click", handleOverlayClick, true);
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      document.removeEventListener("click", handleOverlayClick, true);
+      observer.disconnect();
+      const s = document.getElementById("google-autocomplete-styles-leadlabour");
+      if (s) document.head.removeChild(s);
+    };
+  }, [isCreateDialogOpen, isEditDialogOpen]);
 
   // Check if user is admin (has no specific permissions but should see all actions)
   const isAdmin = permissions.length === 0
@@ -1434,16 +1498,35 @@ useEffect(() => {
           </div>
           <div className="col-span-2 space-y-2">
             <Label htmlFor="address">Address *</Label>
-            <Input
-              id="address"
-              value={formData.address}
-              className={validationErrors.address ? 'border-red-500' : ''}
-              onChange={(e) => {
-                setFormData({ ...formData, address: e.target.value })
-                if (validationErrors.address) {
-                  setValidationErrors({ ...validationErrors, address: '' })
+            <Autocomplete
+              apiKey={
+                process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
+                "AIzaSyBtb6hSmwJ9_OznDC5e8BcZM90ms4WD_DE"
+              }
+              onPlaceSelected={(place: any) => {
+                const address = place?.formatted_address || place?.name || "";
+                if (address) {
+                  setFormData({ ...formData, address });
+                  if (validationErrors.address) {
+                    setValidationErrors({ ...validationErrors, address: "" });
+                  }
                 }
               }}
+              options={{
+                types: ["address"],
+                componentRestrictions: { country: "us" },
+              }}
+              value={formData.address}
+              onChange={(e: any) => {
+                const value = e.target.value;
+                setFormData({ ...formData, address: value });
+                if (validationErrors.address) {
+                  setValidationErrors({ ...validationErrors, address: "" });
+                }
+              }}
+              className={`w-full h-10 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+                validationErrors.address ? "border-red-500" : ""
+              }`}
               placeholder="Enter address"
             />
             {validationErrors.address && (
@@ -1636,7 +1719,21 @@ useEffect(() => {
                   Add Lead Labour
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh]">
+              <DialogContent
+                className="max-w-4xl max-h-[90vh]"
+                onInteractOutside={(e) => {
+                  const target = e.target as HTMLElement | null;
+                  if (target?.closest?.(".pac-container")) e.preventDefault();
+                }}
+                onPointerDownOutside={(e) => {
+                  const target = e.target as HTMLElement | null;
+                  if (target?.closest?.(".pac-container")) e.preventDefault();
+                }}
+                onFocusOutside={(e) => {
+                  const target = e.target as HTMLElement | null;
+                  if (target?.closest?.(".pac-container")) e.preventDefault();
+                }}
+              >
                 <DialogHeader>
                   <DialogTitle>Lead Labour Creation Form</DialogTitle>
                 </DialogHeader>
@@ -1937,7 +2034,21 @@ useEffect(() => {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-4xl sm:max-w-[700px] max-h-[90vh]">
+        <DialogContent
+          className="max-w-4xl sm:max-w-[700px] max-h-[90vh]"
+          onInteractOutside={(e) => {
+            const target = e.target as HTMLElement | null;
+            if (target?.closest?.(".pac-container")) e.preventDefault();
+          }}
+          onPointerDownOutside={(e) => {
+            const target = e.target as HTMLElement | null;
+            if (target?.closest?.(".pac-container")) e.preventDefault();
+          }}
+          onFocusOutside={(e) => {
+            const target = e.target as HTMLElement | null;
+            if (target?.closest?.(".pac-container")) e.preventDefault();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Edit Lead Labour</DialogTitle>
           </DialogHeader>

@@ -80,7 +80,7 @@ export function BlueSheetSelectionModal({
     const paginated = blueSheets.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
     const allOnPageSelected = paginated.length > 0 && paginated.every(b => selectedIds.has(b.id))
     const someOnPageSelected = paginated.some(b => selectedIds.has(b.id))
-
+    console.log(blueSheets, "blueSheets")
     const toggleItem = (id: number) => setSelectedIds(prev => {
         const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next
     })

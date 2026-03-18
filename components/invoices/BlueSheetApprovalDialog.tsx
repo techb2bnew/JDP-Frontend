@@ -1739,10 +1739,10 @@ export function BlueSheetApprovalDialog({
                               Customer
                             </Label>
                             <p className="text-base font-medium text-[#00A1FF] mt-1">
-                              {currentBlueSheet.job.customer?.customer_name || 'N/A'}
+                              {currentBlueSheet.job.customer?.customer_name || currentBlueSheet.job.contractor?.contractor_name || 'N/A'}
                             </p>
                             <p className="text-xs text-slate-500">
-                              {currentBlueSheet.job.customer?.email || currentBlueSheet.job.bill_to_email || '—'}
+                              {currentBlueSheet.job.customer?.email || currentBlueSheet.job.contractor?.email || currentBlueSheet.job.bill_to_email || '—'}
                             </p>
                           </div>
                           <div>
@@ -1783,7 +1783,8 @@ export function BlueSheetApprovalDialog({
                             </Label>
                             <p className="text-sm mt-1 text-slate-800">
                               {currentBlueSheet.job.bill_to_address ||
-                                currentBlueSheet.job.customer?.address ||
+                                currentBlueSheet.job.customer?.address || 
+                                currentBlueSheet.job.contractor?.address ||
                                 '—'}
                             </p>
                             {currentBlueSheet.job.bill_to_city_zip && (

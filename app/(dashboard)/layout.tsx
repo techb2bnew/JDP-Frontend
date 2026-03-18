@@ -185,7 +185,7 @@ export default function DashboardLayout({
           onNotificationViewAll={handleNotificationViewAll}
           onProfileClick={handleProfileClick}
         />
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1">
           <div className={
             pathname === '/contractor-listing' || pathname === '/tracking' 
               ? '' 

@@ -23,6 +23,7 @@ import {
 import { globalApiCall, getAuthToken, handleTokenRevocation } from '../utils/globalApiHandler'
 import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
+import Autocomplete from "react-google-autocomplete";
 
 interface Staff {
   id: string
@@ -155,6 +156,69 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
   
   // API base URL
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+
+  // Fix Google Autocomplete dropdown z-index and pointer events for Dialog
+  useEffect(() => {
+    if (!isStaffDialogOpen) return;
+
+    const style = document.createElement("style");
+    style.id = "google-autocomplete-styles-staff";
+    style.textContent = `
+      .pac-container {
+        z-index: 999999 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+        margin-top: 4px !important;
+        position: absolute !important;
+      }
+      .pac-item {
+        padding: 8px 12px !important;
+        cursor: pointer !important;
+        pointer-events: auto !important;
+      }
+      .pac-item:hover { background-color: #f3f4f6 !important; }
+      .pac-item-selected { background-color: #e5e7eb !important; }
+      /* Disable DialogOverlay when pac-container is visible */
+      .pac-container:not([style*="display: none"]) ~ * [data-radix-dialog-overlay],
+      body:has(.pac-container:not([style*="display: none"])) [data-radix-dialog-overlay] {
+        pointer-events: none !important;
+      }
+      /* Re-enable DialogContent */
+      [data-radix-dialog-content] { pointer-events: auto !important; }
+    `;
+
+    const existingStyle = document.getElementById("google-autocomplete-styles-staff");
+    if (existingStyle) document.head.removeChild(existingStyle);
+    document.head.appendChild(style);
+
+    // Prevent dialog close when clicking autocomplete dropdown
+    const handleOverlayClick = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target.closest(".pac-container")) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    };
+
+    const observer = new MutationObserver(() => {
+      const pacContainer = document.querySelector(".pac-container");
+      const overlay = document.querySelector("[data-radix-dialog-overlay]");
+      if (pacContainer && overlay) {
+        const isVisible = window.getComputedStyle(pacContainer).display !== "none";
+        (overlay as HTMLElement).style.pointerEvents = isVisible ? "none" : "auto";
+      }
+    });
+
+    document.addEventListener("click", handleOverlayClick, true);
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      document.removeEventListener("click", handleOverlayClick, true);
+      observer.disconnect();
+      const s = document.getElementById("google-autocomplete-styles-staff");
+      if (s) document.head.removeChild(s);
+    };
+  }, [isStaffDialogOpen]);
 
   // Validation functions
   const validateField = (fieldName: string, value: string) => {
@@ -1177,7 +1241,7 @@ useEffect(() => {
                   </TableCell>
                   <TableCell className="text-sm text-[#2b2b2b]/80">#{member.id}</TableCell>
                   <TableCell className="text-sm text-[#2b2b2b]/80 font-medium">{member.name}</TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">{member.phone}</TableCell>
+                  <TableCell className="text-sm text-[#2b2b2b]/80">+{member.phone}</TableCell>
                   <TableCell className="text-sm text-gray-900">{member.email}</TableCell>
                   <TableCell className="text-sm text-gray-900 max-w-xs truncate">{member.address}</TableCell>
                   <TableCell className="text-sm text-[#2b2b2b]/80">{member.position}</TableCell>
@@ -1250,7 +1314,27 @@ useEffect(() => {
 
       {/* Unified Staff Modal */}
       <Dialog open={isStaffDialogOpen} onOpenChange={setIsStaffDialogOpen}>
-        <DialogContent className="max-w-2xl bg-white">
+        <DialogContent
+          className="max-w-2xl bg-white"
+          onInteractOutside={(e) => {
+            const target = e.target as HTMLElement | null;
+            if (target?.closest?.(".pac-container")) {
+              e.preventDefault();
+            }
+          }}
+          onPointerDownOutside={(e) => {
+            const target = e.target as HTMLElement | null;
+            if (target?.closest?.(".pac-container")) {
+              e.preventDefault();
+            }
+          }}
+          onFocusOutside={(e) => {
+            const target = e.target as HTMLElement | null;
+            if (target?.closest?.(".pac-container")) {
+              e.preventDefault();
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle>{isEditMode ? 'Edit Staff Member' : 'Add New Staff Member'}</DialogTitle>
             <DialogDescription>
@@ -1378,16 +1462,58 @@ useEffect(() => {
            
             <div className="col-span-2 space-y-2">
               <Label htmlFor="edit-address">Address</Label>
-              <Input
-                id="edit-address"
-                value={formData.address}
-                onChange={(e) => {
-                  setFormData({...formData, address: e.target.value})
-                  validateField('address', e.target.value)
-                }}
-                placeholder="Enter full address"
-                className={validationErrors.address ? 'border-red-500' : ''}
-              />
+              <div className="relative">
+                <Autocomplete
+                  apiKey={
+                    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
+                    "AIzaSyBtb6hSmwJ9_OznDC5e8BcZM90ms4WD_DE"
+                  }
+                  onPlaceSelected={(place: any) => {
+                    if (place) {
+                      // Prevent dialog overlay from stealing clicks while selecting
+                      const overlay = document.querySelector(
+                        "[data-radix-dialog-overlay]",
+                      );
+                      if (overlay) {
+                        (overlay as HTMLElement).style.pointerEvents = "none";
+                      }
+
+                      const address =
+                        place.formatted_address || place.name || "";
+                      setFormData({ ...formData, address });
+                      validateField("address", address);
+
+                      setTimeout(() => {
+                        const pacContainer =
+                          document.querySelector(".pac-container");
+                        if (
+                          overlay &&
+                          (!pacContainer ||
+                            window.getComputedStyle(pacContainer).display ===
+                              "none")
+                        ) {
+                          (overlay as HTMLElement).style.pointerEvents =
+                            "auto";
+                        }
+                      }, 300);
+                    }
+                  }}
+                  options={{
+                    types: ["address"],
+                    componentRestrictions: { country: "us" },
+                  }}
+                  value={formData.address}
+                  onChange={(e: any) => {
+                    const value = e.target.value;
+                    setFormData({ ...formData, address: value });
+                    validateField("address", value);
+                  }}
+                  placeholder="Enter full address"
+                  className={`w-full h-10 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+                    validationErrors.address ? "border-red-500" : ""
+                  }`}
+                />
+              </div>
               {validationErrors.address && (
                 <p className="text-sm text-red-500 mt-1">{validationErrors.address}</p>
               )}

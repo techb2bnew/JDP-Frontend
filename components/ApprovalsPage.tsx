@@ -437,10 +437,10 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" onClick={onBack} className="gap-2">
+        {/* <Button variant="ghost" onClick={onBack} className="gap-2">
           <ArrowLeft className="h-4 w-4" />
           Back to Invoices
-        </Button>
+        </Button> */}
         <div>
           <h1 className="text-2xl font-medium text-[#2b2b2b]">BlueSheet Approvals</h1>
           <p className="text-sm text-[#2b2b2b]/60 mt-1">Review and approve material lists for invoice generation</p>

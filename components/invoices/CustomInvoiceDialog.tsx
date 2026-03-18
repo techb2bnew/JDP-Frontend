@@ -259,6 +259,10 @@ export const CustomInvoiceDialog = ({
   const balanceDueRef = useRef<HTMLInputElement | null>(null)
   const repRef = useRef<HTMLInputElement | null>(null)
   const paymentCreditsRef = useRef<HTMLInputElement | null>(null)
+  // If user edits/adds/removes line items, don't let viewInvoiceData effect overwrite them
+  const hasUserTouchedLineItemsRef = useRef(false)
+  // Always keep latest line items (avoid stale state at send-time)
+  const lineItemsRef = useRef<any[]>([])
 
   const currentJob = selectedJob || jobs?.find((j: any) => j.id === jobId)
 
@@ -304,6 +308,10 @@ export const CustomInvoiceDialog = ({
  useEffect(() => {
   console.log('inlineInvoiceData:11111111111', inlineInvoiceData)
  }, [inlineInvoiceData])
+
+  useEffect(() => {
+    lineItemsRef.current = inlineInvoiceData.lineItems
+  }, [inlineInvoiceData.lineItems])
   // Update form when job is provided
   useEffect(() => {
     if (currentJob) {
@@ -395,40 +403,43 @@ export const CustomInvoiceDialog = ({
                 viewInvoiceData.invoice_type === 'proposal_invoice' ? 'Rough Invoice' :
                   viewInvoiceData.invoice_type === 'progressive_invoice' ? 'Progressive Invoice' :
                     viewInvoiceData.invoice_type === 'final_invoice' ? 'Final Invoice' : 'Estimate',
-            // Prefer custom_products (new API, not typed) and fall back to products (old API)
-            lineItems: (((viewInvoiceData as any).custom_products) ?? viewInvoiceData.products)?.map((product: any, index: number) => {
-              const qty = Number(product.stock_quantity) || 1
-              const rate = Number(product.jdp_price || product.unit_cost || product.estimated_price || product.total_cost || 0)
-              const total = Number(product.total_cost || rate * qty || 0)
-              return {
-                id: `item-${index}`,
-                productId: product.id,
-                qty,
-                item: product.product_name || product.name || '',
-                description: product.description || '',
-                rate,
-                estimatedPrice: Number(product.estimated_price || 0),
-                total,
-                searchQuery: '',
-                showSearchResults: false,
-                supplierId: product.supplier_id || 1,
-                // backend flag is is_custom; keep boolean and map to frontend key
-                isCustomProduct: product.is_custom === true
-              }
-            }) || [{
-              id: Math.random().toString(36).substring(2, 9),
-              productId: null,
-              qty: 1,
-              item: '',
-              description: '',
-              rate: 0,
-              estimatedPrice: 0,
-              total: 0,
-              searchQuery: '',
-              showSearchResults: false,
-              supplierId: 1,
-              isCustomProduct: false
-            }]
+            // Prefer custom_products (new API, not typed) and fall back to products (old API).
+            // IMPORTANT: don't overwrite user-added/edited line items.
+            lineItems: hasUserTouchedLineItemsRef.current
+              ? prev.lineItems
+              : (((viewInvoiceData as any).custom_products) ?? viewInvoiceData.products)?.map((product: any, index: number) => {
+                  const qty = Number(product.stock_quantity) || 1
+                  const rate = Number(product.jdp_price || product.unit_cost || product.estimated_price || product.total_cost || 0)
+                  const total = Number(product.total_cost || rate * qty || 0)
+                  return {
+                    id: `item-${index}`,
+                    productId: product.id,
+                    qty,
+                    item: product.product_name || product.name || '',
+                    description: product.description || '',
+                    rate,
+                    estimatedPrice: Number(product.estimated_price || 0),
+                    total,
+                    searchQuery: '',
+                    showSearchResults: false,
+                    supplierId: product.supplier_id || 1,
+                    // backend flag is is_custom; keep boolean and map to frontend key
+                    isCustomProduct: product.is_custom === true
+                  }
+                }) || [{
+                  id: Math.random().toString(36).substring(2, 9),
+                  productId: null,
+                  qty: 1,
+                  item: '',
+                  description: '',
+                  rate: 0,
+                  estimatedPrice: 0,
+                  total: 0,
+                  searchQuery: '',
+                  showSearchResults: false,
+                  supplierId: 1,
+                  isCustomProduct: false
+                }]
           };
 
           console.log('New data being set:', newData);
@@ -491,6 +502,7 @@ export const CustomInvoiceDialog = ({
   
 
   const updateInvoiceLineItem = (itemId: string, field: string, value: any) => {
+    hasUserTouchedLineItemsRef.current = true
     setInlineInvoiceData(prev => ({
       ...prev,
       lineItems: prev.lineItems.map(item => {
@@ -511,6 +523,7 @@ export const CustomInvoiceDialog = ({
   }
 
   const addInvoiceLineItem = () => {
+    hasUserTouchedLineItemsRef.current = true
     setInlineInvoiceData(prev => ({
       ...prev,
       lineItems: [...prev.lineItems, {
@@ -531,6 +544,7 @@ export const CustomInvoiceDialog = ({
   }
 
   const removeInvoiceLineItem = (itemId: string) => {
+    hasUserTouchedLineItemsRef.current = true
     setInlineInvoiceData(prev => ({
       ...prev,
       lineItems: prev.lineItems.filter(item => item.id !== itemId)
@@ -546,6 +560,7 @@ export const CustomInvoiceDialog = ({
   }
 
   const selectProduct = (itemId: string, product: any) => {
+    hasUserTouchedLineItemsRef.current = true
     setInlineInvoiceData(prev => ({
       ...prev,
       lineItems: prev.lineItems.map(item => {
@@ -576,6 +591,7 @@ export const CustomInvoiceDialog = ({
   }
 
   const addCustomProduct = (itemId: string, productName: string) => {
+    hasUserTouchedLineItemsRef.current = true
     setInlineInvoiceData(prev => ({
       ...prev,
       lineItems: prev.lineItems.map(item => {
@@ -594,6 +610,7 @@ export const CustomInvoiceDialog = ({
   }
 
   const addCustomLineItem = () => {
+    hasUserTouchedLineItemsRef.current = true
     setInlineInvoiceData(prev => ({
       ...prev,
       lineItems: [...prev.lineItems, {
@@ -707,6 +724,10 @@ export const CustomInvoiceDialog = ({
       latestPaymentCreditsRaw !== undefined && latestPaymentCreditsRaw !== null && latestPaymentCreditsRaw !== ''
         ? parseFloat(latestPaymentCreditsRaw) || 0
         : inlineInvoiceData.paymentCredits
+    const latestLineItems = lineItemsRef.current?.length
+      ? lineItemsRef.current
+      : inlineInvoiceData.lineItems
+
     // Use an "effective" invoice data snapshot so we don't depend on async state updates
     const effectiveInlineInvoiceData = {
       ...inlineInvoiceData,
@@ -715,14 +736,15 @@ export const CustomInvoiceDialog = ({
       balanceDue: latestBalanceDue,
       rep: latestRep,
       paymentCredits: latestPaymentCredits,
+      lineItems: latestLineItems,
     }
 
     console.log('effectiveInlineInvoiceData?>>>', effectiveInlineInvoiceData)
 
     // Consider either explicit invoice line items OR existing BlueSheet materials as valid "items"
     const hasInvoiceLineItems =
-      inlineInvoiceData.lineItems.length > 0 &&
-      inlineInvoiceData.lineItems.some(item => !!item.item)
+      latestLineItems.length > 0 &&
+      latestLineItems.some(item => !!item.item)
 
     const hasBlueSheetMaterials =
       Array.isArray(blueSheet?.material_entries) &&
@@ -744,54 +766,70 @@ export const CustomInvoiceDialog = ({
     try {
       const subtotal = calculateInvoiceSubtotal()
 
-      // Build customProducts from either explicit invoice line items (with item filled)
-      // or, if none, from existing BlueSheet material entries so products are not empty.
-      const nonEmptyLineItems = effectiveInlineInvoiceData.lineItems.filter(item => !!item.item)
+      // Build customProducts primarily from dialog line items.
+      // If no line items are present, fall back to BlueSheet material_entries.
+      const nonEmptyLineItems = effectiveInlineInvoiceData.lineItems.filter(
+        (item) => String(item.item || "").trim().length > 0,
+      )
 
-      let customProducts: any[]
+      const customProducts: any[] = []
+
       if (nonEmptyLineItems.length > 0) {
-        customProducts = nonEmptyLineItems.map(item => {
+        // Use line items (these already include the BlueSheet items + any user-added rows)
+        for (const item of nonEmptyLineItems) {
+          const treatedAsCustom =
+            item.isCustomProduct === true || !item.productId
           const base: any = {
             product_name: item.item,
-            description: item.description || '',
+            description: item.description || "",
             supplier_id: item.supplierId || selectedSupplierId || 1,
             supplier_sku: String(item.item).substring(0, 10),
-            jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            jdp_sku: `JDP-${Date.now()}-${Math.random()
+              .toString(36)
+              .substring(2, 9)}`,
             stock_quantity: item.qty,
-            unit: 'unit',
+            unit: "unit",
             job_id: Number(effectiveInlineInvoiceData.jobId),
             unit_cost: item.rate,
             jdp_price: item.rate,
             estimated_price: item.estimatedPrice || 0,
             total_cost: item.total,
             // manual/custom row -> true, searched/selected row -> false
-            is_custom: item.isCustomProduct === true,
+            is_custom: treatedAsCustom,
           }
 
           // Include product id only for searched/selected products
-          if (item.isCustomProduct !== true && item.productId) {
+          if (!treatedAsCustom && item.productId) {
             base.id = item.productId
           }
 
-          return base
-        })
+          customProducts.push(base)
+        }
       } else {
         // Fallback: map from BlueSheet material_entries
-        const materials = Array.isArray(blueSheet?.material_entries) ? blueSheet.material_entries : []
-        customProducts = materials.map((m: any) => {
+        const materials = Array.isArray(blueSheet?.material_entries)
+          ? blueSheet.material_entries
+          : []
+        for (const m of materials) {
           const base: any = {
             product_name: m.material_name,
-            description: m.product?.description || m.material_name || '',
-            supplier_id: m.product?.supplier_id ?? m.product?.suppliers?.id ?? 1,
-            supplier_sku: m.product?.supplier_sku || '',
-            jdp_sku: m.product?.jdp_sku || `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            description: m.product?.description || m.material_name || "",
+            supplier_id:
+              m.product?.supplier_id ?? m.product?.suppliers?.id ?? 1,
+            supplier_sku: m.product?.supplier_sku || "",
+            jdp_sku:
+              m.product?.jdp_sku ||
+              `JDP-${Date.now()}-${Math.random()
+                .toString(36)
+                .substring(2, 9)}`,
             stock_quantity: m.material_used || m.total_ordered || 1,
-            unit: m.unit || 'unit',
+            unit: m.unit || "unit",
             job_id: Number(effectiveInlineInvoiceData.jobId),
             unit_cost: m.unit_cost || 0,
             jdp_price: m.unit_cost || 0,
             estimated_price: m.unit_cost || 0,
-            total_cost: m.total_cost ?? (m.material_used || 0) * (m.unit_cost || 0),
+            total_cost:
+              m.total_cost ?? (m.material_used || 0) * (m.unit_cost || 0),
             is_custom: false,
           }
 
@@ -799,8 +837,8 @@ export const CustomInvoiceDialog = ({
             base.id = m.product.id
           }
 
-          return base
-        })
+          customProducts.push(base)
+        }
       }
 
       // Also add a dedicated custom product for total labor cost (from BlueSheet labor entries)
@@ -835,13 +873,26 @@ export const CustomInvoiceDialog = ({
       const bluesheetIds = blueSheet.length > 0
         ? blueSheet.map((bs: any) => bs.job_bluesheet_id || bs.bluesheet_id || bs.bluesheetId || bs.id)
         : [blueSheet.job_bluesheet_id || blueSheet.bluesheet_id || blueSheet.bluesheetId || blueSheet.id]
+      const emailAddress =
+        viewInvoiceData?.contractor?.email ||
+        viewInvoiceData?.customer?.email ||
+        viewInvoiceData?.email_address ||
+        currentJob?.email ||
+        ""
+
+      if (!emailAddress) {
+        toast.error("Customer/Contractor email is missing.")
+        setSendingInvoice(false)
+        return
+      }
+
       const payload: any = {
         job_id: Number(effectiveInlineInvoiceData.jobId),
         // Always use the effective project (from inline or job title fallback)
         estimate_title: effectiveInlineInvoiceData.project || currentJob?.title || blueSheet?.job?.job_title || '',
         priority: 'medium' as 'low' | 'medium' | 'high',
         service_type: isContractBased ? 'contract_based' : 'service_based',
-        email_address: currentJob?.email || 'customer@example.com',
+        email_address: emailAddress,
         estimate_date: effectiveInlineInvoiceData.date,
         bluesheet_ids: bluesheetIds,
         po_number: effectiveInlineInvoiceData.poNumber || '',
@@ -849,7 +900,7 @@ export const CustomInvoiceDialog = ({
         due_date: effectiveInlineInvoiceData.dueDate || '',
         payment_credits: effectiveInlineInvoiceData.paymentCredits || 0,
         balance_due: effectiveInlineInvoiceData.balanceDue || '',
-        bill_to_address: effectiveInlineInvoiceData.billToAddressEnabled ? effectiveInlineInvoiceData.billToAddress || '' : '',
+        bill_to_address: effectiveInlineInvoiceData.billToAddressEnabled ? effectiveInlineInvoiceData.billToAddress || viewInvoiceData?.contractor?.address || viewInvoiceData?.customer?.address || '' : '',
         notes: effectiveInlineInvoiceData.notes || '',
         status: 'sent',
         invoice_type: mapInvoiceTypeToAPI(effectiveInlineInvoiceData.invoiceType),
@@ -960,7 +1011,12 @@ export const CustomInvoiceDialog = ({
       if (!token) {
         throw new Error('No authentication token found')
       } 
-      let customerEmail = viewInvoiceData?.customer?.email || viewInvoiceData?.email_address || currentJob?.email || 'customer@example.com';
+      let customerEmail =
+        viewInvoiceData?.contractor?.email ||
+        viewInvoiceData?.customer?.email ||
+        viewInvoiceData?.email_address ||
+        currentJob?.email ||
+        'customer@example.com';
  
       let lineItemsSource: { qty: number; item: string; description: string; rate: number; total: number }[] = []
       console.log('lineItemsOverride:11111111111', lineItemsOverride)
@@ -1017,6 +1073,8 @@ export const CustomInvoiceDialog = ({
           ? (effectiveInlineInvoiceData.billToAddress ||
             viewInvoiceData?.bill_to_address ||
             effectiveInlineInvoiceData.customerAddress ||
+            viewInvoiceData?.contractor?.address ||
+            viewInvoiceData?.customer?.address ||
             '')
           : '',
         poNumber: effectiveInlineInvoiceData.poNumber || viewInvoiceData?.po_number || '',
@@ -1595,21 +1653,77 @@ export const CustomInvoiceDialog = ({
                 <Label className="block bg-gray-600 text-white px-3 py-2 mb-0 text-sm font-semibold">Customer Name / Address</Label>
                 <div className="border border-gray-300 p-4 min-h-[120px]">
 
-                  <Input
-                    value={selectedJob?.type === 'contract-based' ? (selectedJob?.contractorName || selectedJob?.contractor?.name || inlineInvoiceData.customerName) : inlineInvoiceData.customerName}
-                    onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customerName: e.target.value }))}
-                    className="mb-2 border-0 p-0 focus-visible:ring-0"
-                    placeholder={selectedJob?.type === 'contract-based' ? 'Contractor Name' : 'Customer Name'}
-                    readOnly
-                  />
-                  <Textarea
-                    value={selectedJob?.type === 'contract-based' ? (selectedJob?.contractorAddress || selectedJob?.contractor?.address || inlineInvoiceData.customerAddress) : inlineInvoiceData.customerAddress}
-                    onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customerAddress: e.target.value }))}
-                    className="border-0 p-0 resize-none focus-visible:ring-0"
-                    rows={3}
-                    placeholder={selectedJob?.type === 'contract-based' ? 'Contractor Address' : 'Customer Address'}
-                    readOnly
-                  />
+                  {(() => {
+                    const jobType = selectedJob?.type || selectedJob?.job_type || selectedJob?.jobType
+                    const isContractBased =
+                      jobType === "contract_based" ||
+                      jobType === "contract-based" ||
+                      viewInvoiceData?.service_type === "contract_based" ||
+                      viewInvoiceData?.job?.job_type === "contract_based" ||
+                      viewInvoiceData?.contractor_id != null
+
+                    const contractorName =
+                      selectedJob?.contractorName ||
+                      selectedJob?.contractor?.contractor_name ||
+                      selectedJob?.contractor?.contractorName ||
+                      selectedJob?.contractor?.name ||
+                      selectedJob?.contractor?.full_name ||
+                      viewInvoiceData?.contractor?.contractor_name ||
+                      viewInvoiceData?.contractor?.company_name ||
+                      ""
+
+                    const contractorAddress =
+                      selectedJob?.contractorAddress ||
+                      selectedJob?.contractor?.address ||
+                      viewInvoiceData?.contractor?.address ||
+                      ""
+
+                    const customerName =
+                      inlineInvoiceData.customerName ||
+                      viewInvoiceData?.customer?.customer_name ||
+                      ""
+                    const customerAddress =
+                      inlineInvoiceData.customerAddress ||
+                      viewInvoiceData?.customer?.address ||
+                      ""
+
+                    const displayName = isContractBased
+                      ? (contractorName || customerName)
+                      : customerName
+                    const displayAddress = isContractBased
+                      ? (contractorAddress || customerAddress)
+                      : customerAddress
+
+                    return (
+                      <>
+                        <Input
+                          value={displayName}
+                          onChange={(e) =>
+                            setInlineInvoiceData((prev) => ({
+                              ...prev,
+                              customerName: e.target.value,
+                            }))
+                          }
+                          className="mb-2 border-0 p-0 focus-visible:ring-0"
+                          placeholder={isContractBased ? "Contractor Name" : "Customer Name"}
+                          readOnly
+                        />
+                        <Textarea
+                          value={displayAddress}
+                          onChange={(e) =>
+                            setInlineInvoiceData((prev) => ({
+                              ...prev,
+                              customerAddress: e.target.value,
+                            }))
+                          }
+                          className="border-0 p-0 resize-none focus-visible:ring-0"
+                          rows={3}
+                          placeholder={isContractBased ? "Contractor Address" : "Customer Address"}
+                          readOnly
+                        />
+                      </>
+                    )
+                  })()}
                 </div>
               </div>
 

@@ -34,6 +34,7 @@ import { apiClient } from '@/utils/api'
 import { usePermissions } from '../contexts/PermissionContext'
 import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
+import Autocomplete from "react-google-autocomplete";
 
 interface Supplier {
   id: string
@@ -106,6 +107,69 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
     total_orders: 0
   })
   const [isStatsLoading, setIsStatsLoading] = useState(false)
+
+  // Fix Google Autocomplete dropdown z-index and pointer events for Dialog
+  useEffect(() => {
+    if (!isCreateDialogOpen && !isEditDialogOpen) return;
+
+    const style = document.createElement("style");
+    style.id = "google-autocomplete-styles-supplier";
+    style.textContent = `
+      .pac-container {
+        z-index: 999999 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+        margin-top: 4px !important;
+        position: absolute !important;
+      }
+      .pac-item {
+        padding: 8px 12px !important;
+        cursor: pointer !important;
+        pointer-events: auto !important;
+      }
+      .pac-item:hover { background-color: #f3f4f6 !important; }
+      .pac-item-selected { background-color: #e5e7eb !important; }
+      /* Disable DialogOverlay when pac-container is visible */
+      .pac-container:not([style*="display: none"]) ~ * [data-radix-dialog-overlay],
+      body:has(.pac-container:not([style*="display: none"])) [data-radix-dialog-overlay] {
+        pointer-events: none !important;
+      }
+      /* Re-enable DialogContent */
+      [data-radix-dialog-content] { pointer-events: auto !important; }
+    `;
+
+    const existingStyle = document.getElementById("google-autocomplete-styles-supplier");
+    if (existingStyle) document.head.removeChild(existingStyle);
+    document.head.appendChild(style);
+
+    // Prevent dialog close when clicking autocomplete dropdown
+    const handleOverlayClick = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target.closest(".pac-container")) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    };
+
+    const observer = new MutationObserver(() => {
+      const pacContainer = document.querySelector(".pac-container");
+      const overlay = document.querySelector("[data-radix-dialog-overlay]");
+      if (pacContainer && overlay) {
+        const isVisible = window.getComputedStyle(pacContainer).display !== "none";
+        (overlay as HTMLElement).style.pointerEvents = isVisible ? "none" : "auto";
+      }
+    });
+
+    document.addEventListener("click", handleOverlayClick, true);
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      document.removeEventListener("click", handleOverlayClick, true);
+      observer.disconnect();
+      const s = document.getElementById("google-autocomplete-styles-supplier");
+      if (s) document.head.removeChild(s);
+    };
+  }, [isCreateDialogOpen, isEditDialogOpen]);
 
   const [formData, setFormData] = useState<SupplierFormData>({
     fullName: '',
@@ -1050,12 +1114,40 @@ useEffect(() => {
       </div>
       <div className="col-span-2 space-y-2">
         <Label htmlFor="address">Address</Label>
-        <Input
-          id="address"
+        <Autocomplete
+          apiKey={
+            process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
+            "AIzaSyBtb6hSmwJ9_OznDC5e8BcZM90ms4WD_DE"
+          }
+          onPlaceSelected={(place: any) => {
+            const address = place?.formatted_address || place?.name || "";
+            if (address) {
+              setFormData({ ...formData, address });
+              if (validationErrors.address) {
+                setValidationErrors({ ...validationErrors, address: "" });
+              }
+            }
+          }}
+          options={{
+            types: ["address"],
+            componentRestrictions: { country: "us" },
+          }}
           value={formData.address}
-          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+          onChange={(e: any) => {
+            const value = e.target.value;
+            setFormData({ ...formData, address: value });
+            if (validationErrors.address) {
+              setValidationErrors({ ...validationErrors, address: "" });
+            }
+          }}
           placeholder="Enter full address"
+          className={`w-full h-10 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+            validationErrors.address ? "border-red-500" : ""
+          }`}
         />
+        {validationErrors.address && (
+          <p className="text-sm text-red-500 mt-1">{validationErrors.address}</p>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -1176,7 +1268,21 @@ useEffect(() => {
                   Add Supplier
                 </Button>
               </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh]">
+            <DialogContent
+              className="max-w-4xl max-h-[90vh]"
+              onInteractOutside={(e) => {
+                const target = e.target as HTMLElement | null;
+                if (target?.closest?.(".pac-container")) e.preventDefault();
+              }}
+              onPointerDownOutside={(e) => {
+                const target = e.target as HTMLElement | null;
+                if (target?.closest?.(".pac-container")) e.preventDefault();
+              }}
+              onFocusOutside={(e) => {
+                const target = e.target as HTMLElement | null;
+                if (target?.closest?.(".pac-container")) e.preventDefault();
+              }}
+            >
               <DialogHeader>
                 <DialogTitle>Add New Supplier</DialogTitle>
               </DialogHeader>
@@ -1330,7 +1436,7 @@ useEffect(() => {
                 <TableHead className="text-white font-medium">ID</TableHead>
                 <TableHead className="text-white font-medium">Name</TableHead>
                 <TableHead className="text-white font-medium">Company</TableHead>
-                <TableHead className="text-white font-medium">Contact</TableHead>
+                <TableHead className="text-white font-medium">Contact Person</TableHead>
                 <TableHead className="text-white font-medium">Orders</TableHead>
                 <TableHead className="text-white font-medium">Status</TableHead>
                 <TableHead className="text-white font-medium">Action</TableHead>
@@ -1456,7 +1562,21 @@ useEffect(() => {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-6xl max-h-[90vh]">
+        <DialogContent
+          className="max-w-6xl max-h-[90vh]"
+          onInteractOutside={(e) => {
+            const target = e.target as HTMLElement | null;
+            if (target?.closest?.(".pac-container")) e.preventDefault();
+          }}
+          onPointerDownOutside={(e) => {
+            const target = e.target as HTMLElement | null;
+            if (target?.closest?.(".pac-container")) e.preventDefault();
+          }}
+          onFocusOutside={(e) => {
+            const target = e.target as HTMLElement | null;
+            if (target?.closest?.(".pac-container")) e.preventDefault();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Edit Supplier</DialogTitle>
           </DialogHeader>

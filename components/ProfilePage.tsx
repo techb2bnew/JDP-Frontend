@@ -10,6 +10,9 @@ import { Textarea } from './ui/textarea'
 import { toast } from 'sonner'
 import { apiClient, globalApiCall } from '../utils/api'
 import { getUserData, logout } from '../utils/auth'
+import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
+import "react-phone-number-input/style.css";
+import Autocomplete from "react-google-autocomplete";
 import { 
   User,
   Mail,
@@ -76,6 +79,35 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+
+  // Ensure Google Autocomplete dropdown appears above UI
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.id = "google-autocomplete-styles-profile";
+    style.textContent = `
+      .pac-container { z-index: 999999 !important; }
+    `;
+    const existingStyle = document.getElementById("google-autocomplete-styles-profile");
+    if (existingStyle) document.head.removeChild(existingStyle);
+    document.head.appendChild(style);
+    return () => {
+      const s = document.getElementById("google-autocomplete-styles-profile");
+      if (s) document.head.removeChild(s);
+    };
+  }, []);
+
+  // Normalize phone to E.164 so react-phone-number-input can infer country/flag
+  const normalizePhoneToE164 = (rawPhone: string) => {
+    const raw = (rawPhone || "").trim();
+    if (!raw) return "";
+    if (raw.startsWith("+")) return raw;
+
+    const digits = raw.replace(/\D/g, "");
+    if (!digits) return "";
+    if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+    if (digits.length === 10) return `+1${digits}`;
+    return `+${digits}`;
+  };
 
   // Helper function to get auth token
   const getAuthToken = (): string | null => {
@@ -216,7 +248,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
           const profileDataToSet = {
             fullName: userData.full_name || '',
             email: userData.email || '',
-            phone: userData.phone || '',
+            phone: normalizePhoneToE164(userData.phone || ''),
             address: staffData.address || '',
             department: staffData.department || '',
             role: userData.role || '',
@@ -348,6 +380,15 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
       return
     }
 
+    // Validate phone if present
+    if (profileData.phone?.trim()) {
+      const normalizedPhone = normalizePhoneToE164(profileData.phone);
+      if (!normalizedPhone || !isValidPhoneNumber(normalizedPhone)) {
+        toast.error('Please enter a valid phone number for the selected country.')
+        return
+      }
+    }
+
     try {
       const loadingToast = toast.loading('Updating profile...')
       
@@ -367,7 +408,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
       const profilePayload = {
         full_name: profileData.fullName,
         email: profileData.email,
-        phone: profileData.phone,
+        phone: normalizePhoneToE164(profileData.phone) || "",
         position: profileData.position,
         department: profileData.department,
         address: profileData.address,
@@ -535,7 +576,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          {onBack && (
+          {/* {onBack && (
             <Button 
               variant="ghost" 
               size="sm" 
@@ -545,7 +586,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
               <ArrowLeft className="h-4 w-4" />
               Back to Dashboard
             </Button>
-          )}
+          )} */}
           <div>
             <h1 className="text-2xl font-medium text-gray-900">Profile</h1>
             <p className="text-sm text-gray-600 mt-1">
@@ -633,15 +674,19 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
                   <Label htmlFor="phone" className="text-sm font-medium text-gray-700">
                     Phone Number
                   </Label>
-                  <Input
+                  <PhoneInput
                     id="phone"
                     value={profileData.phone}
-                    onChange={(e) => setProfileData(prev => ({
-                      ...prev,
-                      phone: e.target.value
-                    }))}
+                    onChange={(value) =>
+                      setProfileData((prev) => ({
+                        ...prev,
+                        phone: value || "",
+                      }))
+                    }
+                    international
+                    defaultCountry="US"
                     disabled={!isEditingProfile}
-                    className={`${!isEditingProfile ? 'bg-gray-50 text-gray-600' : 'bg-white'}`}
+                    className={`${!isEditingProfile ? 'bg-gray-50 text-gray-600 rounded-md px-3 py-2' : 'bg-white border border-gray-300 rounded-md px-3 py-2'}`}
                   />
                 </div>
               </div>
@@ -684,15 +729,30 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
                 <Label htmlFor="address" className="text-sm font-medium text-gray-700">
                   Address
                 </Label>
-                <Input
+                <Autocomplete
                   id="address"
+                  apiKey={
+                    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
+                    "AIzaSyBtb6hSmwJ9_OznDC5e8BcZM90ms4WD_DE"
+                  }
+                  options={{
+                    types: ["address"],
+                    componentRestrictions: { country: "us" },
+                  }}
                   value={profileData.address}
-                  onChange={(e) => setProfileData(prev => ({
-                    ...prev,
-                    address: e.target.value
-                  }))}
+                  onPlaceSelected={(place: any) => {
+                    const address = place?.formatted_address || place?.name || "";
+                    if (!address) return;
+                    setProfileData((prev) => ({ ...prev, address }));
+                  }}
+                  onChange={(e: any) => {
+                    const value = e.target.value;
+                    setProfileData((prev) => ({ ...prev, address: value }));
+                  }}
                   disabled={!isEditingProfile}
-                  className={`${!isEditingProfile ? 'bg-gray-50 text-gray-600' : 'bg-white'}`}
+                  className={`w-full h-10 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+                    !isEditingProfile ? "bg-gray-50 text-gray-600" : "bg-white"
+                  }`}
                 />
               </div>
 

@@ -24,7 +24,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { useEffect, useState } from 'react'
 import { apiClient } from '@/utils/api'
 import { LoadingSpinner } from './common/LoadingSpinner'
-import { Calendar } from './ui/calendar'
+import { Calendar as MultiDateCalendar, DateObject } from "react-multi-date-picker";
 
 interface StaffTimesheetItem {
   employee: string;
@@ -62,6 +62,8 @@ export function StaffTimelineAdminPage() {
     };
   } | null>(null);
   const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined })
+  // Multiple date ranges selection (used by multi-date calendar UI)
+  const [selectedRanges, setSelectedRanges] = useState<DateObject[][]>([])
   const [statusFilter, setStatusFilter] = useState('all');
   const [employeeFilter, setEmployeeFilter] = useState('all');
   const [allEmployeeOptions, setAllEmployeeOptions] = useState<string[]>([]);
@@ -605,46 +607,68 @@ export function StaffTimelineAdminPage() {
               <div className="flex items-center gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-[240px] justify-start text-left font-normal">
+                    <Button variant="outline" className="w-[240px] justify-start text-left font-normal relative pr-10">
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dateRange?.from ? (
-                        dateRange?.to ? (
-                          <>
-                            {format(dateRange.from, "LLL dd, y")} -{" "}
-                            {format(dateRange.to, "LLL dd, y")}
-                          </>
+                      <span className="flex-1 truncate">
+                        {dateRange?.from ? (
+                          dateRange?.to ? (
+                            <>
+                              {format(dateRange.from, "LLL dd, y")} -{" "}
+                              {format(dateRange.to, "LLL dd, y")}
+                            </>
+                          ) : (
+                            format(dateRange.from, "LLL dd, y")
+                          )
                         ) : (
-                          format(dateRange.from, "LLL dd, y")
-                        )
-                      ) : (
-                        <span>Pick a date range</span>
+                          <span>Pick date ranges</span>
+                        )}
+                      </span>
+                      {dateRange?.from && (
+                        <button
+                          type="button"
+                          aria-label="Clear date range"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 inline-flex items-center justify-center rounded-sm hover:bg-muted"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedRanges([]);
+                            setDateRange({ from: undefined, to: undefined });
+                            fetchAllStaffTimesheets();
+                          }}
+                        >
+                          <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+                        </button>
                       )}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      initialFocus
-                      mode="range"
-                      defaultMonth={dateRange?.from}
-                      selected={dateRange as any}
-                      onSelect={(range: any) => setDateRange(range || { from: undefined, to: undefined })}
+                  <PopoverContent className="w-auto rounded-md border bg-background p-3 shadow-lg" align="start">
+                    <MultiDateCalendar
+                      multiple
+                      range
+                      value={selectedRanges}
+                      onChange={(value) => {
+                        const values = (Array.isArray(value) ? value : value ? [value] : []) as unknown as DateObject[][];
+                        setSelectedRanges(values);
+
+                        const allDates = values
+                          .flat()
+                          .map((d) => (d instanceof DateObject ? d.toDate() : new Date(d as any)))
+                          .filter((d) => d instanceof Date && !Number.isNaN(d.getTime()));
+
+                        if (allDates.length === 0) {
+                          setDateRange({ from: undefined, to: undefined });
+                          return;
+                        }
+
+                        const sorted = [...allDates].sort((a, b) => a.getTime() - b.getTime());
+                        setDateRange({ from: sorted[0], to: sorted[sorted.length - 1] });
+                      }}
                       numberOfMonths={2}
+                      disableMonthPicker={false}
+                      disableYearPicker={false}
+                      className="w-full"
                     />
                   </PopoverContent>
                 </Popover>
-                {dateRange?.from && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setDateRange({ from: undefined, to: undefined });
-                      fetchAllStaffTimesheets();
-                    }}
-                    className="px-2"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
               </div>
               <span className="text-sm text-muted-foreground">{filteredTimesheets.length} timesheets</span>
             </div>
