@@ -491,6 +491,29 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
   // Load Google Maps script with Places API
   // react-google-autocomplete handles Google Maps script loading internally
 
+  // Fix Google Autocomplete dropdown z-index (entity modal)
+  useEffect(() => {
+    if (!isAddEntityOpen) return
+
+    const style = document.createElement('style')
+    style.id = 'google-autocomplete-styles-jobcreation-entity'
+    style.textContent = `
+      .pac-container {
+        z-index: 999999 !important;
+        pointer-events: auto !important;
+      }
+    `
+
+    const existingStyle = document.getElementById('google-autocomplete-styles-jobcreation-entity')
+    if (existingStyle) existingStyle.remove()
+    document.head.appendChild(style)
+
+    return () => {
+      const s = document.getElementById('google-autocomplete-styles-jobcreation-entity')
+      if (s) s.remove()
+    }
+  }, [isAddEntityOpen])
+
   // Handle address selection from autocomplete
   const handlePlaceSelect = (place: any) => {
     if (!place) return
@@ -1348,7 +1371,21 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
       {/* Shared Add Customer / Contractor modal */}
       <Dialog open={isAddEntityOpen} onOpenChange={(open) => setIsAddEntityOpen(open)}>
-        <DialogContent className="max-w-md">
+        <DialogContent
+          className="max-w-md"
+          onInteractOutside={(e) => {
+            const target = e.target as HTMLElement | null
+            if (target?.closest?.('.pac-container')) e.preventDefault()
+          }}
+          onPointerDownOutside={(e) => {
+            const target = e.target as HTMLElement | null
+            if (target?.closest?.('.pac-container')) e.preventDefault()
+          }}
+          onFocusOutside={(e) => {
+            const target = e.target as HTMLElement | null
+            if (target?.closest?.('.pac-container')) e.preventDefault()
+          }}
+        >
           <DialogHeader>
             <DialogTitle>
               {addEntityType === 'customer' ? 'Add New Customer' : 'Add New Contractor'}
@@ -1418,10 +1455,20 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             </div>
             <div>
               <Label className="mb-1 block">Address</Label>
-              <Input
+              <Autocomplete
+                apiKey="AIzaSyBtb6hSmwJ9_OznDC5e8BcZM90ms4WD_DE"
+                options={{
+                  types: ['address'],
+                  componentRestrictions: { country: 'us' },
+                }}
                 value={entityForm.address}
-                onChange={(e) => setEntityForm({ ...entityForm, address: e.target.value })}
-                placeholder="Address"
+                onChange={(e: any) => setEntityForm({ ...entityForm, address: e.target.value })}
+                onPlaceSelected={(place: any) => {
+                  const address = place?.formatted_address || place?.name || ''
+                  setEntityForm({ ...entityForm, address })
+                }}
+                placeholder="Start typing address..."
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
           </div>

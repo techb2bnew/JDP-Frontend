@@ -611,11 +611,6 @@ export function CustomersPage() {
     }
     if (!customerFormData.phone.trim()) {
       errors.phone = "Phone number is required";
-    } else {
-      const normalizedPhone = normalizePhoneToE164(customerFormData.phone);
-      if (!normalizedPhone || !isValidPhoneNumber(normalizedPhone)) {
-        errors.phone = "Please enter a valid phone number for the selected country";
-      }
     }
     if (!customerFormData.address.trim()) {
       errors.address = "Address is required";
@@ -2084,7 +2079,10 @@ export function CustomersPage() {
                     <PhoneInput
                       id="phone"
                       international
+                      withCountryCallingCode
                       defaultCountry="US"
+                      countryCallingCodeEditable={false}
+                      limitMaxLength
                       value={customerFormData.phone}
                       onChange={(value) => {
                         const safeValue = value || "";

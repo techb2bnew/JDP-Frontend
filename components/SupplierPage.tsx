@@ -32,7 +32,7 @@ import {
 } from 'lucide-react'
 import { apiClient } from '@/utils/api'
 import { usePermissions } from '../contexts/PermissionContext'
-import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input'
+import PhoneInput from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
 import Autocomplete from "react-google-autocomplete";
 
@@ -270,14 +270,6 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
       return;
     }
 
-    // Phone number validation (country-aware)
-    if (!isValidPhoneNumber(formData.phone || '')) {
-      const errors = { ...validationErrors, phone: 'Please enter a valid phone number' };
-      setValidationErrors(errors);
-      toast.error('Please enter a valid phone number');
-      return;
-    }
-
     let loadingToastId: string | number | undefined;
 
     try {
@@ -469,14 +461,6 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
       const errors = { ...validationErrors, email: 'Please enter a valid email address' };
       setValidationErrors(errors);
       toast.error('Please enter a valid email address');
-      return;
-    }
-
-    // Phone number validation (country-aware)
-    if (!isValidPhoneNumber(formData.phone || '')) {
-      const errors = { ...validationErrors, phone: 'Please enter a valid phone number' };
-      setValidationErrors(errors);
-      toast.error('Please enter a valid phone number');
       return;
     }
 
@@ -1080,7 +1064,10 @@ useEffect(() => {
         <PhoneInput
           id="phone"
           international
+          withCountryCallingCode
           defaultCountry="US"
+          countryCallingCodeEditable={false}
+          limitMaxLength
           value={formData.phone}
           onChange={(value) => {
             const safeValue = value || ''

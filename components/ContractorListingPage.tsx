@@ -1372,11 +1372,6 @@ export function ContractorListingPage() {
 
     if (!contractFormData.phone.trim()) {
       errors.phone = 'Phone number is required'
-    } else {
-      const normalized = normalizePhoneToE164(contractFormData.phone)
-      if (!normalized || !isValidPhoneNumber(normalized)) {
-        errors.phone = 'Please enter a valid phone number'
-      }
     }
 
     setValidationErrors(errors)
@@ -3302,7 +3297,10 @@ export function ContractorListingPage() {
                 <PhoneInput
                   id="phone"
                   international
+                  withCountryCallingCode
                   defaultCountry="US"
+                  countryCallingCodeEditable={false}
+                  limitMaxLength
                   value={contractFormData.phone}
                   onChange={(value) => handleInputChange('phone', value || '')}
                   placeholder="Enter phone number"

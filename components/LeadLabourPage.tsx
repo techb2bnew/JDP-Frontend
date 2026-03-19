@@ -35,7 +35,7 @@ import {
 } from 'lucide-react'
 import Image from 'next/image'
 import { apiClient } from '@/utils/api'
-import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input'
+import PhoneInput from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
 import Autocomplete from "react-google-autocomplete";
 
@@ -325,7 +325,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
 
   const handleCreate = async () => {
     // Validation
-    if (!formData.role || !formData.name || !formData.email || !formData.phone || !formData.dob || !formData.address || !formData.department || !formData.dateOfJoining || !formData.specialization || !formData.experience || !formData.documents.idProof || !formData.agreeToTerms) {
+    if (!formData.role || !formData.name || !formData.email || !formData.phone || !formData.dob || !formData.address || !formData.department || !formData.dateOfJoining || !formData.specialization || !formData.experience || !formData.agreeToTerms) {
       const errors: Record<string, string> = {};
       if (!formData.role) errors.role = 'Role is required';
       if (!formData.name) errors.name = 'Name is required';
@@ -340,7 +340,6 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       if (!formData.dateOfJoining) errors.dateOfJoining = 'Date of Joining is required';
       if (!formData.specialization) errors.specialization = 'Specialization is required';
       if (!formData.experience) errors.experience = 'Experience is required';
-      if (!formData.documents.idProof) errors.idProof = 'ID Proof is required';
       if (!formData.agreeToTerms) errors.agreeToTerms = 'Please agree to terms';
 
       setValidationErrors(errors);
@@ -354,15 +353,6 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       const errors = { ...validationErrors, email: 'Please enter a valid email address' };
       setValidationErrors(errors);
       toast.error('Please enter a valid email address');
-      return;
-    }
-
-    // Phone number validation (length-based, allow more formats)
-    const phoneDigitsCreate = (formData.phone || '').replace(/\D/g, '');
-    if (phoneDigitsCreate.length < 7 || phoneDigitsCreate.length > 15) {
-      const errors = { ...validationErrors, phone: 'Please enter a valid phone number' };
-      setValidationErrors(errors);
-      toast.error('Please enter a valid phone number');
       return;
     }
 
@@ -568,15 +558,6 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       const errors = { ...validationErrors, email: 'Please enter a valid email address' };
       setValidationErrors(errors);
       toast.error('Please enter a valid email address');
-      return;
-    }
-
-    // Phone number validation (length-based, allow more formats)
-    const phoneDigitsUpdate = (formData.phone || '').replace(/\D/g, '');
-    if (phoneDigitsUpdate.length < 7 || phoneDigitsUpdate.length > 15) {
-      const errors = { ...validationErrors, phone: 'Please enter a valid phone number' };
-      setValidationErrors(errors);
-      toast.error('Please enter a valid phone number');
       return;
     }
 
@@ -1426,7 +1407,10 @@ useEffect(() => {
             <PhoneInput
               id="phone"
               international
+              withCountryCallingCode
               defaultCountry="US"
+              countryCallingCodeEditable={false}
+              limitMaxLength
               value={formData.phone}
               onChange={(value) => {
                 const safeValue = value || ''
@@ -1627,7 +1611,7 @@ useEffect(() => {
       <div>
         <h3 className="text-lg font-medium text-[#2b2b2b] mb-4">Document Upload</h3>
         <div className="grid grid-cols-3 gap-4">
-          <FileUploadArea type="idProof" label="Select ID Proof *" accept=".pdf,.jpg,.jpeg,.png" error={validationErrors.idProof} />
+          <FileUploadArea type="idProof" label="Select ID Proof" accept=".pdf,.jpg,.jpeg,.png" error={validationErrors.idProof} />
           <FileUploadArea type="photo" label="Photo Upload" accept=".jpg,.jpeg,.png" />
           <FileUploadArea type="resume" label="Resume Upload" accept=".pdf,.doc,.docx" />
         </div>

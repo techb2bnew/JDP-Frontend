@@ -21,7 +21,7 @@ import {
   Download
 } from 'lucide-react'
 import { globalApiCall, getAuthToken, handleTokenRevocation } from '../utils/globalApiHandler'
-import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input'
+import PhoneInput from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
 import Autocomplete from "react-google-autocomplete";
 
@@ -250,8 +250,6 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       case 'phone':
         if (!value.trim()) {
           errors.phone = 'Phone number is required'
-        } else if (!isValidPhoneNumber(value)) {
-          errors.phone = 'Please enter a valid phone number for the selected country'
         } else {
           delete errors.phone
         }
@@ -636,9 +634,6 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
 
     if (!formData.phone.trim()) {
       errors.phone = 'Phone is required'
-      isValid = false
-    } else if (!isValidPhoneNumber(formData.phone)) {
-      errors.phone = 'Please enter a valid phone number for the selected country'
       isValid = false
     }
 
@@ -1403,7 +1398,10 @@ useEffect(() => {
               <PhoneInput
                 id="edit-phone"
                 international
+                withCountryCallingCode
                 defaultCountry="US"
+                countryCallingCodeEditable={false}
+                limitMaxLength
                 value={formData.phone}
                 onChange={(value) => {
                   const safeValue = value || ''

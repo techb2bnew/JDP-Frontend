@@ -28,7 +28,7 @@ import {
   MapPin
 } from 'lucide-react'
 import { apiClient } from '@/utils/api'
-import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input'
+import PhoneInput from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
 import Autocomplete from "react-google-autocomplete";
 
@@ -305,15 +305,6 @@ const getAvailabilityBadge = (availability: string) => {
       return;
     }
 
-    // Phone number validation (length-based, allow more formats)
-    const phoneDigitsCreate = (formData.phone || '').replace(/\D/g, '');
-    if (phoneDigitsCreate.length < 7 || phoneDigitsCreate.length > 15) {
-      const errors = { ...validationErrors, phone: 'Please enter a valid phone number' };
-      setValidationErrors(errors);
-      toast.error('Please enter a valid phone number');
-      return;
-    }
-
     let loadingToastId: string | number | undefined;
     
     try {
@@ -438,15 +429,6 @@ const getAvailabilityBadge = (availability: string) => {
       const errors = {...validationErrors, email: 'Please enter a valid email address'};
       setValidationErrors(errors);
       toast.error('Please enter a valid email address');
-      return;
-    }
-
-    // Phone number validation (length-based, allow more formats)
-    const phoneDigitsUpdate = (formData.phone || '').replace(/\D/g, '');
-    if (phoneDigitsUpdate.length < 7 || phoneDigitsUpdate.length > 15) {
-      const errors = { ...validationErrors, phone: 'Please enter a valid phone number' };
-      setValidationErrors(errors);
-      toast.error('Please enter a valid phone number');
       return;
     }
 
@@ -1148,7 +1130,10 @@ const fetchLaborById = async (id: string) => {
         <PhoneInput
           id="phone"
           international
+          withCountryCallingCode
           defaultCountry="US"
+          countryCallingCodeEditable={false}
+          limitMaxLength
           value={formData.phone}
           onChange={(value) => {
             const safeValue = value || ''
