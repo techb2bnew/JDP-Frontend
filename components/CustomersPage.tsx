@@ -1788,6 +1788,7 @@ export function CustomersPage() {
                 (job: any) =>
                   job.status === "in_progress" ||
                   job.status === "ongoing" ||
+                  job.status === "pending" ||
                   job.status === "in-progress",
               ).length;
               const totalRevenue = jobs.reduce((sum: number, job: any) => {
@@ -1827,7 +1828,7 @@ export function CustomersPage() {
                       <div className="text-2xl font-bold text-gray-900 mb-1">
                         {ongoingJobs}
                       </div>
-                      <div className="text-sm text-gray-600">Ongoing</div>
+                      <div className="text-sm text-gray-600">In Progess</div>
                     </CardContent>
                   </Card>
 
@@ -1844,6 +1845,86 @@ export function CustomersPage() {
                 </div>
               );
             })()}
+           {/* Jobs Table */}
+          <Card className="mt-8">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-primary" />
+                Jobs
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent>
+              {selectedCustomerData.jobs && selectedCustomerData.jobs.length > 0 ? (
+                <div className="overflow-x-auto rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Job Title</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Address</TableHead>
+                        <TableHead>Due Date</TableHead>
+                        <TableHead>Est. Cost</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+
+                    <TableBody>
+                      {selectedCustomerData.jobs.map((job: any) => (
+                        <TableRow key={job.id}>
+                          <TableCell className="font-medium">
+                            {job.job_title || "N/A"}
+                          </TableCell>
+
+                          <TableCell className="capitalize">
+                            {(job.job_type || "N/A").replace("_", " ")}
+                          </TableCell>
+
+                          <TableCell className="max-w-[240px] truncate">
+                            {job.address || "N/A"}
+                          </TableCell>
+
+                          <TableCell>
+                            {job.due_date ? formatDate(job.due_date) : "N/A"}
+                          </TableCell>
+
+                          <TableCell>
+                            {formatCurrency(job.estimated_cost || 0)}
+                          </TableCell>
+                           <TableCell>{getStatusBadge(job.status)}</TableCell>
+
+                          <TableCell className="text-right">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                selectJob(
+                                  job.id.toString(),
+                                  selectedCustomerData.id.toString(),
+                                )
+                              }
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed p-8 text-center">
+                  <Briefcase className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500 font-medium">No jobs found</p>
+                  <p className="text-sm text-gray-400 mt-1">
+                    This customer does not have any jobs yet.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
           </div>
         ) : (
           <div className="p-6">

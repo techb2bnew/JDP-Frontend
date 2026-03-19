@@ -16,7 +16,9 @@ import {
   Trash2
 } from 'lucide-react'
 import { apiClient, globalApiCall } from '@/utils/api'
-import { toast } from 'sonner'
+import { toast } from 'sonner';
+import PhoneInput from "react-phone-number-input";
+
 
 export function AddEditOrderPage() {
   const router = useRouter()
@@ -943,12 +945,21 @@ export function AddEditOrderPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="delivery-phone">Delivery Phone</Label>
-                  <Input
-                    id="delivery-phone"
-                    value={orderFormData.delivery_phone}
-                    onChange={(e) => setOrderFormData(prev => ({ ...prev, delivery_phone: e.target.value }))}
-                    placeholder="Phone number"
-                  />
+                  <PhoneInput
+                      id="delivery-phone"
+                      value={orderFormData.delivery_phone}
+                      onChange={(value) =>
+                        setOrderFormData((prev) => ({
+                          ...prev,
+                          delivery_phone: value || "",
+                        }))
+                      }
+                      limitMaxLength
+                      international
+                      defaultCountry="US"
+                      placeholder="Phone number"
+                      className="border border-gray-300 rounded-md px-2 py-2"
+                    />
                 </div>
 
                 

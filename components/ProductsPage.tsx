@@ -154,10 +154,13 @@ const [formMode, setFormMode] = useState<ProductAction>('add') // 'add' | 'edit'
     stockQuantity: 0,
     unit: 'piece',
     branchIds: [],
-    status: 'draft',
+    status: 'active',
     unit_cost:0,
     estimated_price:0
-  })
+  });
+
+  console.log(formData,"formData");
+  
   // Auto-generate JDP SKU when supplier SKU changes
  useEffect(() => {
   if (formData.supplierSku) {
@@ -448,7 +451,7 @@ const handleAction = (action: ProductAction, product?: Product) => {
       stockQuantity: 0,
       unit: 'piece',
       branchIds: [],
-      status: 'draft',
+      status: 'active',
       unit_cost: 0,
       estimated_price: 0
     });
@@ -672,7 +675,7 @@ const handleAction = (action: ProductAction, product?: Product) => {
       stockQuantity: 0,
       unit: 'piece',
       branchIds: [],
-      status: 'draft',
+      status: 'active',
       unit_cost:0,
       estimated_price:0
     })

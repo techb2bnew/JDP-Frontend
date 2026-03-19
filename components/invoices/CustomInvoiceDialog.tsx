@@ -1896,16 +1896,18 @@ export const CustomInvoiceDialog = ({
                                     ) : (
                                       <div className="p-3">
                                         <div className="text-sm text-muted-foreground mb-2">No products found</div>
-                                        <Button
+                                       <Button
                                           size="sm"
                                           onMouseDown={(e) => {
-                                            e.preventDefault()
-                                            addCustomProduct(item.id, item.searchQuery || '')
+                                            e.preventDefault();
+                                            addCustomProduct(item.id, item.searchQuery || "");
                                           }}
-                                          className="w-full bg-primary hover:bg-primary/90"
+                                          className="w-full bg-white hover:bg-primary/90 flex items-start gap-2 text-left whitespace-normal break-words"
                                         >
-                                          <Plus className="h-3 w-3 mr-1" />
-                                          Add "{item.searchQuery}"
+                                          <Plus className="h-3 w-3 mt-[2px] shrink-0" />
+                                          <span className="break-all">
+                                            Add "{item.searchQuery}"
+                                          </span>
                                         </Button>
                                       </div>
                                     )}

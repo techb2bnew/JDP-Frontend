@@ -2,7 +2,6 @@
 
 import { apiClient } from "@/utils/api";
 import React, { useEffect, useState } from "react";
-// import { apiClient } from "@/lib/apiClient";
 
 type ActivityType =
   | "job_created"
@@ -25,12 +24,13 @@ type ActivityLogItem = {
   userName: string;
   type: ActivityType;
   avatar?: string;
+  sortDate?: string;
+  priority?: number;
 };
 
 type ActivityLogsProps = {
   jobId: string;
   title?: string;
-//   refreshTrigger?: number | string | boolean;
 };
 
 type ApiUser = {
@@ -74,16 +74,57 @@ type ApiMaterialEntry = {
   id: number;
   material_name?: string;
   supplier_order_id?: string;
+  quantity?: number;
+  unit_cost?: number;
+  total_cost?: number | null;
+  material_used?: number;
+  total_ordered?: number;
+  product_id?: number;
+  unit?: string;
+  return_to_warehouse?: boolean;
+  product?: {
+    id: number;
+    jdp_price?: number;
+    product_name?: string;
+    supplier_cost_price?: number;
+  };
 };
 
 type ApiBlueSheet = {
   id: number;
   date: string;
   created_at: string;
+  updated_at?: string;
   status?: string;
   created_by_user?: ApiUser;
-  updated_by_user?:ApiUser;
+  updated_by_user?: ApiUser | null;
   material_entries?: ApiMaterialEntry[];
+};
+
+type ApiInvoiceActivity = {
+  estimate_id: number;
+  invoice_number: string;
+  status: string;
+  invoice_sent_at?: string;
+  invoice_sent_to?: string;
+  invoice_link?: string;
+  qb_invoice_id?: string | null;
+  sent_by_user?: ApiUser | null;
+};
+
+type ApiBlueSheetSubmittedBy = {
+  bluesheet_id: number;
+  submitted_at: string;
+  submitted_by?: ApiUser;
+};
+
+type ApiActivityAudit = {
+  job_created_by?: ApiUser;
+  job_updated_by?: ApiUser | null;
+  labor_assigned_by?: ApiUser;
+  lead_labor_assigned_by?: ApiUser;
+  bluesheet_submitted_by?: ApiBlueSheetSubmittedBy[];
+  invoice_activity?: ApiInvoiceActivity[];
 };
 
 type JobActivityApiResponse = {
@@ -93,11 +134,18 @@ type JobActivityApiResponse = {
     job: {
       id: number;
       job_title: string;
+      job_type?: string;
+      description?: string;
       status: string;
+      priority?: string;
+      customer_id?: number;
+      contractor_id?: number | null;
+      estimated_cost?: number;
+      due_date?: string;
       created_at: string;
       updated_at: string;
       created_by_user?: ApiUser;
-      updated_by_user?:ApiUser;
+      updated_by_user?: ApiUser | null;
     };
     total_orders?: number;
     regular_hours?: {
@@ -108,36 +156,24 @@ type JobActivityApiResponse = {
     assigned_labor?: ApiAssignedLabor[];
     assigned_lead_labor?: ApiAssignedLeadLabor[];
     bluesheets?: ApiBlueSheet[];
+    activity_audit?: ApiActivityAudit;
   };
   statusCode: number;
 };
 
-const dummyActivities: ActivityLogItem[] = [
-  {
-    id: "1",
-    title: "Job Created",
-    description: "Base2brand job was created.",
-    dateLabel: "Mar 16, 2026",
-    userName: "deepak sharma",
-    type: "job_created",
-  },
-  {
-    id: "2",
-    title: "Lead Labor Assigned",
-    description: "deepak sharma was assigned as lead labor.",
-    dateLabel: "Mar 17, 2026",
-    userName: "deepak sharma",
-    type: "lead_assigned",
-  },
-  {
-    id: "3",
-    title: "Labor Assigned",
-    description: "Labor team members were assigned to this job.",
-    dateLabel: "Mar 17, 2026",
-    userName: "admin",
-    type: "labor_assigned",
-  },
-];
+const activityPriority: Record<ActivityType, number> = {
+  job_created: 1,
+  lead_assigned: 2,
+  labor_assigned: 3,
+  labour_hours_logged: 4,
+  material_ordered: 5,
+  bluesheet_submitted: 6,
+  invoice_generated: 7,
+  status_updated: 8,
+  job_updated: 9,
+  job_started: 10,
+  document_uploaded: 11,
+};
 
 const formatDateLabel = (dateString?: string) => {
   if (!dateString) return "";
@@ -148,14 +184,6 @@ const formatDateLabel = (dateString?: string) => {
     day: "numeric",
     year: "numeric",
   });
-};
-
-const getInitials = (name: string) => {
-  const cleanName = (name || "").trim();
-  if (!cleanName) return "NA";
-  const parts = cleanName.split(" ").filter(Boolean);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
 };
 
 const getTypeStyles = (type: ActivityType) => {
@@ -182,6 +210,7 @@ const getTypeStyles = (type: ActivityType) => {
           </svg>
         ),
       };
+
     case "job_updated":
       return {
         iconBg: "bg-yellow-500",
@@ -204,6 +233,7 @@ const getTypeStyles = (type: ActivityType) => {
           </svg>
         ),
       };
+
     case "job_started":
       return {
         iconBg: "bg-emerald-500",
@@ -236,7 +266,11 @@ const getTypeStyles = (type: ActivityType) => {
             strokeWidth={2}
           >
             <circle cx="12" cy="12" r="8" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l2.5 2.5" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 8v4l2.5 2.5"
+            />
           </svg>
         ),
       };
@@ -301,7 +335,11 @@ const getTypeStyles = (type: ActivityType) => {
             stroke="currentColor"
             strokeWidth={2}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M5 13l4 4L19 7"
+            />
           </svg>
         ),
       };
@@ -320,7 +358,11 @@ const getTypeStyles = (type: ActivityType) => {
             stroke="currentColor"
             strokeWidth={2}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5V4H2v16h5m10 0v-2a4 4 0 00-4-4H11a4 4 0 00-4 4v2m10 0H7m10-10a4 4 0 11-8 0 4 4 0 018 0z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M17 20h5V4H2v16h5m10 0v-2a4 4 0 00-4-4H11a4 4 0 00-4 4v2m10 0H7m10-10a4 4 0 11-8 0 4 4 0 018 0z"
+            />
           </svg>
         ),
       };
@@ -339,7 +381,11 @@ const getTypeStyles = (type: ActivityType) => {
             stroke="currentColor"
             strokeWidth={2}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5V4H2v16h5m10 0a3 3 0 00-3-3H10a3 3 0 00-3 3m10 0H7m8-10a3 3 0 11-6 0 3 3 0 016 0zm6 2a2 2 0 11-4 0 2 2 0 014 0zM7 12a2 2 0 11-4 0 2 2 0 014 0z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M17 20h5V4H2v16h5m10 0a3 3 0 00-3-3H10a3 3 0 00-3 3m10 0H7m8-10a3 3 0 11-6 0 3 3 0 016 0zm6 2a2 2 0 11-4 0 2 2 0 014 0zM7 12a2 2 0 11-4 0 2 2 0 014 0z"
+            />
           </svg>
         ),
       };
@@ -358,7 +404,11 @@ const getTypeStyles = (type: ActivityType) => {
             stroke="currentColor"
             strokeWidth={2}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M9 12h6m-6 4h6M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z"
+            />
           </svg>
         ),
       };
@@ -377,7 +427,11 @@ const getTypeStyles = (type: ActivityType) => {
             stroke="currentColor"
             strokeWidth={2}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V7a2 2 0 00-2-2h-3V3H9v2H6a2 2 0 00-2 2v6m16 0l-2.586 2.586a2 2 0 01-1.414.586H8a2 2 0 01-1.414-.586L4 13m16 0V9a2 2 0 00-2-2h-1M4 13V9a2 2 0 012-2h1" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M20 13V7a2 2 0 00-2-2h-3V3H9v2H6a2 2 0 00-2 2v6m16 0l-2.586 2.586a2 2 0 01-1.414.586H8a2 2 0 01-1.414-.586L4 13m16 0V9a2 2 0 00-2-2h-1M4 13V9a2 2 0 012-2h1"
+            />
           </svg>
         ),
       };
@@ -404,7 +458,9 @@ const ActivityTimelineItem = ({
   return (
     <div className="relative flex gap-4">
       <div className="relative flex w-10 shrink-0 justify-center">
-        {!isLast && <div className="absolute top-10 bottom-[-18px] w-[2px] bg-gray-200" />}
+        {!isLast && (
+          <div className="absolute top-10 bottom-[-18px] w-[2px] bg-gray-200" />
+        )}
         <div
           className={`relative z-10 mt-1 flex h-9 w-9 items-center justify-center rounded-full ${styles.iconBg} shadow-sm`}
         >
@@ -416,31 +472,25 @@ const ActivityTimelineItem = ({
         className={`mb-4 w-full rounded-2xl border p-4 shadow-sm ${styles.cardBg} ${styles.cardBorder}`}
       >
         <div className="flex items-start justify-between gap-3">
-          <h3 className="text-[15px] font-semibold text-gray-800">{item.title}</h3>
+          <h3 className="text-[15px] font-semibold text-gray-800">
+            {item.title}
+          </h3>
           <span className="shrink-0 text-xs font-semibold text-blue-600">
             {item.dateLabel}
           </span>
         </div>
 
-        <p className="mt-2 text-sm leading-6 text-gray-600">{item.description}</p>
-
-        <div className="mt-3 flex items-center gap-2 text-sm text-gray-600">
-          {item.avatar ? (
-            <img
-              src={item.avatar}
-              alt={item.userName}
-              className="h-6 w-6 rounded-full object-cover"
-            />
-          ) : (
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-[10px] font-semibold text-gray-700 ring-1 ring-gray-200">
-              {getInitials(item.userName)}
-            </div>
-          )}
-          <span className="capitalize">{item.userName}</span>
-        </div>
+        <p className="mt-2 text-sm leading-6 text-gray-600">
+          {item.description}
+        </p>
       </div>
     </div>
   );
+};
+
+const getSafeUserName = (name?: string | null) => {
+  const clean = name?.trim();
+  return clean || "System";
 };
 
 const mapApiResponseToActivities = (
@@ -448,55 +498,82 @@ const mapApiResponseToActivities = (
 ): ActivityLogItem[] => {
   const result: ActivityLogItem[] = [];
   const payload = response?.data;
+  const activityAudit = payload?.activity_audit;
 
   if (!payload?.job) return [];
 
   const job = payload.job;
-  console.log(job,"job.updated_by_user");
-  
+
+  const createdBy =
+    getSafeUserName(activityAudit?.job_created_by?.full_name) ||
+    getSafeUserName(job.created_by_user?.full_name);
+
+  const updatedBy =
+    getSafeUserName(activityAudit?.job_updated_by?.full_name) ||
+    getSafeUserName(job.updated_by_user?.full_name);
 
   result.push({
     id: `job-created-${job.id}`,
     title: "Job Created",
-    description: `${job.job_title} was created.`,
+    description: `${createdBy} created the job "${job.job_title}".`,
     dateLabel: formatDateLabel(job.created_at),
-    userName: job.created_by_user?.full_name?.trim() || "system",
+    userName: createdBy,
     type: "job_created",
+    sortDate: job.created_at,
+    priority: activityPriority.job_created,
   });
 
-  if(job.updated_by_user){
-      result.push({
-    id: `job-updated-${job.id}`,
-    title: "Job Updated",
-    description: `${job.job_title} was updated.`,
-    dateLabel: formatDateLabel(job.updated_at),
-    userName: job.updated_by_user?.full_name?.trim() || "system",
-    type: "job_updated",
-  });
+  if (job.updated_by_user || activityAudit?.job_updated_by) {
+    result.push({
+      id: `job-updated-${job.id}`,
+      title: "Job Updated",
+      description: `${updatedBy} updated the job "${job.job_title}".`,
+      dateLabel: formatDateLabel(job.updated_at),
+      userName: updatedBy,
+      type: "job_updated",
+      sortDate: job.updated_at,
+      priority: activityPriority.job_updated,
+    });
   }
 
   if (payload.assigned_lead_labor?.length) {
     payload.assigned_lead_labor.forEach((lead) => {
+      const assignedLeadName = getSafeUserName(lead.user?.full_name);
+      const assignedBy = getSafeUserName(
+        activityAudit?.lead_labor_assigned_by?.full_name
+      );
+      const sortDate = job.updated_at || job.created_at;
+
       result.push({
         id: `lead-${lead.id}`,
         title: "Lead Labor Assigned",
-        description: `${lead.user?.full_name?.trim() || "Lead labor"} was assigned as lead labor.`,
-        dateLabel: formatDateLabel(job.updated_at || job.created_at),
-        userName: lead.user?.full_name?.trim() || "admin",
+        description: `${assignedBy} assigned ${assignedLeadName} as lead labor.`,
+        dateLabel: formatDateLabel(sortDate),
+        userName: assignedBy,
         type: "lead_assigned",
+        sortDate,
+        priority: activityPriority.lead_assigned,
       });
     });
   }
 
   if (payload.assigned_labor?.length) {
     payload.assigned_labor.forEach((labor) => {
+      const assignedLaborName = getSafeUserName(labor.user?.full_name);
+      const assignedBy = getSafeUserName(
+        activityAudit?.labor_assigned_by?.full_name
+      );
+      const sortDate = job.updated_at || job.created_at;
+
       result.push({
         id: `labor-${labor.id}`,
         title: "Labor Assigned",
-        description: `${labor.user?.full_name?.trim() || "Labor"} was assigned to this job.`,
-        dateLabel: formatDateLabel(job.updated_at || job.created_at),
-        userName: labor.user?.full_name?.trim() || "admin",
+        description: `${assignedBy} assigned ${assignedLaborName} to this job.`,
+        dateLabel: formatDateLabel(sortDate),
+        userName: assignedBy,
         type: "labor_assigned",
+        sortDate,
+        priority: activityPriority.labor_assigned,
       });
     });
   }
@@ -504,31 +581,58 @@ const mapApiResponseToActivities = (
   if (payload.labor_timesheets?.length) {
     payload.labor_timesheets.forEach((timesheet) => {
       const workerName =
-        timesheet.lead_labor?.users?.full_name?.trim() ||
-        timesheet.labor?.users?.full_name?.trim() ||
-        "Labor";
+        getSafeUserName(timesheet.lead_labor?.users?.full_name) ||
+        getSafeUserName(timesheet.labor?.users?.full_name);
+
+      const sortDate = timesheet.created_at || timesheet.date;
 
       result.push({
         id: `timesheet-${timesheet.id}`,
         title: "Labour Hours Logged",
-        description: `${workerName} logged ${timesheet.work_activity || "00:00:00"} labour hours.`,
-        dateLabel: formatDateLabel(timesheet.created_at || timesheet.date),
+        description: `${workerName} logged ${
+          timesheet.work_activity || "00:00:00"
+        } labour hours.`,
+        dateLabel: formatDateLabel(sortDate),
         userName: workerName,
         type: "labour_hours_logged",
+        sortDate,
+        priority: activityPriority.labour_hours_logged,
+      });
+    });
+  }
+
+  if (activityAudit?.invoice_activity?.length) {
+    activityAudit.invoice_activity.forEach((invoice, index) => {
+      const sentBy = getSafeUserName(invoice.sent_by_user?.full_name);
+      const sortDate = invoice.invoice_sent_at || job.updated_at || job.created_at;
+
+      result.push({
+        id: `invoice-${invoice.estimate_id}-${index}`,
+        title: "Invoice Sent",
+        description: `${sentBy} sent invoice ${invoice.invoice_number} to ${
+          invoice.invoice_sent_to || "the customer"
+        }.`,
+        dateLabel: formatDateLabel(sortDate),
+        userName: sentBy,
+        type: "invoice_generated",
+        sortDate,
+        priority: activityPriority.invoice_generated,
       });
     });
   }
 
   if (payload.bluesheets?.length) {
     payload.bluesheets.forEach((sheet) => {
-      result.push({
-        id: `bluesheet-${sheet.id}`,
-        title: "Bluesheet Submitted",
-        description: `Bluesheet was submitted with status ${sheet.status || "draft"}.`,
-        dateLabel: formatDateLabel(sheet.created_at || sheet.date),
-        userName: sheet.created_by_user?.full_name?.trim() || "staff",
-        type: "bluesheet_submitted",
-      });
+      const bluesheetAuditEntry = activityAudit?.bluesheet_submitted_by?.find(
+        (entry) => entry.bluesheet_id === sheet.id
+      );
+
+      const submittedBy =
+        getSafeUserName(bluesheetAuditEntry?.submitted_by?.full_name) ||
+        getSafeUserName(sheet.created_by_user?.full_name);
+
+      const sortDate =
+        bluesheetAuditEntry?.submitted_at || sheet.created_at || sheet.date;
 
       const uniqueOrderIds = Array.from(
         new Set(
@@ -542,29 +646,61 @@ const mapApiResponseToActivities = (
         result.push({
           id: `material-order-${sheet.id}-${index}`,
           title: "Material Ordered",
-          description: `Supplier order ${orderId} was linked with this bluesheet.`,
-          dateLabel: formatDateLabel(sheet.created_at || sheet.date),
-          userName: sheet.created_by_user?.full_name?.trim() || "staff",
+          description: `${submittedBy} linked supplier order ${orderId} to BlueSheet #${sheet.id}.`,
+          dateLabel: formatDateLabel(sortDate),
+          userName: submittedBy,
           type: "material_ordered",
+          sortDate,
+          priority: activityPriority.material_ordered,
         });
+      });
+
+      result.push({
+        id: `bluesheet-${sheet.id}`,
+        title: "Bluesheet Submitted",
+        description: `${submittedBy} submitted BlueSheet #${sheet.id} with status "${
+          sheet.status || "draft"
+        }".`,
+        dateLabel: formatDateLabel(sortDate),
+        userName: submittedBy,
+        type: "bluesheet_submitted",
+        sortDate,
+        priority: activityPriority.bluesheet_submitted,
       });
     });
   }
 
   if (job.status) {
+    const statusActor =
+      getSafeUserName(activityAudit?.job_updated_by?.full_name) ||
+      getSafeUserName(job.updated_by_user?.full_name) ||
+      getSafeUserName(job.created_by_user?.full_name);
+
+    const sortDate = job.updated_at || job.created_at;
+
     result.push({
       id: `status-${job.id}`,
       title: "Status Updated",
-      description: `Job status is currently "${job.status}".`,
-      dateLabel: formatDateLabel(job.updated_at || job.created_at),
-      userName: job.created_by_user?.full_name?.trim() || "system",
+      description: `${statusActor} changed the job status to "${job.status.replace(
+        /_/g,
+        " "
+      )}".`,
+      dateLabel: formatDateLabel(sortDate),
+      userName: statusActor,
       type: "status_updated",
+      sortDate,
+      priority: activityPriority.status_updated,
     });
   }
 
   return result.sort((a, b) => {
-    const dateA = new Date(a.dateLabel).getTime();
-    const dateB = new Date(b.dateLabel).getTime();
+    const dateA = new Date(a.sortDate || "").getTime();
+    const dateB = new Date(b.sortDate || "").getTime();
+
+    if (dateA === dateB) {
+      return (a.priority || 0) - (b.priority || 0);
+    }
+
     return dateA - dateB;
   });
 };
@@ -572,9 +708,8 @@ const mapApiResponseToActivities = (
 export default function ActivityLogs({
   jobId,
   title = "Activity Timeline",
-//   refreshTrigger,
 }: ActivityLogsProps) {
-  const [activities, setActivities] = useState<ActivityLogItem[]>(dummyActivities);
+  const [activities, setActivities] = useState<ActivityLogItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const fetchActivityLogs = async () => {
@@ -582,17 +717,18 @@ export default function ActivityLogs({
 
     setIsLoading(true);
     try {
-      const response: JobActivityApiResponse = await apiClient.getActivityLogsByJob(jobId);
+      const response: JobActivityApiResponse =
+        await apiClient.getActivityLogsByJob(jobId);
 
       if (response?.success && response?.data) {
         const mappedActivities = mapApiResponseToActivities(response);
-        setActivities(mappedActivities.length ? mappedActivities : dummyActivities);
+        setActivities(mappedActivities.length ? mappedActivities : []);
       } else {
-        setActivities(dummyActivities);
+        setActivities([]);
       }
     } catch (error) {
       console.error("Failed to fetch activity logs:", error);
-      setActivities(dummyActivities);
+      setActivities([]);
     } finally {
       setIsLoading(false);
     }
@@ -613,7 +749,11 @@ export default function ActivityLogs({
           stroke="currentColor"
           strokeWidth={2}
         >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M4 17l6-6 4 4 6-6" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M4 17l6-6 4 4 6-6"
+          />
         </svg>
         <h2 className="text-base font-semibold text-gray-800">{title}</h2>
       </div>
@@ -630,7 +770,6 @@ export default function ActivityLogs({
                   <div className="h-4 w-40 rounded bg-gray-200" />
                   <div className="mt-3 h-3 w-full rounded bg-gray-200" />
                   <div className="mt-2 h-3 w-3/4 rounded bg-gray-200" />
-                  <div className="mt-4 h-6 w-24 rounded bg-gray-200" />
                 </div>
               </div>
             ))}

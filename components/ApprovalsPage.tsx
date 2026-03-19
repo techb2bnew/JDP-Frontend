@@ -514,7 +514,7 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
                 <TableHead className="text-white font-medium">Job Details</TableHead>
                 {/* <TableHead className="text-white font-medium">PO Number</TableHead> */}
                 <TableHead className="text-white font-medium">Submitted By</TableHead>
-                <TableHead className="text-white font-medium">Amount</TableHead>
+                {/* <TableHead className="text-white font-medium">Amount</TableHead> */}
                 <TableHead className="text-white font-medium">Bluesheet Count</TableHead>
                 {/* <TableHead className="text-white font-medium">Status</TableHead> */}
                 <TableHead className="text-white font-medium">Actions</TableHead>
@@ -578,7 +578,7 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="font-medium">{formatCurrency(blueSheet.total_cost)}</TableCell>
+                    {/* <TableCell className="font-medium">{formatCurrency(blueSheet.total_cost)}</TableCell> */}
                     <TableCell>
 
                       <Badge className="bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-50">

@@ -39,6 +39,7 @@ import {
   ArrowLeft
 } from 'lucide-react'
 import { apiClient } from '@/utils/api'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 
 export interface BlueSheetItem {
   id: number
@@ -1341,7 +1342,7 @@ export function BlueSheetApprovalDialog({
                         <CardTitle className="text-base font-semibold flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full bg-[#00A1FF]" /> BlueSheet Materials
                         </CardTitle>
-                        <p className="text-xs text-white/80 mt-1">
+                        <p className="text-xs text-white/80 mt-1 capitalize">
                           PO: BS-{blueSheet.id} · {blueSheet.job.job_title} · {blueSheet.job.customer?.customer_name || 'N/A'}
                         </p>
                       </CardHeader>
@@ -1485,7 +1486,7 @@ export function BlueSheetApprovalDialog({
                                                 parseFloat(e.target.value) || 0,
                                               )
                                             }
-                                            className="h-7 text-xs text-right"
+                                            className="h-7 text-xs text-right w-[100px] min-w-[100px]"
                                             min="0"
                                           />
                                         ) : (
@@ -1592,10 +1593,43 @@ export function BlueSheetApprovalDialog({
                     </div>
                   )}
                   <div className="flex justify-end pt-2">
-                    <Button onClick={handleProceedToReview} disabled={isBlueSheetEditMode || isSupplierEditMode || isProceedingToReview} className="bg-[#00A1FF] hover:bg-[#0090e6] text-white gap-2 h-10 text-sm px-6">
+                    {/* <Button onClick={handleProceedToReview} disabled={isBlueSheetEditMode || isSupplierEditMode || isProceedingToReview} className="bg-[#00A1FF] hover:bg-[#0090e6] text-white gap-2 h-10 text-sm px-6">
                       {isProceedingToReview ? <RefreshCw className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
                       {isProceedingToReview ? 'Approving...' : 'Proceed to Final Review'}
-                    </Button>
+                    </Button> */}
+                    <div className="flex justify-end pt-2">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span>
+                              <Button
+                                onClick={() => {
+                                  if (isBlueSheetEditMode) return;
+                                  handleProceedToReview();
+                                }}
+                                disabled={isSupplierEditMode || isProceedingToReview}
+                                className="bg-[#00A1FF] hover:bg-[#0090e6] text-white gap-2 h-10 text-sm px-6"
+                              >
+                                {isProceedingToReview ? (
+                                  <RefreshCw className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <ArrowRight className="h-4 w-4" />
+                                )}
+                                {isProceedingToReview
+                                  ? "Approving..."
+                                  : "Proceed to Final Review"}
+                              </Button>
+                            </span>
+                          </TooltipTrigger>
+
+                          {isBlueSheetEditMode && (
+                            <TooltipContent>
+                              <p>Save the BlueSheet before proceeding to final review.</p>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </div>
                 </div>
               </TabsContent>
