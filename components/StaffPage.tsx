@@ -220,6 +220,37 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
     };
   }, [isStaffDialogOpen]);
 
+  const normalizePhoneToE164 = (rawPhone: string) => {
+    const raw = (rawPhone || '').trim()
+    if (!raw) return ''
+    if (raw.startsWith('+')) return raw.replace(/[^\d+]/g, '')
+
+    const digits = raw.replace(/\D/g, '')
+    if (!digits) return ''
+    if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
+    if (digits.length === 10) return `+1${digits}`
+    return `+${digits}`
+  }
+
+  /** API payload: hyphen after country code, e.g. +1-2025550123 */
+  const formatPhoneForPayload = (rawPhone: string): string => {
+    const e164 = normalizePhoneToE164(rawPhone)
+    if (!e164) return ''
+    const digits = e164.replace(/[^\d+]/g, '')
+    if (!digits.startsWith('+')) return e164
+
+    if (digits.startsWith('+1') && digits.length > 2) {
+      const rest = digits.slice(2)
+      return rest ? `+1-${rest}` : '+1'
+    }
+
+    const match = digits.match(/^\+(\d{2,3})(\d*)$/)
+    if (!match) return e164
+    const country = match[1]
+    const rest = match[2]
+    return rest ? `+${country}-${rest}` : `+${country}`
+  }
+
   // Validation functions
   const validateField = (fieldName: string, value: string) => {
     const errors = { ...validationErrors }
@@ -496,7 +527,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       const staffPayload = {
         full_name: formData.name,
         email: formData.email,
-        phone: formData.phone,
+        phone: formatPhoneForPayload(formData.phone) || '',
         position: formData.position,
         department: formData.department,
         date_of_joining: formData.dateOfJoining,
@@ -576,7 +607,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
     const rawPhone = staffMember.phone || ''
     let normalizedPhone = ''
     if (rawPhone.startsWith('+')) {
-      normalizedPhone = rawPhone
+      normalizedPhone = rawPhone.replace(/[^\d+]/g, '')
     } else {
       const digits = rawPhone.replace(/\D/g, '')
       if (!digits) {
@@ -685,7 +716,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       const staffPayload = {
         full_name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
-        phone: formData.phone.replace(/\D/g, ''), // Remove non-digits
+        phone: formatPhoneForPayload(formData.phone) || '',
         dob: formData.dob,
         position: formData.position.trim(),
         department: formData.department.trim(),
@@ -1236,7 +1267,7 @@ useEffect(() => {
                   </TableCell>
                   <TableCell className="text-sm text-[#2b2b2b]/80">#{member.id}</TableCell>
                   <TableCell className="text-sm text-[#2b2b2b]/80 font-medium">{member.name}</TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">+{member.phone}</TableCell>
+                  <TableCell className="text-sm text-[#2b2b2b]/80">{member.phone}</TableCell>
                   <TableCell className="text-sm text-gray-900">{member.email}</TableCell>
                   <TableCell className="text-sm text-gray-900 max-w-xs truncate">{member.address}</TableCell>
                   <TableCell className="text-sm text-[#2b2b2b]/80">{member.position}</TableCell>

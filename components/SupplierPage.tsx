@@ -99,6 +99,38 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
   const [importFile, setImportFile] = useState<File | null>(null)
   const [isImporting, setIsImporting] = useState(false)
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+
+  const normalizePhoneToE164 = (rawPhone: string) => {
+    const raw = (rawPhone || '').trim()
+    if (!raw) return ''
+    if (raw.startsWith('+')) return raw.replace(/[^\d+]/g, '')
+
+    const digits = raw.replace(/\D/g, '')
+    if (!digits) return ''
+    if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
+    if (digits.length === 10) return `+1${digits}`
+    return `+${digits}`
+  }
+
+  /** API payload: hyphen after country code, e.g. +1-2025550123 */
+  const formatPhoneForPayload = (rawPhone: string): string => {
+    const e164 = normalizePhoneToE164(rawPhone)
+    if (!e164) return ''
+    const digits = e164.replace(/[^\d+]/g, '')
+    if (!digits.startsWith('+')) return e164
+
+    if (digits.startsWith('+1') && digits.length > 2) {
+      const rest = digits.slice(2)
+      return rest ? `+1-${rest}` : '+1'
+    }
+
+    const match = digits.match(/^\+(\d{2,3})(\d*)$/)
+    if (!match) return e164
+    const country = match[1]
+    const rest = match[2]
+    return rest ? `+${country}-${rest}` : `+${country}`
+  }
+
   const [roles, setRoles] = useState<any[]>([])
   const [supplierStats, setSupplierStats] = useState({
     total_suppliers: 0,
@@ -283,7 +315,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
       const payload = {
         full_name: formData.fullName,
         email: formData.email.toLowerCase(),
-        phone: formData.phone,
+        phone: formatPhoneForPayload(formData.phone) || '',
         role: formData.role,
         status: formData.status === 'active' ? 'active' : formData.status === 'inactive' ? 'inactive' : formData.status === 'pending' ? 'pending' : 'suspended',
         company_name: formData.companyName,
@@ -365,7 +397,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
             companyName: apiData.company_name || '',
             contactPerson: apiData.contact_person || '',
             email: userData.email || '',
-            phone: userData.phone || '',
+            phone: normalizePhoneToE164(userData.phone || ''),
             address: apiData.address || '',
             status: userData.status?.toLowerCase() || 'pending',
             contractStart: apiData.contract_start || '',
@@ -383,7 +415,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
             companyName: supplier.companyName,
             contactPerson: supplier.contactPerson,
             email: supplier.email,
-            phone: supplier.phone,
+            phone: normalizePhoneToE164(supplier.phone || ''),
             address: supplier.address,
             status: supplier.status,
             contractStart: supplier.contractStart,
@@ -402,7 +434,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
           companyName: supplier.companyName,
           contactPerson: supplier.contactPerson,
           email: supplier.email,
-          phone: supplier.phone,
+          phone: normalizePhoneToE164(supplier.phone || ''),
           address: supplier.address,
           status: supplier.status,
           contractStart: supplier.contractStart,
@@ -424,7 +456,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
         companyName: supplier.companyName,
         contactPerson: supplier.contactPerson,
         email: supplier.email,
-        phone: supplier.phone,
+        phone: normalizePhoneToE164(supplier.phone || ''),
         address: supplier.address,
         status: supplier.status,
         contractStart: supplier.contractStart,
@@ -477,7 +509,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
       const payload = {
         full_name: formData.fullName,
         email: formData.email.toLowerCase(),
-        phone: formData.phone,
+        phone: formatPhoneForPayload(formData.phone) || '',
         role: formData.role,
         status: formData.status === 'active' ? 'active' : formData.status === 'inactive' ? 'inactive' : formData.status === 'pending' ? 'pending' : 'suspended',
         company_name: formData.companyName,

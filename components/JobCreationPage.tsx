@@ -174,6 +174,37 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     return emailRegex.test(email)
   }
 
+  const normalizePhoneToE164 = (rawPhone: string) => {
+    const raw = (rawPhone || '').trim()
+    if (!raw) return ''
+    if (raw.startsWith('+')) return raw
+
+    const digits = raw.replace(/\D/g, '')
+    if (!digits) return ''
+    if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
+    if (digits.length === 10) return `+1${digits}`
+    return `+${digits}`
+  }
+
+  /** API payload: hyphen after country code, e.g. +1-2025550123 */
+  const formatPhoneForPayload = (rawPhone: string): string => {
+    const e164 = normalizePhoneToE164(rawPhone)
+    if (!e164) return ''
+    const digits = e164.replace(/[^\d+]/g, '')
+    if (!digits.startsWith('+')) return e164
+
+    if (digits.startsWith('+1') && digits.length > 2) {
+      const rest = digits.slice(2)
+      return rest ? `+1-${rest}` : '+1'
+    }
+
+    const match = digits.match(/^\+(\d{2,3})(\d*)$/)
+    if (!match) return e164
+    const country = match[1]
+    const rest = match[2]
+    return rest ? `+${country}-${rest}` : `+${country}`
+  }
+
   const validatePhone = (phone: string): boolean => {
     if (!phone) return false
     return isValidPhoneNumber(phone)
@@ -389,8 +420,6 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     }
     if (!entityForm.phone.trim()) {
       newErrors.phone = 'Phone is required'
-    } else if (!validatePhone(entityForm.phone)) {
-      newErrors.phone = 'Please enter a valid phone number'
     }
     setEntityErrors(newErrors)
     if (Object.keys(newErrors).length > 0) {
@@ -409,7 +438,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
           customer_name: entityForm.name,
           company_name: entityForm.company || '',
           email: entityForm.email.toLowerCase(),
-          phone: entityForm.phone || '',
+          phone: formatPhoneForPayload(entityForm.phone) || '',
           contact_person: '',
           address: entityForm.address || '',
           status: 'active',
@@ -437,7 +466,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
           contractor_name: entityForm.name,
           company_name: entityForm.company || '',
           email: entityForm.email.toLowerCase(),
-          phone: entityForm.phone || '',
+          phone: formatPhoneForPayload(entityForm.phone) || '',
           address: entityForm.address || '',
           status: 'active',
           system_ip
@@ -1437,7 +1466,10 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                   }
                 }}
                 international
+                withCountryCallingCode
                 defaultCountry="US"
+                countryCallingCodeEditable={false}
+                limitMaxLength
                 placeholder="Phone number"
                 className="border border-gray-300 rounded-md px-2 py-1"
               />
@@ -1484,6 +1516,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               type="button"
               onClick={handleCreateEntity}
               disabled={addEntityLoading || !addEntityType}
+              className='text-white'
             >
               {addEntityLoading
                 ? addEntityType === 'customer' ? 'Saving customer...' : 'Saving contractor...'

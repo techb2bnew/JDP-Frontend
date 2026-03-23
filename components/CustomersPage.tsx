@@ -598,6 +598,25 @@ export function CustomersPage() {
     return `+${digits}`;
   };
 
+  /** API payload: hyphen after country code, e.g. +1-2025550123, +91-9876543210 */
+  const formatPhoneForPayload = (rawPhone: string): string => {
+    const e164 = normalizePhoneToE164(rawPhone);
+    if (!e164) return "";
+    const digits = e164.replace(/[^\d+]/g, "");
+    if (!digits.startsWith("+")) return e164;
+
+    if (digits.startsWith("+1") && digits.length > 2) {
+      const rest = digits.slice(2);
+      return rest ? `+1-${rest}` : "+1";
+    }
+
+    const match = digits.match(/^\+(\d{2,3})(\d*)$/);
+    if (!match) return e164;
+    const country = match[1];
+    const rest = match[2];
+    return rest ? `+${country}-${rest}` : `+${country}`;
+  };
+
   const validateForm = () => {
     const errors: Record<string, string> = {};
 
@@ -682,7 +701,7 @@ export function CustomersPage() {
         customer_name: customerFormData.name,
         company_name: customerFormData.company || "",
         email: customerFormData.email.toLowerCase(),
-        phone: normalizePhoneToE164(customerFormData.phone) || "",
+        phone: formatPhoneForPayload(customerFormData.phone) || "",
         contact_person: customerFormData.contactPerson || "",
         address: customerFormData.address || "",
         status: customerFormData.status,
@@ -1010,7 +1029,7 @@ export function CustomersPage() {
         customer_name: customerFormData.name,
         company_name: customerFormData.company || "",
         email: customerFormData.email.toLowerCase(),
-        phone: normalizePhoneToE164(customerFormData.phone) || "",
+        phone: formatPhoneForPayload(customerFormData.phone) || "",
         contact_person: customerFormData.contactPerson || "",
         address: customerFormData.address || "",
         status: customerFormData.status,

@@ -356,7 +356,11 @@ export default function RolePermission() {
     setNewRolePermissions(initialPermissions);
   };
 
+  const isAdminRoleName = (roleName: string) =>
+    roleName.trim().toLowerCase() === 'admin';
+
   const handleEditRole = (role: Role) => {
+    if (isAdminRoleName(role.roleName)) return;
     setShowAddForm(true);
     // Fetch fresh role data from API
     fetchRoleById(role.id);
@@ -419,6 +423,7 @@ export default function RolePermission() {
   };
 
   const handleDeleteRole = (role: Role) => {
+    if (isAdminRoleName(role.roleName)) return;
     setRoleToDelete(role);
     setShowDeleteAlert(true);
   };
@@ -998,6 +1003,7 @@ export default function RolePermission() {
                         const permissionCount = getPermissionCount(role);
                         const userCount = getUserCountForRole(role.roleName);
                         const isSystem = isSystemRole(role.roleName);
+                        const isAdminRole = isAdminRoleName(role.roleName);
                         
                         return (
                           <tr key={role.id} className="hover:bg-gray-50">
@@ -1035,22 +1041,26 @@ export default function RolePermission() {
                                 >
                                   <Eye className="h-4 w-4" />
                                 </Button>
-                                <Button
-                                  onClick={() => handleEditRole(role)}
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  onClick={() => handleDeleteRole(role)}
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                {!isAdminRole && (
+                                  <>
+                                    <Button
+                                      onClick={() => handleEditRole(role)}
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      onClick={() => handleDeleteRole(role)}
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -1412,16 +1422,10 @@ export default function RolePermission() {
                 <DialogTitle className="text-2xl font-bold uppercase">
                   {viewingRole?.roleName || 'Role Details'}
                 </DialogTitle>
-              </div>
-              <button
-                onClick={() => setShowViewModal(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              </div> 
             </div>
             <DialogDescription className="text-base mt-2">
-              {viewingRole?.description || 'No description available'}
+              {viewingRole?.description || 'Role View Details'}
             </DialogDescription>
           </DialogHeader>
 

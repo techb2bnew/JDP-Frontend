@@ -611,8 +611,8 @@ export function LaborDetailsPage({ laborId, onBack }: LaborDetailsPageProps) {
               <TableHeader className="bg-slate-50">
                 <TableRow>
                   <TableHead>Job Title</TableHead>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Location</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Address</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Created At</TableHead>
                   <TableHead>Status</TableHead>
