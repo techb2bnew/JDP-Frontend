@@ -312,6 +312,9 @@ export function AnalyticsPage() {
   const [isLoadingOverview, setIsLoadingOverview] = useState(false)
   const [overviewError, setOverviewError] = useState<string | null>(null)
   const [jobTypeAnalytics, setJobTypeAnalytics] = useState<JobTypeAnalyticsItem[]>(defaultJobTypeAnalytics)
+  const [efficiencyTrends, setEfficiencyTrends] = useState(
+    revenueAnalytics.monthly.map(({ month, jobs }) => ({ month, jobs })),
+  )
   const isMountedRef = useRef(true)
 
   useEffect(() => {
@@ -352,6 +355,49 @@ export function AnalyticsPage() {
   useEffect(() => {
     fetchAnalyticsOverview()
   }, [fetchAnalyticsOverview])
+
+  useEffect(() => {
+    if (!isMountedRef.current) return
+
+    const fetchEfficiencyTrends = async () => {
+      try {
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+        if (!apiBaseUrl) return
+
+        const token = localStorage.getItem('jdp_auth')
+          ? JSON.parse(localStorage.getItem('jdp_auth')!).token
+          : null
+
+        const res = await fetch(`${apiBaseUrl}/analytics/efficiency-trends`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        })
+
+        const payload = await res.json()
+        if (!payload?.success) return
+
+        const jobsTrend = payload?.data?.jobs_trend
+        if (!Array.isArray(jobsTrend)) return
+
+        const normalized = jobsTrend.map((item: any) => {
+          const month = item?.month ?? item?.month_key ?? ''
+          return {
+            month,
+            jobs: typeof item?.jobs === 'number' ? item.jobs : Number(item?.jobs) || 0,
+          }
+        }).filter((x: any) => x.month)
+
+        if (normalized.length > 0) setEfficiencyTrends(normalized)
+      } catch (error) {
+        console.error('Error fetching efficiency trends:', error)
+      }
+    }
+
+    fetchEfficiencyTrends()
+  }, [])
 
   const formatMetricValue = (value: number | null | undefined, unit?: 'currency') => {
     if (value === null || value === undefined) {
@@ -903,7 +949,7 @@ export function AnalyticsPage() {
               <CardContent>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={revenueAnalytics.monthly}>
+                    <AreaChart data={efficiencyTrends}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                       <XAxis dataKey="month" stroke="#64748b" />
                       <YAxis stroke="#64748b" />

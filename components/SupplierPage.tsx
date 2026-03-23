@@ -131,7 +131,6 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
     return rest ? `+${country}-${rest}` : `+${country}`
   }
 
-  const [roles, setRoles] = useState<any[]>([])
   const [supplierStats, setSupplierStats] = useState({
     total_suppliers: 0,
     active_suppliers: 0,
@@ -205,7 +204,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
 
   const [formData, setFormData] = useState<SupplierFormData>({
     fullName: '',
-    role: '',
+    role: 'supplier',
     companyName: '',
     contactPerson: '',
     email: '',
@@ -279,10 +278,9 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
 
   const handleCreate = async () => {
     // Validation
-    if (!formData.fullName || !formData.role || !formData.companyName || !formData.contactPerson || !formData.email || !formData.phone) {
+    if (!formData.fullName || !formData.companyName || !formData.contactPerson || !formData.email || !formData.phone) {
       const errors: Record<string, string> = {};
       if (!formData.fullName) errors.fullName = 'Full Name is required';
-      if (!formData.role) errors.role = 'Role is required';
       if (!formData.companyName) errors.companyName = 'Company Name is required';
       if (!formData.contactPerson) errors.contactPerson = 'Contact Person is required';
       if (!formData.email) errors.email = 'Email is required';
@@ -316,7 +314,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
         full_name: formData.fullName,
         email: formData.email.toLowerCase(),
         phone: formatPhoneForPayload(formData.phone) || '',
-        role: formData.role,
+        role: 'supplier',
         status: formData.status === 'active' ? 'active' : formData.status === 'inactive' ? 'inactive' : formData.status === 'pending' ? 'pending' : 'suspended',
         company_name: formData.companyName,
         contact_person: formData.contactPerson,
@@ -393,7 +391,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
           // Populate form with API data
           setFormData({
             fullName: userData.full_name || userData.name || '',
-            role: userData.role || '',
+            role: 'supplier',
             companyName: apiData.company_name || '',
             contactPerson: apiData.contact_person || '',
             email: userData.email || '',
@@ -411,7 +409,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
           // Fallback to existing data
           setFormData({
             fullName: supplier.fullName,
-            role: supplier.role || '',
+            role: 'supplier',
             companyName: supplier.companyName,
             contactPerson: supplier.contactPerson,
             email: supplier.email,
@@ -430,7 +428,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
         // Fallback to existing data
         setFormData({
           fullName: supplier.fullName,
-          role: supplier.role || '',
+          role: 'supplier',
           companyName: supplier.companyName,
           contactPerson: supplier.contactPerson,
           email: supplier.email,
@@ -452,7 +450,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
       // Fallback to existing data
       setFormData({
         fullName: supplier.fullName,
-        role: supplier.role || '',
+        role: 'supplier',
         companyName: supplier.companyName,
         contactPerson: supplier.contactPerson,
         email: supplier.email,
@@ -473,10 +471,9 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
     if (!editingSupplier) return
 
     // Validation
-    if (!formData.fullName || !formData.role || !formData.companyName || !formData.contactPerson || !formData.email || !formData.phone) {
+    if (!formData.fullName || !formData.companyName || !formData.contactPerson || !formData.email || !formData.phone) {
       const errors: Record<string, string> = {};
       if (!formData.fullName) errors.fullName = 'Full Name is required';
-      if (!formData.role) errors.role = 'Role is required';
       if (!formData.companyName) errors.companyName = 'Company Name is required';
       if (!formData.contactPerson) errors.contactPerson = 'Contact Person is required';
       if (!formData.email) errors.email = 'Email is required';
@@ -510,7 +507,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
         full_name: formData.fullName,
         email: formData.email.toLowerCase(),
         phone: formatPhoneForPayload(formData.phone) || '',
-        role: formData.role,
+        role: 'supplier',
         status: formData.status === 'active' ? 'active' : formData.status === 'inactive' ? 'inactive' : formData.status === 'pending' ? 'pending' : 'suspended',
         company_name: formData.companyName,
         contact_person: formData.contactPerson,
@@ -616,7 +613,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
   const resetForm = () => {
     setFormData({
       fullName: '',
-      role: '',
+      role: 'supplier',
       companyName: '',
       contactPerson: '',
       email: '',
@@ -752,51 +749,10 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
     document.body.removeChild(link);
   }
 
-  useEffect(() => {
-    fetchRoles();
-    // Don't fetch data here - let the search/pagination useEffect handle initial fetch
-  }, []);
-
   // Clear selected suppliers when pagination, filters, or search changes
   useEffect(() => {
     setSelectedSuppliers([]);
   }, [currentPage, filterStatus, searchTerm]);
-
-  const fetchRoles = async () => {
-    try {
-      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const response = await fetch(`${apiBaseUrl}/permissions/roles-with-permissions`, {
-        method: 'GET',
-        headers
-      });
-
-      if (response.ok) {
-        const responseData = await response.json();
-        console.log('API Response:', responseData);
-
-        // Transform API response to match component's expected format
-        if (responseData.success && responseData.data) {
-          const transformedRoles = responseData.data.map((apiRole: any) => ({
-            id: apiRole.id.toString(),
-            roleName: apiRole.role_name || '',
-            roleType: apiRole.role_type || '',
-            permissions: apiRole.permissions || []
-          }));
-
-          setRoles(transformedRoles);
-        } else {
-          console.error('Invalid API response structure:', responseData);
-        }
-      } else {
-        console.error('Failed to fetch roles:', response.status, response.statusText);
-      }
-    } catch (error) {
-      console.error('Error fetching roles:', error);
-    }
-  };
 
   const fetchSuppliersData = async (page: number, limit: number) => {
     try {
@@ -996,26 +952,12 @@ useEffect(() => {
     <div className="grid grid-cols-2 gap-4 py-4 max-h-[65vh] overflow-y-auto p-2">
       <div className="space-y-2">
         <Label htmlFor="role">Role *</Label>
-        <Select value={formData.role} onValueChange={(value) => {
-          setFormData({ ...formData, role: value })
-          if (validationErrors.role) {
-            setValidationErrors({ ...validationErrors, role: '' })
-          }
-        }}>
-          <SelectTrigger className={validationErrors.role ? 'border-red-500' : ''}>
-            <SelectValue placeholder="Select role" />
-          </SelectTrigger>
-          <SelectContent>
-            {roles.map((role) => (
-              <SelectItem key={role.id} value={role.roleName}>
-                {role.roleName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {validationErrors.role && (
-          <p className="text-sm text-red-500 mt-1">{validationErrors.role}</p>
-        )}
+        <Input
+          id="role"
+          value="supplier"
+          readOnly
+          className="bg-gray-100 text-gray-600 cursor-not-allowed"
+        />
       </div>
       <div className="space-y-2">
         <Label htmlFor="fullName">Full Name *</Label>
