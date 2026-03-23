@@ -879,7 +879,7 @@ export function OrdersPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -1192,7 +1192,7 @@ export function OrdersPage() {
           </div>
           {/* Pagination Controls */}
 
-          {totalOrders > 0 && (
+          {(Math.ceil(totalOrders / itemsPerPage) > 1)&& (
             <div className="flex items-center justify-between px-4 py-3 border-t">
               <div className="text-sm text-muted-foreground">
                 Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalOrders)} of {totalOrders} products

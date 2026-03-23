@@ -1634,35 +1634,35 @@ const handleAction = (action: ProductAction, product?: Product) => {
           </div>
           
          {/* Pagination Controls */}
-{totalPages > 0 && (
-  <div className="flex items-center justify-between px-4 py-3 border-t">
-    <div className="text-sm text-muted-foreground">
-      Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalProducts)} of {totalProducts} products
-    </div>
-    <div className="flex items-center gap-2">
-    
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-        disabled={currentPage === 1 || isLoadingProducts}
-      >
-        Previous
-      </Button>
-      <span className="text-sm">
-        Page {currentPage} of {totalPages}
-      </span>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setCurrentPage(prev => prev + 1)}
-        disabled={currentPage >= totalPages || isLoadingProducts}
-      >
-        Next
-      </Button>
-    </div>
-  </div>
-)}
+          {(totalPages > 1 && products.length > 0) && (
+            <div className="flex items-center justify-between px-4 py-3 border-t">
+              <div className="text-sm text-muted-foreground">
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalProducts)} of {totalProducts} products
+              </div>
+              <div className="flex items-center gap-2">
+              
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1 || isLoadingProducts}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                  disabled={currentPage >= totalPages || isLoadingProducts}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
 
         </CardContent>
       </Card>

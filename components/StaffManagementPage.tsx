@@ -15,15 +15,16 @@ import { UserDetailsPage } from './UserDetailsPage'
 import { usePermissions } from '../contexts/PermissionContext'
 import { apiClient } from '@/utils/api'
 import { toast } from 'sonner'
-import { 
-  Users, 
-  HardHat, 
-  Wrench, 
-  Building2, 
+import {
+  Users,
+  HardHat,
+  Wrench,
+  Building2,
   User,
   UserCog,
   ArrowLeft
 } from 'lucide-react'
+import { SupplierFormData, SupplierFormDialog } from './common/SupplierFormDialog'
 
 interface StaffManagementPageProps {
   onViewLeadLabourDetails?: (id: string) => void
@@ -32,16 +33,16 @@ interface StaffManagementPageProps {
   showLeadLabourDetails?: boolean
 }
 
-export function StaffManagementPage({ 
-  onViewLeadLabourDetails, 
-  onBackToLeadLabour, 
-  selectedLeadLabourId, 
-  showLeadLabourDetails 
+export function StaffManagementPage({
+  onViewLeadLabourDetails,
+  onBackToLeadLabour,
+  selectedLeadLabourId,
+  showLeadLabourDetails
 }: StaffManagementPageProps) {
   const { hasPermission, isLoading: permissionsLoading, permissions } = usePermissions()
   const [activeTab, setActiveTab] = useState<string>('')
   const hasInitializedTab = useRef(false)
-  
+
   const [viewState, setViewState] = useState<{
     type: 'list' | 'detail'
     category: 'staff' | 'lead-labour' | 'labor' | 'supplier' | null
@@ -51,12 +52,16 @@ export function StaffManagementPage({
     category: null,
     selectedId: null
   })
+
   const [staffDetailData, setStaffDetailData] = useState<any>(null)
   const [isStaffDetailLoading, setIsStaffDetailLoading] = useState(false)
+
   const [leadLabourDetailData, setLeadLabourDetailData] = useState<any>(null)
   const [isLeadLabourDetailLoading, setIsLeadLabourDetailLoading] = useState(false)
+
   const [supplierDetailData, setSupplierDetailData] = useState<any>(null)
   const [isSupplierDetailLoading, setIsSupplierDetailLoading] = useState(false)
+
   const [staffStats, setStaffStats] = useState({
     total_staff: 0,
     staff: 0,
@@ -65,9 +70,76 @@ export function StaffManagementPage({
     suppliers: 0
   })
   const [isStatsLoading, setIsStatsLoading] = useState(false)
+
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
 
-  // Fetch staff statistics on mount
+  const [roles, setRoles] = useState<any[]>([])
+  const [isEditSupplierDialogOpen, setIsEditSupplierDialogOpen] = useState(false)
+  const [isSupplierEditLoading, setIsSupplierEditLoading] = useState(false)
+  const [supplierValidationErrors, setSupplierValidationErrors] = useState<Record<string, string>>({})
+  const [supplierFormData, setSupplierFormData] = useState<SupplierFormData>({
+    fullName: '',
+    companyName: '',
+    contactPerson: '',
+    email: '',
+    phone: '',
+    address: '',
+    status: 'active',
+    contractStart: '',
+    contractEnd: '',
+    totalOrders: 0,
+    notes: '',
+    role:'supplier'
+  })
+
+  const normalizePhoneToE164 = (rawPhone: string) => {
+    const raw = (rawPhone || '').trim()
+    if (!raw) return ''
+    if (raw.startsWith('+')) return raw.replace(/[^\d+]/g, '')
+
+    const digits = raw.replace(/\D/g, '')
+    if (!digits) return ''
+    if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
+    if (digits.length === 10) return `+1${digits}`
+    return `+${digits}`
+  }
+
+  const formatPhoneForPayload = (rawPhone: string): string => {
+    const e164 = normalizePhoneToE164(rawPhone)
+    if (!e164) return ''
+    const digits = e164.replace(/[^\d+]/g, '')
+    if (!digits.startsWith('+')) return e164
+
+    if (digits.startsWith('+1') && digits.length > 2) {
+      const rest = digits.slice(2)
+      return rest ? `+1-${rest}` : '+1'
+    }
+
+    const match = digits.match(/^\+(\d{2,3})(\d*)$/)
+    if (!match) return e164
+    const country = match[1]
+    const rest = match[2]
+    return rest ? `+${country}-${rest}` : `+${country}`
+  }
+
+  const resetSupplierForm = () => {
+    setSupplierFormData({
+      fullName: '',
+      role: 'supplier',
+      companyName: '',
+      contactPerson: '',
+      email: '',
+      phone: '',
+      address: '',
+      status: 'active',
+      contractStart: '',
+      contractEnd: '',
+      totalOrders: 0,
+      notes: '',
+    })
+    setSupplierValidationErrors({})
+  }
+
   useEffect(() => {
     const fetchStaffStats = async () => {
       try {
@@ -85,44 +157,81 @@ export function StaffManagementPage({
     fetchStaffStats()
   }, [])
 
-  // Check if user is admin (has no specific permissions but should see all tabs)
+  useEffect(() => {
+    const fetchRoles = async () => {
+      try {
+        const token = localStorage.getItem('jdp_auth')
+          ? JSON.parse(localStorage.getItem('jdp_auth')!).token
+          : null
+
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+        if (token) headers['Authorization'] = `Bearer ${token}`
+
+        const response = await fetch(`${apiBaseUrl}/permissions/roles-with-permissions`, {
+          method: 'GET',
+          headers
+        })
+
+        if (response.ok) {
+          const responseData = await response.json()
+          if (responseData.success && responseData.data) {
+            const transformedRoles = responseData.data.map((apiRole: any) => ({
+              id: apiRole.id.toString(),
+              roleName: apiRole.role_name || '',
+              roleType: apiRole.role_type || '',
+              permissions: apiRole.permissions || []
+            }))
+            setRoles(transformedRoles)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching roles:', error)
+      }
+    }
+
+    if (apiBaseUrl) {
+      fetchRoles()
+    }
+  }, [apiBaseUrl])
+
   const isAdmin = !permissionsLoading && permissions.length === 0
 
-  // Permission checks for each module
-  // Show tab if user has ANY permission for that module OR if user is admin
   const hasStaffPermissions = !permissionsLoading && (
-    isAdmin || 
-    hasPermission('staff', 'view') || 
-    hasPermission('staff', 'create') || 
-    hasPermission('staff', 'edit') || 
+    isAdmin ||
+    hasPermission('staff', 'view') ||
+    hasPermission('staff', 'create') ||
+    hasPermission('staff', 'edit') ||
     hasPermission('staff', 'delete')
   )
 
   const hasLeadLabourPermissions = !permissionsLoading && (
-    isAdmin || 
-    hasPermission('lead_labour', 'view') || 
-    hasPermission('lead_labour', 'create') || 
-    hasPermission('lead_labour', 'edit') || 
+    isAdmin ||
+    hasPermission('lead_labour', 'view') ||
+    hasPermission('lead_labour', 'create') ||
+    hasPermission('lead_labour', 'edit') ||
     hasPermission('lead_labour', 'delete')
   )
 
   const hasLaborPermissions = !permissionsLoading && (
-    isAdmin || 
-    hasPermission('labour', 'view') || 
-    hasPermission('labour', 'create') || 
-    hasPermission('labour', 'edit') || 
+    isAdmin ||
+    hasPermission('labour', 'view') ||
+    hasPermission('labour', 'create') ||
+    hasPermission('labour', 'edit') ||
     hasPermission('labour', 'delete')
   )
 
   const hasSupplierPermissions = !permissionsLoading && (
-    isAdmin || 
-    hasPermission('suppliers', 'view') || 
-    hasPermission('suppliers', 'create') || 
-    hasPermission('suppliers', 'edit') || 
+    isAdmin ||
+    hasPermission('suppliers', 'view') ||
+    hasPermission('suppliers', 'create') ||
+    hasPermission('suppliers', 'edit') ||
     hasPermission('suppliers', 'delete')
   )
 
-  // Filter tabs based on permissions - memoize to prevent unnecessary re-renders
+  const canEditSupplier = !permissionsLoading && (
+    isAdmin || hasPermission('suppliers', 'edit')
+  )
+
   const allTabItems = useMemo(() => [
     { id: 'staff', label: 'Staff', icon: UserCog, show: hasStaffPermissions },
     { id: 'lead-labour', label: 'Lead Labor', icon: HardHat, show: hasLeadLabourPermissions },
@@ -133,7 +242,6 @@ export function StaffManagementPage({
 
   const tabItems = useMemo(() => allTabItems.filter(item => item.show), [allTabItems])
 
-  // Set active tab to first available tab with permissions
   useEffect(() => {
     if (!permissionsLoading && viewState.type === 'list' && !hasInitializedTab.current) {
       if (tabItems.length > 0) {
@@ -220,6 +328,118 @@ export function StaffManagementPage({
     }
   }
 
+  const handleEditSupplierFromDetails = () => {
+    if (!supplierDetailData) return
+
+    const userData = supplierDetailData.users || {}
+
+    setSupplierFormData({
+      fullName: userData.full_name || userData.name || '',
+      role: userData.role || '',
+      companyName: supplierDetailData.company_name || '',
+      contactPerson: supplierDetailData.contact_person || '',
+      email: userData.email || '',
+      phone: normalizePhoneToE164(userData.phone || ''),
+      address: supplierDetailData.address || '',
+      status: userData.status?.toLowerCase() || 'active',
+      contractStart: supplierDetailData.contract_start || '',
+      contractEnd: supplierDetailData.contract_end || '',
+      totalOrders: supplierDetailData.total_orders || 0,
+      notes: supplierDetailData.notes || '',
+    })
+
+    setSupplierValidationErrors({})
+    setIsEditSupplierDialogOpen(true)
+  }
+
+  const handleUpdateSupplierFromDetails = async () => {
+    if (!viewState.selectedId) return
+
+    const errors: Record<string, string> = {}
+    if (!supplierFormData.fullName) errors.fullName = 'Full Name is required'
+    if (!supplierFormData.role) errors.role = 'Role is required'
+    if (!supplierFormData.companyName) errors.companyName = 'Company Name is required'
+    if (!supplierFormData.contactPerson) errors.contactPerson = 'Contact Person is required'
+    if (!supplierFormData.email) errors.email = 'Email is required'
+    if (!supplierFormData.phone) errors.phone = 'Phone is required'
+
+    if (Object.keys(errors).length > 0) {
+      setSupplierValidationErrors(errors)
+      toast.error('Please fill in all required fields')
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(supplierFormData.email)) {
+      setSupplierValidationErrors((prev) => ({
+        ...prev,
+        email: 'Please enter a valid email address'
+      }))
+      toast.error('Please enter a valid email address')
+      return
+    }
+
+    let loadingToastId: string | number | undefined
+
+    try {
+      setIsSupplierEditLoading(true)
+      loadingToastId = toast.loading('Updating supplier...')
+
+      const token = localStorage.getItem('jdp_auth')
+        ? JSON.parse(localStorage.getItem('jdp_auth')!).token
+        : null
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
+      const payload = {
+        full_name: supplierFormData.fullName,
+        email: supplierFormData.email.toLowerCase(),
+        phone: formatPhoneForPayload(supplierFormData.phone) || '',
+        role: supplierFormData.role,
+        status: supplierFormData.status,
+        company_name: supplierFormData.companyName,
+        contact_person: supplierFormData.contactPerson,
+        address: supplierFormData.address,
+        contract_start: supplierFormData.contractStart,
+        contract_end: supplierFormData.contractEnd,
+        notes: supplierFormData.notes
+      }
+
+      const response = await fetch(`${apiBaseUrl}/suppliers/updateSupplier/${viewState.selectedId}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      })
+
+      if (loadingToastId) toast.dismiss(loadingToastId)
+
+      if (response.ok) {
+        const responseData = await response.json()
+        if (responseData.success) {
+          toast.success('Supplier updated successfully!')
+          setIsEditSupplierDialogOpen(false)
+          await fetchSupplierDetails(viewState.selectedId)
+          const statsResponse = await apiClient.getStaffStats()
+          if (statsResponse.success && statsResponse.data) {
+            setStaffStats(statsResponse.data)
+          }
+        } else {
+          toast.error(responseData.message || 'Failed to update supplier')
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        toast.error(errorData.message || 'Failed to update supplier')
+      }
+    } catch (error) {
+      if (loadingToastId) toast.dismiss(loadingToastId)
+      console.error('Error updating supplier:', error)
+      toast.error('An error occurred while updating supplier')
+    } finally {
+      setIsSupplierEditLoading(false)
+    }
+  }
+
   const handleViewDetails = async (category: 'staff' | 'lead-labour' | 'labor' | 'supplier', id: string) => {
     if (category === 'staff') {
       setIsStaffDetailLoading(true)
@@ -273,19 +493,20 @@ export function StaffManagementPage({
     setIsLeadLabourDetailLoading(false)
     setSupplierDetailData(null)
     setIsSupplierDetailLoading(false)
+    setIsEditSupplierDialogOpen(false)
+    setIsSupplierEditLoading(false)
+    resetSupplierForm()
   }
 
-  // Handle legacy lead labour details view
   if (showLeadLabourDetails && selectedLeadLabourId) {
     return (
-      <LeadLabourDetailsPage 
-        leadLabourId={selectedLeadLabourId} 
+      <LeadLabourDetailsPage
+        leadLabourId={selectedLeadLabourId}
         onBack={onBackToLeadLabour || (() => {})}
       />
     )
   }
 
-  // Handle new detail views
   if (viewState.type === 'detail' && viewState.selectedId) {
     switch (viewState.category) {
       case 'staff':
@@ -297,6 +518,7 @@ export function StaffManagementPage({
             onBack={handleBackToList}
           />
         )
+
       case 'lead-labour':
         return (
           <LeadLabourDetailsPage
@@ -306,13 +528,15 @@ export function StaffManagementPage({
             onBack={handleBackToList}
           />
         )
+
       case 'labor':
         return (
-          <LaborDetailsPage 
-            laborId={viewState.selectedId} 
+          <LaborDetailsPage
+            laborId={viewState.selectedId}
             onBack={handleBackToList}
           />
         )
+
       case 'supplier':
         if (isSupplierDetailLoading) {
           return (
@@ -324,36 +548,64 @@ export function StaffManagementPage({
                 </Button>
               </div>
 
-                <Card className="border-0 shadow-sm">
-              <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              <span className="ml-2 text-gray-600">Loading supplier details...</span>
-            </div>
-        </Card>
+              <Card className="bg-white shadow-md border-0">
+                <CardContent className="p-8">
+                  <div className="flex items-center justify-center py-12">
+                    <div className="flex items-center gap-3">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      <span className="text-gray-600">Loading supplier details...</span>
+                    </div>
+                  </div>
+                </CardContent>
+             </Card>
             </div>
           )
         }
+
         return (
-          <SupplierDetailsPage 
-            supplierId={viewState.selectedId || ''} 
-            supplierData={supplierDetailData}
-            onBack={handleBackToList}
-          />
+          <>
+            <SupplierDetailsPage
+              supplierId={viewState.selectedId || ''}
+              supplierData={supplierDetailData}
+              onBack={handleBackToList}
+              onEdit={canEditSupplier ? handleEditSupplierFromDetails : undefined}
+            />
+
+            <SupplierFormDialog
+              open={isEditSupplierDialogOpen}
+              onOpenChange={setIsEditSupplierDialogOpen}
+              title="Edit Supplier"
+              submitLabel="Update Supplier"
+              formData={supplierFormData}
+              setFormData={setSupplierFormData}
+              validationErrors={supplierValidationErrors}
+              setValidationErrors={setSupplierValidationErrors}
+              roles={roles}
+              isLoading={isSupplierEditLoading}
+              onSubmit={handleUpdateSupplierFromDetails}
+              onCancel={() => {
+                setIsEditSupplierDialogOpen(false)
+                resetSupplierForm()
+              }}
+            />
+          </>
         )
+
       // case 'user':
       //   return (
-      //     <UserDetailsPage 
-      //       userId={viewState.selectedId} 
+      //     <UserDetailsPage
+      //       userId={viewState.selectedId}
       //       onBack={handleBackToList}
       //     />
       //   )
     }
   }
 
-  const gridCols = tabItems.length <= 2 ? 'grid-cols-2' : 
-                   tabItems.length <= 3 ? 'grid-cols-3' : 
-                   tabItems.length <= 4 ? 'grid-cols-4' : 
-                   tabItems.length <= 5 ? 'grid-cols-5' : 'grid-cols-6'
+  const gridCols = tabItems.length <= 2 ? 'grid-cols-2'
+    : tabItems.length <= 3 ? 'grid-cols-3'
+    : tabItems.length <= 4 ? 'grid-cols-4'
+    : tabItems.length <= 5 ? 'grid-cols-5'
+    : 'grid-cols-6'
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -361,26 +613,26 @@ export function StaffManagementPage({
         return <StaffPage onViewDetails={(id) => handleViewDetails('staff', id)} />
       case 'lead-labour':
         return (
-          <LeadLabourPage 
-            onViewDetails={(id) => handleViewDetails('lead-labour', id)} 
+          <LeadLabourPage
+            onViewDetails={(id) => handleViewDetails('lead-labour', id)}
           />
         )
       case 'labor':
         return (
-          <LaborPage 
-            onViewDetails={(id) => handleViewDetails('labor', id)} 
+          <LaborPage
+            onViewDetails={(id) => handleViewDetails('labor', id)}
           />
         )
       case 'supplier':
         return (
-          <SupplierPage 
-            onViewDetails={(id) => handleViewDetails('supplier', id)} 
+          <SupplierPage
+            onViewDetails={(id) => handleViewDetails('supplier', id)}
           />
         )
       // case 'user':
       //   return (
-      //     <UserPage 
-      //       onViewDetails={(id) => handleViewDetails('user', id)} 
+      //     <UserPage
+      //       onViewDetails={(id) => handleViewDetails('user', id)}
       //     />
       //   )
       default:
@@ -388,7 +640,6 @@ export function StaffManagementPage({
     }
   }
 
-  // Show loading state while permissions are being loaded
   if (permissionsLoading) {
     return (
       <div className="space-y-6">
@@ -419,7 +670,6 @@ export function StaffManagementPage({
         </div>
       </div>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
@@ -434,7 +684,7 @@ export function StaffManagementPage({
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -448,7 +698,7 @@ export function StaffManagementPage({
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -462,7 +712,7 @@ export function StaffManagementPage({
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -500,9 +750,9 @@ export function StaffManagementPage({
                 {tabItems.map((item) => {
                   const Icon = item.icon
                   return (
-                    <TabsTrigger 
-                      key={item.id} 
-                      value={item.id} 
+                    <TabsTrigger
+                      key={item.id}
+                      value={item.id}
                       className="flex items-center gap-2 data-[state=active]:bg-[#00A1FF] data-[state=active]:text-white"
                     >
                       <Icon className="h-4 w-4" />
@@ -512,7 +762,7 @@ export function StaffManagementPage({
                 })}
               </TabsList>
             </div>
-            
+
             <div className="p-6">
               {activeTab && (
                 <TabsContent value={activeTab} className="mt-0">
@@ -534,7 +784,6 @@ export function StaffManagementPage({
   )
 }
 
-// All Staff Page that shows combined data from all categories
 function AllStaffPage() {
   const [staffStats, setStaffStats] = useState({
     total_staff: 0,
@@ -545,7 +794,6 @@ function AllStaffPage() {
   })
   const [isStatsLoading, setIsStatsLoading] = useState(false)
 
-  // Fetch staff statistics on mount
   useEffect(() => {
     const fetchStaffStats = async () => {
       try {
@@ -572,7 +820,6 @@ function AllStaffPage() {
         </div>
       </div>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
@@ -587,7 +834,7 @@ function AllStaffPage() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -601,7 +848,7 @@ function AllStaffPage() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -615,7 +862,7 @@ function AllStaffPage() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">

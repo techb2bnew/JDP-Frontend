@@ -40,12 +40,13 @@ interface SupplierDetailsPageProps {
   supplierId: string
   onBack: () => void
   supplierData?: any
+  onEdit?: () => void
 }
 
-export function SupplierDetailsPage({ supplierId, onBack, supplierData }: SupplierDetailsPageProps) {
+export function SupplierDetailsPage({ supplierId, onBack, supplierData,onEdit }: SupplierDetailsPageProps) {
   const data = supplierData || {}
   const userData = data.users || {}
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL  
 
   // Pagination state for orders
   const [orderRows, setOrderRows] = useState<SupplierOrder[]>([])
@@ -266,16 +267,16 @@ export function SupplierDetailsPage({ supplierId, onBack, supplierData }: Suppli
           </div>
         </div>
 
-        {/* <div className="flex items-center gap-3">
-          <Button variant="outline" className="gap-2" onClick={() => console.info('Export supplier details')}>
-            <Download className="h-4 w-4" />
-            Export
-          </Button>
-          <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2" onClick={() => console.info('Edit supplier details')}>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={onEdit}
+          >
             <Edit className="h-4 w-4" />
-            Edit Details
+            Edit
           </Button>
-        </div> */}
+        </div>
       </div>
 
       <Card className="bg-white shadow-md border-0">
@@ -463,29 +464,33 @@ export function SupplierDetailsPage({ supplierId, onBack, supplierData }: Suppli
               </TableBody>
             </Table>
           </div>
-          <div className="flex items-center justify-between mt-4">
-            <p className="text-sm text-gray-500">
-              Showing page {orderPage} of {Math.max(orderTotalPages, 1)} (Total orders: {orderTotal})
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleOrderPageChange('prev')}
-                disabled={isOrderLoading || orderPage <= 1}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleOrderPageChange('next')}
-                disabled={isOrderLoading || orderPage >= orderTotalPages}
-              >
-                Next
-              </Button>
+          {orderTotalPages > 1 && orderRows.length > 0 && (
+            <div className="flex items-center justify-between mt-4">
+              <p className="text-sm text-gray-500">
+                Showing page {orderPage} of {orderTotalPages} (Total orders: {orderTotal})
+              </p>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleOrderPageChange('prev')}
+                  disabled={isOrderLoading || orderPage <= 1}
+                >
+                  Previous
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleOrderPageChange('next')}
+                  disabled={isOrderLoading || orderPage >= orderTotalPages}
+                >
+                  Next
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -202,6 +202,16 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       requiredActions: ["view", "create", "edit", "delete"]
     },
     {
+      id: "suppliers",
+      name: "Suppliers",
+      icon: Clock,
+      href: "/suppliers",
+      description: "Manage your suppliers and vendor relationships.",
+      module: "suppliers",
+      requiredActions: ["view", "create", "edit", "delete"],
+      staffOnly: true
+    },
+    {
       id: "staff-timeline",
       name: "Staff Timeline",
       icon: Clock,
