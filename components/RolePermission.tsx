@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
@@ -13,7 +13,9 @@ import {
   Users,
   Circle,
   FileText,
-  UserCheck
+  UserCheck,
+  ChevronDown,
+  Check,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { updateUserPermissions } from '../utils/auth'
@@ -37,6 +39,15 @@ import {
 } from './ui/dialog'
 import { ScrollArea } from './ui/scroll-area'
 import { CheckCircle2, X } from 'lucide-react'
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
+import {
+  Command,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from './ui/command'
+import { cn } from './ui/utils'
 
 interface Permission {
   module: string;
@@ -52,6 +63,15 @@ interface Role {
   createdAt: string;
   updatedAt: string;
 }
+
+/** Preset labels for the role name dropdown (custom names can be added via Add) */
+const PREDEFINED_ROLE_OPTIONS = [
+  'super admin',
+  'admin',
+  'lead labor',
+  'labor',
+  'supplier',
+] as const;
 
 export default function RolePermission() {
   const [roles, setRoles] = useState<Role[]>([]);
@@ -69,6 +89,10 @@ export default function RolePermission() {
   const [errors, setErrors] = useState({
     roleName: ''
   });
+  /** User-added custom role names (shown in dropdown with presets) */
+  const [customRoleOptions, setCustomRoleOptions] = useState<string[]>([]);
+  const [roleComboOpen, setRoleComboOpen] = useState(false);
+  const [roleComboSearch, setRoleComboSearch] = useState('');
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -276,6 +300,19 @@ export default function RolePermission() {
               roleName: transformedRole.roleName,
               description: transformedRole.description
             });
+            const rn = (transformedRole.roleName || '').trim();
+            if (
+              rn &&
+              !PREDEFINED_ROLE_OPTIONS.some(
+                (p) => p.toLowerCase() === rn.toLowerCase()
+              )
+            ) {
+              setCustomRoleOptions((prev) =>
+                prev.some((x) => x.toLowerCase() === rn.toLowerCase())
+                  ? prev
+                  : [...prev, rn]
+              );
+            }
           }
           
           return transformedRole;
@@ -345,6 +382,7 @@ export default function RolePermission() {
     setShowAddForm(true);
     setEditingRole(null);
     setFormData({ roleName: '', description: '' });
+    setRoleComboSearch('');
 
     // Initialize permissions for new role
     const initialPermissions: Permission[] = [];
@@ -850,6 +888,7 @@ export default function RolePermission() {
       setEditingRole(null);
       setFormData({ roleName: '', description: '' });
       setNewRolePermissions([]);
+      setRoleComboSearch('');
     } catch (error) {
       console.error('RolePermission: Error saving role:', error);
       // Dismiss any loading toast that might still be showing
@@ -870,6 +909,63 @@ export default function RolePermission() {
     setFormData({ roleName: '', description: '' });
     setNewRolePermissions([]);
     setErrors({ roleName: '' });
+    setRoleComboSearch('');
+    setRoleComboOpen(false);
+  };
+
+  const roleDropdownOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    [...PREDEFINED_ROLE_OPTIONS, ...customRoleOptions].forEach((r) => {
+      const t = (r || '').trim();
+      if (!t) return;
+      const key = t.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push(t);
+      }
+    });
+    const current = (formData.roleName || '').trim();
+    if (current && !seen.has(current.toLowerCase())) {
+      out.push(current);
+    }
+    return out;
+  }, [customRoleOptions, formData.roleName]);
+
+  const filteredRoleComboOptions = useMemo(() => {
+    const q = roleComboSearch.trim().toLowerCase();
+    if (!q) return roleDropdownOptions;
+    return roleDropdownOptions.filter((o) =>
+      o.toLowerCase().includes(q),
+    );
+  }, [roleComboSearch, roleDropdownOptions]);
+
+  /** Show “Add …” in the list when typed text is new (no matches in list) */
+  const canAddNewRoleInCombo = useMemo(() => {
+    const t = roleComboSearch.trim();
+    if (!t) return false;
+    const exact = roleDropdownOptions.some(
+      (o) => o.toLowerCase() === t.toLowerCase(),
+    );
+    if (exact) return false;
+    return filteredRoleComboOptions.length === 0;
+  }, [roleComboSearch, roleDropdownOptions, filteredRoleComboOptions]);
+
+  const handleAddCustomRole = (explicit?: string) => {
+    const t = (explicit ?? roleComboSearch).trim();
+    if (!t) return;
+    const allKnown = [
+      ...PREDEFINED_ROLE_OPTIONS,
+      ...customRoleOptions,
+    ];
+    const exists = allKnown.some((x) => x.toLowerCase() === t.toLowerCase());
+    if (!exists) {
+      setCustomRoleOptions((prev) => [...prev, t]);
+    }
+    setFormData((prev) => ({ ...prev, roleName: t }));
+    setRoleComboSearch('');
+    setRoleComboOpen(false);
+    setErrors((prev) => ({ ...prev, roleName: '' }));
   };
 
   // Helper function to check if role is system role
@@ -1190,17 +1286,109 @@ export default function RolePermission() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Role Name *
                   </label>
-                  <input
-                    type="text"
-                    value={formData.roleName}
-                    onChange={(e) => {
-                      setFormData({ ...formData, roleName: e.target.value });
-                      if (errors.roleName) setErrors({ ...errors, roleName: '' });
+                  <Popover
+                    open={roleComboOpen}
+                    onOpenChange={(open) => {
+                      setRoleComboOpen(open);
+                      if (open) setRoleComboSearch('');
                     }}
-                    placeholder="Role Name"
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 ${errors.roleName ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                  />
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={roleComboOpen}
+                        className={cn(
+                          'w-full justify-between font-normal h-10 px-3 py-2',
+                          errors.roleName
+                            ? 'border-red-500 text-red-900'
+                            : 'border-gray-300 bg-gray-50',
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            'truncate',
+                            !formData.roleName.trim() && 'text-muted-foreground',
+                          )}
+                        >
+                          {formData.roleName.trim()
+                            ? formData.roleName
+                            : 'Select role…'}
+                        </span>
+                        <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="p-0 bg-white w-[var(--radix-popover-trigger-width)] max-w-[min(100vw-2rem,24rem)]"
+                      align="start"
+                    >
+                      <Command shouldFilter={false}>
+                        <CommandInput
+                          placeholder="Search or type new role name…"
+                          value={roleComboSearch}
+                          onValueChange={setRoleComboSearch}
+                        />
+                        <CommandList>
+                          {filteredRoleComboOptions.length === 0 &&
+                          !canAddNewRoleInCombo ? (
+                            <div className="py-6 text-center text-sm text-muted-foreground">
+                              No matching role.
+                            </div>
+                          ) : null}
+                          <CommandGroup heading="Roles">
+                            {filteredRoleComboOptions.map((opt) => (
+                              <CommandItem
+                                key={opt}
+                                value={opt}
+                                onSelect={() => {
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    roleName: opt,
+                                  }));
+                                  setRoleComboOpen(false);
+                                  setRoleComboSearch('');
+                                  setErrors((prev) => ({
+                                    ...prev,
+                                    roleName: '',
+                                  }));
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    'mr-2 h-4 w-4',
+                                    formData.roleName.trim().toLowerCase() ===
+                                      opt.toLowerCase()
+                                      ? 'opacity-100'
+                                      : 'opacity-0',
+                                  )}
+                                />
+                                {opt}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                          {canAddNewRoleInCombo ? (
+                            <CommandGroup heading="Add new">
+                              <CommandItem
+                                value={`__add__${roleComboSearch.trim()}`}
+                                className="text-primary font-medium"
+                                onSelect={() =>
+                                  handleAddCustomRole(roleComboSearch.trim())
+                                }
+                              >
+                                <Plus className="mr-2 h-4 w-4" />
+                                Add &quot;{roleComboSearch.trim()}&quot;
+                              </CommandItem>
+                            </CommandGroup>
+                          ) : null}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Open the list, type to search — if the name is new, use{' '}
+                    <strong>Add &quot;…&quot;</strong> in the list.
+                  </p>
                   {errors.roleName && (
                     <p className="mt-1 text-sm text-red-600">{errors.roleName}</p>
                   )}
