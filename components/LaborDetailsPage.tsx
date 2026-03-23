@@ -391,7 +391,8 @@ export function LaborDetailsPage({ laborId, onBack }: LaborDetailsPageProps) {
     { label: 'Email Address', value: laborData.email || 'Not provided', icon: Mail },
     { label: 'Phone Number', value: laborData.phone || 'Not provided', icon: Phone },
     { label: 'Date of Birth', value: formatDate(laborData.dob), icon: Calendar },
-    { label: 'Address', value: laborData.address || 'Not provided', icon: MapPin, }
+    { label: 'Address', value: laborData.address || 'Not provided', icon: MapPin, },
+    { label: 'Hourly Rate', value: `$ ${laborData.hourly_rate}`, icon: DollarSign, }
   ] as Array<{ label: string; value: string; icon: typeof Mail; colSpan?: number }>
 
   const workDetailsItems = [
@@ -438,7 +439,7 @@ export function LaborDetailsPage({ laborId, onBack }: LaborDetailsPageProps) {
             ? metric.formatter(metric.value)
             : (metric.value ?? 0).toLocaleString()
           return (
-            <Card key={metric.label} className="border-0 shadow-sm">
+            <Card key={metric.label} className="bg-white shadow-sm border border-gray-100">
               <CardContent className="p-6 flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">{metric.label}</p>
@@ -483,11 +484,7 @@ export function LaborDetailsPage({ laborId, onBack }: LaborDetailsPageProps) {
                 <p className="text-xs text-gray-500 mt-1">Joined {formatDate(laborData.date_of_joining)}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4 text-right text-sm text-gray-600">
-              <div>
-                <p className="text-xs text-gray-500">Hourly Rate</p>
-                <p className="font-medium text-[#2b2b2b]">${laborData.hourly_rate ?? 0}</p>
-              </div>
+            <div className="grid grid-cols-1 gap-4 text-right text-sm text-gray-600">
               <div>
                 <p className="text-xs text-gray-500">Availability</p>
                 <p className="font-medium text-[#2b2b2b]">{laborData.availability || 'Not provided'}</p>

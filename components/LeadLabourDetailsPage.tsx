@@ -3,7 +3,7 @@ import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
-import { ArrowLeft, Briefcase, Clock, CheckCircle, User, Mail, Phone, Calendar, MapPin, FileText } from 'lucide-react'
+import { ArrowLeft, Briefcase, Clock, CheckCircle, User, Mail, Phone, Calendar, MapPin, FileText, DollarSign } from 'lucide-react'
 import { toast } from 'sonner'
 
 type LeadLabourDocument = {
@@ -360,12 +360,16 @@ export function LeadLabourDetailsPage({ leadLabourId, onBack, leadLabourData, is
             Back
           </Button>
         </div>
-        <Card className="border-0 shadow-sm">
-        <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              <span className="ml-2 text-gray-600">Loading Lead Labor details...</span>
+       <Card className="bg-white shadow-md border-0">
+          <CardContent className="p-8">
+            <div className="flex items-center justify-center py-12">
+              <div className="flex items-center gap-3">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <span className="text-gray-600">Loading labor details...</span>
+              </div>
             </div>
-        </Card> 
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -402,7 +406,7 @@ export function LeadLabourDetailsPage({ leadLabourId, onBack, leadLabourData, is
         }].map((metric) => {
           const Icon = metric.icon
           return (
-            <Card key={metric.label} className="border-0 shadow-sm">
+            <Card key={metric.label} className="bg-white shadow-sm border border-gray-100">
               <CardContent className="p-6 flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">{metric.label}</p>
@@ -447,11 +451,11 @@ export function LeadLabourDetailsPage({ leadLabourId, onBack, leadLabourData, is
                 <p className="text-xs text-gray-500 mt-1">Joined {formatDate(details.dateOfJoining)}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4 text-right text-sm text-gray-600">
-              <div>
+            <div className="grid grid-cols-1 gap-4 text-right text-sm text-gray-600">
+              {/* <div>
                 <p className="text-xs text-gray-500">Hourly Rate</p>
                 <p className="font-medium text-[#2b2b2b]">{formatCurrency(details.hourlyRate)}</p>
-              </div>
+              </div> */}
               <div>
                 <p className="text-xs text-gray-500">Availability</p>
                 <p className="font-medium text-[#2b2b2b]">{details.availability}</p>
@@ -464,7 +468,8 @@ export function LeadLabourDetailsPage({ leadLabourId, onBack, leadLabourData, is
               { label: 'Email Address', value: details.email, icon: Mail },
               { label: 'Phone Number', value: details.phone, icon: Phone },
               { label: 'Date of Birth', value: formatDate(details.dateOfBirth), icon: Calendar },
-              { label: 'Address', value: details.address, icon: MapPin, colSpan: 2 }
+              { label: 'Address', value: details.address, icon: MapPin, colSpan: 2 },
+              { label: 'Hourly Rate', value: `$ ${details.hourlyRate}`, icon: DollarSign, colSpan: 2 }
             ].map((item, index) => {
               const Icon = item.icon
               return (
