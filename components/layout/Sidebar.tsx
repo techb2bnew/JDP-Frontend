@@ -222,6 +222,8 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
     
     // Staff Timeline - only show for staff users with view permission
     if (item.id === 'staff-timeline') {
+      // super admin ko hide karna hai
+      if (isSuperAdmin()) return false
       return isStaffUser() && hasAnyPermission('staff_timeline', ['view'])
     }
     
