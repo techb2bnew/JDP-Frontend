@@ -821,12 +821,18 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
 
   if (viewingSupplier) {
     return (
-      <SupplierDetailsPage
-        supplierId={viewingSupplier.id}
-        onBack={handleBackToList}
-        supplierData={supplierDetails}
-        onEdit={() => handleEdit(viewingSupplier)}
-      />
+      isLoadingDetails || !supplierDetails ? (
+        <div className="p-6">
+          <h2 className="text-lg text-center font-medium text-[#2b2b2b]">Loading supplier details...</h2>
+        </div>
+      ) : (
+        <SupplierDetailsPage
+          supplierId={viewingSupplier.id}
+          onBack={handleBackToList}
+          supplierData={supplierDetails}
+          onEdit={() => handleEdit(viewingSupplier)}
+        />
+      )
     )
   }
 
