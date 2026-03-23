@@ -61,7 +61,7 @@ interface LeadLabour {
   createdAt?: string
   agreedTerms?: boolean
   certifications: string[]
-  hourlyRate: number | string
+  hourly_rate: number | string
   availability: 'available' | 'assigned' | 'on-leave' | 'unavailable' | string
   jobsCompleted: number
   lastAssignment: string
@@ -96,9 +96,9 @@ interface LeadLabourFormData {
   dateOfJoining: string
   specialization: string
   experience: string
+  hourly_rate:string | number
   status: 'active' | 'inactive'
   certifications: string[]
-  hourlyRate: number
   availability: 'available' | 'assigned' | 'on-leave' | 'unavailable'
   jobsCompleted: number
   lastAssignment: string
@@ -248,7 +248,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     experience: '',
     status: 'active',
     certifications: [],
-    hourlyRate: 0,
+    hourly_rate: 0,
     availability: 'available',
     jobsCompleted: 0,
     lastAssignment: '',
@@ -402,6 +402,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       formDataPayload.append('experience', formData.experience);
       formDataPayload.append('agreed_terms', formData.agreeToTerms.toString());
       formDataPayload.append('role', formData.role);
+      formDataPayload.append('hourly_rate', formData.hourly_rate);
       formDataPayload.append('management_type', 'lead_labor');
 
       // Append file uploads if they exist
@@ -509,7 +510,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       experience: leadLabour.experience,
       status: (leadLabour.status as 'active' | 'inactive') || 'active',
       certifications: leadLabour.certifications,
-      hourlyRate: typeof leadLabour.hourlyRate === 'string' ? 0 : leadLabour.hourlyRate,
+      hourly_rate: typeof leadLabour.hourly_rate === 'string' ? 0 : leadLabour.hourly_rate,
       availability: leadLabour.availability as 'available' | 'assigned' | 'on-leave' | 'unavailable',
       jobsCompleted: leadLabour.jobsCompleted,
       lastAssignment: leadLabour.lastAssignment,
@@ -704,7 +705,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     }
   }
 
-  const resetForm = () => {
+    const resetForm = () => {
     setFormData({
       role: '',
       name: '',
@@ -719,7 +720,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       experience: '',
       status: 'active',
       certifications: [],
-      hourlyRate: 0,
+      hourly_rate: 0,
       availability: 'available',
       jobsCompleted: 0,
       lastAssignment: '',
@@ -1080,7 +1081,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
             role: item.users?.role || 'Lead labor',
             createdAt: item.created_at,
             jobsCompleted: item.assigned_jobs_count || 0, // Default value
-            hourlyRate: 0, // Default value
+            hourly_rate: 0, // Default value
             availability: 'available', // Default value
             certifications: [], // Default value
             lastAssignment: '', // Default value
@@ -1212,7 +1213,7 @@ useEffect(() => {
         experience: item.experience || '',
         status: item.users?.status || 'inactive',
         certifications: Array.isArray(item.certifications) ? item.certifications : (item.certifications ? [item.certifications] : []),
-        hourlyRate: item.hourly_rate || 0,
+        hourly_rate: item.hourly_rate || 0,
         availability: item.availability || 'available',
         jobsCompleted: item.assigned_jobs_count || 0,
         lastAssignment: item.last_assignment || '',
@@ -1516,6 +1517,17 @@ useEffect(() => {
             {validationErrors.address && (
               <p className="text-sm text-red-500 mt-1">{validationErrors.address}</p>
             )}
+          </div>
+           <div className="col-span-2 space-y-2">
+              <Label htmlFor="hourly_rate">Hourly Rate ($)</Label>
+              <Input
+                id="hourly_rate"
+                type="number"
+                step="0.01"
+                value={formData.hourly_rate || ''}
+                onChange={(e) => setFormData({...formData, hourly_rate: Number(e.target.value)})}
+                placeholder="Enter hourly rate"
+              />
           </div>
           <div className="col-span-2 space-y-2">
             <Label htmlFor="notes">Notes</Label>
@@ -1887,6 +1899,7 @@ useEffect(() => {
                 <TableHead className="text-white font-medium">Department</TableHead>
                 <TableHead className="text-white font-medium">Specialization</TableHead>
                 <TableHead className="text-white font-medium">Experience</TableHead>
+                 <TableHead className="text-white font-medium">Hourly Rate</TableHead>
                 {/* <TableHead className="text-white font-medium">Total Jobs</TableHead> */}
                 <TableHead className="text-white font-medium">Status</TableHead>
                 <TableHead className="text-white font-medium">Date Joined</TableHead>
@@ -1917,8 +1930,10 @@ useEffect(() => {
                   </TableCell>
                 </TableRow>
               ) : (
-                paginatedLeadLabours.map((labour, index) => (
-                  <TableRow key={labour.id} className={index % 2 === 1 ? "bg-[#eff4fa]" : ""}>
+                paginatedLeadLabours.map((labour, index) => {
+                  console.log(labour,"labourlabour");
+                  return (
+                    <TableRow key={labour.id} className={index % 2 === 1 ? "bg-[#eff4fa]" : ""}>
                     <TableCell>
                       <Checkbox
                         checked={selectedLeadLabours.includes(String(labour.id))}
@@ -1950,6 +1965,7 @@ useEffect(() => {
                     <TableCell className="text-sm text-[#2b2b2b]/80">{labour.department}</TableCell>
                     <TableCell className="text-sm text-[#2b2b2b]/80">{labour.specialization}</TableCell>
                     <TableCell className="text-sm text-[#2b2b2b]/80">{labour.experience}</TableCell>
+                    <TableHead className="text-white font-medium">{labour.hourly_rate}</TableHead>
                     {/* <TableCell className="text-sm text-[#2b2b2b]/80">{labour.jobsCompleted}</TableCell> */}
                     <TableCell>{getStatusBadge(labour.status || 'active')}</TableCell>
                     <TableCell className="text-sm text-gray-900">{labour.dateOfJoining}</TableCell>
@@ -1966,7 +1982,8 @@ useEffect(() => {
                       />
                     </TableCell>
                   </TableRow>
-                ))
+                  )
+})
               )}
             </TableBody>
           </Table>

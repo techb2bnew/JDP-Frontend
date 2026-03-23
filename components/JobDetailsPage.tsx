@@ -4304,7 +4304,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                   {!isEditing && (
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-600">
-                        {showJobDetails ? 'Details On' : 'Details Off'}
+                        {showJobDetails ? 'Hide Details' : 'Show Details'}
                       </span>
                       <button
                         type="button"
