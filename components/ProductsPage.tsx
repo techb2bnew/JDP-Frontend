@@ -181,7 +181,9 @@ const [formMode, setFormMode] = useState<ProductAction>('add') // 'add' | 'edit'
   useEffect(() => {
     const markupAmount = formData.unit_cost * (formData.markupPercentage / 100);
     const jdpPrice = formData.unit_cost + markupAmount;
-    const profitMargin = (markupAmount / jdpPrice) * 100;
+    // Profit margin as % of cost (profit / unit_cost)
+    const profitMargin =
+      formData.unit_cost > 0 ? (markupAmount / formData.unit_cost) * 100 : 0;
 
     setFormData(prev => ({
       ...prev,
@@ -196,7 +198,7 @@ const [formMode, setFormMode] = useState<ProductAction>('add') // 'add' | 'edit'
     if (formData.unit_cost > 0 && formData.markupPercentage > 0) {
       const markupAmount = formData.unit_cost * (formData.markupPercentage / 100);
       const jdpPrice = formData.unit_cost + markupAmount;
-      const profitMargin = (markupAmount / jdpPrice) * 100;
+      const profitMargin = (markupAmount / formData.unit_cost) * 100;
 
       // Only update if values are different to avoid infinite loops
       if (Math.abs(formData.markupAmount - markupAmount) > 0.01 || 
@@ -1634,35 +1636,35 @@ const handleAction = (action: ProductAction, product?: Product) => {
           </div>
           
          {/* Pagination Controls */}
-{totalPages > 0 && (
-  <div className="flex items-center justify-between px-4 py-3 border-t">
-    <div className="text-sm text-muted-foreground">
-      Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalProducts)} of {totalProducts} products
-    </div>
-    <div className="flex items-center gap-2">
-    
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-        disabled={currentPage === 1 || isLoadingProducts}
-      >
-        Previous
-      </Button>
-      <span className="text-sm">
-        Page {currentPage} of {totalPages}
-      </span>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setCurrentPage(prev => prev + 1)}
-        disabled={currentPage >= totalPages || isLoadingProducts}
-      >
-        Next
-      </Button>
-    </div>
-  </div>
-)}
+          {(totalPages > 1 && products.length > 0) && (
+            <div className="flex items-center justify-between px-4 py-3 border-t">
+              <div className="text-sm text-muted-foreground">
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalProducts)} of {totalProducts} products
+              </div>
+              <div className="flex items-center gap-2">
+              
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1 || isLoadingProducts}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                  disabled={currentPage >= totalPages || isLoadingProducts}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
 
         </CardContent>
       </Card>

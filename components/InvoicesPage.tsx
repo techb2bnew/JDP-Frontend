@@ -893,6 +893,7 @@ export function InvoicesPage() {
 
     fetchEstimatesByFilters();
   }, [statusFilter, invoiceTypeFilter, searchTerm]);
+  const totalPages = Math.ceil(totalEstimates / itemsPerPage) || 1;
 
 
   return (
@@ -1156,7 +1157,7 @@ export function InvoicesPage() {
                   )}
                 </div>
                 {/* Pagination Controls */}
-                {totalEstimates > 0 && (
+                {(totalPages > 1 && estimates.length > 0 ) && (
                   <div className="flex items-center justify-between px-4 py-3 border-t">
                     <div className="text-sm text-muted-foreground">
                       Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalEstimates)} of {totalEstimates} invoices

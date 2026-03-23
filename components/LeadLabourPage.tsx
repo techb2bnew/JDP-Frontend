@@ -402,7 +402,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       formDataPayload.append('experience', formData.experience);
       formDataPayload.append('agreed_terms', formData.agreeToTerms.toString());
       formDataPayload.append('role', formData.role);
-      formDataPayload.append('hourly_rate', formData.hourly_rate);
+      formDataPayload.append('hourly_rate', String(formData.hourly_rate || 0));
       formDataPayload.append('management_type', 'lead_labor');
 
       // Append file uploads if they exist
@@ -510,7 +510,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       experience: leadLabour.experience,
       status: (leadLabour.status as 'active' | 'inactive') || 'active',
       certifications: leadLabour.certifications,
-      hourly_rate: typeof leadLabour.hourly_rate === 'string' ? 0 : leadLabour.hourly_rate,
+      hourly_rate: Number(leadLabour.hourly_rate) || 0, 
       availability: leadLabour.availability as 'available' | 'assigned' | 'on-leave' | 'unavailable',
       jobsCompleted: leadLabour.jobsCompleted,
       lastAssignment: leadLabour.lastAssignment,
@@ -608,6 +608,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       formDataPayload.append('agreed_terms', formData.agreeToTerms.toString());
       formDataPayload.append('role', formData.role);
       formDataPayload.append('management_type', 'lead_labour');
+      formDataPayload.append('hourly_rate', String(formData.hourly_rate || 0));
 
       // Append file uploads if they exist
       if (formData.documents.idProof && formData.documents.idProof instanceof File) {
@@ -959,6 +960,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       "Date of Joining",
       "Specialization",
       "Experience", 
+      "Hourly Rate",
       "Availability",
       "Assigned Jobs", 
     ];
@@ -976,6 +978,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       labour.dateOfJoining,
       labour.specialization,
       labour.experience,  
+      labour.hourly_rate,  
       labour.availability,
       labour.jobsCompleted, 
     ]);
@@ -1081,7 +1084,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
             role: item.users?.role || 'Lead labor',
             createdAt: item.created_at,
             jobsCompleted: item.assigned_jobs_count || 0, // Default value
-            hourly_rate: 0, // Default value
+            hourly_rate: item.hourly_rate || 0, // Default value
             availability: 'available', // Default value
             certifications: [], // Default value
             lastAssignment: '', // Default value
@@ -1102,11 +1105,11 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
               changeLaborTime: false
             },
             agreeToTerms: item.agreed_terms
-          }));
+          }));          
 
           setLeadLabours(mappedData);
-setFilteredLeadLabours(mappedData); 
-setTotalLead(responseData.data.pagination.totalItems || mappedData.length);
+          setFilteredLeadLabours(mappedData); 
+          setTotalLead(responseData.data.pagination.totalItems || mappedData.length);
 
           // Extract unique departments and specializations
           const uniqueDepartments = Array.from(new Set(responseData.data?.data?.map((item: any) => item.department).filter(Boolean))) as string[];
@@ -1146,6 +1149,7 @@ setTotalLead(responseData.data.pagination.totalItems || mappedData.length);
       dob: labor.dob || 'N/A',
       address: labor.address || 'N/A',
       department: labor.department || 'N/A',
+      hourly_rate: labor.hourly_rate,
       dateOfJoining: labor.date_of_joining || 'N/A',
       specialization: labor.specialization || 'N/A',
       trade: labor.trade || 'N/A',
@@ -1304,7 +1308,7 @@ useEffect(() => {
               ].filter(Boolean) as any[]
 
           const jobStats = item.job_statistics || {}
-
+          
           const detailPayload = {
             id: item.id,
             labor_code: item.labor_code,
@@ -1323,8 +1327,11 @@ useEffect(() => {
             completed_jobs: jobStats.completed_jobs ?? jobHistory.filter((job: any) => (job.status || '').toLowerCase() === 'completed').length,
             documentsList,
             job_history: jobHistory,
-            about: item.about || item.notes
-          }
+            about: item.about || item.notes,
+          };
+
+          console.log(detailPayload,"detailPayload");
+
 
           setLeadLabourDetails(detailPayload)
         } else {
@@ -1518,16 +1525,21 @@ useEffect(() => {
               <p className="text-sm text-red-500 mt-1">{validationErrors.address}</p>
             )}
           </div>
-           <div className="col-span-2 space-y-2">
-              <Label htmlFor="hourly_rate">Hourly Rate ($)</Label>
-              <Input
-                id="hourly_rate"
-                type="number"
-                step="0.01"
-                value={formData.hourly_rate || ''}
-                onChange={(e) => setFormData({...formData, hourly_rate: Number(e.target.value)})}
-                placeholder="Enter hourly rate"
-              />
+          <div className="col-span-2 space-y-2">
+            <Label htmlFor="hourly_rate">Hourly Rate ($)</Label>
+            <Input
+              id="hourly_rate"
+              type="number"
+              step="0.01"
+              value={formData.hourly_rate}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  hourly_rate: e.target.value === '' ? '' : Number(e.target.value)
+                })
+              }
+              placeholder="Enter hourly rate"
+            />
           </div>
           <div className="col-span-2 space-y-2">
             <Label htmlFor="notes">Notes</Label>
@@ -1965,8 +1977,9 @@ useEffect(() => {
                     <TableCell className="text-sm text-[#2b2b2b]/80">{labour.department}</TableCell>
                     <TableCell className="text-sm text-[#2b2b2b]/80">{labour.specialization}</TableCell>
                     <TableCell className="text-sm text-[#2b2b2b]/80">{labour.experience}</TableCell>
-                    <TableHead className="text-white font-medium">{labour.hourly_rate}</TableHead>
-                    {/* <TableCell className="text-sm text-[#2b2b2b]/80">{labour.jobsCompleted}</TableCell> */}
+                    <TableCell className="text-sm text-[#2b2b2b]/80">
+                      {labour.hourly_rate ? `$${Number(labour.hourly_rate)}` : '$0'}
+                    </TableCell>                    {/* <TableCell className="text-sm text-[#2b2b2b]/80">{labour.jobsCompleted}</TableCell> */}
                     <TableCell>{getStatusBadge(labour.status || 'active')}</TableCell>
                     <TableCell className="text-sm text-gray-900">{labour.dateOfJoining}</TableCell>
                     <TableCell>

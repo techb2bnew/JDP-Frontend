@@ -588,7 +588,7 @@ export function AnalyticsPage() {
 
       {/* Main Analytics Dashboard */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <Eye className="h-4 w-4" />
             Overview

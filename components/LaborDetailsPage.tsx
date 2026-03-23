@@ -643,6 +643,8 @@ export function LaborDetailsPage({ laborId, onBack }: LaborDetailsPageProps) {
               </TableBody>
             </Table>
           </div>
+          {jobTotalPages > 1 && jobRows.length > 0 && (
+
           <div className="flex items-center justify-between mt-4">
             <p className="text-sm text-gray-500">
               Showing page {jobPage} of {Math.max(jobTotalPages, 1)} (Total jobs: {jobTotal})
@@ -665,7 +667,7 @@ export function LaborDetailsPage({ laborId, onBack }: LaborDetailsPageProps) {
                 Next
               </Button>
             </div>
-          </div>
+          </div>)}
         </CardContent>
       </Card>
     </div>
