@@ -59,6 +59,9 @@ interface Role {
   id: string;
   roleName: string;
   description: string;
+  allowedPermissions: number;
+  roleType?: string; // 'Internal' (Portal) | 'Mobile' etc — from API
+  platform?: string;
   permissions: Permission[];
   createdAt: string;
   updatedAt: string;
@@ -162,13 +165,6 @@ export default function RolePermission() {
   // State to track permissions for new roles
   const [newRolePermissions, setNewRolePermissions] = useState<Permission[]>([]);
   
-  // Stats state
-  const [roleStats, setRoleStats] = useState({
-    totalRoles: 0,
-    systemRoles: 0,
-    customRoles: 0,
-    totalUsers: 0
-  });
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   
   // View modal state
@@ -198,6 +194,9 @@ export default function RolePermission() {
             id: apiRole.id.toString(),
             roleName: apiRole.role_name || '',
             description: apiRole.description || '',
+            allowedPermissions: apiRole.allowedPermissions ?? apiRole.allowed_permissions ?? 0,
+            roleType: apiRole.role_type || '',
+            platform: apiRole.platform || '',
             permissions: apiRole.permissions || [],
             createdAt: apiRole.created_at ? apiRole.created_at.split('T')[0] : '',
             updatedAt: apiRole.updated_at ? apiRole.updated_at.split('T')[0] : ''
@@ -216,54 +215,13 @@ export default function RolePermission() {
     }
   }, [apiBaseUrl]);
 
-  // Fetch role stats
-  const fetchRoleStats = useCallback(async () => {
-    setIsLoadingStats(true);
-    try {
-      const token = localStorage.getItem('jdp_auth')
-        ? JSON.parse(localStorage.getItem('jdp_auth')!).token
-        : null;
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const totalRoles = roles.length;
-      const systemRoles = roles.filter(role => {
-        const systemRoleNames = ['STAFF', 'LEAD_LABOUR', 'LABOUR', 'ADMIN', 'SUPER_ADMIN'];
-        return systemRoleNames.includes(role.roleName.toUpperCase());
-      }).length;
-      const customRoles = totalRoles - systemRoles;
-      
-      try {
-        const usersResponse = await fetch(`${apiBaseUrl}/staff/getStaff`, {
-          method: 'GET',
-          headers
-        });
-        if (usersResponse.ok) {
-          const usersData = await usersResponse.json();
-          const totalUsers = usersData.data?.pagination?.total || usersData.data?.staff?.length || 0;
-          setRoleStats({ totalRoles, systemRoles, customRoles, totalUsers });
-        } else {
-          setRoleStats({ totalRoles, systemRoles, customRoles, totalUsers: 0 });
-        }
-      } catch (error) {
-        setRoleStats({ totalRoles, systemRoles, customRoles, totalUsers: 0 });
-      }
-    } catch (error) {
-      console.error('Error fetching role stats:', error);
-    } finally {
-      setIsLoadingStats(false);
-    }
-  }, [roles, apiBaseUrl]);
+  
 
   useEffect(() => {
     fetchRoles();
   }, [fetchRoles]);
 
-  useEffect(() => {
-    if (roles.length > 0) {
-      fetchRoleStats();
-    }
-  }, [roles, fetchRoleStats]);
+ 
 
   // Pagination logic
   const paginatedRoles = roles.slice(
@@ -273,7 +231,7 @@ export default function RolePermission() {
 
   const totalPages = Math.ceil(roles.length / itemsPerPage);
 
-  const fetchRoleById = async (roleId: string, forView: boolean = false): Promise<Role | null> => {
+  const fetchRoleById = async (roleId: string, forView: boolean = false, displayRoleName?: string): Promise<Role | null> => {
     try {
       const token = localStorage.getItem('jdp_auth')
         ? JSON.parse(localStorage.getItem('jdp_auth')!).token
@@ -294,9 +252,11 @@ export default function RolePermission() {
           const apiPermissions = responseData.data.permissions || [];
 
           const transformedPermissions: Permission[] = [];
-          const roleNameForPermissions = apiRole.role_name || '';
-          getActiveModulesForRole(roleNameForPermissions).forEach(modName => {
-            getActionsForModule(modName, roleNameForPermissions).forEach(act => {
+          // Use displayRoleName (with platform suffix like "(Mobile)") if provided
+          // so that isCustomMobileRole / isCustomPortalRole checks work correctly
+          const roleNameForPermissions = displayRoleName || apiRole.role_name || '';
+          getActiveModulesForRole(roleNameForPermissions, apiRole.platform).forEach(modName => {
+            getActionsForModule(modName, roleNameForPermissions, apiRole.platform).forEach(act => {
               transformedPermissions.push({ module: modName, action: act, allowed: false });
             });
           });
@@ -318,6 +278,9 @@ export default function RolePermission() {
             id: apiRole.id.toString(),
             roleName: apiRole.role_name || '',
             description: apiRole.description || '',
+            allowedPermissions: apiRole.allowed_permissions || 0,
+            roleType: apiRole.role_type || '',
+            platform: apiRole.platform || '',
             permissions: transformedPermissions,
             createdAt: apiRole.created_at ? apiRole.created_at.split('T')[0] : '',
             updatedAt: apiRole.updated_at ? apiRole.updated_at.split('T')[0] : ''
@@ -327,11 +290,13 @@ export default function RolePermission() {
             setViewingRole(transformedRole);
           } else {
             setEditingRole(transformedRole);
+            // Use displayRoleName (with suffix) in the form so platform badge shows correctly
+            const formRoleName = displayRoleName || transformedRole.roleName;
             setFormData({
-              roleName: transformedRole.roleName,
+              roleName: formRoleName,
               description: transformedRole.description
             });
-            const rn = (transformedRole.roleName || '').trim();
+            const rn = formRoleName.trim();
             if (
               rn &&
               !PREDEFINED_ROLE_OPTIONS.some(
@@ -452,13 +417,34 @@ export default function RolePermission() {
     return isLabourOnlyRole(roleName) || isLeadLabourRole(roleName);
   };
 
-  const getActiveModulesForRole = (roleName: string): string[] => {
-    // Custom Portal roles → all modules + both Assigned virtual modules
+  const isMobilePlatform = (roleName: string, platform?: string) => {
+    if ((platform || '').toLowerCase() === 'mobile') return true;
+    return getPlatformTag(roleName) === 'Mobile';
+  };
+
+  const isPortalPlatform = (roleName: string, platform?: string) => {
+    if ((platform || '').toLowerCase() === 'portal') return true;
+    return getPlatformTag(roleName) === 'Portal';
+  };
+
+  const getActiveModulesForRole = (roleName: string, platform?: string): string[] => {
+    if (isPortalPlatform(roleName, platform)) {
+      return [...modules, ASSIGNED_LABOUR_MODULE, ASSIGNED_LEAD_LABOUR_MODULE];
+    }
+
+    if (isMobilePlatform(roleName, platform)) {
+      const baseModules = modules.filter((m) =>
+        ONLY_LABOUR_ROLE_ALLOWED_MODULES.includes(
+          m as typeof ONLY_LABOUR_ROLE_ALLOWED_MODULES[number],
+        ),
+      );
+      return [...baseModules, ASSIGNED_LABOUR_MODULE, ASSIGNED_LEAD_LABOUR_MODULE];
+    }
+
     if (isCustomPortalRole(roleName)) {
       return [...modules, ASSIGNED_LABOUR_MODULE, ASSIGNED_LEAD_LABOUR_MODULE];
     }
 
-    // Custom Mobile roles → lead labour restricted modules + both Assigned virtual modules
     if (isCustomMobileRole(roleName)) {
       const baseModules = modules.filter((m) =>
         ONLY_LABOUR_ROLE_ALLOWED_MODULES.includes(
@@ -468,25 +454,18 @@ export default function RolePermission() {
       return [...baseModules, ASSIGNED_LABOUR_MODULE, ASSIGNED_LEAD_LABOUR_MODULE];
     }
 
-    // Admin / Super Admin (Portal) → all modules + both Assigned virtual modules
-    if (isPortalRole(roleName)) {
-      return [...modules, ASSIGNED_LABOUR_MODULE, ASSIGNED_LEAD_LABOUR_MODULE];
-    }
-
     if (!isLabourScopedRole(roleName)) return modules;
 
-    // Both labour and lead labour use the same base module list
     const baseModules = modules.filter((m) =>
       ONLY_LABOUR_ROLE_ALLOWED_MODULES.includes(
         m as typeof ONLY_LABOUR_ROLE_ALLOWED_MODULES[number],
       ),
     );
 
-    // Labour role: only show Assigned Labour (NOT Assigned Lead Labour)
-    // Lead Labour role: show both Assigned Labour AND Assigned Lead Labour
     if (isLabourOnlyRole(roleName)) {
       return [...baseModules, ASSIGNED_LABOUR_MODULE];
     }
+
     return [...baseModules, ASSIGNED_LABOUR_MODULE, ASSIGNED_LEAD_LABOUR_MODULE];
   };
 
@@ -500,20 +479,28 @@ export default function RolePermission() {
    *  4. Labour-scoped role (no override) → ['view', 'create', 'edit']
    *  5. Normal role → specialActionsMap[module] ?? default actions
    */
-  const getActionsForModule = (modName: string, roleName?: string): string[] => {
+  const getActionsForModule = (modName: string, roleName?: string, platform?: string): string[] => {
     const role = roleName ?? formData.roleName;
 
-    // Virtual assigned modules — only special actions regardless of role
     if (modName === ASSIGNED_LABOUR_MODULE || modName === ASSIGNED_LEAD_LABOUR_MODULE) {
       return specialActionsMap[modName] || [];
     }
 
-    // Custom Portal roles → all permissions, no restrictions
+    if (isPortalPlatform(role, platform)) {
+      return specialActionsMap[modName] || actions;
+    }
+
+    if (isMobilePlatform(role, platform)) {
+      if (LABOUR_MODULE_ACTION_OVERRIDES[modName]) {
+        return LABOUR_MODULE_ACTION_OVERRIDES[modName];
+      }
+      return ['view', 'create', 'edit'];
+    }
+
     if (isCustomPortalRole(role)) {
       return specialActionsMap[modName] || actions;
     }
 
-    // Custom Mobile roles → same restrictions as lead labour
     if (isCustomMobileRole(role)) {
       if (LABOUR_MODULE_ACTION_OVERRIDES[modName]) {
         return LABOUR_MODULE_ACTION_OVERRIDES[modName];
@@ -522,11 +509,9 @@ export default function RolePermission() {
     }
 
     if (isLabourScopedRole(role)) {
-      // Check per-module override first
       if (LABOUR_MODULE_ACTION_OVERRIDES[modName]) {
         return LABOUR_MODULE_ACTION_OVERRIDES[modName];
       }
-      // Default for labour-scoped roles
       return ['view', 'create', 'edit'];
     }
 
@@ -546,8 +531,8 @@ export default function RolePermission() {
     setRoleComboSearch('');
 
     const initialPermissions: Permission[] = [];
-    getActiveModulesForRole(formData.roleName).forEach(modName => {
-      getActionsForModule(modName, formData.roleName).forEach(act => {
+    getActiveModulesForRole(formData.roleName, currentRolePlatform).forEach(modName => {
+      getActionsForModule(modName, formData.roleName, currentRolePlatform).forEach(act => {
         initialPermissions.push({ module: modName, action: act, allowed: false });
       });
     });
@@ -562,7 +547,33 @@ export default function RolePermission() {
   const handleEditRole = (role: Role) => {
     if (isProtectedRoleName(role.roleName)) return;
     setShowAddForm(true);
-    fetchRoleById(role.id);
+
+    // 1. Check if user already added this role with a platform suffix in this session
+    const fromSession = customRoleOptions.find(
+      (opt) => stripPlatformSuffix(opt).toLowerCase() === role.roleName.toLowerCase()
+    );
+
+    let displayName = fromSession || role.roleName;
+
+    // 2. If no session entry, infer suffix from platform returned by API
+    if (!fromSession && !getPlatformTag(displayName)) {
+      const platform = (role.platform || '').toLowerCase();
+      const cleanName = role.roleName.toLowerCase();
+      const isPredefined = ['admin', 'super admin', 'labour', 'labor', 'lead labour', 'lead labor'].includes(cleanName);
+
+      if (!isPredefined) {
+        const inferredPlatform = platform === 'mobile' ? 'Mobile' : 'Portal';
+        displayName = `${role.roleName} (${inferredPlatform})`;
+
+        setCustomRoleOptions((prev) =>
+          prev.some((x) => x.toLowerCase() === displayName.toLowerCase())
+            ? prev
+            : [...prev, displayName]
+        );
+      }
+    }
+
+    fetchRoleById(role.id, false, displayName);
     setNewRolePermissions([]);
   };
 
@@ -715,8 +726,8 @@ export default function RolePermission() {
             updatedPermissions = updatedPermissions.map(p =>
               p.action === act ? { ...p, allowed: checked } : p
             );
-            getActiveModulesForRole(formData.roleName).forEach(modName => {
-              const moduleActs = getActionsForModule(modName);
+            getActiveModulesForRole(formData.roleName, currentRolePlatform).forEach(modName => {
+              const moduleActs = getActionsForModule(modName, formData.roleName, currentRolePlatform);
               if (moduleActs.includes(act)) {
                 const existingPermission = updatedPermissions.find(p =>
                   p.module === modName && p.action === act
@@ -738,8 +749,8 @@ export default function RolePermission() {
         updatedPermissions = updatedPermissions.map(p =>
           p.action === act ? { ...p, allowed: checked } : p
         );
-        getActiveModulesForRole(formData.roleName).forEach(modName => {
-          const moduleActs = getActionsForModule(modName);
+        getActiveModulesForRole(formData.roleName, currentRolePlatform).forEach(modName => {
+          const moduleActs = getActionsForModule(modName, formData.roleName, currentRolePlatform);
           if (moduleActs.includes(act)) {
             const existingPermission = updatedPermissions.find(p =>
               p.module === modName && p.action === act
@@ -757,8 +768,8 @@ export default function RolePermission() {
         updated = updated.map(p =>
           p.action === act ? { ...p, allowed: checked } : p
         );
-        getActiveModulesForRole(formData.roleName).forEach(modName => {
-          const moduleActs = getActionsForModule(modName);
+        getActiveModulesForRole(formData.roleName, currentRolePlatform).forEach(modName => {
+          const moduleActs = getActionsForModule(modName, formData.roleName, currentRolePlatform);
           if (moduleActs.includes(act)) {
             const existingPermission = updated.find(p =>
               p.module === modName && p.action === act
@@ -783,8 +794,8 @@ export default function RolePermission() {
               const isSpecialAction = !['view', 'create', 'edit', 'delete'].includes(p.action);
               return isSpecialAction ? { ...p, allowed: checked } : p;
             });
-            getActiveModulesForRole(formData.roleName).forEach(modName => {
-              const moduleActs = getActionsForModule(modName);
+            getActiveModulesForRole(formData.roleName, currentRolePlatform).forEach(modName => {
+              const moduleActs = getActionsForModule(modName, formData.roleName, currentRolePlatform);
               const specialActs = moduleActs.filter(a =>
                 !['view', 'create', 'edit', 'delete'].includes(a)
               );
@@ -810,8 +821,8 @@ export default function RolePermission() {
           const isSpecialAction = !['view', 'create', 'edit', 'delete'].includes(p.action);
           return isSpecialAction ? { ...p, allowed: checked } : p;
         });
-        getActiveModulesForRole(formData.roleName).forEach(modName => {
-          const moduleActs = getActionsForModule(modName);
+        getActiveModulesForRole(formData.roleName, currentRolePlatform).forEach(modName => {
+          const moduleActs = getActionsForModule(modName, formData.roleName, currentRolePlatform);
           const specialActs = moduleActs.filter(a =>
             !['view', 'create', 'edit', 'delete'].includes(a)
           );
@@ -833,8 +844,8 @@ export default function RolePermission() {
           const isSpecialAction = !['view', 'create', 'edit', 'delete'].includes(p.action);
           return isSpecialAction ? { ...p, allowed: checked } : p;
         });
-        getActiveModulesForRole(formData.roleName).forEach(modName => {
-          const moduleActs = getActionsForModule(modName);
+        getActiveModulesForRole(formData.roleName, currentRolePlatform).forEach(modName => {
+          const moduleActs = getActionsForModule(modName, formData.roleName, currentRolePlatform);
           const specialActs = moduleActs.filter(a =>
             !['view', 'create', 'edit', 'delete'].includes(a)
           );
@@ -876,8 +887,8 @@ export default function RolePermission() {
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
     const compiledPermissions: Permission[] = [];
-    getActiveModulesForRole(formData.roleName).forEach(modName => {
-      getActionsForModule(modName, formData.roleName).forEach(act => {
+    getActiveModulesForRole(formData.roleName, currentRolePlatform).forEach(modName => {
+      getActionsForModule(modName, formData.roleName, currentRolePlatform).forEach(act => {
         const allowed = editingRole
           ? getPermissionValue(modName, act, editingRole.permissions)
           : getPermissionValue(modName, act, newRolePermissions);
@@ -888,9 +899,13 @@ export default function RolePermission() {
     // Strip (Portal)/(Mobile) suffix — API receives clean role name
     const apiRoleName = stripPlatformSuffix(formData.roleName);
 
+    // Determine platform from the display role name suffix
+    const platformValue = getPlatformTag(formData.roleName) || 'Portal';
+
     const baseRoleData = {
       roleName: apiRoleName,
       description: formData.description,
+      platform: platformValue,
       permissions: compiledPermissions.map((perm, index) => ({
         id: index + 1,
         ...perm
@@ -903,6 +918,7 @@ export default function RolePermission() {
         const updateData = {
           roleId: parseInt(editingRole.id),
           roleName: apiRoleName,
+          platform: platformValue,
           permissions: compiledPermissions.map(perm => ({
             module: perm.module,
             action: perm.action,
@@ -1076,8 +1092,12 @@ export default function RolePermission() {
     return mockUserCounts[roleName.toUpperCase()] || 0;
   };
 
-  const isLabourRoleSelected = isLabourScopedRole(formData.roleName);
-  const permissionModulesToRender = getActiveModulesForRole(formData.roleName);
+  const currentRolePlatform =
+    editingRole?.platform ||
+    (getPlatformTag(formData.roleName) ?? '');
+
+  const isLabourRoleSelected = isMobilePlatform(formData.roleName, currentRolePlatform);
+  const permissionModulesToRender = getActiveModulesForRole(formData.roleName, currentRolePlatform);
 
   // ─── Helper: for a module, which of the "standard" columns are visible? ───────
   /**
@@ -1087,8 +1107,9 @@ export default function RolePermission() {
   const getStandardColumnVisibility = (
     modName: string,
     roleName: string,
+    platform?: string,
   ): { view: boolean; create: boolean; edit: boolean; delete: boolean } => {
-    const acts = getActionsForModule(modName, roleName);
+    const acts = getActionsForModule(modName, roleName, platform);
     return {
       view:   acts.includes('view'),
       create: acts.includes('create'),
@@ -1098,8 +1119,8 @@ export default function RolePermission() {
   };
 
   /** True if the module has any special (non-standard) actions for this role */
-  const moduleHasSpecialActions = (modName: string, roleName: string): boolean => {
-    const acts = getActionsForModule(modName, roleName);
+  const moduleHasSpecialActions = (modName: string, roleName: string, platform?: string): boolean => {
+    const acts = getActionsForModule(modName, roleName, platform);
     return acts.some(a => !['view', 'create', 'edit', 'delete'].includes(a));
   };
 
@@ -1176,7 +1197,7 @@ export default function RolePermission() {
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex items-center gap-2">
                                 <Circle className="h-4 w-4 text-blue-600" />
-                                <span className="text-sm font-medium text-gray-900">{role.roleName}</span>
+                                <span className="text-sm font-medium text-gray-900">{role.roleName}</span> 
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -1469,13 +1490,13 @@ export default function RolePermission() {
                     </thead>
                     <tbody>
                       {permissionModulesToRender.map((modName) => {
-                        const moduleActs = getActionsForModule(modName, formData.roleName);
+                        const moduleActs = getActionsForModule(modName, formData.roleName, currentRolePlatform);
                         const isDashboard = modName === 'dashboard';
                         // Virtual "Assigned" modules — only special actions column is relevant
                         const isAssignedModule =
                           modName === ASSIGNED_LABOUR_MODULE || modName === ASSIGNED_LEAD_LABOUR_MODULE;
-                        const colVis = getStandardColumnVisibility(modName, formData.roleName);
-                        const hasSpecial = moduleHasSpecialActions(modName, formData.roleName);
+                        const colVis = getStandardColumnVisibility(modName, formData.roleName, currentRolePlatform);
+                        const hasSpecial = moduleHasSpecialActions(modName, formData.roleName, currentRolePlatform);
 
                         // Current permission source
                         const permSource = editingRole ? editingRole.permissions : newRolePermissions;
