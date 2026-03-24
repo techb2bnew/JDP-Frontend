@@ -153,8 +153,9 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
   const [productsList, setProductsList] = useState<any[]>([])
   const [jobsList, setJobsList] = useState<any[]>([])
   const [selectedJob, setSelectedJob] = useState<any>(null)
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
-
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [estimateCost, setEstimateCost] = useState(null)
+ 
   const currentJob = selectedJob || jobs?.find((j: any) => j.id === jobId)
 
   // Inline Invoice Data State
@@ -724,8 +725,9 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
   }
 
   const handleJobSelection = (jobId: string) => {
-    const job = jobsList.find((j: any) => j.id === jobId)
+    const job = jobsList.find((j: any) => j.id === jobId);
     if (job) {
+      setEstimateCost(job?.estimatedCost)
       setSelectedJob(job)
 
       // Determine if it's contract-based
@@ -1006,6 +1008,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
           total_cost: item.total,
           // Mark whether this row is a manual/custom product
           is_custom: item.isCustomProduct === true,
+
         } as any
 
         // Include product id only for searched/selected products
@@ -1070,7 +1073,9 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
         notes: inlineInvoiceData.notes || '',
         status: 'sent',
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
-        custom_products: customProducts
+        custom_products: customProducts,
+        estimate_source_type: estimateCost? 'estimate_job' : 'time_material_job'
+
       }
 
       // Add customer_id or contractor_id based on job type
@@ -1466,6 +1471,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
 
 
 
+console.log(jobsList,"jobsListjobsListjobsList");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
