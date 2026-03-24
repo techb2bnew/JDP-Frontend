@@ -78,8 +78,7 @@ import TimeRangePicker from '@wojtekmaj/react-timerange-picker'
 import '@wojtekmaj/react-timerange-picker/dist/TimeRangePicker.css'
 import Autocomplete from 'react-google-autocomplete'
 import ActivityLogs from './ActivityLogs'
-import Link from 'next/link'
-
+import { CheckCircle } from 'lucide-react'
 // Sample data structure - replace with your actual data
 const sampleJobData = {
   "job": {
@@ -725,7 +724,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
   const [customInvoiceTypes, setCustomInvoiceTypes] = useState<string[]>([])
   const [customerData, setCustomerData] = useState<any>(null)
   const [contractorData, setContractorData] = useState<any>(null)
-  const [InvoioiceNumber, setInvoioiceNumber] = useState('')
+  const [InvoioiceNumber, setInvoioiceNumber] = useState('');
+  const [isMarkingPaidId, setIsMarkingPaidId] = useState<number | null>(null);
+  const [isPaidLoading,setIsPaidLoading] = useState(false);
+
   // Clean duplicate custom types (case-insensitive)
   const cleanCustomTypes = (types: string[]) => {
     const seen = new Set<string>()
@@ -1655,8 +1657,93 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
   };
 
 
+    const handleMarkAsPaid = async (invoice: any) => {
+      if (!invoice?.id) {
+        toast.error('Invoice ID not found')
+        return
+      }
 
+      const invoiceStatus = String(invoice.status || '').toLowerCase()
+      if (invoiceStatus === 'paid') {
+        return
+      }
 
+      try {
+        setIsPaidLoading(true)
+        setIsMarkingPaidId(invoice.id)
+
+        const estimateResponse = await apiClient.getEstimateById(invoice.id)
+        const estimateData = estimateResponse?.data || estimateResponse
+
+        const customProducts = Array.isArray(estimateData?.products)
+          ? estimateData.products.map((item: any) => ({
+              ...(item.id ? { id: item.id } : {}),
+              product_name: item.product_name || item.item || '',
+              description: item.description || '',
+              jdp_sku: item.jdp_sku || '',
+              stock_quantity: Number(item.stock_quantity || item.qty || 1),
+              unit: item.unit || 'unit',
+              job_id: Number(estimateData.job_id),
+              unit_cost: Number(item.unit_cost || item.rate || 0),
+              jdp_price: Number(item.jdp_price || item.rate || 0),
+              estimated_price: Number(item.estimated_price || 0),
+              total_cost: Number(item.total_cost || item.total || 0),
+              is_custom: item.is_custom === true,
+            }))
+          : []
+
+        const payload = {
+          job_id: Number(estimateData.job_id),
+          estimate_title: estimateData.estimate_title || '',
+          ...(estimateData.contractor_id
+            ? { contractor_id: Number(estimateData.contractor_id) }
+            : { customer_id: Number(estimateData.customer_id) }),
+          priority: estimateData.priority || 'medium',
+          service_type: estimateData.service_type || 'service_based',
+          email_address: estimateData.email_address || '',
+          estimate_date: estimateData.estimate_date || '',
+          po_number: estimateData.po_number || '',
+          rep: estimateData.rep || '',
+          due_date: estimateData.due_date || '',
+          payment_credits: Number(estimateData.payment_credits || 0),
+          balance_due: estimateData.balance_due || '',
+          ...(estimateData.bill_to_address && {
+            bill_to_address: estimateData.bill_to_address,
+          }),
+          invoice_type: estimateData.invoice_type || 'estimate',
+          notes: estimateData.notes || '',
+          custom_products: customProducts,
+
+          status: 'paid',
+        }
+
+        await apiClient.updateEstimate(Number(invoice.id), payload as any)
+
+        setEstimates((prev) =>
+          prev.map((item: any) =>
+            Number(item.id) === Number(invoice.id)
+              ? { ...item, status: 'paid' }
+              : item
+          )
+        )
+        setIsPaidLoading(false)
+        toast.success('Invoice marked as paid')
+        await fetchEstimates()
+        onJobsRefresh?.()
+      } catch (error: any) {
+        setIsPaidLoading(false);
+        console.error('Error marking invoice as paid:', error)
+
+        const apiMessage =
+          error?.response?.data?.message ||
+          error?.message ||
+          'Failed to mark invoice as paid'
+
+        toast.error(apiMessage)
+      } finally {
+        setIsMarkingPaidId(null)
+      }
+    }
   // const handleDeleteProduct = async (productId: string | number) => {
   //   try {
   //     const confirmDelete = window.confirm("Are you sure you want to delete this product?");
@@ -3584,7 +3671,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
     }
   }
 
-  const handleSendFromPreview = async () => {
+  const handleSendFromPreview = async () => {    
     setIsLoading(true)
     try {
       // Prepare API payload
@@ -5572,6 +5659,33 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                               <FileText className="h-4 w-4 mr-2 text-green-600" />
                               <span>Duplicate</span>
                             </DropdownMenuItem>
+                             {/* {( */}
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  if (String(invoice.status || '').toLowerCase() !== 'paid') {
+                                    handleMarkAsPaid(invoice)
+                                  }
+                                }}
+                                className={`cursor-pointer ${
+                                  String(invoice.status || '').toLowerCase() === 'paid'
+                                    ? 'opacity-60 cursor-default'
+                                    : ''
+                                }`}
+                                disabled={
+                                  isMarkingPaidId === invoice.id ||
+                                  String(invoice.status || '').toLowerCase() === 'paid'
+                                }
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                                <span>
+                                  {String(invoice.status || '').toLowerCase() === 'paid'
+                                    ? 'Already Paid'
+                                    : isMarkingPaidId === invoice.id
+                                    ? 'Marking...'
+                                    : 'Mark As Paid'}
+                                </span>
+                              </DropdownMenuItem>
+                                                            {/* // )} */}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               onClick={() => handleDeleteInvoice(invoice.id)}

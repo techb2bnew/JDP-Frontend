@@ -710,7 +710,6 @@ export const CustomInvoiceDialog = ({
     
     // Ensure project uses job title as fallback
     const effectiveProject = inlineInvoiceData.project || blueSheet?.job?.job_title || ''
-    console.log('effectiveProject:11111111111', effectiveProject)
     if (!effectiveProject) {
       errors.project = 'Project field is required'
     }
@@ -739,7 +738,6 @@ export const CustomInvoiceDialog = ({
       lineItems: latestLineItems,
     }
 
-    console.log('effectiveInlineInvoiceData?>>>', effectiveInlineInvoiceData)
 
     // Consider either explicit invoice line items OR existing BlueSheet materials as valid "items"
     const hasInvoiceLineItems =
@@ -2082,14 +2080,14 @@ export const CustomInvoiceDialog = ({
                   </p>
                 </div>
                 <div className="flex justify-end mt-4">
-                  <div className="text-right">
+                  {/* <div className="text-right">
                     <div className="flex items-center gap-4">
                       <span className="text-xl font-bold">Total</span>
                       <span className="text-2xl font-bold">
                         ${calculateInvoiceSubtotal().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
-                  </div>
+                  </div> */}
                 </div>
                 <div className='text-center text-sm text-blue-500 font-bold'>
                   <p>1432 Oakpointe Drive Waconia, MN 55387 paul@jdpelectric.us</p>

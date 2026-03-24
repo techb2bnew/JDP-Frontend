@@ -1,31 +1,32 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
-import { Button } from './ui/button'
-import { Badge } from './ui/badge'
-import { Progress } from './ui/progress'
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
-import { 
-  AreaChart, 
-  Area, 
-  BarChart, 
-  Bar, 
-  LineChart, 
-  Line, 
-  PieChart, 
-  Pie, 
-  Cell, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
+import { Progress } from "./ui/progress";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   RadialBarChart,
-  RadialBar
-} from 'recharts'
+  RadialBar,
+  ComposedChart,
+} from "recharts";
 import {
   TrendingUp,
   TrendingDown,
@@ -62,267 +63,404 @@ import {
   AlertCircle,
   Award,
   Building,
-  CreditCard
-} from 'lucide-react'
-import { apiClient } from '../utils/api'
+  CreditCard,
+} from "lucide-react";
+import { apiClient } from "../utils/api";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { CalendarIcon, X } from "lucide-react";
+import { format } from "date-fns";
+import {
+  Calendar as MultiDateCalendar,
+  DateObject,
+} from "react-multi-date-picker";
 
 // (Removed dummy KPI data; KPIs now use live API summary)
 
 const revenueData = [
-  { month: 'Jan', revenue: 65000, expenses: 45000, profit: 20000 },
-  { month: 'Feb', revenue: 72000, expenses: 48000, profit: 24000 },
-  { month: 'Mar', revenue: 68000, expenses: 47000, profit: 21000 },
-  { month: 'Apr', revenue: 79000, expenses: 52000, profit: 27000 },
-  { month: 'May', revenue: 85000, expenses: 55000, profit: 30000 },
-  { month: 'Jun', revenue: 84725, expenses: 54000, profit: 30725 }
-]
+  { month: "Jan", revenue: 65000, expenses: 45000, profit: 20000 },
+  { month: "Feb", revenue: 72000, expenses: 48000, profit: 24000 },
+  { month: "Mar", revenue: 68000, expenses: 47000, profit: 21000 },
+  { month: "Apr", revenue: 79000, expenses: 52000, profit: 27000 },
+  { month: "May", revenue: 85000, expenses: 55000, profit: 30000 },
+  { month: "Jun", revenue: 84725, expenses: 54000, profit: 30725 },
+];
 
 // (Removed static projectStatusData; now fetched from API)
 
 const teamPerformanceData = [
-  { name: 'David Wilson', role: 'Lead Electrician', completedJobs: 23, rating: 4.9, status: 'active' },
-  { name: 'Mike Rodriguez', role: 'Electrician', completedJobs: 18, rating: 4.7, status: 'active' },
-  { name: 'Sarah Chen', role: 'Project Manager', completedJobs: 31, rating: 4.8, status: 'active' },
-  { name: 'John Smith', role: 'Lead Plumber', completedJobs: 19, rating: 4.6, status: 'on-job' }
-]
+  {
+    name: "David Wilson",
+    role: "Lead Electrician",
+    completedJobs: 23,
+    rating: 4.9,
+    status: "active",
+  },
+  {
+    name: "Mike Rodriguez",
+    role: "Electrician",
+    completedJobs: 18,
+    rating: 4.7,
+    status: "active",
+  },
+  {
+    name: "Sarah Chen",
+    role: "Project Manager",
+    completedJobs: 31,
+    rating: 4.8,
+    status: "active",
+  },
+  {
+    name: "John Smith",
+    role: "Lead Plumber",
+    completedJobs: 19,
+    rating: 4.6,
+    status: "on-job",
+  },
+];
 
 // Recent activities are fetched from API
 
 const upcomingTasks = [
   {
     id: 1,
-    title: 'Review Quarterly Reports',
-    dueDate: 'Today, 3:00 PM',
-    priority: 'high',
-    category: 'Analytics'
+    title: "Review Quarterly Reports",
+    dueDate: "Today, 3:00 PM",
+    priority: "high",
+    category: "Analytics",
   },
   {
     id: 2,
-    title: 'Approve Overtime Requests',
-    dueDate: 'Tomorrow, 9:00 AM',
-    priority: 'medium',
-    category: 'HR'
+    title: "Approve Overtime Requests",
+    dueDate: "Tomorrow, 9:00 AM",
+    priority: "medium",
+    category: "HR",
   },
   {
     id: 3,
-    title: 'Update Inventory Levels',
-    dueDate: 'Jan 25, 2:00 PM',
-    priority: 'low',
-    category: 'Inventory'
+    title: "Update Inventory Levels",
+    dueDate: "Jan 25, 2:00 PM",
+    priority: "low",
+    category: "Inventory",
   },
   {
     id: 4,
-    title: 'Customer Follow-up Call',
-    dueDate: 'Jan 26, 10:00 AM',
-    priority: 'medium',
-    category: 'Sales'
-  }
-]
+    title: "Customer Follow-up Call",
+    dueDate: "Jan 26, 10:00 AM",
+    priority: "medium",
+    category: "Sales",
+  },
+];
 
 const quickActions = [
-  { title: 'Jobs', icon: Plus, color: 'bg-blue-500', path: 'jobs' },
-  { title: 'Customer', icon: Users, color: 'bg-green-500', path: 'customers' },
-  { title: 'Generate Invoice', icon: FileText, color: 'bg-purple-500', path: 'invoices' },
-  { title: 'View Analytics', icon: BarChart3, color: 'bg-orange-500', path: 'analytics' },
-  { title: 'Manage Staff', icon: UserCheck, color: 'bg-red-500', path: 'staff' },
-  { title: 'Orders', icon: Package, color: 'bg-indigo-500', path: 'orders' }
-]
+  { title: "Jobs", icon: Plus, color: "bg-blue-500", path: "jobs" },
+  { title: "Customer", icon: Users, color: "bg-green-500", path: "customers" },
+  {
+    title: "Generate Invoice",
+    icon: FileText,
+    color: "bg-purple-500",
+    path: "invoices",
+  },
+  {
+    title: "View Analytics",
+    icon: BarChart3,
+    color: "bg-orange-500",
+    path: "analytics",
+  },
+  {
+    title: "Manage Staff",
+    icon: UserCheck,
+    color: "bg-red-500",
+    path: "staff",
+  },
+  { title: "Orders", icon: Package, color: "bg-indigo-500", path: "orders" },
+];
 
 const moduleCards = [
   {
-    title: 'Job Management',
-    description: 'Manage projects and assignments',
+    title: "Job Management",
+    description: "Manage projects and assignments",
     icon: Briefcase,
-    stats: '142 Active Jobs',
-    color: 'from-blue-500 to-blue-600',
-    path: 'job-management'
+    stats: "142 Active Jobs",
+    color: "from-blue-500 to-blue-600",
+    path: "job-management",
   },
   {
-    title: 'Staff Management',
-    description: 'Team performance and scheduling',
+    title: "Staff Management",
+    description: "Team performance and scheduling",
     icon: UserCheck,
-    stats: '89 Team Members',
-    color: 'from-green-500 to-green-600',
-    path: 'staff-management'
+    stats: "89 Team Members",
+    color: "from-green-500 to-green-600",
+    path: "staff-management",
   },
   {
-    title: 'Live Tracking',
-    description: 'Real-time project monitoring',
+    title: "Live Tracking",
+    description: "Real-time project monitoring",
     icon: Activity,
-    stats: '23 Live Jobs',
-    color: 'from-purple-500 to-purple-600',
-    path: 'live-tracking'
+    stats: "23 Live Jobs",
+    color: "from-purple-500 to-purple-600",
+    path: "live-tracking",
   },
   {
-    title: 'Analytics',
-    description: 'Business insights and reports',
+    title: "Analytics",
+    description: "Business insights and reports",
     icon: BarChart3,
-    stats: '$847K Revenue',
-    color: 'from-orange-500 to-orange-600',
-    path: 'analytics'
-  }
-]
+    stats: "$847K Revenue",
+    color: "from-orange-500 to-orange-600",
+    path: "analytics",
+  },
+];
 
 export function DashboardOverview() {
-  const [selectedTimeframe, setSelectedTimeframe] = useState('7days')
-  const router = useRouter()
-  const [isKpiLoading, setIsKpiLoading] = useState(true)
+  const [selectedTimeframe, setSelectedTimeframe] = useState("7days");
+  const router = useRouter();
+  const [isKpiLoading, setIsKpiLoading] = useState(true);
   const [summary, setSummary] = useState<{
-    total_revenue: number
-    active_jobs: number
-    jobs_summary: { total: number; active: number; completed: number; draft: number; pending: number }
-    team_members: { total: number; staff: number; labor: number; lead_labor: number }
-  } | null>(null)
-  const [statusLoading, setStatusLoading] = useState(true)
-  const [projectStatusData, setProjectStatusData] = useState<Array<{ name: string; value: number; color: string }>>([
-    { name: 'In Progress', value: 0, color: '#00A1FF' },
-    { name: 'Active', value: 0, color: '#4F46E5' },
-    { name: 'Completed', value: 0, color: '#00CEB6' }
-  ])
-  const [activitiesLoading, setActivitiesLoading] = useState(true)
-  const [activities, setActivities] = useState<Array<{ id: number; type: string; title: string; description: string; timestamp: string }>>([])
-  const [activitiesTotal, setActivitiesTotal] = useState(0)
-  const [activitiesPage, setActivitiesPage] = useState(1)
-  const activitiesPageSize = 5
-  const [userName, setUserName] = useState('Admin')
+    total_revenue: number;
+    active_jobs: number;
+    jobs_summary: {
+      total: number;
+      active: number;
+      completed: number;
+      draft: number;
+      pending: number;
+    };
+    team_members: {
+      total: number;
+      staff: number;
+      labor: number;
+      lead_labor: number;
+    };
+  } | null>(null);
+  const [statusLoading, setStatusLoading] = useState(true);
+  const [projectStatusData, setProjectStatusData] = useState<
+    Array<{ name: string; value: number; color: string }>
+  >([
+    { name: "In Progress", value: 0, color: "#00A1FF" },
+    { name: "Active", value: 0, color: "#4F46E5" },
+    { name: "Completed", value: 0, color: "#00CEB6" },
+  ]);
+  const [activitiesLoading, setActivitiesLoading] = useState(true);
+  const [activities, setActivities] = useState<
+    Array<{
+      id: number;
+      type: string;
+      title: string;
+      description: string;
+      timestamp: string;
+    }>
+  >([]);
+  const [activitiesTotal, setActivitiesTotal] = useState(0);
+  const [activitiesPage, setActivitiesPage] = useState(1);
+  const activitiesPageSize = 5;
+  const [userName, setUserName] = useState("Admin");
+  const [selectedRanges, setSelectedRanges] = useState<any[]>([]);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [revenueChartData, setRevenueChartData] = useState([]);
 
   useEffect(() => {
     const load = async () => {
       try {
-        setIsKpiLoading(true)
-        const data = await apiClient.getDashboardSummary()
-        setSummary(data)
+        setIsKpiLoading(true);
+        const data = await apiClient.getDashboardSummary();
+        setSummary(data);
       } catch (e) {
-        console.error('Failed to load dashboard summary', e)
+        console.error("Failed to load dashboard summary", e);
       } finally {
-        setIsKpiLoading(false)
+        setIsKpiLoading(false);
       }
-    }
-    load()
-  }, [])
+    };
+    load();
+  }, []);
 
   useEffect(() => {
     try {
-      if (typeof window !== 'undefined') {
-        const raw = localStorage.getItem('jdp_auth')
+      if (typeof window !== "undefined") {
+        const raw = localStorage.getItem("jdp_auth");
         if (raw) {
-          const parsed = JSON.parse(raw)
-          const name = parsed?.user?.full_name || parsed?.user?.name || parsed?.user?.email
-          if (name) setUserName(name)
+          const parsed = JSON.parse(raw);
+          const name =
+            parsed?.user?.full_name ||
+            parsed?.user?.name ||
+            parsed?.user?.email;
+          if (name) setUserName(name);
         }
       }
     } catch (e) {
-      console.error('Failed to load user from localStorage', e)
+      console.error("Failed to load user from localStorage", e);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
     const loadStatus = async () => {
       try {
-        setStatusLoading(true)
-        const data = await apiClient.getJobStatusDistribution()
-        const percentages = data?.percentages || {}
+        setStatusLoading(true);
+        const data = await apiClient.getJobStatusDistribution();
+        const percentages = data?.percentages || {};
         setProjectStatusData([
-          { name: 'In Progress', value: percentages.in_progress ?? 0, color: '#00A1FF' },
-          { name: 'Active', value: percentages.active ?? (percentages.in_progress ?? 0), color: '#4F46E5' },
-          { name: 'Completed', value: percentages.completed ?? 0, color: '#00CEB6' }
-        ])
+          {
+            name: "In Progress",
+            value: percentages.in_progress ?? 0,
+            color: "#00A1FF",
+          },
+          {
+            name: "Active",
+            value: percentages.active ?? percentages.in_progress ?? 0,
+            color: "#4F46E5",
+          },
+          {
+            name: "Completed",
+            value: percentages.completed ?? 0,
+            color: "#00CEB6",
+          },
+        ]);
       } catch (e) {
-        console.error('Failed to load job status distribution', e)
+        console.error("Failed to load job status distribution", e);
       } finally {
-        setStatusLoading(false)
+        setStatusLoading(false);
       }
-    }
-    loadStatus()
-  }, [])
+    };
+    loadStatus();
+  }, []);
 
   useEffect(() => {
     const loadActivities = async () => {
       try {
-        setActivitiesLoading(true)
-        const res = await apiClient.getRecentActivities(activitiesPage, activitiesPageSize)
-        setActivities(res.items || [])
-        setActivitiesTotal(res.total_found || 0)
+        setActivitiesLoading(true);
+        const res = await apiClient.getRecentActivities(
+          activitiesPage,
+          activitiesPageSize,
+        );
+        setActivities(res.items || []);
+        setActivitiesTotal(res.total_found || 0);
       } catch (e) {
-        console.error('Failed to load recent activities', e)
-        setActivities([])
-        setActivitiesTotal(0)
+        console.error("Failed to load recent activities", e);
+        setActivities([]);
+        setActivitiesTotal(0);
       } finally {
-        setActivitiesLoading(false)
+        setActivitiesLoading(false);
       }
-    }
-    loadActivities()
-  }, [activitiesPage])
+    };
+    loadActivities();
+  }, [activitiesPage]);
 
   const formatActivityTime = (ts: string) => {
     try {
-      const d = new Date(ts)
-      return d.toLocaleString()
+      const d = new Date(ts);
+      return d.toLocaleString();
     } catch {
-      return ts
+      return ts;
     }
-  }
+  };
 
   const getActivityStyle = (type: string) => {
     switch (type) {
-      case 'job_completed':
-        return { Icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50' }
-      case 'new_order':
-        return { Icon: ShoppingCart, color: 'text-blue-600', bg: 'bg-blue-50' }
-      case 'payment_received':
-        return { Icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' }
-      case 'overtime_request':
-        return { Icon: Clock, color: 'text-orange-600', bg: 'bg-orange-50' }
-      case 'staff_created':
-        return { Icon: Users, color: 'text-purple-600', bg: 'bg-purple-50' }
-      case 'labor_updated':
-        return { Icon: HardHat, color: 'text-amber-600', bg: 'bg-amber-50' }
+      case "job_completed":
+        return {
+          Icon: CheckCircle,
+          color: "text-green-600",
+          bg: "bg-green-50",
+        };
+      case "new_order":
+        return { Icon: ShoppingCart, color: "text-blue-600", bg: "bg-blue-50" };
+      case "payment_received":
+        return { Icon: DollarSign, color: "text-green-600", bg: "bg-green-50" };
+      case "overtime_request":
+        return { Icon: Clock, color: "text-orange-600", bg: "bg-orange-50" };
+      case "staff_created":
+        return { Icon: Users, color: "text-purple-600", bg: "bg-purple-50" };
+      case "labor_updated":
+        return { Icon: HardHat, color: "text-amber-600", bg: "bg-amber-50" };
       default:
-        return { Icon: Activity, color: 'text-gray-600', bg: 'bg-gray-100' }
+        return { Icon: Activity, color: "text-gray-600", bg: "bg-gray-100" };
     }
-  }
+  };
 
   const kpiCards = [
     {
-      title: 'Total Revenue',
-      value: typeof summary?.total_revenue === 'number' ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(summary.total_revenue) : '$0',
-      change: '',
-      trend: 'up',
-      period: '',
+      title: "Total Revenue",
+      value:
+        typeof summary?.total_revenue === "number"
+          ? new Intl.NumberFormat("en-US", {
+              style: "currency",
+              currency: "USD",
+              minimumFractionDigits: 0,
+            }).format(summary.total_revenue)
+          : "$0",
+      change: "",
+      trend: "up",
+      period: "",
       icon: DollarSign,
-      color: 'text-green-600',
-      bgColor: 'bg-green-50', 
+      color: "text-green-600",
+      bgColor: "bg-green-50",
     },
     {
-      title: 'Active Jobs',
+      title: "Active Jobs",
       value: String(summary?.active_jobs ?? 0),
-      change: '',
-      trend: 'up',
-      period: '',
+      change: "",
+      trend: "up",
+      period: "",
       icon: Briefcase,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50', 
+      color: "text-blue-600",
+      bgColor: "bg-blue-50",
     },
     {
-      title: 'Team Members',
+      title: "Team Members",
       value: String(summary?.team_members?.total ?? 0),
-      change: '',
-      trend: 'up',
-      period: '', 
+      change: "",
+      trend: "up",
+      period: "",
       icon: Users,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50', 
+      color: "text-purple-600",
+      bgColor: "bg-purple-50",
     },
-  ]
+  ];
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800 border-red-200'
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'low': return 'bg-green-100 text-green-800 border-green-200'
-      default: return 'bg-gray-100 text-gray-800 border-gray-200'
+      case "high":
+        return "bg-red-100 text-red-800 border-red-200";
+      case "medium":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "low":
+        return "bg-green-100 text-green-800 border-green-200";
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200";
     }
-  }
+  };
+
+  const fetchRevenueAnalytics = async () => {
+    try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+
+      const token = localStorage.getItem("jdp_auth")
+        ? JSON.parse(localStorage.getItem("jdp_auth")!).token
+        : null;
+
+      const res = await fetch(
+        `${apiBaseUrl}/analytics/revenue?start_date=${dateFrom}&end_date=${dateTo}&status=paid`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        },
+      );
+
+      const data = await res.json();
+
+      if (data?.success) {
+        setRevenueChartData(data.data || []);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  useEffect(() => {
+    if (dateFrom && dateTo) {
+      fetchRevenueAnalytics();
+    }
+  }, [dateFrom, dateTo]);
 
   return (
     <div className="space-y-6">
@@ -330,9 +468,11 @@ export function DashboardOverview() {
       <div className="bg-gradient-to-r from-[#00A1FF] to-[#0090e6] rounded-xl p-6 text-white">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Welcome back, {userName}! 👋</h1>
+            <h1 className="text-3xl font-bold mb-2">
+              Welcome back, {userName}! 👋
+            </h1>
             <p className="text-blue-100 text-lg">
-              Here&apos;s what&apos;s happening with your business today.  
+              Here&apos;s what&apos;s happening with your business today.
             </p>
           </div>
           <div className="hidden md:flex items-center gap-4">
@@ -341,39 +481,18 @@ export function DashboardOverview() {
               <div className="text-sm text-blue-100">Weather</div>
             </div> */}
             <div className="text-center">
-              <div className="text-2xl font-bold">{new Date().toLocaleDateString('en-US', { day: 'numeric' })}</div>
-              <div className="text-sm text-blue-100">{new Date().toLocaleDateString('en-US', { month: 'short' })}</div>
+              <div className="text-2xl font-bold">
+                {new Date().toLocaleDateString("en-US", { day: "numeric" })}
+              </div>
+              <div className="text-sm text-blue-100">
+                {new Date().toLocaleDateString("en-US", { month: "short" })}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {kpiCards.map((kpi, index) => {
-          const Icon = kpi.icon
-          return (
-            <Card key={index} className="relative overflow-hidden border-0 shadow-sm hover:shadow-lg transition-all duration-300 hover:scale-105">
-              <CardContent className="p-6">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className={`w-10 h-10 rounded-lg ${kpi.bgColor} flex items-center justify-center`}>
-                        <Icon className={`h-5 w-5 ${kpi.color}`} />
-                      </div>
-                      <div className="text-sm text-muted-foreground">{kpi.title}</div>
-                    </div>
-                    <div className="text-2xl font-bold text-foreground mb-1">{isKpiLoading ? '…' : kpi.value}</div>
-                     
-                  </div> 
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
-
-      {/* Quick Actions */}
+           {/* Quick Actions */}
       <Card className="border-0 shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -384,7 +503,7 @@ export function DashboardOverview() {
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {quickActions.map((action, index) => {
-              const Icon = action.icon
+              const Icon = action.icon;
               return (
                 <Button
                   key={index}
@@ -392,16 +511,55 @@ export function DashboardOverview() {
                   onClick={() => router.push(`/${action.path}`)}
                   className="h-20 flex flex-col gap-2 hover:scale-105 transition-transform duration-200 border-dashed hover:bg-muted/50"
                 >
-                  <div className={`w-8 h-8 rounded-lg ${action.color} flex items-center justify-center`}>
+                  <div
+                    className={`w-8 h-8 rounded-lg ${action.color} flex items-center justify-center`}
+                  >
                     <Icon className="h-4 w-4 text-white" />
                   </div>
-                  <span className="text-xs text-center leading-tight">{action.title}</span>
+                  <span className="text-xs text-center leading-tight">
+                    {action.title}
+                  </span>
                 </Button>
-              )
+              );
             })}
           </div>
         </CardContent>
       </Card>
+      
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {kpiCards.map((kpi, index) => {
+          const Icon = kpi.icon;
+          return (
+            <Card
+              key={index}
+              className="relative overflow-hidden border-0 shadow-sm hover:shadow-lg transition-all duration-300 hover:scale-105"
+            >
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div
+                        className={`w-10 h-10 rounded-lg ${kpi.bgColor} flex items-center justify-center`}
+                      >
+                        <Icon className={`h-5 w-5 ${kpi.color}`} />
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {kpi.title}
+                      </div>
+                    </div>
+                    <div className="text-2xl font-bold text-foreground mb-1">
+                      {isKpiLoading ? "…" : kpi.value}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+ 
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -413,19 +571,109 @@ export function DashboardOverview() {
                 <TrendingUp className="h-5 w-5 text-[#00A1FF]" />
                 Revenue Analytics
               </CardTitle>
-              <Tabs value={selectedTimeframe} onValueChange={setSelectedTimeframe}>
+              {/* <Tabs value={selectedTimeframe} onValueChange={setSelectedTimeframe}>
                 <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="7days">7D</TabsTrigger>
                   <TabsTrigger value="30days">30D</TabsTrigger>
                   <TabsTrigger value="90days">90D</TabsTrigger>
                 </TabsList>
-              </Tabs>
+              </Tabs> */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-[260px] justify-start text-left font-normal relative pr-10"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    <span className="flex-1 truncate">
+                      {selectedRanges.length > 0
+                        ? (() => {
+                            const allDates = selectedRanges
+                              .flat()
+                              .map((d) =>
+                                d instanceof DateObject
+                                  ? d.toDate()
+                                  : new Date(d),
+                              )
+                              .filter((d) => !Number.isNaN(d.getTime()));
+
+                            const sorted = [...allDates].sort(
+                              (a, b) => a.getTime() - b.getTime(),
+                            );
+                            const from = sorted[0];
+                            const to = sorted[sorted.length - 1];
+
+                            if (!from) return "Pick dates";
+                            if (sorted.length === 1)
+                              return format(from, "LLL dd, y");
+
+                            return `${format(from, "LLL dd, y")} - ${format(to, "LLL dd, y")}`;
+                          })()
+                        : "Pick dates range"}
+                    </span>
+
+                    {selectedRanges.length > 0 && (
+                      <button
+                        type="button"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedRanges([]);
+                          setDateFrom("");
+                          setDateTo("");
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+
+                <PopoverContent className="p-3">
+                  <MultiDateCalendar
+                    multiple
+                    range
+                    value={selectedRanges}
+                    onChange={(value) => {
+                      const values = Array.isArray(value)
+                        ? value
+                        : value
+                          ? [value]
+                          : [];
+                      setSelectedRanges(values);
+
+                      const allDates = values
+                        .flat()
+                        .map((d) =>
+                          d instanceof DateObject ? d.toDate() : new Date(d),
+                        )
+                        .filter((d) => !Number.isNaN(d.getTime()));
+
+                      if (allDates.length === 0) {
+                        setDateFrom("");
+                        setDateTo("");
+                        return;
+                      }
+
+                      const sorted = [...allDates].sort(
+                        (a, b) => a.getTime() - b.getTime(),
+                      );
+
+                      setDateFrom(format(sorted[0], "yyyy-MM-dd"));
+                      setDateTo(
+                        format(sorted[sorted.length - 1], "yyyy-MM-dd"),
+                      );
+                    }}
+                    numberOfMonths={2}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
           </CardHeader>
           <CardContent>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={revenueData}>
+                {/* <AreaChart data={revenueData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="month" stroke="#64748b" />
                   <YAxis stroke="#64748b" />
@@ -453,20 +701,44 @@ export function DashboardOverview() {
                     fill="#00CEB6"
                     fillOpacity={0.3}
                   />
-                </AreaChart>
+                </AreaChart> */}
+                <ComposedChart data={revenueData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="month" stroke="#64748b" />
+                  <YAxis stroke="#64748b" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "white",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "8px",
+                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                    }}
+                  />
+
+                  {/* 🔥 ONLY PAID JOBS DATA */}
+                  <Bar dataKey="revenue" fill="#00A1FF" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="profit" fill="#00CEB6" radius={[4, 4, 0, 0]} />
+
+                  {/* Optional jobs count */}
+                  <Line
+                    type="monotone"
+                    dataKey="jobs"
+                    stroke="#FF6692"
+                    strokeWidth={3}
+                  />
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
-         
         </Card>
 
         {/* Project Status */}
         <Card className="border-0 shadow-sm">
           <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-[#00A1FF]" />
-                Job Status
-              </CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-[#00A1FF]" />
+              Job Status
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-64 flex items-center justify-center">
@@ -493,13 +765,15 @@ export function DashboardOverview() {
               {projectStatusData.map((item, index) => (
                 <div key={index} className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
-                    <div 
-                      className="w-3 h-3 rounded-full" 
+                    <div
+                      className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: item.color }}
                     />
                     <span className="text-sm">{item.name}</span>
                   </div>
-                  <span className="text-sm font-medium">{statusLoading ? '…' : `${item.value}%`}</span>
+                  <span className="text-sm font-medium">
+                    {statusLoading ? "…" : `${item.value}%`}
+                  </span>
                 </div>
               ))}
             </div>
@@ -525,46 +799,66 @@ export function DashboardOverview() {
           <CardContent>
             <div className="space-y-4">
               {activitiesLoading ? (
-                <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">Loading activities…</div>
+                <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+                  Loading activities…
+                </div>
               ) : activities.length === 0 ? (
-                <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">No recent activities</div>
+                <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+                  No recent activities
+                </div>
               ) : (
                 activities.map((activity, index) => {
-                  const { Icon, color, bg } = getActivityStyle(activity.type)
+                  const { Icon, color, bg } = getActivityStyle(activity.type);
                   return (
-                    <div key={`activity-${activity.id}-${index}`} className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                      <div className={`w-8 h-8 rounded-lg ${bg} flex items-center justify-center flex-shrink-0`}>
+                    <div
+                      key={`activity-${activity.id}-${index}`}
+                      className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <div
+                        className={`w-8 h-8 rounded-lg ${bg} flex items-center justify-center flex-shrink-0`}
+                      >
                         <Icon className={`h-4 w-4 ${color}`} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm text-foreground">{activity.title}</p>
-                        <p className="text-xs text-muted-foreground">{activity.description}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{formatActivityTime(activity.timestamp)}</p>
+                        <p className="font-medium text-sm text-foreground">
+                          {activity.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {activity.description}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {formatActivityTime(activity.timestamp)}
+                        </p>
                       </div>
                     </div>
-                  )
+                  );
                 })
               )}
             </div>
           </CardContent>
-           {/* Pagination */}
+          {/* Pagination */}
           <div className="flex items-center justify-center gap-4 pb-4">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setActivitiesPage(p => Math.max(1, p - 1))}
+              onClick={() => setActivitiesPage((p) => Math.max(1, p - 1))}
               disabled={activitiesPage === 1 || activitiesLoading}
             >
               Previous
             </Button>
             <span className="text-sm">
-              Page {activitiesPage} of {Math.max(1, Math.ceil(activitiesTotal / activitiesPageSize))}
+              Page {activitiesPage} of{" "}
+              {Math.max(1, Math.ceil(activitiesTotal / activitiesPageSize))}
             </span>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setActivitiesPage(p => p + 1)}
-              disabled={activitiesLoading || activitiesPage >= Math.ceil(activitiesTotal / activitiesPageSize)}
+              onClick={() => setActivitiesPage((p) => p + 1)}
+              disabled={
+                activitiesLoading ||
+                activitiesPage >=
+                  Math.ceil(activitiesTotal / activitiesPageSize)
+              }
             >
               Next
             </Button>
@@ -579,9 +873,9 @@ export function DashboardOverview() {
                 <Timer className="h-5 w-5 text-[#00A1FF]" />
                 Financial Summary
               </CardTitle>
-              <Button variant="ghost" size="sm">
+              {/* <Button variant="ghost" size="sm">
                 <Plus className="h-4 w-4" />
-              </Button>
+              </Button> */}
             </div>
           </CardHeader>
           <CardContent>
@@ -604,40 +898,50 @@ export function DashboardOverview() {
               ))}
             </div> */}
             <Card className="border-0 shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-muted-foreground text-sm">Monthly Revenue</p>
-                <p className="text-2xl font-bold text-foreground">$84,725</p>
-                <div className="flex items-center gap-1 mt-1">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-muted-foreground text-sm">
+                      Monthly Revenue
+                    </p>
+                    <p className="text-2xl font-bold text-foreground">
+                      $84,725
+                    </p>
+                    {/* <div className="flex items-center gap-1 mt-1">
                   <TrendingUp className="h-3 w-3 text-green-600" />
                   <span className="text-sm text-green-600">+12.5%</span>
+                </div> */}
+                  </div>
+                  <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
+                    <DollarSign className="h-6 w-6 text-green-600" />
+                  </div>
                 </div>
-              </div>
-              <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
 
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-muted-foreground text-sm">Pending Invoices</p>
-                <p className="text-2xl font-bold text-foreground">$23,450</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <AlertCircle className="h-3 w-3 text-orange-600" />
-                  <span className="text-sm text-orange-600">15 Overdue</span>
+            <Card className="border-0 shadow-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-muted-foreground text-sm">
+                      Pending Invoices
+                    </p>
+                    <p className="text-2xl font-bold text-foreground">
+                      $23,450
+                    </p>
+                    <div className="flex items-center gap-1 mt-1">
+                      <AlertCircle className="h-3 w-3 text-orange-600" />
+                      <span className="text-sm text-orange-600">
+                        15 Overdue
+                      </span>
+                    </div>
+                  </div>
+                  <div className="w-12 h-12 bg-orange-50 rounded-lg flex items-center justify-center">
+                    <CreditCard className="h-6 w-6 text-orange-600" />
+                  </div>
                 </div>
-              </div>
-              <div className="w-12 h-12 bg-orange-50 rounded-lg flex items-center justify-center">
-                <CreditCard className="h-6 w-6 text-orange-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
           </CardContent>
         </Card>
       </div>
@@ -784,5 +1088,5 @@ export function DashboardOverview() {
         </Card>
       </div> */}
     </div>
-  )
+  );
 }

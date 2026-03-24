@@ -273,14 +273,14 @@ const metricDefinitions: MetricDefinition[] = [
     color: 'text-orange-600',
     bgColor: 'bg-orange-50'
   },
-  {
-    key: 'todays_revenue',
-    title: "Today's Revenue",
-    icon: DollarSign,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-50',
-    unit: 'currency'
-  }
+  // {
+  //   key: 'todays_revenue',
+  //   title: "Today's Revenue",
+  //   icon: DollarSign,
+  //   color: 'text-purple-600',
+  //   bgColor: 'bg-purple-50',
+  //   unit: 'currency'
+  // }
 ]
 
 const timeSeriesComparison = [
@@ -543,7 +543,7 @@ export function AnalyticsPage() {
       )}
 
       {/* Real-time Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {metricDefinitions.map((definition) => {
           const metricData = analyticsOverview?.[definition.key]
           const difference = metricData?.change_today_vs_yesterday?.difference ?? null
@@ -588,72 +588,9 @@ export function AnalyticsPage() {
 
       {/* Main Analytics Dashboard */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
-            <Eye className="h-4 w-4" />
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="revenue" className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4" />
-            Revenue
-          </TabsTrigger>
-          <TabsTrigger value="performance" className="flex items-center gap-2">
-            <Target className="h-4 w-4" />
-            Performance
-          </TabsTrigger>
-          {/* <TabsTrigger value="geographic" className="flex items-center gap-2">
-            <MapPin className="h-4 w-4" />
-            Geographic
-          </TabsTrigger>
-          <TabsTrigger value="predictive" className="flex items-center gap-2">
-            <TrendingUpIcon className="h-4 w-4" />
-            Predictive
-          </TabsTrigger>
-          <TabsTrigger value="insights" className="flex items-center gap-2">
-            <Layers className="h-4 w-4" />
-            Insights
-          </TabsTrigger> */}
-        </TabsList>
-
         {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-6">
-          {/* Performance Metrics Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {performanceMetrics.map((metric, index) => {
-              const TrendIcon = getComparisonIcon(metric.trend)
-              return (
-                <Card key={index} className="border-0 shadow-sm">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-medium text-foreground">{metric.category}</h3>
-                      <div className={`p-2 rounded-lg ${metric.trend === 'up' ? 'bg-green-50' : 'bg-red-50'}`}>
-                        <TrendIcon className={`h-4 w-4 ${metric.trend === 'up' ? 'text-green-600' : 'text-red-600'}`} />
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="flex items-end gap-2">
-                        <span className="text-2xl font-bold text-foreground">
-                          {typeof metric.current === 'number' && metric.current > 1000 
-                            ? `$${(metric.current / 1000).toFixed(0)}k` 
-                            : metric.current}
-                        </span>
-                        <span className={`text-sm ${metric.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-                          {metric.change}
-                        </span>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Progress</span>
-                          <span className="font-medium">{metric.percentage}%</span>
-                        </div>
-                        <Progress value={metric.percentage} className="h-2" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
+        <div className="space-y-6">
+        
 
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -668,7 +605,7 @@ export function AnalyticsPage() {
               <CardContent>
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={revenueAnalytics.monthly}>
+                    {/* <ComposedChart data={revenueAnalytics.monthly}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                       <XAxis dataKey="month" stroke="#64748b" />
                       <YAxis stroke="#64748b" />
@@ -683,7 +620,20 @@ export function AnalyticsPage() {
                       <Bar dataKey="profit" fill="#00CEB6" radius={[2, 2, 0, 0]} />
                       <Line type="monotone" dataKey="revenue" stroke="#00A1FF" strokeWidth={3} />
                       <Area type="monotone" dataKey="revenue" fill="#00A1FF" fillOpacity={0.1} />
-                    </ComposedChart>
+                    </ComposedChart> */}
+                    <AreaChart data={efficiencyTrends}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <XAxis dataKey="month" stroke="#64748b" />
+                        <YAxis stroke="#64748b" />
+                        <Tooltip />
+                        <Area
+                          type="monotone"
+                          dataKey="jobs"
+                          stroke="#00A1FF"
+                          fill="#00A1FF"
+                          fillOpacity={0.3}
+                        />
+                    </AreaChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>
@@ -743,409 +693,11 @@ export function AnalyticsPage() {
               </CardContent>
             </Card>
           </div>
-
-          {/* Activity Heatmap */}
-          {/* <Card className="border-0 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5 text-primary" />
-                Job Activity Heatmap
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="grid grid-cols-8 gap-2 text-sm">
-                  <div></div>
-                  {['6AM', '8AM', '10AM', '12PM', '2PM', '4PM', '6PM'].map(hour => (
-                    <div key={hour} className="text-center text-muted-foreground">{hour}</div>
-                  ))}
-                </div>
-                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(day => (
-                  <div key={day} className="grid grid-cols-8 gap-2">
-                    <div className="text-sm text-muted-foreground text-right pr-2">{day}</div>
-                    {heatmapData.filter(d => d.day === day).map((item, index) => (
-                      <div
-                        key={index}
-                        className={`h-8 rounded ${getHeatmapColor(item.value)} flex items-center justify-center`}
-                        title={`${item.day} ${item.hour}: ${item.value}% capacity`}
-                      >
-                        <span className="text-xs text-white font-medium">{item.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card> */}
-        </TabsContent>
-
-        {/* Revenue Tab */}
-        <TabsContent value="revenue" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Revenue Summary Cards */}
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
-                    <DollarSign className="h-6 w-6 text-green-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium">Total Revenue</h3>
-                    <p className="text-sm text-muted-foreground">This period</p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-3xl font-bold text-foreground">
-                    ${(revenueAnalytics.current / 1000).toFixed(0)}k
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <ArrowUpRight className="h-4 w-4 text-green-600" />
-                    <span className="text-sm text-green-600 font-medium">
-                      +{revenueAnalytics.change}%
-                    </span>
-                    <span className="text-sm text-muted-foreground">vs last period</span>
-                  </div>
-                  <Progress value={(revenueAnalytics.current / revenueAnalytics.target) * 100} className="h-2" />
-                  <p className="text-xs text-muted-foreground">
-                    {((revenueAnalytics.current / revenueAnalytics.target) * 100).toFixed(1)}% of ${(revenueAnalytics.target / 1000).toFixed(0)}k target
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
-                    <Calculator className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium">Avg Job Value</h3>
-                    <p className="text-sm text-muted-foreground">Per completed job</p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-3xl font-bold text-foreground">$13,035</p>
-                  <div className="flex items-center gap-2">
-                    <ArrowUpRight className="h-4 w-4 text-green-600" />
-                    <span className="text-sm text-green-600 font-medium">+8.3%</span>
-                    <span className="text-sm text-muted-foreground">improvement</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-purple-50 rounded-lg flex items-center justify-center">
-                    <TrendingUp className="h-6 w-6 text-purple-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium">Profit Margin</h3>
-                    <p className="text-sm text-muted-foreground">Current period</p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-3xl font-bold text-foreground">30.1%</p>
-                  <div className="flex items-center gap-2">
-                    <ArrowUpRight className="h-4 w-4 text-green-600" />
-                    <span className="text-sm text-green-600 font-medium">+2.1%</span>
-                    <span className="text-sm text-muted-foreground">vs target</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
+   
 
-          {/* Detailed Revenue Chart */}
-          <Card className="border-0 shadow-sm">
-            <CardHeader>
-              <CardTitle>Revenue vs Profit Analysis</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-96">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={revenueAnalytics.monthly}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="month" stroke="#64748b" />
-                    <YAxis stroke="#64748b" />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'white', 
-                        border: '1px solid #e2e8f0', 
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-                      }} 
-                    />
-                    <Bar dataKey="revenue" fill="#00A1FF" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="profit" fill="#00CEB6" radius={[4, 4, 0, 0]} />
-                    <Line type="monotone" dataKey="jobs" stroke="#FF6692" strokeWidth={3} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        {/* Performance Tab */}
-        <TabsContent value="performance" className="space-y-6">
-          {/* Top Performers */}
-          <Card className="border-0 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Award className="h-5 w-5 text-primary" />
-                Top Performers This Month
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {topPerformers.map((performer, index) => (
-                  <div key={index} className="p-4 rounded-lg border border-border hover:shadow-md transition-shadow">
-                    <div className="flex items-center gap-3 mb-3">
-                      <Avatar>
-                        <AvatarFallback className="bg-primary/10 text-primary">
-                          {performer.name.split(' ').map(n => n[0]).join('')}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <h4 className="font-medium">{performer.name}</h4>
-                        <p className="text-sm text-muted-foreground">{performer.role}</p>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Jobs Completed</span>
-                        <span className="font-medium">{performer.jobsCompleted}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Revenue</span>
-                        <span className="font-medium">${(performer.revenue / 1000).toFixed(0)}k</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Efficiency</span>
-                        <span className="font-medium">{performer.efficiency}%</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Rating</span>
-                        <div className="flex items-center gap-1">
-                          <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                          <span className="font-medium">{performer.rating}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* Performance Metrics */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="border-0 shadow-sm">
-              <CardHeader>
-                <CardTitle>Efficiency Trends</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={efficiencyTrends}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis dataKey="month" stroke="#64748b" />
-                      <YAxis stroke="#64748b" />
-                      <Tooltip />
-                      <Area type="monotone" dataKey="jobs" stroke="#00A1FF" fill="#00A1FF" fillOpacity={0.3} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm">
-              <CardHeader>
-                <CardTitle>Customer Satisfaction Metrics</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {customerInsights.map((segment, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                      <div>
-                        <h4 className="font-medium">{segment.segment}</h4>
-                        <p className="text-sm text-muted-foreground">{segment.customers} customers</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium">${(segment.revenue / 1000).toFixed(0)}k</p>
-                        <p className="text-sm text-muted-foreground">${segment.avgJobValue} avg</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Geographic Tab */}
-        {/* <TabsContent value="geographic" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"> 
-            <Card className="border-0 shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-primary" />
-                  Regional Performance
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {geographicData.map((region, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                          <Building className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <h4 className="font-medium">{region.region}</h4>
-                          <p className="text-sm text-muted-foreground">{region.jobs} active jobs</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium">${(region.revenue / 1000).toFixed(0)}k</p>
-                        <div className="flex items-center gap-1">
-                          <ArrowUpRight className="h-3 w-3 text-green-600" />
-                          <span className="text-sm text-green-600">{region.growth}%</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
- 
-            <Card className="border-0 shadow-sm">
-              <CardHeader>
-                <CardTitle>Market Share by Region</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={geographicData} layout="horizontal">
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis type="number" stroke="#64748b" />
-                      <YAxis dataKey="region" type="category" stroke="#64748b" />
-                      <Tooltip />
-                      <Bar dataKey="revenue" fill="#00A1FF" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent> */}
-
-        {/* Predictive Tab */}
-        {/* <TabsContent value="predictive" className="space-y-6">
-          <Card className="border-0 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Zap className="h-5 w-5 text-primary" />
-                Revenue Forecasting
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-96">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={[...revenueAnalytics.monthly, ...predictiveAnalytics]}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="month" stroke="#64748b" />
-                    <YAxis stroke="#64748b" />
-                    <Tooltip />
-                    <Area type="monotone" dataKey="revenue" stroke="#00A1FF" fill="#00A1FF" fillOpacity={0.3} />
-                    <Area type="monotone" dataKey="predicted" stroke="#FF6692" fill="#FF6692" fillOpacity={0.1} strokeDasharray="5 5" />
-                    <Area type="monotone" dataKey="upper" stroke="#FFB800" fill="none" strokeDasharray="2 2" />
-                    <Area type="monotone" dataKey="lower" stroke="#FFB800" fill="none" strokeDasharray="2 2" />
-                    <ReferenceLine x="Jun" stroke="#666" strokeDasharray="3 3" label="Current" />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent> */}
-
-        {/* Insights Tab */}
-        {/* <TabsContent value="insights" className="space-y-6"> 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
-                    <TrendingUp className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-blue-900">Growth Opportunity</h3>
-                    <p className="text-sm text-blue-600">Eastern region shows 22% growth</p>
-                  </div>
-                </div>
-                <p className="text-sm text-blue-800">
-                  Consider expanding operations in the Eastern region to capitalize on the 22% growth rate.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm bg-gradient-to-br from-green-50 to-green-100">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center">
-                    <Award className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-green-900">Performance Insight</h3>
-                    <p className="text-sm text-green-600">Customer satisfaction at 4.8/5.0</p>
-                  </div>
-                </div>
-                <p className="text-sm text-green-800">
-                  Excellent customer satisfaction scores indicate strong service quality and potential for referrals.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm bg-gradient-to-br from-orange-50 to-orange-100">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-orange-500 rounded-lg flex items-center justify-center">
-                    <AlertTriangle className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-orange-900">Action Required</h3>
-                    <p className="text-sm text-orange-600">8 pending approvals need attention</p>
-                  </div>
-                </div>
-                <p className="text-sm text-orange-800">
-                  Review and process pending approvals to maintain operational efficiency and customer satisfaction.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
- 
-          <Card className="border-0 shadow-sm">
-            <CardHeader>
-              <CardTitle>Year-over-Year Performance Comparison</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={timeSeriesComparison}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="period" stroke="#64748b" />
-                    <YAxis stroke="#64748b" />
-                    <Tooltip />
-                    <Bar dataKey="thisYear" fill="#00A1FF" radius={[4, 4, 0, 0]} name="2024" />
-                    <Bar dataKey="lastYear" fill="#00CEB6" radius={[4, 4, 0, 0]} name="2023" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent> */}
       </Tabs>
     </div>
   )

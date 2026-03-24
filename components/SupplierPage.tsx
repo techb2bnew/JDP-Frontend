@@ -822,9 +822,16 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
   if (viewingSupplier) {
     return (
       isLoadingDetails || !supplierDetails ? (
-        <div className="p-6">
-          <h2 className="text-lg text-center font-medium text-[#2b2b2b]">Loading supplier details...</h2>
-        </div>
+        <Card className="bg-white shadow-md border-0">
+          <CardContent className="p-8">
+            <div className="flex items-center justify-center py-12">
+              <div className="flex items-center gap-3">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <span className="text-gray-600">Loading supplier details...</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
         <SupplierDetailsPage
           supplierId={viewingSupplier.id}

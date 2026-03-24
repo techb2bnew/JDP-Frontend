@@ -2678,7 +2678,6 @@ export const apiClient = {
 
     return response.json();
   },
-
   updateEstimate: async (estimateId: number, estimateData: {
     estimate_title?: string;
     customer_id?: number;
