@@ -579,9 +579,9 @@ export function DashboardOverview() {
                 <Timer className="h-5 w-5 text-[#00A1FF]" />
                 Financial Summary
               </CardTitle>
-              <Button variant="ghost" size="sm">
+              {/* <Button variant="ghost" size="sm">
                 <Plus className="h-4 w-4" />
-              </Button>
+              </Button> */}
             </div>
           </CardHeader>
           <CardContent>
@@ -609,10 +609,10 @@ export function DashboardOverview() {
               <div>
                 <p className="text-muted-foreground text-sm">Monthly Revenue</p>
                 <p className="text-2xl font-bold text-foreground">$84,725</p>
-                <div className="flex items-center gap-1 mt-1">
+                {/* <div className="flex items-center gap-1 mt-1">
                   <TrendingUp className="h-3 w-3 text-green-600" />
                   <span className="text-sm text-green-600">+12.5%</span>
-                </div>
+                </div> */}
               </div>
               <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
                 <DollarSign className="h-6 w-6 text-green-600" />

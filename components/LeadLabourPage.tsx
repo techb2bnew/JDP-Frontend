@@ -1575,7 +1575,7 @@ useEffect(() => {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="specialization">Specialization</Label>
+            <Label htmlFor="specialization">Specialization *</Label>
             <AutoSuggestInput
               label=""
               value={formData.specialization}
@@ -1610,7 +1610,7 @@ useEffect(() => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="experience">Experience</Label>
+            <Label htmlFor="experience">Experience *</Label>
             <Input
               id="experience"
               value={formData.experience}

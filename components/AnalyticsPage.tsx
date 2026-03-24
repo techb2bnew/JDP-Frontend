@@ -273,14 +273,14 @@ const metricDefinitions: MetricDefinition[] = [
     color: 'text-orange-600',
     bgColor: 'bg-orange-50'
   },
-  {
-    key: 'todays_revenue',
-    title: "Today's Revenue",
-    icon: DollarSign,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-50',
-    unit: 'currency'
-  }
+  // {
+  //   key: 'todays_revenue',
+  //   title: "Today's Revenue",
+  //   icon: DollarSign,
+  //   color: 'text-purple-600',
+  //   bgColor: 'bg-purple-50',
+  //   unit: 'currency'
+  // }
 ]
 
 const timeSeriesComparison = [
@@ -543,7 +543,7 @@ export function AnalyticsPage() {
       )}
 
       {/* Real-time Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {metricDefinitions.map((definition) => {
           const metricData = analyticsOverview?.[definition.key]
           const difference = metricData?.change_today_vs_yesterday?.difference ?? null

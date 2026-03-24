@@ -996,6 +996,8 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               <PhoneInput
                 id="phone"
                 value={formData.phone}
+                countryCallingCodeEditable={false}
+                limitMaxLength
                 onChange={(value) => {
                   const safeValue = value || ''
                   const newFormData = { ...formData, phone: safeValue }
@@ -1014,6 +1016,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                     : 'border border-gray-300 rounded-md px-2 py-2'
                 }
               />
+              
               {validationErrors.phone && (
                 <p className="text-red-500 text-sm">{validationErrors.phone}</p>
               )}
