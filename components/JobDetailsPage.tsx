@@ -725,7 +725,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
   const [customerData, setCustomerData] = useState<any>(null)
   const [contractorData, setContractorData] = useState<any>(null)
   const [InvoioiceNumber, setInvoioiceNumber] = useState('');
-  const [isMarkingPaidId, setIsMarkingPaidId] = useState<number | null>(null)
+  const [isMarkingPaidId, setIsMarkingPaidId] = useState<number | null>(null);
+  const [isPaidLoading,setIsPaidLoading] = useState(false);
 
   // Clean duplicate custom types (case-insensitive)
   const cleanCustomTypes = (types: string[]) => {
@@ -1656,67 +1657,93 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
   };
 
 
-  const handleMarkAsPaid = async (invoice: any) => {
-    if (!invoice?.id) {
-      toast.error('Invoice ID not found')
-      return
-    }
-
-    try {
-      setIsMarkingPaidId(invoice.id)
-
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
-      const token =
-        typeof window !== 'undefined' && localStorage.getItem('jdp_auth')
-          ? JSON.parse(localStorage.getItem('jdp_auth')!).token
-          : null
-
-      // later you can change this URL
-      const response = await fetch(`${apiBaseUrl}/estimates/${invoice.id}/mark-as-paid`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          status: 'paid',
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok || data?.success === false) {
-        throw new Error(data?.message || 'Failed to mark invoice as paid')
+    const handleMarkAsPaid = async (invoice: any) => {
+      if (!invoice?.id) {
+        toast.error('Invoice ID not found')
+        return
       }
 
-      // update local estimates state instantly
-      setEstimates((prev) =>
-        prev.map((item: any) =>
-          Number(item.id) === Number(invoice.id)
-            ? {
-                ...item,
-                status: 'paid',
-              }
-            : item
+      const invoiceStatus = String(invoice.status || '').toLowerCase()
+      if (invoiceStatus === 'paid') {
+        return
+      }
+
+      try {
+        setIsPaidLoading(true)
+        setIsMarkingPaidId(invoice.id)
+
+        const estimateResponse = await apiClient.getEstimateById(invoice.id)
+        const estimateData = estimateResponse?.data || estimateResponse
+
+        const customProducts = Array.isArray(estimateData?.products)
+          ? estimateData.products.map((item: any) => ({
+              ...(item.id ? { id: item.id } : {}),
+              product_name: item.product_name || item.item || '',
+              description: item.description || '',
+              jdp_sku: item.jdp_sku || '',
+              stock_quantity: Number(item.stock_quantity || item.qty || 1),
+              unit: item.unit || 'unit',
+              job_id: Number(estimateData.job_id),
+              unit_cost: Number(item.unit_cost || item.rate || 0),
+              jdp_price: Number(item.jdp_price || item.rate || 0),
+              estimated_price: Number(item.estimated_price || 0),
+              total_cost: Number(item.total_cost || item.total || 0),
+              is_custom: item.is_custom === true,
+            }))
+          : []
+
+        const payload = {
+          job_id: Number(estimateData.job_id),
+          estimate_title: estimateData.estimate_title || '',
+          ...(estimateData.contractor_id
+            ? { contractor_id: Number(estimateData.contractor_id) }
+            : { customer_id: Number(estimateData.customer_id) }),
+          priority: estimateData.priority || 'medium',
+          service_type: estimateData.service_type || 'service_based',
+          email_address: estimateData.email_address || '',
+          estimate_date: estimateData.estimate_date || '',
+          po_number: estimateData.po_number || '',
+          rep: estimateData.rep || '',
+          due_date: estimateData.due_date || '',
+          payment_credits: Number(estimateData.payment_credits || 0),
+          balance_due: estimateData.balance_due || '',
+          ...(estimateData.bill_to_address && {
+            bill_to_address: estimateData.bill_to_address,
+          }),
+          invoice_type: estimateData.invoice_type || 'estimate',
+          notes: estimateData.notes || '',
+          custom_products: customProducts,
+
+          status: 'paid',
+        }
+
+        await apiClient.updateEstimate(Number(invoice.id), payload as any)
+
+        setEstimates((prev) =>
+          prev.map((item: any) =>
+            Number(item.id) === Number(invoice.id)
+              ? { ...item, status: 'paid' }
+              : item
+          )
         )
-      )
+        setIsPaidLoading(false)
+        toast.success('Invoice marked as paid')
+        await fetchEstimates()
+        onJobsRefresh?.()
+      } catch (error: any) {
+        setIsPaidLoading(false);
+        console.error('Error marking invoice as paid:', error)
 
-      toast.success('Invoice marked as paid')
+        const apiMessage =
+          error?.response?.data?.message ||
+          error?.message ||
+          'Failed to mark invoice as paid'
 
-      // optional refresh if you want latest server data
-      fetchEstimates()
-      onJobsRefresh?.()
-    } catch (error) {
-      console.error('Error marking invoice as paid:', error)
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to mark invoice as paid'
-      )
-    } finally {
-      setIsMarkingPaidId(null)
+        toast.error(apiMessage)
+      } finally {
+        setIsMarkingPaidId(null)
+      }
     }
-  }
-
-
   // const handleDeleteProduct = async (productId: string | number) => {
   //   try {
   //     const confirmDelete = window.confirm("Are you sure you want to delete this product?");
@@ -3644,212 +3671,210 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
     }
   }
 
-  const handleSendFromPreview = async () => {
-    console.log("kjk");
-    
-    // setIsLoading(true)
-    // try {
-    //   // Prepare API payload
-    //   const subtotal = calculateInvoiceSubtotal()
-    //   const total = subtotal // You can add tax calculation here if needed
+  const handleSendFromPreview = async () => {    
+    setIsLoading(true)
+    try {
+      // Prepare API payload
+      const subtotal = calculateInvoiceSubtotal()
+      const total = subtotal // You can add tax calculation here if needed
 
-    //   const payload = {
-    //     estimateNumber: inlineInvoiceData.estimateNumber || 'Draft',
-    //     estimateDate: new Date(inlineInvoiceData.date).toLocaleDateString('en-US', {
-    //       month: '2-digit',
-    //       day: '2-digit',
-    //       year: 'numeric'
-    //     }),
-    //     ...(job.type === 'contract-based'
-    //       ? {
-    //         customerName: inlineInvoiceData.customerName || 'Contractor',
-    //         customerEmail: contractorData?.email || job.email || 'contractor@example.com',
-    //         customerAddress: inlineInvoiceData.customerAddress || ''
-    //       }
-    //       : {
-    //         customerName: inlineInvoiceData.customerName || 'Customer',
-    //         customerEmail: customerData?.email || job.customer?.email || job.customerEmail || 'customer@example.com',
-    //         customerAddress: inlineInvoiceData.customerAddress || ''
-    //       }
-    //     ),
-    //     billToAddress: inlineInvoiceData.billToAddressEnabled ? inlineInvoiceData.billToAddress || '' : '',
-    //     poNumber: inlineInvoiceData.poNumber || '',
-    //     projectName: inlineInvoiceData.project || job.title || '',
-    //     items: inlineInvoiceData.lineItems.map(item => ({
-    //       quantity: item.qty.toString(),
-    //       item: item.item,
-    //       description: item.description || '',
-    //       rate: (item.rate || 0).toFixed(2),
-    //       amount: (item.estimatedPrice || 0).toFixed(2)
-    //     })),
-    //     subtotal: subtotal.toFixed(2),
-    //     total: total.toFixed(2),
-    //     dueDate: inlineInvoiceData.dueDate || '',
-    //     rep: inlineInvoiceData.rep || 'JDP',
-    //     paymentCredits: inlineInvoiceData.paymentCredits || 0,
-    //     balanceDue: (subtotal - (inlineInvoiceData.paymentCredits || 0)).toFixed(2),
-    //     notes: inlineInvoiceData.notes ? inlineInvoiceData.notes.split('\n').filter(note => note.trim()) : [],
-    //     email: 'jen@jdpelectric.us',
-    //     phone: '952-449-1088',
-    //     status: 'sent'
-    //   }
+      const payload = {
+        estimateNumber: inlineInvoiceData.estimateNumber || 'Draft',
+        estimateDate: new Date(inlineInvoiceData.date).toLocaleDateString('en-US', {
+          month: '2-digit',
+          day: '2-digit',
+          year: 'numeric'
+        }),
+        ...(job.type === 'contract-based'
+          ? {
+            customerName: inlineInvoiceData.customerName || 'Contractor',
+            customerEmail: contractorData?.email || job.email || 'contractor@example.com',
+            customerAddress: inlineInvoiceData.customerAddress || ''
+          }
+          : {
+            customerName: inlineInvoiceData.customerName || 'Customer',
+            customerEmail: customerData?.email || job.customer?.email || job.customerEmail || 'customer@example.com',
+            customerAddress: inlineInvoiceData.customerAddress || ''
+          }
+        ),
+        billToAddress: inlineInvoiceData.billToAddressEnabled ? inlineInvoiceData.billToAddress || '' : '',
+        poNumber: inlineInvoiceData.poNumber || '',
+        projectName: inlineInvoiceData.project || job.title || '',
+        items: inlineInvoiceData.lineItems.map(item => ({
+          quantity: item.qty.toString(),
+          item: item.item,
+          description: item.description || '',
+          rate: (item.rate || 0).toFixed(2),
+          amount: (item.estimatedPrice || 0).toFixed(2)
+        })),
+        subtotal: subtotal.toFixed(2),
+        total: total.toFixed(2),
+        dueDate: inlineInvoiceData.dueDate || '',
+        rep: inlineInvoiceData.rep || 'JDP',
+        paymentCredits: inlineInvoiceData.paymentCredits || 0,
+        balanceDue: (subtotal - (inlineInvoiceData.paymentCredits || 0)).toFixed(2),
+        notes: inlineInvoiceData.notes ? inlineInvoiceData.notes.split('\n').filter(note => note.trim()) : [],
+        email: 'jen@jdpelectric.us',
+        phone: '952-449-1088',
+        status: 'sent'
+      }
 
-    //   // Get auth token
-    //   const getAuthToken = (): string | null => {
-    //     if (typeof window !== "undefined") {
-    //       const savedAuth = localStorage.getItem("jdp_auth");
-    //       if (savedAuth) {
-    //         try {
-    //           const authData = JSON.parse(savedAuth);
-    //           if (authData.token && authData.expires > Date.now()) {
-    //             return authData.token;
-    //           }
-    //         } catch (error) {
-    //           console.error("Error parsing auth data:", error);
-    //         }
-    //       }
-    //     }
-    //     return null;
-    //   };
+      // Get auth token
+      const getAuthToken = (): string | null => {
+        if (typeof window !== "undefined") {
+          const savedAuth = localStorage.getItem("jdp_auth");
+          if (savedAuth) {
+            try {
+              const authData = JSON.parse(savedAuth);
+              if (authData.token && authData.expires > Date.now()) {
+                return authData.token;
+              }
+            } catch (error) {
+              console.error("Error parsing auth data:", error);
+            }
+          }
+        }
+        return null;
+      };
 
-    //   // Call API to send invoice
-    //   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
-    //   const token = getAuthToken()
+      // Call API to send invoice
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+      const token = getAuthToken()
 
-    //   const headers: Record<string, string> = {
-    //     'Content-Type': 'application/json',
-    //   }
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
 
-    //   if (token) {
-    //     headers['Authorization'] = `Bearer ${token}`
-    //   }
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
 
-    //   const response = await fetch(`${apiUrl}/invoices/sendInvoiceToCustomer/${editingInvoiceId || estimates[0]?.id}`, {
-    //     method: 'POST',
-    //     headers,
-    //     body: JSON.stringify(payload)
-    //   })
+      const response = await fetch(`${apiUrl}/invoices/sendInvoiceToCustomer/${editingInvoiceId || estimates[0]?.id}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      })
 
-    //   if (!response.ok) {
-    //     throw new Error('Failed to send invoice')
-    //   }
+      if (!response.ok) {
+        throw new Error('Failed to send invoice')
+      }
 
-    //   toast.success('Invoice sent successfully to customer!')
+      toast.success('Invoice sent successfully to customer!')
 
-    //   // Also save the invoice data to backend
-    //   const customProducts = inlineInvoiceData.lineItems.map(item => {
-    //     const productPayload: any = {
-    //       product_name: item.item,
-    //       description: item.description || '',
-    //       jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-    //       stock_quantity: item.qty,
-    //       unit: 'unit',
-    //       job_id: Number(jobId),
-    //       unit_cost: item.rate,
-    //       jdp_price: item.rate,
-    //       estimated_price: item.estimatedPrice || 0,
-    //       total_cost: item.total,
-    //       is_custom: item.isCustomProduct === true,
-    //     }
+      // Also save the invoice data to backend
+      const customProducts = inlineInvoiceData.lineItems.map(item => {
+        const productPayload: any = {
+          product_name: item.item,
+          description: item.description || '',
+          jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          stock_quantity: item.qty,
+          unit: 'unit',
+          job_id: Number(jobId),
+          unit_cost: item.rate,
+          jdp_price: item.rate,
+          estimated_price: item.estimatedPrice || 0,
+          total_cost: item.total,
+          is_custom: item.isCustomProduct === true,
+        }
 
-    //     // Add product ID only for searched/selected products
-    //     if (item.isCustomProduct !== true && item.productId) {
-    //       productPayload.id = item.productId
-    //     }
+        // Add product ID only for searched/selected products
+        if (item.isCustomProduct !== true && item.productId) {
+          productPayload.id = item.productId
+        }
 
-    //     return productPayload
-    //   })
+        return productPayload
+      })
 
-    //   const backendPayload = {
-    //     job_id: Number(jobId),
-    //     estimate_title: inlineInvoiceData.project || job.title,
-    //     ...(job.type === 'contract-based'
-    //       ? { contractor_id: Number(job.contractor) || 0 }
-    //       : { customer_id: Number(job.customer?.id || job.customer) || 0 }
-    //     ),
-    //     priority: 'medium' as 'low' | 'medium' | 'high',
-    //     service_type: job.type === 'contract-based' ? 'contract_based' : 'service_based',
-    //     email_address: job.type === 'contract-based'
-    //       ? (contractorData?.email || job.email || 'contractor@example.com')
-    //       : (customerData?.email || job.customer?.email || job.email || 'customer@example.com'),
-    //     estimate_date: inlineInvoiceData.date,
-    //     po_number: inlineInvoiceData.poNumber || '',
-    //     rep: inlineInvoiceData.rep || '',
-    //     due_date: inlineInvoiceData.dueDate || '',
-    //     payment_credits: inlineInvoiceData.paymentCredits || 0,
-    //     balance_due: inlineInvoiceData.balanceDue || '',
-    //     ...(inlineInvoiceData.billToAddressEnabled && { bill_to_address: inlineInvoiceData.billToAddress || '' }),
-    //     status: 'sent',
-    //     invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType),
-    //     notes: inlineInvoiceData.notes || '',
-    //     custom_products: customProducts
-    //   }
+      const backendPayload = {
+        job_id: Number(jobId),
+        estimate_title: inlineInvoiceData.project || job.title,
+        ...(job.type === 'contract-based'
+          ? { contractor_id: Number(job.contractor) || 0 }
+          : { customer_id: Number(job.customer?.id || job.customer) || 0 }
+        ),
+        priority: 'medium' as 'low' | 'medium' | 'high',
+        service_type: job.type === 'contract-based' ? 'contract_based' : 'service_based',
+        email_address: job.type === 'contract-based'
+          ? (contractorData?.email || job.email || 'contractor@example.com')
+          : (customerData?.email || job.customer?.email || job.email || 'customer@example.com'),
+        estimate_date: inlineInvoiceData.date,
+        po_number: inlineInvoiceData.poNumber || '',
+        rep: inlineInvoiceData.rep || '',
+        due_date: inlineInvoiceData.dueDate || '',
+        payment_credits: inlineInvoiceData.paymentCredits || 0,
+        balance_due: inlineInvoiceData.balanceDue || '',
+        ...(inlineInvoiceData.billToAddressEnabled && { bill_to_address: inlineInvoiceData.billToAddress || '' }),
+        status: 'sent',
+        invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType),
+        notes: inlineInvoiceData.notes || '',
+        custom_products: customProducts
+      }
 
-    //   // Check if we're editing an existing invoice
-    //   if (editingInvoiceId) {
-    //     await apiClient.updateEstimate(Number(editingInvoiceId), backendPayload as any)
-    //     // toast.success('Invoice updated and sent successfully!')
-    //   } else {
-    //     // Don't create new estimate when sending - it should already exist from preview step
-    //     // toast.success('Invoice sent successfully!')
-    //   }
+      // Check if we're editing an existing invoice
+      if (editingInvoiceId) {
+        await apiClient.updateEstimate(Number(editingInvoiceId), backendPayload as any)
+        // toast.success('Invoice updated and sent successfully!')
+      } else {
+        // Don't create new estimate when sending - it should already exist from preview step
+        // toast.success('Invoice sent successfully!')
+      }
 
-    //   // Refresh estimates list
-    //   await fetchEstimates()
-    //   try {
-    //     const res = await apiClient.getJobDashboard(jobId);
-    //     setDashboardMetrics(res.data.dashboardMetrics);
-    //   } catch (error) {
-    //     console.error("Error fetching dashboard data:", error);
-    //   }
-    //   setShowInlineInvoiceForm(false)
-    //   setShowPreviewDialog(false)
-    //   setEditingInvoiceId(null)
+      // Refresh estimates list
+      await fetchEstimates()
+      try {
+        const res = await apiClient.getJobDashboard(jobId);
+        setDashboardMetrics(res.data.dashboardMetrics);
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      }
+      setShowInlineInvoiceForm(false)
+      setShowPreviewDialog(false)
+      setEditingInvoiceId(null)
 
-    //   // Reset form
-    //   setInlineInvoiceData({
-    //     date: new Date().toISOString().split('T')[0],
-    //     estimateNumber: '',
-    //     customerName: job.customerName || '',
-    //     customerAddress: job.address || '',
-    //     billToAddress: job.billToAddress || '',
-    //     billToAddressEnabled: true,
-    //     poNumber: '',
-    //     project: job.title || '',
-    //     rep: '',
-    //     dueDate: '',
-    //     paymentCredits: 0,
-    //     balanceDue: '',
-    //     lineItems: [{
-    //       id: Math.random().toString(36).substring(2, 9),
-    //       productId: null,
-    //       qty: 1,
-    //       item: '',
-    //       description: '',
-    //       rate: 0,
-    //       estimatedPrice: 0,
-    //       total: 0,
-    //       searchQuery: '',
-    //       showSearchResults: false,
-    //       supplierId: 1,
-    //       isCustomProduct: false,
-    //       estimate_product_id: null
-    //     }],
-    //     notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
-    //     signatureText: 'ACCEPTED BY________________DATE_____',
-    //     invoiceType: 'Estimate',
-    //     customInvoiceType: '',
-    //     paymentPercentage: 0,
-    //     estimateTotal: 0,
-    //     paymentHistory: []
-    //   })
-    //   setInvoiceValidationErrors({})
-    // } catch (error) {
-    //   console.error('Error sending invoice:', error)
-    //   toast.error('Failed to send invoice')
-    // } finally {
-    //   setIsLoading(false)
-    // }
+      // Reset form
+      setInlineInvoiceData({
+        date: new Date().toISOString().split('T')[0],
+        estimateNumber: '',
+        customerName: job.customerName || '',
+        customerAddress: job.address || '',
+        billToAddress: job.billToAddress || '',
+        billToAddressEnabled: true,
+        poNumber: '',
+        project: job.title || '',
+        rep: '',
+        dueDate: '',
+        paymentCredits: 0,
+        balanceDue: '',
+        lineItems: [{
+          id: Math.random().toString(36).substring(2, 9),
+          productId: null,
+          qty: 1,
+          item: '',
+          description: '',
+          rate: 0,
+          estimatedPrice: 0,
+          total: 0,
+          searchQuery: '',
+          showSearchResults: false,
+          supplierId: 1,
+          isCustomProduct: false,
+          estimate_product_id: null
+        }],
+        notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
+        signatureText: 'ACCEPTED BY________________DATE_____',
+        invoiceType: 'Estimate',
+        customInvoiceType: '',
+        paymentPercentage: 0,
+        estimateTotal: 0,
+        paymentHistory: []
+      })
+      setInvoiceValidationErrors({})
+    } catch (error) {
+      console.error('Error sending invoice:', error)
+      toast.error('Failed to send invoice')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handlePrintPreview = async () => {
@@ -5635,17 +5660,32 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                               <span>Duplicate</span>
                             </DropdownMenuItem>
                              {/* {( */}
-                                <DropdownMenuItem
-                                  onClick={() => handleMarkAsPaid(invoice)}
-                                  className="cursor-pointer"
-                                  disabled={isMarkingPaidId === invoice.id}
-                                >
-                                  <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
-                                  <span>
-                                    {isMarkingPaidId === invoice.id ? 'Marking...' : 'Mark As Paid'}
-                                  </span>
-                                </DropdownMenuItem>
-                              {/* // )} */}
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  if (String(invoice.status || '').toLowerCase() !== 'paid') {
+                                    handleMarkAsPaid(invoice)
+                                  }
+                                }}
+                                className={`cursor-pointer ${
+                                  String(invoice.status || '').toLowerCase() === 'paid'
+                                    ? 'opacity-60 cursor-default'
+                                    : ''
+                                }`}
+                                disabled={
+                                  isMarkingPaidId === invoice.id ||
+                                  String(invoice.status || '').toLowerCase() === 'paid'
+                                }
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                                <span>
+                                  {String(invoice.status || '').toLowerCase() === 'paid'
+                                    ? 'Already Paid'
+                                    : isMarkingPaidId === invoice.id
+                                    ? 'Marking...'
+                                    : 'Mark As Paid'}
+                                </span>
+                              </DropdownMenuItem>
+                                                            {/* // )} */}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               onClick={() => handleDeleteInvoice(invoice.id)}

@@ -49,6 +49,7 @@ import { useDispatch } from 'react-redux'
 import { deleteInvoice } from '@/redux/slices/jobsSlice'
 import { toast } from 'sonner'
 import { LoadingSpinner } from './common/LoadingSpinner'
+import { Badge } from './ui/badge'
 interface Job {
   id: string
   title: string
@@ -1099,52 +1100,109 @@ export function InvoicesPage() {
                       </TableHeader>
                       <TableBody>
                         {estimates.length > 0 ? (
-                          estimates.map((invoice: any) => (
-                            <TableRow key={invoice.id}>
-                              <TableCell className="font-mono">{invoice.invoice_number}</TableCell>
-                              <TableCell>{invoice.customer?.customer_name || invoice.contractor?.contractor_name || 'N/A'}</TableCell>
-                              <TableCell className="max-w-48 truncate">{invoice.job?.job_title || 'N/A'}</TableCell>
-                              <TableCell>{invoice.invoice_type || 'N/A'}</TableCell>
-                              <TableCell>{invoice.created_at ? new Date(invoice.created_at).toLocaleDateString() : 'N/A'}</TableCell>
-                              <TableCell>{invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}</TableCell>
-                              <TableCell className="font-medium">
-                                ${Number(invoice.total_amount || 0).toFixed(2)}
-                              </TableCell>
-                              <TableCell>
-                                <span
-                                  className={`px-2 py-1 text-xs font-medium rounded-full ${invoice.status === 'paid'
-                                      ? 'bg-green-100 text-green-800'
-                                      : invoice.status === 'sent'
-                                        ? 'bg-blue-100 text-blue-800'
-                                        : invoice.status === 'overdue'
-                                          ? 'bg-red-100 text-red-800'
-                                          : 'bg-gray-100 text-gray-800'
+                          estimates.map((invoice: any) => {
+                            console.log(invoice?.qb_invoice_id,"invoiceeeee");
+                            
+                            return (
+                              <TableRow key={invoice.id}>
+                                <TableCell className="font-mono flex items-center gap-2">
+                                  <span>{invoice.invoice_number}</span>
+
+                                  {invoice?.qb_invoice_id ? (
+                                    <Badge className="bg-blue-100 text-blue-700 border border-blue-300">
+                                      QuickBooks
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="bg-purple-100 text-purple-700 border border-purple-300">
+                                      Custom
+                                    </Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {invoice.customer?.customer_name ||
+                                    invoice.contractor?.contractor_name ||
+                                    "N/A"}
+                                </TableCell>
+                                <TableCell className="max-w-48 truncate">
+                                  {invoice.job?.job_title || "N/A"}
+                                </TableCell>
+                                <TableCell>
+                                  {invoice.invoice_type || "N/A"}
+                                </TableCell>
+                                <TableCell>
+                                  {invoice.created_at
+                                    ? new Date(
+                                        invoice.created_at,
+                                      ).toLocaleDateString()
+                                    : "N/A"}
+                                </TableCell>
+                                <TableCell>
+                                  {invoice.due_date
+                                    ? new Date(
+                                        invoice.due_date,
+                                      ).toLocaleDateString()
+                                    : "-"}
+                                </TableCell>
+                                <TableCell className="font-medium">
+                                  $
+                                  {Number(invoice.total_amount || 0).toFixed(2)}
+                                </TableCell>
+                                <TableCell>
+                                  <span
+                                    className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                      invoice.status === "paid"
+                                        ? "bg-green-100 text-green-800"
+                                        : invoice.status === "sent"
+                                          ? "bg-blue-100 text-blue-800"
+                                          : invoice.status === "overdue"
+                                            ? "bg-red-100 text-red-800"
+                                            : "bg-gray-100 text-gray-800"
                                     }`}
-                                >
-                                  {invoice.status?.charAt(0).toUpperCase() + invoice.status?.slice(1)}
-                                </span>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center justify-end gap-2">
-                                  {hasPermission('invoices', 'view') && (
-                                    <Button variant="outline" size="icon" onClick={() => handleViewInvoice(invoice)}>
-                                      <Eye className="w-4 h-4" />
-                                    </Button>
-                                  )}
-                                  {hasPermission('invoices', 'view') && (
-                                    <Button variant="outline" size="icon" onClick={() => handleDownloadInvoice(invoice)}>
-                                      <Download className="w-4 h-4" />
-                                    </Button>
-                                  )}
-                                  {hasPermission('invoices', 'delete') && (
-                                    <Button variant="outline" size="icon" onClick={() => handleDeleteInvoice(invoice.id)}>
-                                      <Trash2 className="w-4 h-4 text-red-500" />
-                                    </Button>
-                                  )}
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))
+                                  >
+                                    {invoice.status?.charAt(0).toUpperCase() +
+                                      invoice.status?.slice(1)}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center justify-end gap-2">
+                                    {hasPermission("invoices", "view") && (
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={() =>
+                                          handleViewInvoice(invoice)
+                                        }
+                                      >
+                                        <Eye className="w-4 h-4" />
+                                      </Button>
+                                    )}
+                                    {hasPermission("invoices", "view") && (
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={() =>
+                                          handleDownloadInvoice(invoice)
+                                        }
+                                      >
+                                        <Download className="w-4 h-4" />
+                                      </Button>
+                                    )}
+                                    {hasPermission("invoices", "delete") && (
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={() =>
+                                          handleDeleteInvoice(invoice.id)
+                                        }
+                                      >
+                                        <Trash2 className="w-4 h-4 text-red-500" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+})
                         ) : (
                           <TableRow>
                             <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
