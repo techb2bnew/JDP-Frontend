@@ -710,7 +710,6 @@ export const CustomInvoiceDialog = ({
     
     // Ensure project uses job title as fallback
     const effectiveProject = inlineInvoiceData.project || blueSheet?.job?.job_title || ''
-    console.log('effectiveProject:11111111111', effectiveProject)
     if (!effectiveProject) {
       errors.project = 'Project field is required'
     }
@@ -739,7 +738,6 @@ export const CustomInvoiceDialog = ({
       lineItems: latestLineItems,
     }
 
-    console.log('effectiveInlineInvoiceData?>>>', effectiveInlineInvoiceData)
 
     // Consider either explicit invoice line items OR existing BlueSheet materials as valid "items"
     const hasInvoiceLineItems =

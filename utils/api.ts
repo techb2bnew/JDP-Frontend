@@ -2662,7 +2662,7 @@ export const apiClient = {
       throw new Error("No authentication token found");
     }
 
-    const response = await fetch(`${apiBaseUrl}/estimates/createEstimate`, {
+    const response = await fetch(`${apiBaseUrl}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
