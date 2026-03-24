@@ -64,38 +64,74 @@ interface Role {
   updatedAt: string;
 }
 
-/** Preset labels for the role name dropdown (custom names can be added via Add) */
+/** Preset labels for the role name dropdown — display includes platform suffix */
 const PREDEFINED_ROLE_OPTIONS = [
-  'super admin',
-  'admin',
-  'lead labour',
-  'labour',
+  'super admin (Portal)',
+  'admin (Portal)',
+  'lead labour (Mobile)',
+  'labour (Mobile)',
 ] as const;
 
+/**
+ * Strip the (Portal)/(Mobile) suffix to get the clean API role name.
+ * e.g. "labour (Mobile)" -> "labour"
+ *      "my custom role (Portal)" -> "my custom role"
+ *      "some role" -> "some role"  (no suffix — unchanged)
+ */
+const stripPlatformSuffix = (displayName: string): string =>
+  displayName.replace(/\s*\((Portal|Mobile)\)\s*$/i, '').trim();
+
+/** Extract platform tag from display name: returns 'Mobile' | 'Portal' | null */
+const getPlatformTag = (displayName: string): 'Mobile' | 'Portal' | null => {
+  const m = displayName.match(/\((Portal|Mobile)\)\s*$/i);
+  if (!m) return null;
+  return m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase() as 'Mobile' | 'Portal';
+};
+
+// Lead Labour role allowed modules (excludes labour/lead_labour self-modules)
 const LABOUR_ROLE_ALLOWED_MODULES = [
-  'lead_labour',
-  'labour',
   'jobs',
+  'sub_jobs',
   'suppliers',
   'products',
   'orders',
   'bluesheet',
   'notification',
   'inventory_price',
-  'sub_jobs',
+  'activity_logs',
 ] as const;
 
+// Labour role allowed modules (same as lead labour - both exclude self-role modules)
 const ONLY_LABOUR_ROLE_ALLOWED_MODULES = [
-  'labour',
   'jobs',
+  'sub_jobs',
   'suppliers',
   'products',
   'orders',
   'bluesheet',
   'notification',
   'inventory_price',
-  'sub_jobs',
+  'activity_logs',
 ] as const;
+
+// Per-module action restrictions for labour-scoped roles
+// Key = module name, Value = allowed actions
+// Modules not listed here get default labour actions (view, create, edit)
+const LABOUR_MODULE_ACTION_OVERRIDES: Record<string, string[]> = {
+  products:        ['view'],
+  orders:          ['create'],
+  notification:    ['view'],
+  bluesheet:       ['view', 'create'],
+  inventory_price: ['view'],
+  suppliers:       ['view'],
+  jobs:            ['view', 'create'],
+  sub_jobs:        ['view', 'create'],
+  activity_logs:   ['view'],
+};
+
+// Virtual modules for labour-scoped roles (only Special Actions column)
+const ASSIGNED_LABOUR_MODULE = 'assigned_labour';
+const ASSIGNED_LEAD_LABOUR_MODULE = 'assigned_lead_labour';
 
 export default function RolePermission() {
   const [roles, setRoles] = useState<Role[]>([]);
@@ -117,6 +153,9 @@ export default function RolePermission() {
   const [customRoleOptions, setCustomRoleOptions] = useState<string[]>([]);
   const [roleComboOpen, setRoleComboOpen] = useState(false);
   const [roleComboSearch, setRoleComboSearch] = useState('');
+  // Platform picker modal for custom roles
+  const [showPlatformModal, setShowPlatformModal] = useState(false);
+  const [pendingCustomRoleName, setPendingCustomRoleName] = useState('');
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -154,7 +193,6 @@ export default function RolePermission() {
       if (response.ok) {
         const responseData = await response.json();
 
-        // Transform API response to match component's expected format
         if (responseData.success && responseData.data) {
           const transformedRoles = responseData.data.map((apiRole: any) => ({
             id: apiRole.id.toString(),
@@ -188,16 +226,13 @@ export default function RolePermission() {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      // Calculate stats from roles data
       const totalRoles = roles.length;
       const systemRoles = roles.filter(role => {
-        // System roles are typically predefined (STAFF, LEAD_LABOUR, LABOUR, ADMIN, etc.)
         const systemRoleNames = ['STAFF', 'LEAD_LABOUR', 'LABOUR', 'ADMIN', 'SUPER_ADMIN'];
         return systemRoleNames.includes(role.roleName.toUpperCase());
       }).length;
       const customRoles = totalRoles - systemRoles;
       
-      // Fetch total users count (you may need to adjust this API endpoint)
       try {
         const usersResponse = await fetch(`${apiBaseUrl}/staff/getStaff`, {
           method: 'GET',
@@ -206,27 +241,12 @@ export default function RolePermission() {
         if (usersResponse.ok) {
           const usersData = await usersResponse.json();
           const totalUsers = usersData.data?.pagination?.total || usersData.data?.staff?.length || 0;
-          setRoleStats({
-            totalRoles,
-            systemRoles,
-            customRoles,
-            totalUsers
-          });
+          setRoleStats({ totalRoles, systemRoles, customRoles, totalUsers });
         } else {
-          setRoleStats({
-            totalRoles,
-            systemRoles,
-            customRoles,
-            totalUsers: 0
-          });
+          setRoleStats({ totalRoles, systemRoles, customRoles, totalUsers: 0 });
         }
       } catch (error) {
-        setRoleStats({
-          totalRoles,
-          systemRoles,
-          customRoles,
-          totalUsers: 0
-        });
+        setRoleStats({ totalRoles, systemRoles, customRoles, totalUsers: 0 });
       }
     } catch (error) {
       console.error('Error fetching role stats:', error);
@@ -235,12 +255,10 @@ export default function RolePermission() {
     }
   }, [roles, apiBaseUrl]);
 
-  // Fetch roles from API when component mounts
   useEffect(() => {
     fetchRoles();
   }, [fetchRoles]);
 
-  // Update stats when roles change
   useEffect(() => {
     if (roles.length > 0) {
       fetchRoleStats();
@@ -272,32 +290,21 @@ export default function RolePermission() {
         const responseData = await response.json();
 
         if (responseData.success && responseData.data) {
-          const apiRole = responseData.data.role; // Role data is nested in data.role
-          const apiPermissions = responseData.data.permissions || []; // Permissions are in data.permissions
+          const apiRole = responseData.data.role;
+          const apiPermissions = responseData.data.permissions || [];
 
-          // Transform API permissions to component format dynamically
           const transformedPermissions: Permission[] = [];
-
-          // Create role-scoped permissions first (all unchecked)
           const roleNameForPermissions = apiRole.role_name || '';
           getActiveModulesForRole(roleNameForPermissions).forEach(modName => {
             getActionsForModule(modName, roleNameForPermissions).forEach(act => {
-              transformedPermissions.push({
-                module: modName,
-                action: act,
-                allowed: false // Default to false
-              });
+              transformedPermissions.push({ module: modName, action: act, allowed: false });
             });
           });
 
-          // Now update permissions based on API response
           apiPermissions.forEach((apiPerm: any) => {
-            // Extract module and action from the permission object
             const modName = apiPerm.permission?.module;
             const act = apiPerm.permission?.action;
-
             if (modName && act) {
-              // Find and update the corresponding permission
               const existingPermission = transformedPermissions.find(p =>
                 p.module === modName && p.action === act
               );
@@ -307,12 +314,11 @@ export default function RolePermission() {
             }
           });
 
-          // Transform API response to match component's expected format
           const transformedRole: Role = {
             id: apiRole.id.toString(),
             roleName: apiRole.role_name || '',
             description: apiRole.description || '',
-            permissions: transformedPermissions, // Use transformed permissions
+            permissions: transformedPermissions,
             createdAt: apiRole.created_at ? apiRole.created_at.split('T')[0] : '',
             updatedAt: apiRole.updated_at ? apiRole.updated_at.split('T')[0] : ''
           };
@@ -375,7 +381,8 @@ export default function RolePermission() {
     'inventory_price',
     'bluesheet',
     'role_permission',
-    'configuration'
+    'configuration',
+    'activity_logs'
   ];
 
   const actions = ['view', 'create', 'edit', 'delete'];
@@ -392,11 +399,14 @@ export default function RolePermission() {
     'bluesheet': ['view', 'create', 'edit', 'delete'],
     'sub_jobs': ['view', 'create', 'edit', 'delete'],
     'staff_timeline': ['view', 'create', 'edit', 'delete'],
-    'role_permission': ['view', 'create', 'edit', 'delete']
+    'role_permission': ['view', 'create', 'edit', 'delete'],
+    // NEW virtual modules — only special actions
+    [ASSIGNED_LABOUR_MODULE]: ['assign'],
+    [ASSIGNED_LEAD_LABOUR_MODULE]: ['assign'],
   };
 
   const normalizeRoleName = (roleName: string) =>
-    roleName
+    stripPlatformSuffix(roleName)
       .trim()
       .toLowerCase()
       .replace(/[_-]+/g, ' ')
@@ -412,32 +422,114 @@ export default function RolePermission() {
     return normalized === 'labor' || normalized === 'labour';
   };
 
+  /** True if the role is a "Portal" role (admin, super admin, or custom Portal role) */
+  const isPortalRole = (roleName: string): boolean => {
+    const tag = getPlatformTag(roleName);
+    if (tag === 'Portal') return true;
+    if (tag === 'Mobile') return false;
+    // Fallback: predefined admin names without suffix
+    const n = normalizeRoleName(roleName);
+    return n === 'admin' || n === 'super admin';
+  };
+
+  /** True if a custom portal role (not admin/super admin) */
+  const isCustomPortalRole = (roleName: string): boolean => {
+    const tag = getPlatformTag(roleName);
+    if (tag !== 'Portal') return false;
+    const clean = stripPlatformSuffix(roleName).trim().toLowerCase();
+    return clean !== 'admin' && clean !== 'super admin';
+  };
+
+  /** True if a custom mobile role (not labour/lead labour) */
+  const isCustomMobileRole = (roleName: string): boolean => {
+    const tag = getPlatformTag(roleName);
+    if (tag !== 'Mobile') return false;
+    const n = normalizeRoleName(roleName);
+    return n !== 'labour' && n !== 'labor' && n !== 'lead labour' && n !== 'lead labor';
+  };
+
   const isLabourScopedRole = (roleName: string) => {
     return isLabourOnlyRole(roleName) || isLeadLabourRole(roleName);
   };
 
   const getActiveModulesForRole = (roleName: string): string[] => {
-    if (!isLabourScopedRole(roleName)) return modules;
-    if (isLabourOnlyRole(roleName)) {
-      return modules.filter((m) =>
+    // Custom Portal roles → all modules + both Assigned virtual modules
+    if (isCustomPortalRole(roleName)) {
+      return [...modules, ASSIGNED_LABOUR_MODULE, ASSIGNED_LEAD_LABOUR_MODULE];
+    }
+
+    // Custom Mobile roles → lead labour restricted modules + both Assigned virtual modules
+    if (isCustomMobileRole(roleName)) {
+      const baseModules = modules.filter((m) =>
         ONLY_LABOUR_ROLE_ALLOWED_MODULES.includes(
           m as typeof ONLY_LABOUR_ROLE_ALLOWED_MODULES[number],
         ),
       );
+      return [...baseModules, ASSIGNED_LABOUR_MODULE, ASSIGNED_LEAD_LABOUR_MODULE];
     }
-    return modules.filter((m) =>
-      LABOUR_ROLE_ALLOWED_MODULES.includes(m as typeof LABOUR_ROLE_ALLOWED_MODULES[number]),
+
+    // Admin / Super Admin (Portal) → all modules + both Assigned virtual modules
+    if (isPortalRole(roleName)) {
+      return [...modules, ASSIGNED_LABOUR_MODULE, ASSIGNED_LEAD_LABOUR_MODULE];
+    }
+
+    if (!isLabourScopedRole(roleName)) return modules;
+
+    // Both labour and lead labour use the same base module list
+    const baseModules = modules.filter((m) =>
+      ONLY_LABOUR_ROLE_ALLOWED_MODULES.includes(
+        m as typeof ONLY_LABOUR_ROLE_ALLOWED_MODULES[number],
+      ),
     );
+
+    // Labour role: only show Assigned Labour (NOT Assigned Lead Labour)
+    // Lead Labour role: show both Assigned Labour AND Assigned Lead Labour
+    if (isLabourOnlyRole(roleName)) {
+      return [...baseModules, ASSIGNED_LABOUR_MODULE];
+    }
+    return [...baseModules, ASSIGNED_LABOUR_MODULE, ASSIGNED_LEAD_LABOUR_MODULE];
   };
 
+  /**
+   * Returns the list of actions to show for a given module + role.
+   *
+   * Priority:
+   *  1. Virtual assigned_* modules → always just special actions
+   *  2. Custom Portal role → all normal actions (no restrictions)
+   *  3. Labour-scoped role + module has override → use override
+   *  4. Labour-scoped role (no override) → ['view', 'create', 'edit']
+   *  5. Normal role → specialActionsMap[module] ?? default actions
+   */
   const getActionsForModule = (modName: string, roleName?: string): string[] => {
     const role = roleName ?? formData.roleName;
-    if (isLabourScopedRole(role)) {
-      const isAllowedModule = LABOUR_ROLE_ALLOWED_MODULES.includes(
-        modName as typeof LABOUR_ROLE_ALLOWED_MODULES[number],
-      );
-      return isAllowedModule ? ['view', 'create', 'edit'] : [];
+
+    // Virtual assigned modules — only special actions regardless of role
+    if (modName === ASSIGNED_LABOUR_MODULE || modName === ASSIGNED_LEAD_LABOUR_MODULE) {
+      return specialActionsMap[modName] || [];
     }
+
+    // Custom Portal roles → all permissions, no restrictions
+    if (isCustomPortalRole(role)) {
+      return specialActionsMap[modName] || actions;
+    }
+
+    // Custom Mobile roles → same restrictions as lead labour
+    if (isCustomMobileRole(role)) {
+      if (LABOUR_MODULE_ACTION_OVERRIDES[modName]) {
+        return LABOUR_MODULE_ACTION_OVERRIDES[modName];
+      }
+      return ['view', 'create', 'edit'];
+    }
+
+    if (isLabourScopedRole(role)) {
+      // Check per-module override first
+      if (LABOUR_MODULE_ACTION_OVERRIDES[modName]) {
+        return LABOUR_MODULE_ACTION_OVERRIDES[modName];
+      }
+      // Default for labour-scoped roles
+      return ['view', 'create', 'edit'];
+    }
+
     return specialActionsMap[modName] || actions;
   };
 
@@ -445,7 +537,7 @@ export default function RolePermission() {
     if (!perms || perms.length === 0) return false;
     const permission = perms.find(p => p.module === modName && p.action === act);
     return permission ? permission.allowed : false;
-    };
+  };
 
   const handleAddRole = () => {
     setShowAddForm(true);
@@ -453,7 +545,6 @@ export default function RolePermission() {
     setFormData({ roleName: '', description: '' });
     setRoleComboSearch('');
 
-    // Initialize permissions for new role
     const initialPermissions: Permission[] = [];
     getActiveModulesForRole(formData.roleName).forEach(modName => {
       getActionsForModule(modName, formData.roleName).forEach(act => {
@@ -471,31 +562,26 @@ export default function RolePermission() {
   const handleEditRole = (role: Role) => {
     if (isProtectedRoleName(role.roleName)) return;
     setShowAddForm(true);
-    // Fetch fresh role data from API
     fetchRoleById(role.id);
-    setNewRolePermissions([]); // Clear new role permissions when editing
+    setNewRolePermissions([]);
   };
 
   const handleViewRole = async (role: Role) => {
     setIsLoadingViewRole(true);
     setShowViewModal(true);
     try {
-      // Fetch fresh role data from API for view
       const roleData = await fetchRoleById(role.id, true);
       if (!roleData) {
-        // If fetch failed, use the role from the list
         setViewingRole(role);
       }
     } catch (error) {
       console.error('Error fetching role for view:', error);
-      // Use the role from the list as fallback
       setViewingRole(role);
     } finally {
       setIsLoadingViewRole(false);
     }
   };
   
-  // Helper to group permissions by module
   const groupPermissionsByModule = (permissions: Permission[]) => {
     const grouped: { [key: string]: Permission[] } = {};
     permissions.forEach(perm => {
@@ -509,15 +595,16 @@ export default function RolePermission() {
     return grouped;
   };
   
-  // Helper to format module name for display
   const formatModuleName = (module: string): string => {
+    // Handle virtual modules display name
+    if (module === ASSIGNED_LABOUR_MODULE) return 'Assigned Labour';
+    if (module === ASSIGNED_LEAD_LABOUR_MODULE) return 'Assigned Lead Labour';
     return module
       .split('_')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
   };
   
-  // Helper to format action name for display
   const formatActionName = (action: string): string => {
     const actionMap: { [key: string]: string } = {
       'view': 'View',
@@ -554,7 +641,7 @@ export default function RolePermission() {
 
       if (response.ok) {
         toast.success('Role deleted successfully!');
-        await fetchRoles(); // Refresh roles list
+        await fetchRoles();
       } else {
         const errorData = await response.json().catch(() => ({}));
         toast.error(`${errorData.message || 'Unknown error'}`);
@@ -570,64 +657,47 @@ export default function RolePermission() {
 
   const handlePermissionChange = (modName: string, act: string, allowed: boolean) => {
     if (editingRole) {
-      // Update existing role permissions
       setRoles(prevRoles => {
         return prevRoles.map(role => {
           if (role.id === editingRole.id) {
-            // Check if permission already exists
             const existingPermission = role.permissions.find(p =>
               p.module === modName && p.action === act
             );
-
             let updatedPermissions: Permission[];
             if (existingPermission) {
-              // Update existing permission
               updatedPermissions = role.permissions.map(p =>
-                p.module === modName && p.action === act
-                  ? { ...p, allowed }
-                  : p
+                p.module === modName && p.action === act ? { ...p, allowed } : p
               );
             } else {
-              // Add new permission
               updatedPermissions = [...role.permissions, { module: modName, action: act, allowed }];
             }
-
             return { ...role, permissions: updatedPermissions };
           }
           return role;
         });
       });
 
-      // Also update the editingRole state to reflect changes immediately
       setEditingRole(prev => {
         if (!prev) return prev;
-
         const existingPermission = prev.permissions.find(p =>
           p.module === modName && p.action === act
         );
-
         let updatedPermissions: Permission[];
         if (existingPermission) {
           updatedPermissions = prev.permissions.map(p =>
-            p.module === modName && p.action === act
-              ? { ...p, allowed }
-              : p
+            p.module === modName && p.action === act ? { ...p, allowed } : p
           );
         } else {
           updatedPermissions = [...prev.permissions, { module: modName, action: act, allowed }];
         }
-
         return { ...prev, permissions: updatedPermissions };
       });
     } else {
-      // Update new role permissions
       setNewRolePermissions(prev => {
         const existing = prev.find(p => p.module === modName && p.action === act);
         if (existing) {
           return prev.map(p =>
-            p.module === modName && p.action === act
-              ? { ...p, allowed }
-              : p
+            p.module === modName && p.action === act ? { ...p, allowed } : p
           );
         } else {
           return [...prev, { module: modName, action: act, allowed }];
@@ -636,21 +706,15 @@ export default function RolePermission() {
     }
   };
 
-  // Handle selecting all checkboxes for a specific action
   const handleSelectAll = (act: string, checked: boolean) => {
     if (editingRole) {
-      // Update existing role permissions
       setRoles(prevRoles => {
         return prevRoles.map(role => {
           if (role.id === editingRole.id) {
             let updatedPermissions = [...role.permissions];
-
-            // Update existing permissions for this action
             updatedPermissions = updatedPermissions.map(p =>
               p.action === act ? { ...p, allowed: checked } : p
             );
-
-            // Add missing permissions for this action if they don't exist
             getActiveModulesForRole(formData.roleName).forEach(modName => {
               const moduleActs = getActionsForModule(modName);
               if (moduleActs.includes(act)) {
@@ -662,24 +726,18 @@ export default function RolePermission() {
                 }
               }
             });
-
             return { ...role, permissions: updatedPermissions };
           }
           return role;
         });
       });
 
-      // Also update the editingRole state
       setEditingRole(prev => {
         if (!prev) return prev;
         let updatedPermissions = [...prev.permissions];
-
-        // Update existing permissions for this action
         updatedPermissions = updatedPermissions.map(p =>
           p.action === act ? { ...p, allowed: checked } : p
         );
-
-        // Add missing permissions for this action if they don't exist
         getActiveModulesForRole(formData.roleName).forEach(modName => {
           const moduleActs = getActionsForModule(modName);
           if (moduleActs.includes(act)) {
@@ -691,20 +749,14 @@ export default function RolePermission() {
             }
           }
         });
-
         return { ...prev, permissions: updatedPermissions };
       });
     } else {
-      // Update new role permissions
       setNewRolePermissions(prev => {
         let updated = [...prev];
-
-        // Update existing permissions for this action
         updated = updated.map(p =>
           p.action === act ? { ...p, allowed: checked } : p
         );
-
-        // Add missing permissions for this action if they don't exist
         getActiveModulesForRole(formData.roleName).forEach(modName => {
           const moduleActs = getActionsForModule(modName);
           if (moduleActs.includes(act)) {
@@ -716,34 +768,26 @@ export default function RolePermission() {
             }
           }
         });
-
         return updated;
       });
     }
   };
 
-  // Handle selecting all special action checkboxes
   const handleSelectAllSpecial = (checked: boolean) => {
     if (editingRole) {
-      // Update existing role permissions for special actions
       setRoles(prevRoles => {
         return prevRoles.map(role => {
           if (role.id === editingRole.id) {
             let updatedPermissions = [...role.permissions];
-
-            // Update existing special action permissions
             updatedPermissions = updatedPermissions.map(p => {
               const isSpecialAction = !['view', 'create', 'edit', 'delete'].includes(p.action);
               return isSpecialAction ? { ...p, allowed: checked } : p;
             });
-
-            // Add missing special action permissions if they don't exist
             getActiveModulesForRole(formData.roleName).forEach(modName => {
               const moduleActs = getActionsForModule(modName);
               const specialActs = moduleActs.filter(a =>
                 !['view', 'create', 'edit', 'delete'].includes(a)
               );
-
               specialActs.forEach(a => {
                 const existingPermission = updatedPermissions.find(p =>
                   p.module === modName && p.action === a
@@ -753,31 +797,24 @@ export default function RolePermission() {
                 }
               });
             });
-
             return { ...role, permissions: updatedPermissions };
           }
           return role;
         });
       });
 
-      // Also update the editingRole state
       setEditingRole(prev => {
         if (!prev) return prev;
         let updatedPermissions = [...prev.permissions];
-
-        // Update existing special action permissions
         updatedPermissions = updatedPermissions.map(p => {
           const isSpecialAction = !['view', 'create', 'edit', 'delete'].includes(p.action);
           return isSpecialAction ? { ...p, allowed: checked } : p;
         });
-
-        // Add missing special action permissions if they don't exist
         getActiveModulesForRole(formData.roleName).forEach(modName => {
           const moduleActs = getActionsForModule(modName);
           const specialActs = moduleActs.filter(a =>
             !['view', 'create', 'edit', 'delete'].includes(a)
           );
-
           specialActs.forEach(a => {
             const existingPermission = updatedPermissions.find(p =>
               p.module === modName && p.action === a
@@ -787,27 +824,20 @@ export default function RolePermission() {
             }
           });
         });
-
         return { ...prev, permissions: updatedPermissions };
       });
     } else {
-      // Update new role permissions for special actions
       setNewRolePermissions(prev => {
         let updated = [...prev];
-
-        // Update existing special action permissions
         updated = updated.map(p => {
           const isSpecialAction = !['view', 'create', 'edit', 'delete'].includes(p.action);
           return isSpecialAction ? { ...p, allowed: checked } : p;
         });
-
-        // Add missing special action permissions if they don't exist
         getActiveModulesForRole(formData.roleName).forEach(modName => {
           const moduleActs = getActionsForModule(modName);
           const specialActs = moduleActs.filter(a =>
             !['view', 'create', 'edit', 'delete'].includes(a)
           );
-
           specialActs.forEach(a => {
             const existingPermission = updated.find(p =>
               p.module === modName && p.action === a
@@ -817,7 +847,6 @@ export default function RolePermission() {
             }
           });
         });
-
         return updated;
       });
     }
@@ -826,10 +855,8 @@ export default function RolePermission() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Reset errors
     setErrors({ roleName: '' });
 
-    // Validate required fields
     let hasErrors = false;
     const newErrors = { roleName: '' };
 
@@ -858,11 +885,14 @@ export default function RolePermission() {
       });
     });
 
+    // Strip (Portal)/(Mobile) suffix — API receives clean role name
+    const apiRoleName = stripPlatformSuffix(formData.roleName);
+
     const baseRoleData = {
-      roleName: formData.roleName,
+      roleName: apiRoleName,
       description: formData.description,
       permissions: compiledPermissions.map((perm, index) => ({
-        id: index + 1, // Add unique ID for each permission
+        id: index + 1,
         ...perm
       }))
     };
@@ -870,10 +900,9 @@ export default function RolePermission() {
     try {
       setIsSubmitting(true);
       if (editingRole) {
-        // Update existing role - only send roleId and permissions
         const updateData = {
           roleId: parseInt(editingRole.id),
-          roleName: formData.roleName,
+          roleName: apiRoleName,
           permissions: compiledPermissions.map(perm => ({
             module: perm.module,
             action: perm.action,
@@ -881,7 +910,6 @@ export default function RolePermission() {
           }))
         };
 
-        // Show a more detailed loading message
         const loadingToastId = toast.loading('Updating role permissions... This may take a moment.');
 
         const response = await fetch(`${apiBaseUrl}/permissions/roles/update-permissions`, {
@@ -890,33 +918,25 @@ export default function RolePermission() {
           body: JSON.stringify(updateData)
         });
 
-        // Dismiss loading toast
         toast.dismiss(loadingToastId);
 
         if (response.ok) {
           const responseData = await response.json();
           if (responseData.success) {
-            // toast.success('Role updated successfully!');
-
-            // Check if this is the current user's role being updated
             const currentUser = JSON.parse(localStorage.getItem('jdp_auth') || '{}').user;
             if (currentUser && currentUser.role === formData.roleName) {
-              // Update current user's permissions in localStorage
               const updatedPermissions = compiledPermissions
                 .filter(p => p.allowed)
                 .map(p => ({
-                  id: Math.random(), // Generate temporary ID
+                  id: Math.random(),
                   action: p.action,
                   module: p.module,
                   description: `${p.action} ${p.module}`,
                   display_name: `${p.action.charAt(0).toUpperCase() + p.action.slice(1)} ${p.module.charAt(0).toUpperCase() + p.module.slice(1)}`
                 }));
-
               updateUserPermissions(updatedPermissions);
               toast.success('Your permissions have been updated!');
             }
-
-            // Refresh roles from API in background (non-blocking)
             fetchRoles();
           } else {
             toast.error(`Failed to update role: ${responseData.message || 'Unknown error'}`);
@@ -926,9 +946,6 @@ export default function RolePermission() {
           toast.error(`Failed to update role: ${errorData.message || 'Unknown error'}`);
         }
       } else {
-        // Create new role
-
-        // Show a more detailed loading message
         const loadingToastId = toast.loading('Creating new role... This may take a moment.');
 
         const response = await fetch(`${apiBaseUrl}/permissions/roles`, {
@@ -937,14 +954,12 @@ export default function RolePermission() {
           body: JSON.stringify(baseRoleData)
         });
 
-        // Dismiss loading toast
         toast.dismiss(loadingToastId);
 
         if (response.ok) {
           const responseData = await response.json();
           if (responseData.success) {
             toast.success('Role created successfully!');
-            // Refresh roles from API in background (non-blocking)
             fetchRoles();
           } else {
             toast.error(`Failed to create role: ${responseData.message || 'Unknown error'}`);
@@ -962,7 +977,6 @@ export default function RolePermission() {
       setRoleComboSearch('');
     } catch (error) {
       console.error('RolePermission: Error saving role:', error);
-      // Dismiss any loading toast that might still be showing
       toast.dismiss();
       if (error instanceof Error) {
         toast.error(`Error saving role: ${error.message}`);
@@ -982,6 +996,8 @@ export default function RolePermission() {
     setErrors({ roleName: '' });
     setRoleComboSearch('');
     setRoleComboOpen(false);
+    setShowPlatformModal(false);
+    setPendingCustomRoleName('');
   };
 
   const roleDropdownOptions = useMemo(() => {
@@ -1006,53 +1022,52 @@ export default function RolePermission() {
   const filteredRoleComboOptions = useMemo(() => {
     const q = roleComboSearch.trim().toLowerCase();
     if (!q) return roleDropdownOptions;
-    return roleDropdownOptions.filter((o) =>
-      o.toLowerCase().includes(q),
-    );
+    return roleDropdownOptions.filter((o) => o.toLowerCase().includes(q));
   }, [roleComboSearch, roleDropdownOptions]);
 
-  /** Show “Add …” in the list when typed text is new (no matches in list) */
   const canAddNewRoleInCombo = useMemo(() => {
     const t = roleComboSearch.trim();
     if (!t) return false;
-    const exact = roleDropdownOptions.some(
-      (o) => o.toLowerCase() === t.toLowerCase(),
-    );
+    const exact = roleDropdownOptions.some((o) => o.toLowerCase() === t.toLowerCase());
     if (exact) return false;
     return filteredRoleComboOptions.length === 0;
   }, [roleComboSearch, roleDropdownOptions, filteredRoleComboOptions]);
 
+  /** Called when user clicks "Add '…'" in the combo — shows platform picker */
   const handleAddCustomRole = (explicit?: string) => {
     const t = (explicit ?? roleComboSearch).trim();
     if (!t) return;
-    const allKnown = [
-      ...PREDEFINED_ROLE_OPTIONS,
-      ...customRoleOptions,
-    ];
-    const exists = allKnown.some((x) => x.toLowerCase() === t.toLowerCase());
-    if (!exists) {
-      setCustomRoleOptions((prev) => [...prev, t]);
-    }
-    setFormData((prev) => ({ ...prev, roleName: t }));
-    setRoleComboSearch('');
+    // Close combo, open platform selection modal
     setRoleComboOpen(false);
-    setErrors((prev) => ({ ...prev, roleName: '' }));
+    setRoleComboSearch('');
+    setPendingCustomRoleName(t);
+    setShowPlatformModal(true);
   };
 
-  // Helper function to check if role is system role
+  /** Called when user picks Mobile or Portal in the platform modal */
+  const confirmCustomRoleWithPlatform = (platform: 'Mobile' | 'Portal') => {
+    const displayName = `${pendingCustomRoleName} (${platform})`;
+    const allKnown = [...PREDEFINED_ROLE_OPTIONS, ...customRoleOptions];
+    const exists = allKnown.some((x) => x.toLowerCase() === displayName.toLowerCase());
+    if (!exists) {
+      setCustomRoleOptions((prev) => [...prev, displayName]);
+    }
+    setFormData((prev) => ({ ...prev, roleName: displayName }));
+    setErrors((prev) => ({ ...prev, roleName: '' }));
+    setShowPlatformModal(false);
+    setPendingCustomRoleName('');
+  };
+
   const isSystemRole = (roleName: string): boolean => {
     const systemRoleNames = ['STAFF', 'LEAD_LABOUR', 'LABOUR', 'ADMIN', 'SUPER_ADMIN'];
     return systemRoleNames.includes(roleName.toUpperCase());
   };
 
-  // Helper function to get permission count
   const getPermissionCount = (role: Role): number => {
     return role.permissions?.filter(p => p.allowed).length || 0;
   };
 
-  // Helper function to get user count for a role (mock for now, you'll need to fetch from API)
   const getUserCountForRole = (roleName: string): number => {
-    // This should be fetched from API, for now returning mock data
     const mockUserCounts: { [key: string]: number } = {
       'STAFF': 3,
       'LEAD_LABOUR': 5,
@@ -1063,6 +1078,30 @@ export default function RolePermission() {
 
   const isLabourRoleSelected = isLabourScopedRole(formData.roleName);
   const permissionModulesToRender = getActiveModulesForRole(formData.roleName);
+
+  // ─── Helper: for a module, which of the "standard" columns are visible? ───────
+  /**
+   * Returns which standard columns (view/create/edit/delete) should render
+   * a real checkbox (true) vs a dash (false) for the given module + role context.
+   */
+  const getStandardColumnVisibility = (
+    modName: string,
+    roleName: string,
+  ): { view: boolean; create: boolean; edit: boolean; delete: boolean } => {
+    const acts = getActionsForModule(modName, roleName);
+    return {
+      view:   acts.includes('view'),
+      create: acts.includes('create'),
+      edit:   acts.includes('edit'),
+      delete: acts.includes('delete'),
+    };
+  };
+
+  /** True if the module has any special (non-standard) actions for this role */
+  const moduleHasSpecialActions = (modName: string, roleName: string): boolean => {
+    const acts = getActionsForModule(modName, roleName);
+    return acts.some(a => !['view', 'create', 'edit', 'delete'].includes(a));
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -1089,44 +1128,6 @@ export default function RolePermission() {
           )}
         </div>
 
-        {/* Summary Cards */}
-        {/* {!showAddForm && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Total Roles</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{isLoadingStats ? '...' : roleStats.totalRoles}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">System Roles</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{isLoadingStats ? '...' : roleStats.systemRoles}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Custom Roles</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{isLoadingStats ? '...' : roleStats.customRoles}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Total Users</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{isLoadingStats ? '...' : roleStats.totalUsers}</div>
-              </CardContent>
-            </Card>
-          </div>
-        )} */}
-
         {/* Role Listing */}
         {!showAddForm && (
           <Card>
@@ -1142,17 +1143,14 @@ export default function RolePermission() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role Name</th>
-                      {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th> */}
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Permissions</th>
-                      {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Users</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th> */}
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {isLoadingRoles ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-8">
+                        <td colSpan={3} className="text-center py-8">
                           <div className="flex items-center justify-center">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                             <span className="ml-2 text-gray-500">Loading roles...</span>
@@ -1161,7 +1159,7 @@ export default function RolePermission() {
                       </tr>
                     ) : paginatedRoles.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-8">
+                        <td colSpan={3} className="text-center py-8">
                           <div className="flex flex-col items-center justify-center text-gray-500">
                             <div className="text-lg font-medium mb-2">No data available</div>
                             <div className="text-sm">No roles found. Create your first role.</div>
@@ -1171,8 +1169,6 @@ export default function RolePermission() {
                     ) : (
                       paginatedRoles.map((role) => {
                         const permissionCount = getPermissionCount(role);
-                        const userCount = getUserCountForRole(role.roleName);
-                        const isSystem = isSystemRole(role.roleName);
                         const isProtectedRole = isProtectedRoleName(role.roleName);
                         
                         return (
@@ -1183,42 +1179,19 @@ export default function RolePermission() {
                                 <span className="text-sm font-medium text-gray-900">{role.roleName}</span>
                               </div>
                             </td>
-                            {/* <td className="px-6 py-4">
-                              <span className="text-sm text-gray-700">{role.description || 'No description'}</span>
-                            </td> */}
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <Badge 
-                                className={permissionCount > 0 ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}
-                              >
+                              <Badge className={permissionCount > 0 ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}>
                                 {permissionCount} permissions
                               </Badge>
                             </td>
-                            {/* <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="text-sm text-gray-700">{userCount} users</span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <Badge variant="outline" className="bg-gray-100 text-gray-700">
-                                {isSystem ? 'System' : 'Custom'}
-                              </Badge>
-                            </td> */}
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex space-x-2">
-                                <Button
-                                  onClick={() => handleViewRole(role)}
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                >
+                                <Button onClick={() => handleViewRole(role)} variant="ghost" size="sm" className="h-8 w-8 p-0">
                                   <Eye className="h-4 w-4" />
                                 </Button>
                                 {!isProtectedRole && (
                                   <>
-                                    <Button
-                                      onClick={() => handleEditRole(role)}
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-8 w-8 p-0"
-                                    >
+                                    <Button onClick={() => handleEditRole(role)} variant="ghost" size="sm" className="h-8 w-8 p-0">
                                       <Edit className="h-4 w-4" />
                                     </Button>
                                     <Button
@@ -1248,14 +1221,9 @@ export default function RolePermission() {
                     Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, roles.length)} of {roles.length} roles
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                      disabled={currentPage === 1}
-                    >
+                    <Button variant="outline" onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1}>
                       Previous
                     </Button>
-                    
                     {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                       <Button
                         key={page}
@@ -1266,12 +1234,7 @@ export default function RolePermission() {
                         {page}
                       </Button>
                     ))}
-                    
-                    <Button
-                      variant="outline"
-                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                      disabled={currentPage === totalPages}
-                    >
+                    <Button variant="outline" onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages}>
                       Next
                     </Button>
                   </div>
@@ -1289,48 +1252,31 @@ export default function RolePermission() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {/* Step 1 */}
                 <div className="flex gap-4 p-4 rounded-lg border-2 bg-blue-50 border-blue-200">
                   <div className="flex-shrink-0">
-                    <div className="w-10 h-10 bg-blue-100 border border-blue-300 rounded-lg flex items-center justify-center font-bold text-lg text-gray-700">
-                      1
-                    </div>
+                    <div className="w-10 h-10 bg-blue-100 border border-blue-300 rounded-lg flex items-center justify-center font-bold text-lg text-gray-700">1</div>
                   </div>
                   <div className="flex-1">
                     <h3 className="font-semibold text-gray-900 mb-2">Create Roles</h3>
-                    <p className="text-sm text-gray-600">
-                      Define roles with specific permission sets. For example: &quot;Warehouse Manager&quot;, &quot;Sales Representative&quot;, &quot;Accountant&quot;
-                    </p>
+                    <p className="text-sm text-gray-600">Define roles with specific permission sets. For example: &quot;Warehouse Manager&quot;, &quot;Sales Representative&quot;, &quot;Accountant&quot;</p>
                   </div>
                 </div>
-
-                {/* Step 2 */}
                 <div className="flex gap-4 p-4 rounded-lg border-2 bg-green-50 border-green-200">
                   <div className="flex-shrink-0">
-                    <div className="w-10 h-10 bg-green-100 border border-green-300 rounded-lg flex items-center justify-center font-bold text-lg text-gray-700">
-                      2
-                    </div>
+                    <div className="w-10 h-10 bg-green-100 border border-green-300 rounded-lg flex items-center justify-center font-bold text-lg text-gray-700">2</div>
                   </div>
                   <div className="flex-1">
                     <h3 className="font-semibold text-gray-900 mb-2">Assign Permissions</h3>
-                    <p className="text-sm text-gray-600">
-                      Select the permissions each role should have. Permissions are organized by category for easy management.
-                    </p>
+                    <p className="text-sm text-gray-600">Select the permissions each role should have. Permissions are organized by category for easy management.</p>
                   </div>
                 </div>
-
-                {/* Step 3 */}
                 <div className="flex gap-4 p-4 rounded-lg border-2 bg-purple-50 border-purple-200">
                   <div className="flex-shrink-0">
-                    <div className="w-10 h-10 bg-purple-100 border border-purple-300 rounded-lg flex items-center justify-center font-bold text-lg text-gray-700">
-                      3
-                    </div>
+                    <div className="w-10 h-10 bg-purple-100 border border-purple-300 rounded-lg flex items-center justify-center font-bold text-lg text-gray-700">3</div>
                   </div>
                   <div className="flex-1">
                     <h3 className="font-semibold text-gray-900 mb-2">Assign to Users</h3>
-                    <p className="text-sm text-gray-600">
-                      In Staff Management, simply select a role when creating a user. All permissions are automatically assigned!
-                    </p>
+                    <p className="text-sm text-gray-600">In Staff Management, simply select a role when creating a user. All permissions are automatically assigned!</p>
                   </div>
                 </div>
               </div>
@@ -1345,21 +1291,14 @@ export default function RolePermission() {
               <h2 className="text-2xl font-bold text-gray-900">
                 {editingRole ? 'Edit Role' : 'Create Role'}
               </h2>
-              <button
-                onClick={handleCancel}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
+              <button onClick={handleCancel} className="text-gray-500 hover:text-gray-700">✕</button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Role Details */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Role Name *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Role Name *</label>
                   <Popover
                     open={roleComboOpen}
                     onOpenChange={(open) => {
@@ -1375,28 +1314,16 @@ export default function RolePermission() {
                         aria-expanded={roleComboOpen}
                         className={cn(
                           'w-full justify-between font-normal h-10 px-3 py-2',
-                          errors.roleName
-                            ? 'border-red-500 text-red-900'
-                            : 'border-gray-300 bg-gray-50',
+                          errors.roleName ? 'border-red-500 text-red-900' : 'border-gray-300 bg-gray-50',
                         )}
                       >
-                        <span
-                          className={cn(
-                            'truncate',
-                            !formData.roleName.trim() && 'text-muted-foreground',
-                          )}
-                        >
-                          {formData.roleName.trim()
-                            ? formData.roleName
-                            : 'Select role…'}
+                        <span className={cn('truncate', !formData.roleName.trim() && 'text-muted-foreground')}>
+                          {formData.roleName.trim() ? formData.roleName : 'Select role…'}
                         </span>
                         <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent
-                      className="p-0 bg-white w-[var(--radix-popover-trigger-width)] max-w-[min(100vw-2rem,24rem)]"
-                      align="start"
-                    >
+                    <PopoverContent className="p-0 bg-white w-[var(--radix-popover-trigger-width)] max-w-[min(100vw-2rem,24rem)]" align="start">
                       <Command shouldFilter={false}>
                         <CommandInput
                           placeholder="Search or type new role name…"
@@ -1404,11 +1331,8 @@ export default function RolePermission() {
                           onValueChange={setRoleComboSearch}
                         />
                         <CommandList>
-                          {filteredRoleComboOptions.length === 0 &&
-                          !canAddNewRoleInCombo ? (
-                            <div className="py-6 text-center text-sm text-muted-foreground">
-                              No matching role.
-                            </div>
+                          {filteredRoleComboOptions.length === 0 && !canAddNewRoleInCombo ? (
+                            <div className="py-6 text-center text-sm text-muted-foreground">No matching role.</div>
                           ) : null}
                           <CommandGroup heading="Roles">
                             {filteredRoleComboOptions.map((opt) => (
@@ -1416,27 +1340,13 @@ export default function RolePermission() {
                                 key={opt}
                                 value={opt}
                                 onSelect={() => {
-                                  setFormData((prev) => ({
-                                    ...prev,
-                                    roleName: opt,
-                                  }));
+                                  setFormData((prev) => ({ ...prev, roleName: opt }));
                                   setRoleComboOpen(false);
                                   setRoleComboSearch('');
-                                  setErrors((prev) => ({
-                                    ...prev,
-                                    roleName: '',
-                                  }));
+                                  setErrors((prev) => ({ ...prev, roleName: '' }));
                                 }}
                               >
-                                <Check
-                                  className={cn(
-                                    'mr-2 h-4 w-4',
-                                    formData.roleName.trim().toLowerCase() ===
-                                      opt.toLowerCase()
-                                      ? 'opacity-100'
-                                      : 'opacity-0',
-                                  )}
-                                />
+                                <Check className={cn('mr-2 h-4 w-4', formData.roleName.trim().toLowerCase() === opt.toLowerCase() ? 'opacity-100' : 'opacity-0')} />
                                 {opt}
                               </CommandItem>
                             ))}
@@ -1446,9 +1356,7 @@ export default function RolePermission() {
                               <CommandItem
                                 value={`__add__${roleComboSearch.trim()}`}
                                 className="text-primary font-medium"
-                                onSelect={() =>
-                                  handleAddCustomRole(roleComboSearch.trim())
-                                }
+                                onSelect={() => handleAddCustomRole(roleComboSearch.trim())}
                               >
                                 <Plus className="mr-2 h-4 w-4" />
                                 Add &quot;{roleComboSearch.trim()}&quot;
@@ -1460,17 +1368,12 @@ export default function RolePermission() {
                     </PopoverContent>
                   </Popover>
                   <p className="mt-1 text-xs text-gray-500">
-                    Open the list, type to search — if the name is new, use{' '}
-                    <strong>Add &quot;…&quot;</strong> in the list.
+                    Open the list, type to search — if the name is new, use <strong>Add &quot;…&quot;</strong> in the list.
                   </p>
-                  {errors.roleName && (
-                    <p className="mt-1 text-sm text-red-600">{errors.roleName}</p>
-                  )}
+                  {errors.roleName && <p className="mt-1 text-sm text-red-600">{errors.roleName}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
                   <input
                     type="text"
                     value={formData.description}
@@ -1483,8 +1386,20 @@ export default function RolePermission() {
 
               {/* Permissions Matrix */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900   bg-primary text-white p-3 rounded-t-lg">
-                  Permissions
+                <h3 className="text-lg font-semibold bg-primary text-white p-3 rounded-t-lg flex items-center gap-3">
+                  <span>Permissions</span>
+                  {formData.roleName && (
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 ${
+                      getPlatformTag(formData.roleName) === 'Mobile'
+                        ? 'bg-green-500 text-white'
+                        : getPlatformTag(formData.roleName) === 'Portal'
+                        ? 'bg-purple-500 text-white'
+                        : 'bg-white/20 text-white'
+                    }`}>
+                      {getPlatformTag(formData.roleName) === 'Mobile' ? '📱' : getPlatformTag(formData.roleName) === 'Portal' ? '🌐' : ''}
+                      {getPlatformTag(formData.roleName) ? ` ${getPlatformTag(formData.roleName)}` : ''}
+                    </span>
+                  )}
                 </h3>
                 <div className="overflow-x-auto">
                   <table className="w-full border border-gray-300">
@@ -1493,6 +1408,7 @@ export default function RolePermission() {
                         <th className="px-4 py-3 text-left text-sm font-medium border border-gray-300">
                           Module
                         </th>
+                        {/* View column — always shown */}
                         <th className="px-4 py-3 text-center text-sm font-medium border border-gray-300">
                           <div className="flex flex-col items-center space-y-2">
                             <span>View</span>
@@ -1503,6 +1419,7 @@ export default function RolePermission() {
                             />
                           </div>
                         </th>
+                        {/* Create column — always shown */}
                         <th className="px-4 py-3 text-center text-sm font-medium border border-gray-300">
                           <div className="flex flex-col items-center space-y-2">
                             <span>Create</span>
@@ -1513,6 +1430,7 @@ export default function RolePermission() {
                             />
                           </div>
                         </th>
+                        {/* Edit column — hide for labour-scoped roles that have overrides */}
                         <th className="px-4 py-3 text-center text-sm font-medium border border-gray-300">
                           <div className="flex flex-col items-center space-y-2">
                             <span>Edit</span>
@@ -1523,6 +1441,7 @@ export default function RolePermission() {
                             />
                           </div>
                         </th>
+                        {/* Delete column — hidden for labour-scoped roles */}
                         {!isLabourRoleSelected && (
                           <th className="px-4 py-3 text-center text-sm font-medium border border-gray-300">
                             <div className="flex flex-col items-center space-y-2">
@@ -1535,48 +1454,60 @@ export default function RolePermission() {
                             </div>
                           </th>
                         )}
-                        {!isLabourRoleSelected && (
-                          <th className="px-4 py-3 text-center text-sm font-medium border border-gray-300">
-                            <div className="flex flex-col items-center space-y-2">
-                              <span>Special Actions</span>
-                              <input
-                                type="checkbox"
-                                onChange={(e) => handleSelectAllSpecial(e.target.checked)}
-                                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                              />
-                            </div>
-                          </th>
-                        )}
+                        {/* Special Actions column — always shown */}
+                        <th className="px-4 py-3 text-center text-sm font-medium border border-gray-300">
+                          <div className="flex flex-col items-center space-y-2">
+                            <span>Special Actions</span>
+                            <input
+                              type="checkbox"
+                              onChange={(e) => handleSelectAllSpecial(e.target.checked)}
+                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                            />
+                          </div>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {permissionModulesToRender.map((modName) => {
-                        const moduleActs = getActionsForModule(modName);
-                        const hasSpecialActions = moduleActs.length > 4;
+                        const moduleActs = getActionsForModule(modName, formData.roleName);
                         const isDashboard = modName === 'dashboard';
+                        // Virtual "Assigned" modules — only special actions column is relevant
+                        const isAssignedModule =
+                          modName === ASSIGNED_LABOUR_MODULE || modName === ASSIGNED_LEAD_LABOUR_MODULE;
+                        const colVis = getStandardColumnVisibility(modName, formData.roleName);
+                        const hasSpecial = moduleHasSpecialActions(modName, formData.roleName);
+
+                        // Current permission source
+                        const permSource = editingRole ? editingRole.permissions : newRolePermissions;
 
                         return (
-                          <tr key={modName} className="hover:bg-gray-50">
+                          <tr key={modName} className={`hover:bg-gray-50 ${isAssignedModule ? 'bg-white' : ''}`}>
+                            {/* Module name */}
                             <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300 capitalize">
-                              {modName.replace('_', ' ')}
+                              {formatModuleName(modName)}
+                              
                             </td>
 
-                            {/* View Checkbox - Always show */}
+                            {/* View */}
                             <td className="px-4 py-3 text-center border border-gray-300">
-                              <input
-                                type="checkbox"
-                                checked={editingRole ? getPermissionValue(modName, 'view', editingRole.permissions) : getPermissionValue(modName, 'view', newRolePermissions)}
-                                onChange={(e) => handlePermissionChange(modName, 'view', e.target.checked)}
-                                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                              />
-                            </td>
-
-                            {/* Create Checkbox - Hide for dashboard */}
-                            <td className="px-4 py-3 text-center border border-gray-300">
-                              {!isDashboard ? (
+                              {!isAssignedModule && colVis.view ? (
                                 <input
                                   type="checkbox"
-                                  checked={editingRole ? getPermissionValue(modName, 'create', editingRole.permissions) : getPermissionValue(modName, 'create', newRolePermissions)}
+                                  checked={getPermissionValue(modName, 'view', permSource)}
+                                  onChange={(e) => handlePermissionChange(modName, 'view', e.target.checked)}
+                                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                                />
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+
+                            {/* Create */}
+                            <td className="px-4 py-3 text-center border border-gray-300">
+                              {!isDashboard && !isAssignedModule && colVis.create ? (
+                                <input
+                                  type="checkbox"
+                                  checked={getPermissionValue(modName, 'create', permSource)}
                                   onChange={(e) => handlePermissionChange(modName, 'create', e.target.checked)}
                                   className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                                 />
@@ -1585,12 +1516,12 @@ export default function RolePermission() {
                               )}
                             </td>
 
-                            {/* Edit Checkbox - Hide for dashboard */}
+                            {/* Edit */}
                             <td className="px-4 py-3 text-center border border-gray-300">
-                              {!isDashboard ? (
+                              {!isDashboard && !isAssignedModule && colVis.edit ? (
                                 <input
                                   type="checkbox"
-                                  checked={editingRole ? getPermissionValue(modName, 'edit', editingRole.permissions) : getPermissionValue(modName, 'edit', newRolePermissions)}
+                                  checked={getPermissionValue(modName, 'edit', permSource)}
                                   onChange={(e) => handlePermissionChange(modName, 'edit', e.target.checked)}
                                   className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                                 />
@@ -1599,12 +1530,13 @@ export default function RolePermission() {
                               )}
                             </td>
 
+                            {/* Delete — column hidden for labour-scoped */}
                             {!isLabourRoleSelected && (
                               <td className="px-4 py-3 text-center border border-gray-300">
-                                {!isDashboard ? (
+                                {!isDashboard && !isAssignedModule && colVis.delete ? (
                                   <input
                                     type="checkbox"
-                                    checked={editingRole ? getPermissionValue(modName, 'delete', editingRole.permissions) : getPermissionValue(modName, 'delete', newRolePermissions)}
+                                    checked={getPermissionValue(modName, 'delete', permSource)}
                                     onChange={(e) => handlePermissionChange(modName, 'delete', e.target.checked)}
                                     className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                                   />
@@ -1614,29 +1546,28 @@ export default function RolePermission() {
                               </td>
                             )}
 
-                            {!isLabourRoleSelected && (
-                              <td className="px-4 py-3 text-center border border-gray-300">
-                                {!isDashboard && hasSpecialActions ? (
-                                  <div className="space-y-2">
-                                    {moduleActs
-                                      .filter(a => !['view', 'create', 'edit', 'delete'].includes(a))
-                                      .map((a) => (
-                                        <div key={a} className="flex items-center justify-center">
-                                          <input
-                                            type="checkbox"
-                                            checked={editingRole ? getPermissionValue(modName, a, editingRole.permissions) : getPermissionValue(modName, a, newRolePermissions)}
-                                            onChange={(e) => handlePermissionChange(modName, a, e.target.checked)}
-                                            className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                                          />
-                                          <span className="text-xs ml-1 capitalize">{a}</span>
-                                        </div>
-                                      ))}
-                                  </div>
-                                ) : (
-                                  <span className="text-gray-400">-</span>
-                                )}
-                              </td>
-                            )}
+                            {/* Special Actions — always shown */}
+                            <td className="px-4 py-3 text-center border border-gray-300">
+                              {hasSpecial ? (
+                                <div className="space-y-2">
+                                  {moduleActs
+                                    .filter(a => !['view', 'create', 'edit', 'delete'].includes(a))
+                                    .map((a) => (
+                                      <div key={a} className="flex items-center justify-center">
+                                        <input
+                                          type="checkbox"
+                                          checked={getPermissionValue(modName, a, permSource)}
+                                          onChange={(e) => handlePermissionChange(modName, a, e.target.checked)}
+                                          className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                                        />
+                                        <span className="text-xs ml-1 capitalize">{a}</span>
+                                      </div>
+                                    ))}
+                                </div>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
                           </tr>
                         );
                       })}
@@ -1704,7 +1635,6 @@ export default function RolePermission() {
             </div>
           ) : viewingRole ? (
             <div className="flex-1 overflow-y-auto space-y-6">
-              {/* Summary Cards */}
               <div className="grid grid-cols-2 gap-4">
                 <Card>
                   <CardHeader className="pb-2">
@@ -1721,27 +1651,28 @@ export default function RolePermission() {
                     <CardTitle className="text-sm font-medium text-gray-600">Assigned Users</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold">
-                      {getUserCountForRole(viewingRole.roleName)}
-                    </div>
+                    <div className="text-3xl font-bold">{getUserCountForRole(viewingRole.roleName)}</div>
                   </CardContent>
                 </Card>
               </div>
 
-              {/* Permissions List */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Permissions List</h3>
                 <ScrollArea className="h-[400px] pr-4">
                   <div className="space-y-4">
                     {(() => {
                       const groupedPermissions = groupPermissionsByModule(viewingRole.permissions || []);
-                      const moduleOrder = modules.filter(mod => groupedPermissions[mod]);
+                      const allModulesForView = [
+                        ...modules,
+                        ASSIGNED_LABOUR_MODULE,
+                        ASSIGNED_LEAD_LABOUR_MODULE,
+                      ];
+                      const moduleOrder = allModulesForView.filter(mod => groupedPermissions[mod]);
                       
                       return moduleOrder.length > 0 ? (
                         moduleOrder.map((module) => {
                           const modulePermissions = groupedPermissions[module];
                           const moduleName = formatModuleName(module);
-                          
                           return (
                             <div key={module} className="border border-gray-200 rounded-lg p-4">
                               <div className="flex items-center justify-between mb-3">
@@ -1776,8 +1707,43 @@ export default function RolePermission() {
           ) : null}
 
           <DialogFooter>
-            <Button onClick={() => setShowViewModal(false)} variant="outline">
-              Close
+            <Button onClick={() => setShowViewModal(false)} variant="outline">Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Platform Picker Modal — shown when adding a custom role */}
+      <Dialog open={showPlatformModal} onOpenChange={(open) => { if (!open) { setShowPlatformModal(false); setPendingCustomRoleName(''); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold">Select Platform</DialogTitle>
+            <DialogDescription>
+              Is the role <strong>&quot;{pendingCustomRoleName}&quot;</strong> for Mobile or Portal?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <button
+              type="button"
+              onClick={() => confirmCustomRoleWithPlatform('Mobile')}
+              className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-gray-200 hover:border-green-400 hover:bg-green-50 transition-all group"
+            >
+              <span className="text-4xl">📱</span>
+              <span className="font-semibold text-gray-700 group-hover:text-green-700">Mobile</span>
+              <span className="text-xs text-gray-400 text-center">Labour / Lead Labour permissions</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => confirmCustomRoleWithPlatform('Portal')}
+              className="flex flex-col items-center gap-3 p-6 rounded-xl border-2 border-gray-200 hover:border-purple-400 hover:bg-purple-50 transition-all group"
+            >
+              <span className="text-4xl">🌐</span>
+              <span className="font-semibold text-gray-700 group-hover:text-purple-700">Portal</span>
+              <span className="text-xs text-gray-400 text-center">All permissions with assigned modules</span>
+            </button>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowPlatformModal(false); setPendingCustomRoleName(''); }}>
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>
