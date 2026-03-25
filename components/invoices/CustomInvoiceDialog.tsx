@@ -797,26 +797,27 @@ console.log(totalAmount,"amounttt");
         for (const item of nonEmptyLineItems) {
           const treatedAsCustom =
             item.isCustomProduct === true || !item.productId
-          const base: any = {
-            product_id:item.productId,
-            product_name: item.item,
-            description: item.description || "",
-            supplier_id: item.supplierId || selectedSupplierId || 1,
-            supplier_sku: String(item.item).substring(0, 10),
-            jdp_sku: `JDP-${Date.now()}-${Math.random()
-              .toString(36)
-              .substring(2, 9)}`,
-            stock_quantity: item.qty,
-            unit: "unit",
-            job_id: Number(effectiveInlineInvoiceData.jobId),
-             unit_cost: item.unit_cost || 0,
-            jdp_price: item.rate,
-            estimated_price: item.estimatedPrice || 0,
-            total_cost: item.total,
-            // manual/custom row -> true, searched/selected row -> false
-            is_custom: treatedAsCustom,
-          
-          }
+         const base: any = {
+           ...(item.isCustomProduct === false && {
+             product_id: item.productId,
+           }),
+
+           product_name: item.item,
+           description: item.description || "",
+           supplier_id: item.supplierId || selectedSupplierId || 1,
+           supplier_sku: String(item.item).substring(0, 10),
+           jdp_sku: `JDP-${Date.now()}-${Math.random()
+             .toString(36)
+             .substring(2, 9)}`,
+           stock_quantity: item.qty,
+           unit: "unit",
+           job_id: Number(effectiveInlineInvoiceData.jobId),
+           unit_cost: item.unit_cost || 0,
+           jdp_price: item.rate,
+           estimated_price: item.estimatedPrice || 0,
+           total_cost: item.total,
+           is_custom: treatedAsCustom,
+         };
 
           // Include product id only for searched/selected products
           if (!treatedAsCustom && item.productId) {
@@ -906,32 +907,49 @@ console.log(totalAmount,"amounttt");
         return
       }
 
-      const payload: any = {
-        job_id: Number(effectiveInlineInvoiceData.jobId),
-        // Always use the effective project (from inline or job title fallback)
-        estimate_title: effectiveInlineInvoiceData.project || currentJob?.title || blueSheet?.job?.job_title || '',
-        priority: 'medium' as 'low' | 'medium' | 'high',
-        service_type: isContractBased ? 'contract_based' : 'service_based',
-        email_address: emailAddress,
-        estimate_date: effectiveInlineInvoiceData.date,
-        bluesheet_ids: bluesheetIds,
-        po_number: effectiveInlineInvoiceData.poNumber || '',
-        rep: effectiveInlineInvoiceData.rep || '',
-        due_date: effectiveInlineInvoiceData.dueDate || '',
-        payment_credits: effectiveInlineInvoiceData.paymentCredits || 0,
-        balance_due: effectiveInlineInvoiceData.balanceDue || '',
-        bill_to_address: effectiveInlineInvoiceData.billToAddressEnabled ? effectiveInlineInvoiceData.billToAddress || viewInvoiceData?.contractor?.address || viewInvoiceData?.customer?.address || '' : '',
-        notes: effectiveInlineInvoiceData.notes || '',
-        status: 'sent',
-        invoice_type: mapInvoiceTypeToAPI(effectiveInlineInvoiceData.invoiceType),
-        invoice_source: "custom",
-        custom_products: customProducts,
-        estimate_source_type:blueSheet?.job?.estimated_cost ? "estimate_job" : "time_material_job",
-        total_labor_cost: laborEntriesTotalFromBlueSheet,
-        // totalProductAmount:totalProductAmount,
-        total_amount : totalProductAmount + (viewInvoiceData as any).labor_total_cost
-      }
-      console.log(payload,"payloadd");
+     const materialTotal = customProducts.reduce(
+       (sum, product) => sum + Number(product.total_cost || 0),
+       0,
+     );
+
+     const laborTotal = Number(laborEntriesTotalFromBlueSheet || 0);
+
+     const payload: any = {
+       job_id: Number(effectiveInlineInvoiceData.jobId),
+       estimate_title:
+         effectiveInlineInvoiceData.project ||
+         currentJob?.title ||
+         blueSheet?.job?.job_title ||
+         "",
+       priority: "medium",
+       service_type: isContractBased ? "contract_based" : "service_based",
+       email_address: emailAddress,
+       estimate_date: effectiveInlineInvoiceData.date,
+       bluesheet_ids: bluesheetIds,
+       po_number: effectiveInlineInvoiceData.poNumber || "",
+       rep: effectiveInlineInvoiceData.rep || "",
+       due_date: effectiveInlineInvoiceData.dueDate || "",
+       payment_credits: effectiveInlineInvoiceData.paymentCredits || 0,
+       balance_due: effectiveInlineInvoiceData.balanceDue || "",
+       bill_to_address: effectiveInlineInvoiceData.billToAddressEnabled
+         ? effectiveInlineInvoiceData.billToAddress ||
+           viewInvoiceData?.contractor?.address ||
+           viewInvoiceData?.customer?.address ||
+           ""
+         : "",
+       notes: effectiveInlineInvoiceData.notes || "",
+       status: "sent",
+       invoice_type: mapInvoiceTypeToAPI(
+         effectiveInlineInvoiceData.invoiceType,
+       ),
+       invoice_source: "custom",
+       custom_products: customProducts,
+       estimate_source_type: blueSheet?.job?.estimated_cost
+         ? "estimate_job"
+         : "time_material_job",
+       total_labor_cost: laborTotal,
+       total_amount: materialTotal + laborTotal,
+     };
       
       if (isContractBased && contractorId) payload.contractor_id = contractorId;
       if (customerId) payload.customer_id = customerId;
