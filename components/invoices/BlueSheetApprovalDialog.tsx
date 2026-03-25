@@ -102,6 +102,7 @@ interface SupplierInvoice {
     name: string
     quantity: number
     unitPrice: number
+    jdpPrice:number
     total: number
   }>
   status: 'received' | 'matched' | 'discrepancy'
@@ -494,10 +495,13 @@ export function BlueSheetApprovalDialog({
         materials: materialsSource.map((item: any, index: number) => {
           const quantity = Number(item.quantity ?? item.qty ?? 0)
           const unitPrice = Number(item.unitPrice ?? item.unit_price ?? item.price ?? item.rate ?? 0)
+          const jdpPrice = Number(item.jdp_price  ?? 0)
+
           return {
             name: item.name || item.description || `Item ${index + 1}`,
             quantity,
             unitPrice,
+            jdpPrice,
             total: Number(item.total ?? item.line_total ?? item.amount ?? quantity * unitPrice),
           }
         }),
@@ -582,7 +586,7 @@ export function BlueSheetApprovalDialog({
     if (!editedSupplierInvoice) return
     setEditedSupplierInvoice({
       ...editedSupplierInvoice,
-      materials: [...editedSupplierInvoice.materials, { name: 'New Supplier Item', quantity: 1, unitPrice: 0, total: 0 }],
+      materials: [...editedSupplierInvoice.materials, { name: 'New Supplier Item', quantity: 1, unitPrice: 0, jdpPrice:0,total: 0 }],
     })
   }
 
@@ -692,7 +696,7 @@ export function BlueSheetApprovalDialog({
         unit_cost: item.unit_cost || 0,
         estimated_price: item.unit_cost || 0,
         total_cost: item.total_cost ?? (item.total_ordered || 0) * (item.unit_cost || 0),
-        jdp_price: item.unit_cost || 0,
+        jdp_price: item.jdp_price || 0,
         total_ordered: item.total_ordered || 0,
         material_used: item.material_used || 0,
         is_custom: false,
@@ -790,7 +794,7 @@ export function BlueSheetApprovalDialog({
   // Labor, material and overall totals
   const totalLaborLabel = currentBlueSheet.total_labor_hours || null
   const materialTotal = currentBlueSheet.material_entries.reduce(
-    (s: number, i: any) => s + (i.total_cost || i.material_used * i.unit_cost || 0),
+    (s: number, i: any) => s + (i.total_cost || i.material_used * i.jdp_price || 0),
     0,
   )
   // Derive total labor cost from labor_entries so it reflects merged selections
@@ -1478,11 +1482,11 @@ export function BlueSheetApprovalDialog({
                                           <Input
                                             type="number"
                                             step="0.01"
-                                            value={item.unit_cost}
+                                            value={item.jdp_price}
                                             onChange={(e) =>
                                               handleBlueSheetMaterialChange(
                                                 idx,
-                                                'unit_cost',
+                                                'jdp_price',
                                                 parseFloat(e.target.value) || 0,
                                               )
                                             }
@@ -1490,11 +1494,11 @@ export function BlueSheetApprovalDialog({
                                             min="0"
                                           />
                                         ) : (
-                                          formatCurrency(item.unit_cost)
+                                          formatCurrency(item.jdp_price)
                                         )}
                                       </td>
                                       <td className="py-2 px-3 text-right font-semibold text-[#00A1FF]">
-                                        {formatCurrency(item.total_cost || item.material_used * item.unit_cost)}
+                                        {formatCurrency(item.total_cost || item.material_used * item.jdp_price)}
                                       </td>
                                       {isBlueSheetEditMode && currentBlueSheet.material_entries.length > 1 && (
                                         <td className="py-1">

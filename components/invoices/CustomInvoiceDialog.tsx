@@ -121,14 +121,15 @@ export const CustomInvoiceDialog = ({
   // Derive viewInvoiceData and job list from blueSheet (custom invoice from bluesheet)
   const viewInvoiceData = useMemo(() => {
     if (!blueSheet) return null
-    const job = blueSheet.job || {}
+    const job = blueSheet.job || {};    
     const products = (blueSheet.material_entries || []).map((item: any, index: number) => ({
       id: item.product?.id || index,
+      product_id: item?.id,
       product_name: item.material_name,
       description: item.product?.description || item.material_name,
-      jdp_price: item.unit_cost || 0,
+      jdp_price: item.jdp_price || 0,
       unit_cost: item.unit_cost || 0,
-      total_cost: item.total_cost ?? (item.material_used || 0) * (item.unit_cost || 0),
+      total_cost: item.total_cost ?? (item.material_used || 0) * (item.jdp_price || 0),
       stock_quantity: item.material_used || 0,
       supplier_id: item.product?.supplier_id ?? item.product?.suppliers?.id ?? 1,
     }))
@@ -295,7 +296,8 @@ export const CustomInvoiceDialog = ({
       searchQuery: '',
       showSearchResults: false,
       supplierId: 1,
-      isCustomProduct: false
+      isCustomProduct: false,
+      unit_cost:""
     }],
     notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
     signatureText: 'ACCEPTED BY________________DATE_____',
@@ -409,16 +411,20 @@ export const CustomInvoiceDialog = ({
             lineItems: hasUserTouchedLineItemsRef.current
               ? prev.lineItems
               : (((viewInvoiceData as any).custom_products) ?? viewInvoiceData.products)?.map((product: any, index: number) => {
+                
                   const qty = Number(product.stock_quantity) || 1
-                  const rate = Number(product.jdp_price || product.unit_cost || product.estimated_price || product.total_cost || 0)
-                  const total = Number(product.total_cost || rate * qty || 0)
+                  const rate = Number(product.jdp_price || 0);
+                  const unit_cost = Number(product.unit_cost || 0);
+                  const total = Number(product.total_cost || rate * qty || 0);
+                  console.log(product,"productttt");
                   return {
                     id: `item-${index}`,
-                    productId: product.id,
+                    productId: product.product_id,
                     qty,
                     item: product.product_name || product.name || '',
                     description: product.description || '',
                     rate,
+                    unit_cost,
                     estimatedPrice: Number(product.estimated_price || 0),
                     total,
                     searchQuery: '',
@@ -439,7 +445,8 @@ export const CustomInvoiceDialog = ({
                   searchQuery: '',
                   showSearchResults: false,
                   supplierId: 1,
-                  isCustomProduct: false
+                  isCustomProduct: false,
+                  uni_cost :0
                 }]
           };
 
@@ -539,7 +546,8 @@ export const CustomInvoiceDialog = ({
         searchQuery: '',
         showSearchResults: false,
         supplierId: selectedSupplierId || 1,
-        isCustomProduct: false
+        isCustomProduct: false,
+        unit_cost:''
       }]
     }))
   }
@@ -626,7 +634,8 @@ export const CustomInvoiceDialog = ({
         searchQuery: '',
         showSearchResults: false,
         supplierId: selectedSupplierId || 1,
-        isCustomProduct: true
+        isCustomProduct: true,
+        unit_cost:''
       }]
     }))
   }
@@ -775,10 +784,11 @@ export const CustomInvoiceDialog = ({
 
       if (nonEmptyLineItems.length > 0) {
         // Use line items (these already include the BlueSheet items + any user-added rows)
-        for (const item of nonEmptyLineItems) {
+        for (const item of nonEmptyLineItems) {          
           const treatedAsCustom =
             item.isCustomProduct === true || !item.productId
           const base: any = {
+            productId:item.productId,
             product_name: item.item,
             description: item.description || "",
             supplier_id: item.supplierId || selectedSupplierId || 1,
@@ -789,12 +799,13 @@ export const CustomInvoiceDialog = ({
             stock_quantity: item.qty,
             unit: "unit",
             job_id: Number(effectiveInlineInvoiceData.jobId),
-            unit_cost: item.rate,
+             unit_cost: item.unit_cost || 0,
             jdp_price: item.rate,
             estimated_price: item.estimatedPrice || 0,
             total_cost: item.total,
             // manual/custom row -> true, searched/selected row -> false
             is_custom: treatedAsCustom,
+          
           }
 
           // Include product id only for searched/selected products
@@ -825,7 +836,7 @@ export const CustomInvoiceDialog = ({
             unit: m.unit || "unit",
             job_id: Number(effectiveInlineInvoiceData.jobId),
             unit_cost: m.unit_cost || 0,
-            jdp_price: m.unit_cost || 0,
+            jdp_price: m.jdp_price || 0,
             estimated_price: m.unit_cost || 0,
             total_cost:
               m.total_cost ?? (m.material_used || 0) * (m.unit_cost || 0),
@@ -840,24 +851,24 @@ export const CustomInvoiceDialog = ({
         }
       }
 
-      // Also add a dedicated custom product for total labor cost (from BlueSheet labor entries)
-      if (laborEntriesTotalFromBlueSheet > 0) {
-        customProducts.push({
-          product_name: 'Labor total cost',
-          description: 'Total labor cost from BlueSheet labor entries',
-          supplier_id: selectedSupplierId || 1,
-          supplier_sku: 'LABOR_TOTAL',
-          jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          stock_quantity: 1,
-          unit: 'unit',
-          job_id: Number(effectiveInlineInvoiceData.jobId),
-          unit_cost: laborEntriesTotalFromBlueSheet,
-          jdp_price: laborEntriesTotalFromBlueSheet,
-          estimated_price: laborEntriesTotalFromBlueSheet,
-          total_cost: laborEntriesTotalFromBlueSheet,
-          is_custom: true,
-        })
-      }
+      // // Also add a dedicated custom product for total labor cost (from BlueSheet labor entries)
+      // if (laborEntriesTotalFromBlueSheet > 0) {
+      //   customProducts.push({
+      //     product_name: 'Labor total cost',
+      //     description: 'Total labor cost from BlueSheet labor entries',
+      //     supplier_id: selectedSupplierId || 1,
+      //     supplier_sku: 'LABOR_TOTAL',
+      //     jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      //     stock_quantity: 1,
+      //     unit: 'unit',
+      //     job_id: Number(effectiveInlineInvoiceData.jobId),
+      //     unit_cost: laborEntriesTotalFromBlueSheet,
+      //     jdp_price: laborEntriesTotalFromBlueSheet,
+      //     estimated_price: laborEntriesTotalFromBlueSheet,
+      //     total_cost: laborEntriesTotalFromBlueSheet,
+      //     is_custom: true,
+      //   })
+      // }
 
       // CustomInvoiceDialog: always use viewInvoiceData (from blueSheet) for customer_id/contractor_id
       let customerId: number | null = null;
@@ -905,7 +916,9 @@ export const CustomInvoiceDialog = ({
         invoice_type: mapInvoiceTypeToAPI(effectiveInlineInvoiceData.invoiceType),
         invoice_source: "custom",
         custom_products: customProducts,
-        estimate_source_type:blueSheet?.job?.estimated_cost ? "estimate_job" : "time_material_job"
+        estimate_source_type:blueSheet?.job?.estimated_cost ? "estimate_job" : "time_material_job",
+        total_labor_cost: laborEntriesTotalFromBlueSheet,
+        
 
       }
       if (isContractBased && contractorId) payload.contractor_id = contractorId;
@@ -1020,14 +1033,13 @@ export const CustomInvoiceDialog = ({
         'customer@example.com';
  
       let lineItemsSource: { qty: number; item: string; description: string; rate: number; total: number }[] = []
-      console.log('lineItemsOverride:11111111111', lineItemsOverride)
       if (lineItemsOverride && lineItemsOverride.length > 0) {
         lineItemsSource = lineItemsOverride
       } else {
         const customProducts = (viewInvoiceData as any)?.custom_products as any[] | undefined
-        console.log('customProducts:11111111111', customProducts)
-        if (customProducts && customProducts.length > 0) {
+        if (customProducts && customProducts.length > 0) {          
           lineItemsSource = customProducts.map((p: any) => {
+             console.log(p,"::ppp");
             const qty = Number(p.stock_quantity) || 1
             const rate = Number(p.jdp_price || p.unit_cost || p.estimated_price || p.total_cost || 0)
             const total = Number(p.total_cost || rate * qty || 0)
@@ -1091,6 +1103,7 @@ export const CustomInvoiceDialog = ({
         dueDate: effectiveInlineInvoiceData.dueDate,
         paymentCredits: effectiveInlineInvoiceData.paymentCredits,
         balanceDue: effectiveInlineInvoiceData.balanceDue,
+        
 
         lineItems: lineItemsSource.map((item) => ({
           qty: item.qty,
@@ -1153,274 +1166,7 @@ export const CustomInvoiceDialog = ({
     }
   }, [registerPreviewAndSend])
 
-
-
-
-
-  const addInvoiceItem = () => {
-    const newItem: InvoiceItem = {
-      id: `ITEM-${Date.now()}`,
-      sku: "",
-      description: "",
-      quantity: 1,
-      unitPrice: 0,
-      total_cost: 0,
-      supplierId: 1,
-      productId: 0,
-    }
-    setNewInvoice((prev) => ({
-      ...prev,
-      items: [...(prev.items || []), newItem],
-    }))
-  }
-
-  const updateInvoiceItem = (
-    index: number,
-    field: keyof InvoiceItem,
-    value: any
-  ) => {
-    const updatedItems = [...(newInvoice.items || [])];
-    updatedItems[index] = { ...updatedItems[index], [field]: value };
-
-    if (field === "quantity" || field === "unitPrice") {
-      updatedItems[index].total_cost =
-        updatedItems[index].quantity * updatedItems[index].unitPrice;
-    }
-
-    if (field === "total_cost") {
-      updatedItems[index].total_cost = value;
-    }
-
-    setNewInvoice((prev) => ({ ...prev, items: updatedItems }));
-  };
-
-  const removeInvoiceItem = (index: number) => {
-    setNewInvoice((prev) => ({
-      ...prev,
-      items: prev.items?.filter((_, i) => i !== index),
-    }));
-  };
-
-  const addLaborEntry = () => {
-    const newLabor: LaborEntry = {
-      id: `LAB-${Date.now()}`,
-      laborName: "",
-      hours: 0,
-      hourlyRate: 0,
-      total_cost: 0,
-      description: "",
-    }
-    setNewInvoice((prev) => ({
-      ...prev,
-      labor: [...(prev.labor || []), newLabor],
-    }))
-  }
-
-  const updateLaborEntry = (
-    index: number,
-    field: keyof LaborEntry,
-    value: any
-  ) => {
-    const updatedLabor = [...(newInvoice.labor || [])];
-    updatedLabor[index] = { ...updatedLabor[index], [field]: value };
-
-    if (field === "hours" || field === "hourlyRate") {
-      updatedLabor[index].total_cost =
-        updatedLabor[index].hours * updatedLabor[index].hourlyRate;
-    }
-
-    if (field === "total_cost") {
-      updatedLabor[index].total_cost = value;
-    }
-
-    setNewInvoice((prev) => ({ ...prev, labor: updatedLabor }));
-  };
-
-  const removeLaborEntry = (index: number) => {
-    setNewInvoice((prev) => ({
-      ...prev,
-      labor: prev.labor?.filter((_, i) => i !== index),
-    }));
-  };
-
-  const addAdditionalCost = () => {
-    setNewInvoice((prev) => ({
-      ...prev,
-      additionalCosts: [
-        ...(prev.additionalCosts || []),
-        { description: "", amount: 0 },
-      ],
-    }))
-  }
-
-  const updateAdditionalCost = (
-    index: number,
-    field: "description" | "amount",
-    value: any
-  ) => {
-    const updatedCosts = [...(newInvoice.additionalCosts || [])]
-    updatedCosts[index] = { ...updatedCosts[index], [field]: value }
-    setNewInvoice((prev) => ({ ...prev, additionalCosts: updatedCosts }))
-  }
-
-  const removeAdditionalCost = (index: number) => {
-    setNewInvoice((prev) => ({
-      ...prev,
-      additionalCosts: prev.additionalCosts?.filter((_, i) => i !== index),
-    }))
-  }
-
-  const handleNext = () => {
-    if (!validateStep(currentStep)) return
-    setCurrentStep(prev => prev + 1)
-  }
-
-
-  const validateStep = (step: number) => {
-    let stepErrors: Record<string, string> = {}
-
-    if (step === 1) {
-      if (!newInvoice.customerId) stepErrors.customerId = "Customer is required"
-      if (!newInvoice.jobId) stepErrors.jobId = "Job is required"
-      if (!newInvoice.type) stepErrors.type = "Invoice type is required"
-      if (!newInvoice.issueDate) stepErrors.issueDate = "Issue date is required"
-      if (!newInvoice.dueDate) stepErrors.dueDate = "Due date is required"
-    }
-
-    if (step === 2 && (newInvoice.items?.length || 0) > 0) {
-      newInvoice.items!.forEach((item, i) => {
-        if (!item.sku) stepErrors[`item_${i}_sku`] = `Item ${i + 1}: SKU required`
-        if (!item.description) stepErrors[`item_${i}_desc`] = `Item ${i + 1}: Description required`
-        if (item.quantity <= 0) stepErrors[`item_${i}_qty`] = `Item ${i + 1}: Quantity must be > 0`
-        if (item.unitPrice <= 0) stepErrors[`item_${i}_price`] = `Item ${i + 1}: Unit price must be > 0`
-      })
-    }
-
-    if (step === 3 && (newInvoice.labor?.length || 0) > 0) {
-      newInvoice.labor!.forEach((labor, i) => {
-        if (!labor.laborName) stepErrors[`labor_${i}_name`] = `Labor ${i + 1}: Name required`
-        if (labor.hours <= 0) stepErrors[`labor_${i}_hours`] = `Labor ${i + 1}: Hours must be > 0`
-        if (labor.hourlyRate <= 0) stepErrors[`labor_${i}_rate`] = `Labor ${i + 1}: Hourly rate must be > 0`
-      })
-    }
-
-    // if (step === 4 && (newInvoice.additionalCosts?.length || 0) > 0) {
-    //   newInvoice.additionalCosts!.forEach((cost, i) => {
-    //     if (!cost.description) stepErrors[`cost_${i}_desc`] = `Cost ${i + 1}: Description required`
-    //     if (cost.amount <= 0) stepErrors[`cost_${i}_amt`] = `Cost ${i + 1}: Amount must be > 0`
-    //   })
-    // }
-
-
-    setErrors(stepErrors)
-    return Object.keys(stepErrors).length === 0
-  }
-
-  const isPriority = (value: any): value is "low" | "medium" | "high" =>
-    ["low", "medium", "high"].includes(value);
-
-
-  const handleSave = async () => {
-    setLoading(true);
-    try {
-      const laborPayload =
-        newInvoice.labor?.map((l) => ({
-          full_name: l.laborName,
-          email: l.email || "customer@example.com",
-          hours_worked: l.hours,
-          hourly_rate: l.hourlyRate,
-          job_id: Number(newInvoice.jobId),
-          is_custom: true,
-        })) || [];
-
-      const productsPayload =
-        newInvoice.items?.map((i) => ({
-          product_name: i.description,
-          supplier_id: i.supplierId && i.supplierId > 0 ? i.supplierId : 1,
-          supplier_sku: i.sku || "",
-          jdp_sku: i.jdp_sku || "SKU-DEFAULT",
-          stock_quantity: i.quantity,
-          job_id: Number(newInvoice.jobId),
-          unit: i.unit ? i.unit.toString() : "1",
-          is_custom: true,
-          unit_cost: i.unitPrice,
-        })) || [];
-
-      const payload: CreateEstimatePayload = {
-        estimate_title: "New Estimate",
-        customer_id: Number(newInvoice.customerId),
-
-        priority: isPriority(newInvoice.priority) ? newInvoice.priority : "medium",
-        valid_until: newInvoice.dueDate || "",
-        location: newInvoice.location || "N/A",
-        description: newInvoice.notes || "",
-        service_type: "service_based",
-        email_address: newInvoice.emailAddress || "customer@example.com",
-        estimate_date: newInvoice.issueDate || "",
-
-        materials_cost: itemsTotal,
-        labor_cost: laborTotal,
-        additional_costs: additionalTotal,
-        subtotal,
-        tax_percentage: (newInvoice.taxRate || 0) * 100,
-        tax_amount: taxAmount,
-        total_amount: totalAmount,
-
-        status: "draft",
-        invoice_type: newInvoice.type || "proposal_invoice",
-        invoice_number: `INV-${Date.now()}`,
-        issue_date: newInvoice.issueDate || "",
-        due_date: newInvoice.dueDate || "",
-
-        job_id: Number(newInvoice.jobId),
-
-        // additional_cost: newInvoice.additionalCosts?.length
-        //   ? {
-        //       description: newInvoice.additionalCosts[0].description || "",
-        //       amount: newInvoice.additionalCosts.reduce((sum, c) => sum + c.amount, 0),
-        //     }
-        //   : { description: "", amount: 0 },
-
-        custom_labor: laborPayload,
-        custom_products: productsPayload,
-        estimate_source_type: blueSheet?.job?.estimatedCost? 'estimate_job' : 'time_material_job'
-
-      };
-      console.log(payload,"payloadpayload");
-      
-
-      const createdInvoice = await apiClient.createEstimate(payload);
-      dispatch(addInvoice(createdInvoice));
-      toast.success("Invoice created successfully!");
-      onOpenChange(false);
-
-      onInvoiceSaved?.(createdInvoice);
-
-      setNewInvoice({
-        customerId: "",
-        jobId: undefined,
-        type: "proposal_invoice",
-        issueDate: format(new Date(), "yyyy-MM-dd"),
-        dueDate: format(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"),
-        items: [],
-        labor: [],
-        additionalCosts: [],
-        notes: "",
-        taxRate: 0.08,
-        priority: "medium",
-      });
-
-      setCurrentStep(1);
-    } catch (error) {
-      console.error("Error creating invoice:", error);
-      toast.error("Failed to create invoice");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
-
+ 
 
   useEffect(() => {
     setNewInvoice(prev => ({ ...prev, jobId }))
