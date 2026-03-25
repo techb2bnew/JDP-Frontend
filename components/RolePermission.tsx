@@ -121,16 +121,17 @@ const ONLY_LABOUR_ROLE_ALLOWED_MODULES = [
 // Key = module name, Value = allowed actions
 // Modules not listed here get default labour actions (view, create, edit)
 const LABOUR_MODULE_ACTION_OVERRIDES: Record<string, string[]> = {
-  products:        ['view'],
-  orders:          ['create'],
-  notification:    ['view'],
-  bluesheet:       ['view', 'create'],
+  products: ['view'],
+  orders: ['create'],
+  notification: ['view'],
+  bluesheet: ['view', 'create'],
   inventory_price: ['view'],
-  suppliers:       ['view'],
-  jobs:            ['view', 'create'],
-  sub_jobs:        ['view', 'create'],
-  activity_logs:   ['view'],
+  suppliers: ['view'],
+  jobs: ['view', 'create'],
+  sub_jobs: ['view', 'create'],
+  activity_logs: ['view'],
 };
+
 
 // Virtual modules for labour-scoped roles (only Special Actions column)
 const ASSIGNED_LABOUR_MODULE = 'assigned_labour';
@@ -164,9 +165,9 @@ export default function RolePermission() {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
   // State to track permissions for new roles
   const [newRolePermissions, setNewRolePermissions] = useState<Permission[]>([]);
-  
+
   const [isLoadingStats, setIsLoadingStats] = useState(false);
-  
+
   // View modal state
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingRole, setViewingRole] = useState<Role | null>(null);
@@ -215,13 +216,13 @@ export default function RolePermission() {
     }
   }, [apiBaseUrl]);
 
-  
+
 
   useEffect(() => {
     fetchRoles();
   }, [fetchRoles]);
 
- 
+
 
   // Pagination logic
   const paginatedRoles = roles.slice(
@@ -310,7 +311,7 @@ export default function RolePermission() {
               );
             }
           }
-          
+
           return transformedRole;
         } else {
           toast.error('Failed to fetch role details');
@@ -370,6 +371,19 @@ export default function RolePermission() {
     [ASSIGNED_LEAD_LABOUR_MODULE]: ['assign'],
   };
 
+const LABOUR_HIDDEN_PERMISSIONS: Record<string, string[]> = {
+  jobs:            ['create'],
+  sub_jobs:        ['create'],
+  products:        ['view'],
+  orders:          ['create'],
+  inventory_price: ['view'],
+  [ASSIGNED_LABOUR_MODULE]: ['assign'],
+  [ASSIGNED_LEAD_LABOUR_MODULE]: ['assign'],
+};
+  const isPermissionHidden = (modName: string, act: string, roleName: string): boolean => {
+  if (!isLabourOnlyRole(roleName)) return false;
+  return (LABOUR_HIDDEN_PERMISSIONS[modName] || []).includes(act);
+};
   const normalizeRoleName = (roleName: string) =>
     stripPlatformSuffix(roleName)
       .trim()
@@ -592,7 +606,7 @@ export default function RolePermission() {
       setIsLoadingViewRole(false);
     }
   };
-  
+
   const groupPermissionsByModule = (permissions: Permission[]) => {
     const grouped: { [key: string]: Permission[] } = {};
     permissions.forEach(perm => {
@@ -605,7 +619,7 @@ export default function RolePermission() {
     });
     return grouped;
   };
-  
+
   const formatModuleName = (module: string): string => {
     // Handle virtual modules display name
     if (module === ASSIGNED_LABOUR_MODULE) return 'Assigned Labour';
@@ -615,7 +629,7 @@ export default function RolePermission() {
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
   };
-  
+
   const formatActionName = (action: string): string => {
     const actionMap: { [key: string]: string } = {
       'view': 'View',
@@ -875,7 +889,7 @@ export default function RolePermission() {
       newErrors.roleName = 'Role name is required';
       hasErrors = true;
     }
- 
+
     if (hasErrors) {
       setErrors(newErrors);
       return;
@@ -1111,9 +1125,9 @@ export default function RolePermission() {
   ): { view: boolean; create: boolean; edit: boolean; delete: boolean } => {
     const acts = getActionsForModule(modName, roleName, platform);
     return {
-      view:   acts.includes('view'),
+      view: acts.includes('view'),
       create: acts.includes('create'),
-      edit:   acts.includes('edit'),
+      edit: acts.includes('edit'),
       delete: acts.includes('delete'),
     };
   };
@@ -1191,13 +1205,13 @@ export default function RolePermission() {
                       paginatedRoles.map((role) => {
                         const permissionCount = getPermissionCount(role);
                         const isProtectedRole = isProtectedRoleName(role.roleName);
-                        
+
                         return (
                           <tr key={role.id} className="hover:bg-gray-50">
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex items-center gap-2">
                                 <Circle className="h-4 w-4 text-blue-600" />
-                                <span className="text-sm font-medium text-gray-900">{role.roleName}</span> 
+                                <span className="text-sm font-medium text-gray-900">{role.roleName}</span>
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -1234,7 +1248,7 @@ export default function RolePermission() {
                   </tbody>
                 </table>
               </div>
-            
+
               {/* Pagination Controls */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
@@ -1410,13 +1424,12 @@ export default function RolePermission() {
                 <h3 className="text-lg font-semibold bg-primary text-white p-3 rounded-t-lg flex items-center gap-3">
                   <span>Permissions</span>
                   {formData.roleName && (
-                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 ${
-                      getPlatformTag(formData.roleName) === 'Mobile'
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 ${getPlatformTag(formData.roleName) === 'Mobile'
                         ? 'bg-green-500 text-white'
                         : getPlatformTag(formData.roleName) === 'Portal'
-                        ? 'bg-purple-500 text-white'
-                        : 'bg-white/20 text-white'
-                    }`}>
+                          ? 'bg-purple-500 text-white'
+                          : 'bg-white/20 text-white'
+                      }`}>
                       {getPlatformTag(formData.roleName) === 'Mobile' ? '📱' : getPlatformTag(formData.roleName) === 'Portal' ? '🌐' : ''}
                       {getPlatformTag(formData.roleName) ? ` ${getPlatformTag(formData.roleName)}` : ''}
                     </span>
@@ -1506,12 +1519,12 @@ export default function RolePermission() {
                             {/* Module name */}
                             <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300 capitalize">
                               {formatModuleName(modName)}
-                              
+
                             </td>
 
-                            {/* View */}
+                            {/* View */} 
                             <td className="px-4 py-3 text-center border border-gray-300">
-                              {!isAssignedModule && colVis.view ? (
+                              {!isAssignedModule && colVis.view && !isPermissionHidden(modName, 'view', formData.roleName) ? (
                                 <input
                                   type="checkbox"
                                   checked={getPermissionValue(modName, 'view', permSource)}
@@ -1525,7 +1538,7 @@ export default function RolePermission() {
 
                             {/* Create */}
                             <td className="px-4 py-3 text-center border border-gray-300">
-                              {!isDashboard && !isAssignedModule && colVis.create ? (
+                              {!isDashboard && !isAssignedModule && colVis.create && !isPermissionHidden(modName, 'create', formData.roleName) ? (
                                 <input
                                   type="checkbox"
                                   checked={getPermissionValue(modName, 'create', permSource)}
@@ -1539,7 +1552,7 @@ export default function RolePermission() {
 
                             {/* Edit */}
                             <td className="px-4 py-3 text-center border border-gray-300">
-                              {!isDashboard && !isAssignedModule && colVis.edit ? (
+                              {!isDashboard && !isAssignedModule && colVis.edit && !isPermissionHidden(modName, 'edit', formData.roleName) ? (
                                 <input
                                   type="checkbox"
                                   checked={getPermissionValue(modName, 'edit', permSource)}
@@ -1554,7 +1567,7 @@ export default function RolePermission() {
                             {/* Delete — column hidden for labour-scoped */}
                             {!isLabourRoleSelected && (
                               <td className="px-4 py-3 text-center border border-gray-300">
-                                {!isDashboard && !isAssignedModule && colVis.delete ? (
+                                {!isDashboard && !isAssignedModule && colVis.delete && !isPermissionHidden(modName, 'delete', formData.roleName) ? (
                                   <input
                                     type="checkbox"
                                     checked={getPermissionValue(modName, 'delete', permSource)}
@@ -1573,6 +1586,7 @@ export default function RolePermission() {
                                 <div className="space-y-2">
                                   {moduleActs
                                     .filter(a => !['view', 'create', 'edit', 'delete'].includes(a))
+                                    .filter(a => !isPermissionHidden(modName, a, formData.roleName))  // ← ADD THIS LINE
                                     .map((a) => (
                                       <div key={a} className="flex items-center justify-center">
                                         <input
@@ -1642,7 +1656,7 @@ export default function RolePermission() {
                 <DialogTitle className="text-2xl font-bold uppercase">
                   {viewingRole?.roleName || 'Role Details'}
                 </DialogTitle>
-              </div> 
+              </div>
             </div>
             <DialogDescription className="text-base mt-2">
               {viewingRole?.description || 'Role View Details'}
@@ -1689,7 +1703,7 @@ export default function RolePermission() {
                         ASSIGNED_LEAD_LABOUR_MODULE,
                       ];
                       const moduleOrder = allModulesForView.filter(mod => groupedPermissions[mod]);
-                      
+
                       return moduleOrder.length > 0 ? (
                         moduleOrder.map((module) => {
                           const modulePermissions = groupedPermissions[module];
