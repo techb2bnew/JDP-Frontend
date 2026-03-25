@@ -77,12 +77,12 @@ import {
 // (Removed dummy KPI data; KPIs now use live API summary)
 
 const revenueData = [
-  { month: "Jan", revenue: 65000, expenses: 45000, profit: 20000 },
-  { month: "Feb", revenue: 72000, expenses: 48000, profit: 24000 },
-  { month: "Mar", revenue: 68000, expenses: 47000, profit: 21000 },
-  { month: "Apr", revenue: 79000, expenses: 52000, profit: 27000 },
-  { month: "May", revenue: 85000, expenses: 55000, profit: 30000 },
-  { month: "Jun", revenue: 84725, expenses: 54000, profit: 30725 },
+  { month: "Jan", revenue: 65000, expenses: 45000, profit: 20000 ,jobs:30},
+  { month: "Feb", revenue: 72000, expenses: 48000, profit: 24000,jobs:10 },
+  { month: "Mar", revenue: 68000, expenses: 47000, profit: 21000 ,jobs:70},
+  { month: "Apr", revenue: 79000, expenses: 52000, profit: 27000 ,jobs:0},
+  { month: "May", revenue: 85000, expenses: 55000, profit: 30000,jobs:40 },
+  { month: "Jun", revenue: 84725, expenses: 54000, profit: 30725 ,jobs:70},
 ];
 
 // (Removed static projectStatusData; now fetched from API)
@@ -461,6 +461,8 @@ export function DashboardOverview() {
       fetchRevenueAnalytics();
     }
   }, [dateFrom, dateTo]);
+  console.log(revenueData,"revenueDatarevenueData");
+  
 
   return (
     <div className="space-y-6">

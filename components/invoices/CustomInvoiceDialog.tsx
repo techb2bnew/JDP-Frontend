@@ -63,6 +63,7 @@ export interface CreateEstimatePayload {
   due_date: string;
 
   job_id: number;
+  estimate_source_type:string
 
   // additional_cost: {
   //   description: string;
@@ -903,7 +904,9 @@ export const CustomInvoiceDialog = ({
         status: 'sent',
         invoice_type: mapInvoiceTypeToAPI(effectiveInlineInvoiceData.invoiceType),
         invoice_source: "custom",
-        custom_products: customProducts
+        custom_products: customProducts,
+        estimate_source_type:blueSheet?.job?.estimated_cost ? "estimate_job" : "time_material_job"
+
       }
       if (isContractBased && contractorId) payload.contractor_id = contractorId;
       if (customerId) payload.customer_id = customerId;
@@ -1380,7 +1383,11 @@ export const CustomInvoiceDialog = ({
 
         custom_labor: laborPayload,
         custom_products: productsPayload,
+        estimate_source_type: blueSheet?.job?.estimatedCost? 'estimate_job' : 'time_material_job'
+
       };
+      console.log(payload,"payloadpayload");
+      
 
       const createdInvoice = await apiClient.createEstimate(payload);
       dispatch(addInvoice(createdInvoice));
@@ -1466,7 +1473,7 @@ export const CustomInvoiceDialog = ({
     fetchSuppliersList();
     fetchJobsList();
   }, []);
-
+ 
   if (!blueSheet || !viewInvoiceData) return null;
 
   return (

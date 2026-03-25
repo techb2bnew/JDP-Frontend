@@ -3171,7 +3171,6 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
           </div>
  
           <div style="text-align:center;margin-bottom:32px;">
-            <div style="font-size:28px;font-weight:bold;margin-bottom:20px;color:#1f2937;">Total $${(invoice.total_amount || 0).toFixed(2)}</div>
             <div style="font-size:14px;color:blue;font-weight:500;">EMAIL: jen@jdpelectric.us 952-449-1088</div>
           </div>
  
@@ -3413,7 +3412,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
         customerAddress: customerData.address
       }))
     }
-  }, [customerData?.address])
+  }, [customerData?.address]);
+  
 
   const handleSaveInvoiceAsDraft = async () => {
     // Validation
@@ -3633,7 +3633,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
         status: 'draft',
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType),
         notes: inlineInvoiceData.notes || '',
-        custom_products: customProducts
+        custom_products: customProducts,
+        estimate_source_type: job?.estimatedCost? 'estimate_job' : 'time_material_job'
+
       }
 
       if (editingInvoiceId) {
@@ -7352,7 +7354,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
 
               {/* Total and Contact */}
               <div className="text-center mb-6">
-                <div className="text-2xl font-bold mb-4">Total ${calculateInvoiceSubtotal().toFixed(2)}</div>
+                {/* <div className="text-2xl font-bold mb-4">Total ${calculateInvoiceSubtotal().toFixed(2)}</div> */}
                 <div className="text-sm text-blue-600">
                   EMAIL: jen@jdpelectric.us 952-449-1088
                 </div>

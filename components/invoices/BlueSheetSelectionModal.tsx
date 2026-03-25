@@ -138,7 +138,9 @@ export function BlueSheetSelectionModal({
         }
 
         onSubmitSelected(selectedSheets)
-    }
+    };
+
+    
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>

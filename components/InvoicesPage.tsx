@@ -469,7 +469,6 @@ export function InvoicesPage() {
           </div>
  
           <div style="text-align:center;margin-bottom:32px;">
-            <div style="font-size:28px;font-weight:bold;margin-bottom:20px;color:#1f2937;">Total $${(invoiceData?.total_amount || invoiceData?.total || 0).toFixed(2)}</div>
             <div style="font-size:14px;color:blue;font-weight:500;">EMAIL: jen@jdpelectric.us 952-449-1088</div>
           </div>
  

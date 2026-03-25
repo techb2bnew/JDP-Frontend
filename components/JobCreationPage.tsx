@@ -998,6 +998,8 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                 value={formData.phone}
                 countryCallingCodeEditable={false}
                 limitMaxLength
+                  withCountryCallingCode
+                  defaultCountry="US"
                 onChange={(value) => {
                   const safeValue = value || ''
                   const newFormData = { ...formData, phone: safeValue }
@@ -1008,7 +1010,6 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                   clearValidationError('phone')
                 }}
                 international
-                defaultCountry="US"
                 placeholder="Phone number"
                 className={
                   validationErrors.phone
