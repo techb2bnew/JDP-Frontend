@@ -106,9 +106,6 @@ interface ProductFormData {
   description?: string;
 }
 
-
-
-
 export const CustomInvoiceDialog = ({
   open,
   onOpenChange,
@@ -122,9 +119,11 @@ export const CustomInvoiceDialog = ({
   const viewInvoiceData = useMemo(() => {
     if (!blueSheet) return null
     const job = blueSheet.job || {};    
+    console.log(blueSheet.material_entries,"blueSheet.material_entries");
+    
     const products = (blueSheet.material_entries || []).map((item: any, index: number) => ({
-      id: item.product?.id || index,
-      product_id: item?.id,
+      id: item.product?.product_id || index,
+      product_id: item?.product_id,
       product_name: item.material_name,
       description: item.product?.description || item.material_name,
       jdp_price: item.jdp_price || 0,
@@ -132,6 +131,8 @@ export const CustomInvoiceDialog = ({
       total_cost: item.total_cost ?? (item.material_used || 0) * (item.jdp_price || 0),
       stock_quantity: item.material_used || 0,
       supplier_id: item.product?.supplier_id ?? item.product?.suppliers?.id ?? 1,
+      material_used:item.material_used,
+      total_ordered:item.total_ordered
     }))
     const laborLabel = (blueSheet.total_labor_hours || '').toString().trim()
     // Derive labor cost from labor_entries so it reflects merged selections
@@ -432,7 +433,9 @@ export const CustomInvoiceDialog = ({
                     showSearchResults: false,
                     supplierId: product.supplier_id || 1,
                     // backend flag is is_custom; keep boolean and map to frontend key
-                    isCustomProduct: product.is_custom === true
+                    isCustomProduct: product.is_custom === true,
+                    material_used:product.material_used,
+                    total_ordered:product.total_ordered
                   }
                 }) || [{
                   id: Math.random().toString(36).substring(2, 9),
@@ -447,7 +450,9 @@ export const CustomInvoiceDialog = ({
                   showSearchResults: false,
                   supplierId: 1,
                   isCustomProduct: false,
-                  uni_cost :0
+                  uni_cost :0,
+                  material_used:"",
+                  total_ordered:""
                 }]
           };
 
@@ -508,15 +513,7 @@ console.log(totalAmount,"amounttt");
   const calculateInvoiceSubtotal = () => {
     return inlineInvoiceData.lineItems.reduce((sum, item) => sum + item.total, 0)
   }
-  
-  useEffect(()=>{
-    if(blueSheet.material_entries?.length){
-      const amount =  blueSheet.material_entries.reduce((sum, item) => sum + (item.total_cost ?? (item.material_used || 0) * (item.jdp_price || 0)), 0);
-      console.log(amount,"amount");
-      settotalProductAmount(amount)
-    }
-  },[blueSheet, totalLaborCost])
-  console.log(totalProductAmount,"::calculateInvoiceSubtotal");
+
   
 
   const updateInvoiceLineItem = (itemId: string, field: string, value: any) => {
@@ -795,10 +792,11 @@ console.log(totalAmount,"amounttt");
       if (nonEmptyLineItems.length > 0) {
         // Use line items (these already include the BlueSheet items + any user-added rows)
         for (const item of nonEmptyLineItems) {
+          
           const treatedAsCustom =
             item.isCustomProduct === true || !item.productId
          const base: any = {
-           ...(item.isCustomProduct === false && {
+           ...(item.productId && {
              product_id: item.productId,
            }),
 
@@ -817,6 +815,8 @@ console.log(totalAmount,"amounttt");
            estimated_price: item.estimatedPrice || 0,
            total_cost: item.total,
            is_custom: treatedAsCustom,
+           material_used:item.material_used,
+           total_ordered:item.total_ordered
          };
 
           // Include product id only for searched/selected products

@@ -808,6 +808,8 @@ export function BlueSheetApprovalDialog({
   const handleSendCustomInvoice = () => {
     setIsCustomInvoiceOpen(true)
   }
+  console.log(blueSheet,"blueeeee");
+  
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
