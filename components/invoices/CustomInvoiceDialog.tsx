@@ -1696,7 +1696,7 @@ console.log(totalAmount,"amounttt");
                             <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
                             <Input
                               type="number"
-                              value={item.jdp_price}
+                              value={item.rate}
                               onChange={(e) => updateInvoiceLineItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
                               className="text-right border-0 p-2 pl-6"
                               min="0"
