@@ -254,7 +254,8 @@ export const CustomInvoiceDialog = ({
   const [productsList, setProductsList] = useState<any[]>([])
   const [jobsList, setJobsList] = useState<any[]>([])
   const [selectedJob, setSelectedJob] = useState<any>(null)
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [totalProductAmount, settotalProductAmount] = useState(0)
 
   // Refs to ensure we always read the latest typed values from the inputs
   const dueDateRef = useRef<HTMLInputElement | null>(null)
@@ -501,12 +502,21 @@ export const CustomInvoiceDialog = ({
   const subtotal = itemsTotal + laborTotal + additionalTotal;
   const taxAmount = subtotal * (newInvoice.taxRate || 0);
   const totalAmount = subtotal + taxAmount;
+console.log(totalAmount,"amounttt");
 
   // Invoice Helper Functions
   const calculateInvoiceSubtotal = () => {
     return inlineInvoiceData.lineItems.reduce((sum, item) => sum + item.total, 0)
   }
-
+  
+  useEffect(()=>{
+    if(blueSheet.material_entries?.length){
+      const amount =  blueSheet.material_entries.reduce((sum, item) => sum + (item.total_cost ?? (item.material_used || 0) * (item.jdp_price || 0)), 0);
+      console.log(amount,"amount");
+      settotalProductAmount(amount)
+    }
+  },[blueSheet, totalLaborCost])
+  console.log(totalProductAmount,"::calculateInvoiceSubtotal");
   
 
   const updateInvoiceLineItem = (itemId: string, field: string, value: any) => {
@@ -760,9 +770,7 @@ export const CustomInvoiceDialog = ({
 
     if (!hasInvoiceLineItems && !hasBlueSheetMaterials) {
       errors.lineItems = 'Please add at least one product item'
-    }
-    console.log(inlineInvoiceData.jobId, 'inlineInvoiceData.jobId')
-    console.log(errors, 'errors handlePreviewAndSend')
+    } 
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors)
       toast.error('Please fix the validation errors')
@@ -772,7 +780,9 @@ export const CustomInvoiceDialog = ({
     setValidationErrors({})
     setSendingInvoice(true)
     try {
-      const subtotal = calculateInvoiceSubtotal()
+      const subtotal = calculateInvoiceSubtotal();
+      console.log(subtotal,"subtotalsubtotalsubtotal");
+      
 
       // Build customProducts primarily from dialog line items.
       // If no line items are present, fall back to BlueSheet material_entries.
@@ -784,11 +794,11 @@ export const CustomInvoiceDialog = ({
 
       if (nonEmptyLineItems.length > 0) {
         // Use line items (these already include the BlueSheet items + any user-added rows)
-        for (const item of nonEmptyLineItems) {          
+        for (const item of nonEmptyLineItems) {
           const treatedAsCustom =
             item.isCustomProduct === true || !item.productId
           const base: any = {
-            productId:item.productId,
+            product_id:item.productId,
             product_name: item.item,
             description: item.description || "",
             supplier_id: item.supplierId || selectedSupplierId || 1,
@@ -918,9 +928,11 @@ export const CustomInvoiceDialog = ({
         custom_products: customProducts,
         estimate_source_type:blueSheet?.job?.estimated_cost ? "estimate_job" : "time_material_job",
         total_labor_cost: laborEntriesTotalFromBlueSheet,
-        
-
+        // totalProductAmount:totalProductAmount,
+        total_amount : totalProductAmount + (viewInvoiceData as any).labor_total_cost
       }
+      console.log(payload,"payloadd");
+      
       if (isContractBased && contractorId) payload.contractor_id = contractorId;
       if (customerId) payload.customer_id = customerId;
 
@@ -1039,7 +1051,6 @@ export const CustomInvoiceDialog = ({
         const customProducts = (viewInvoiceData as any)?.custom_products as any[] | undefined
         if (customProducts && customProducts.length > 0) {          
           lineItemsSource = customProducts.map((p: any) => {
-             console.log(p,"::ppp");
             const qty = Number(p.stock_quantity) || 1
             const rate = Number(p.jdp_price || p.unit_cost || p.estimated_price || p.total_cost || 0)
             const total = Number(p.total_cost || rate * qty || 0)
@@ -1103,7 +1114,6 @@ export const CustomInvoiceDialog = ({
         dueDate: effectiveInlineInvoiceData.dueDate,
         paymentCredits: effectiveInlineInvoiceData.paymentCredits,
         balanceDue: effectiveInlineInvoiceData.balanceDue,
-        
 
         lineItems: lineItemsSource.map((item) => ({
           qty: item.qty,
@@ -1686,7 +1696,7 @@ export const CustomInvoiceDialog = ({
                             <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
                             <Input
                               type="number"
-                              value={item.rate}
+                              value={item.jdp_price}
                               onChange={(e) => updateInvoiceLineItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
                               className="text-right border-0 p-2 pl-6"
                               min="0"
