@@ -890,6 +890,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
         notes: inlineInvoiceData.notes || '',
         status: 'draft',
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
+        total_amount: subtotal,
         custom_products: customProducts
       }
 
@@ -1074,6 +1075,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
         status: 'sent',
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
         custom_products: customProducts,
+        total_amount:subtotal,
         estimate_source_type: estimateCost? 'estimate_job' : 'time_material_job'
 
       }

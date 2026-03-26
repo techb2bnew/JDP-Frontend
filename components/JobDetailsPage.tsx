@@ -1978,7 +1978,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
           : { description: "", amount: 0 },
 
         custom_labor: laborPayload,
-        custom_products: productsPayload,
+        custom_products: productsPayload, 
       };
 
       const createdInvoice = await apiClient.createEstimate(payload);
@@ -3489,6 +3489,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
         status: 'draft',
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType),
         notes: inlineInvoiceData.notes || '',
+        total_amount:subtotal,
         custom_products: customProducts
       }
 
@@ -3634,8 +3635,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType),
         notes: inlineInvoiceData.notes || '',
         custom_products: customProducts,
-        estimate_source_type: job?.estimatedCost? 'estimate_job' : 'time_material_job'
-
+        estimate_source_type: job?.estimatedCost? 'estimate_job' : 'time_material_job',
+        total_amount:subtotal,
       }
 
       if (editingInvoiceId) {

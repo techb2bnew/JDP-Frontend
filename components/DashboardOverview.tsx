@@ -26,6 +26,7 @@ import {
   RadialBarChart,
   RadialBar,
   ComposedChart,
+  Legend
 } from "recharts";
 import {
   TrendingUp,
@@ -74,82 +75,8 @@ import {
   DateObject,
 } from "react-multi-date-picker";
 
-// (Removed dummy KPI data; KPIs now use live API summary)
 
-const revenueData = [
-  { month: "Jan", revenue: 65000, expenses: 45000, profit: 20000 ,jobs:30},
-  { month: "Feb", revenue: 72000, expenses: 48000, profit: 24000,jobs:10 },
-  { month: "Mar", revenue: 68000, expenses: 47000, profit: 21000 ,jobs:70},
-  { month: "Apr", revenue: 79000, expenses: 52000, profit: 27000 ,jobs:0},
-  { month: "May", revenue: 85000, expenses: 55000, profit: 30000,jobs:40 },
-  { month: "Jun", revenue: 84725, expenses: 54000, profit: 30725 ,jobs:70},
-];
 
-// (Removed static projectStatusData; now fetched from API)
-
-const teamPerformanceData = [
-  {
-    name: "David Wilson",
-    role: "Lead Electrician",
-    completedJobs: 23,
-    rating: 4.9,
-    status: "active",
-  },
-  {
-    name: "Mike Rodriguez",
-    role: "Electrician",
-    completedJobs: 18,
-    rating: 4.7,
-    status: "active",
-  },
-  {
-    name: "Sarah Chen",
-    role: "Project Manager",
-    completedJobs: 31,
-    rating: 4.8,
-    status: "active",
-  },
-  {
-    name: "John Smith",
-    role: "Lead Plumber",
-    completedJobs: 19,
-    rating: 4.6,
-    status: "on-job",
-  },
-];
-
-// Recent activities are fetched from API
-
-const upcomingTasks = [
-  {
-    id: 1,
-    title: "Review Quarterly Reports",
-    dueDate: "Today, 3:00 PM",
-    priority: "high",
-    category: "Analytics",
-  },
-  {
-    id: 2,
-    title: "Approve Overtime Requests",
-    dueDate: "Tomorrow, 9:00 AM",
-    priority: "medium",
-    category: "HR",
-  },
-  {
-    id: 3,
-    title: "Update Inventory Levels",
-    dueDate: "Jan 25, 2:00 PM",
-    priority: "low",
-    category: "Inventory",
-  },
-  {
-    id: 4,
-    title: "Customer Follow-up Call",
-    dueDate: "Jan 26, 10:00 AM",
-    priority: "medium",
-    category: "Sales",
-  },
-];
 
 const quickActions = [
   { title: "Jobs", icon: Plus, color: "bg-blue-500", path: "jobs" },
@@ -175,40 +102,7 @@ const quickActions = [
   { title: "Orders", icon: Package, color: "bg-indigo-500", path: "orders" },
 ];
 
-const moduleCards = [
-  {
-    title: "Job Management",
-    description: "Manage projects and assignments",
-    icon: Briefcase,
-    stats: "142 Active Jobs",
-    color: "from-blue-500 to-blue-600",
-    path: "job-management",
-  },
-  {
-    title: "Staff Management",
-    description: "Team performance and scheduling",
-    icon: UserCheck,
-    stats: "89 Team Members",
-    color: "from-green-500 to-green-600",
-    path: "staff-management",
-  },
-  {
-    title: "Live Tracking",
-    description: "Real-time project monitoring",
-    icon: Activity,
-    stats: "23 Live Jobs",
-    color: "from-purple-500 to-purple-600",
-    path: "live-tracking",
-  },
-  {
-    title: "Analytics",
-    description: "Business insights and reports",
-    icon: BarChart3,
-    stats: "$847K Revenue",
-    color: "from-orange-500 to-orange-600",
-    path: "analytics",
-  },
-];
+
 
 export function DashboardOverview() {
   const [selectedTimeframe, setSelectedTimeframe] = useState("7days");
@@ -256,7 +150,15 @@ export function DashboardOverview() {
   const [selectedRanges, setSelectedRanges] = useState<any[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [revenueChartData, setRevenueChartData] = useState([]);
+  const [revenueChartData, setRevenueChartData] = useState<{
+    month: string;
+    tm_revenue: number;
+    tm_profit: number;
+    tm_jobs: number;
+    est_revenue: number;
+    est_profit: number;
+    est_jobs: number;
+  }[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -382,10 +284,10 @@ export function DashboardOverview() {
       value:
         typeof summary?.total_revenue === "number"
           ? new Intl.NumberFormat("en-US", {
-              style: "currency",
-              currency: "USD",
-              minimumFractionDigits: 0,
-            }).format(summary.total_revenue)
+            style: "currency",
+            currency: "USD",
+            minimumFractionDigits: 0,
+          }).format(summary.total_revenue)
           : "$0",
       change: "",
       trend: "up",
@@ -429,41 +331,71 @@ export function DashboardOverview() {
     }
   };
 
-  const fetchRevenueAnalytics = async () => {
+
+
+
+  const fetchRevenueAnalytics = async (from = "", to = "") => {
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-
       const token = localStorage.getItem("jdp_auth")
         ? JSON.parse(localStorage.getItem("jdp_auth")!).token
         : null;
 
+      const params = new URLSearchParams();
+      if (from) params.set("startDate", from);
+      if (to) params.set("endDate", to);
+
       const res = await fetch(
-        `${apiBaseUrl}/analytics/revenue?start_date=${dateFrom}&end_date=${dateTo}&status=paid`,
+        `${apiBaseUrl}/analytics/revenue-analytics?${params.toString()}`,
         {
           headers: {
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-        },
+        }
       );
 
       const data = await res.json();
 
       if (data?.success) {
-        setRevenueChartData(data.data || []);
+        const tmJobs: any[] = data.data?.revenue_analytics_by_source?.time_material_job || [];
+        const estJobs: any[] = data.data?.revenue_analytics_by_source?.estimate_job || [];
+
+        const merged = tmJobs.map((tm: any, i: number) => {
+          const est = estJobs[i] || {};
+          return {
+            month: tm.month,
+            tm_revenue: tm.revenue || 0,
+            tm_profit: tm.profit || 0,
+            tm_jobs: tm.jobs || 0,
+            est_revenue: est.revenue || 0,
+            est_profit: est.profit || 0,
+            est_jobs: est.jobs || 0,
+          };
+        });
+
+        setRevenueChartData(merged);
       }
     } catch (err) {
       console.error(err);
     }
   };
+
+  useEffect(() => {
+    fetchRevenueAnalytics();
+  }, []);
+
   useEffect(() => {
     if (dateFrom && dateTo) {
-      fetchRevenueAnalytics();
+      fetchRevenueAnalytics(dateFrom, dateTo);
     }
   }, [dateFrom, dateTo]);
-  console.log(revenueData,"revenueDatarevenueData");
-  
 
+  useEffect(() => {
+    if (!dateFrom && !dateTo && selectedRanges.length === 0) {
+      fetchRevenueAnalytics();
+    }
+  }, [dateFrom, dateTo, selectedRanges]);
   return (
     <div className="space-y-6">
       {/* Welcome Header */}
@@ -494,7 +426,7 @@ export function DashboardOverview() {
         </div>
       </div>
 
-           {/* Quick Actions */}
+      {/* Quick Actions */}
       <Card className="border-0 shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -527,7 +459,7 @@ export function DashboardOverview() {
           </div>
         </CardContent>
       </Card>
-      
+
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {kpiCards.map((kpi, index) => {
@@ -561,7 +493,7 @@ export function DashboardOverview() {
         })}
       </div>
 
- 
+
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -573,44 +505,37 @@ export function DashboardOverview() {
                 <TrendingUp className="h-5 w-5 text-[#00A1FF]" />
                 Revenue Analytics
               </CardTitle>
-              {/* <Tabs value={selectedTimeframe} onValueChange={setSelectedTimeframe}>
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="7days">7D</TabsTrigger>
-                  <TabsTrigger value="30days">30D</TabsTrigger>
-                  <TabsTrigger value="90days">90D</TabsTrigger>
-                </TabsList>
-              </Tabs> */}
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="w-[260px] justify-start text-left font-normal relative pr-10"
+                    className="w-[300px] justify-start text-left font-normal relative pr-10"
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     <span className="flex-1 truncate">
                       {selectedRanges.length > 0
                         ? (() => {
-                            const allDates = selectedRanges
-                              .flat()
-                              .map((d) =>
-                                d instanceof DateObject
-                                  ? d.toDate()
-                                  : new Date(d),
-                              )
-                              .filter((d) => !Number.isNaN(d.getTime()));
+                          const allDates = selectedRanges
+                            .flat()
+                            .map((d) =>
+                              d instanceof DateObject
+                                ? d.toDate()
+                                : new Date(d),
+                            )
+                            .filter((d) => !Number.isNaN(d.getTime()));
 
-                            const sorted = [...allDates].sort(
-                              (a, b) => a.getTime() - b.getTime(),
-                            );
-                            const from = sorted[0];
-                            const to = sorted[sorted.length - 1];
+                          const sorted = [...allDates].sort(
+                            (a, b) => a.getTime() - b.getTime(),
+                          );
+                          const from = sorted[0];
+                          const to = sorted[sorted.length - 1];
 
-                            if (!from) return "Pick dates";
-                            if (sorted.length === 1)
-                              return format(from, "LLL dd, y");
+                          if (!from) return "Pick dates";
+                          if (sorted.length === 1)
+                            return format(from, "LLL dd, y");
 
-                            return `${format(from, "LLL dd, y")} - ${format(to, "LLL dd, y")}`;
-                          })()
+                          return `${format(from, "LLL dd, y")} - ${format(to, "LLL dd, y")}`;
+                        })()
                         : "Pick dates range"}
                     </span>
 
@@ -675,60 +600,96 @@ export function DashboardOverview() {
           <CardContent>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                {/* <AreaChart data={revenueData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="month" stroke="#64748b" />
-                  <YAxis stroke="#64748b" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'white', 
-                      border: '1px solid #e2e8f0', 
-                      borderRadius: '8px',
-                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-                    }} 
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="revenue"
-                    stackId="1"
-                    stroke="#00A1FF"
-                    fill="#00A1FF"
-                    fillOpacity={0.3}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="profit"
-                    stackId="2"
-                    stroke="#00CEB6"
-                    fill="#00CEB6"
-                    fillOpacity={0.3}
-                  />
-                </AreaChart> */}
-                <ComposedChart data={revenueData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="month" stroke="#64748b" />
-                  <YAxis stroke="#64748b" />
+                <ComposedChart data={revenueChartData} barGap={4} barCategoryGap="30%">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis dataKey="month" stroke="#64748b" axisLine={false} tickLine={false} />
+                  <YAxis stroke="#64748b" axisLine={false} tickLine={false} />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: "white",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "8px",
-                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                    cursor={{ fill: "rgba(0,0,0,0.04)" }}
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload || !payload.length) return null;
+                      return (
+                        <div
+                          style={{
+                            backgroundColor: "white",
+                            border: "1px solid #e2e8f0",
+                            borderRadius: "8px",
+                            boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                            padding: "12px 16px",
+                            minWidth: "200px",
+                          }}
+                        >
+                          <p style={{ fontWeight: 600, marginBottom: 8, color: "#1e293b" }}>
+                            {label}
+                          </p>
+
+                          {/* Estimate Job Section */}
+                          <p style={{ fontSize: 11, color: "#64748b", marginBottom: 4, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                            Estimate Job
+                          </p>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                            <span style={{ fontSize: 13, color: "#00CEB6" }}>● Revenue</span>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>
+                              ${(payload.find(p => p.dataKey === "est_revenue")?.value ?? 0).toLocaleString()}
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                            <span style={{ fontSize: 13, color: "#009E8E" }}>● Profit</span>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>
+                              ${(payload.find(p => p.dataKey === "est_profit")?.value ?? 0).toLocaleString()}
+                            </span>
+                          </div>
+
+                          {/* T&M Job Section */}
+                          <p style={{ fontSize: 11, color: "#64748b", marginBottom: 4, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                            Time &amp; Material Job
+                          </p>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                            <span style={{ fontSize: 13, color: "#00A1FF" }}>● Revenue</span>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>
+                              ${(payload.find(p => p.dataKey === "tm_revenue")?.value ?? 0).toLocaleString()}
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between" }}>
+                            <span style={{ fontSize: 13, color: "#0070CC" }}>● Profit</span>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>
+                              ${(payload.find(p => p.dataKey === "tm_profit")?.value ?? 0).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      );
                     }}
                   />
-
-                  {/* 🔥 ONLY PAID JOBS DATA */}
-                  <Bar dataKey="revenue" fill="#00A1FF" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="profit" fill="#00CEB6" radius={[4, 4, 0, 0]} />
-
-                  {/* Optional jobs count */}
-                  <Line
-                    type="monotone"
-                    dataKey="jobs"
-                    stroke="#FF6692"
-                    strokeWidth={3}
+                  <Legend
+                    iconType="circle"
+                    iconSize={8}
+                    wrapperStyle={{ paddingTop: "16px" }}
                   />
+ 
+
+                  {/* Time & Material Job */}
+                  <Bar dataKey="tm_revenue" name="T&M Revenue" fill="#00A1FF" radius={[6, 6, 0, 0]} maxBarSize={40} />
+                  <Bar dataKey="tm_profit" name="T&M Profit" fill="#0070CC" radius={[6, 6, 0, 0]} maxBarSize={40} />
+
+                  {/* Estimate Job */}
+                  <Bar dataKey="est_revenue" name="Estimate Revenue" fill="#00CEB6" radius={[6, 6, 0, 0]} maxBarSize={40} />
+                  <Bar dataKey="est_profit" name="Estimate Profit" fill="#009E8E" radius={[6, 6, 0, 0]} maxBarSize={40} />
+
+                  {/* Hidden bars for tooltip data only */}
+                  <Bar dataKey="tm_profit" name="T&M Profit" fill="#0070CC" hide />
+                  <Bar dataKey="est_profit" name="Estimate Profit" fill="#009E8E" hide />
                 </ComposedChart>
+
+                {/* 🔥 ONLY PAID JOBS DATA */}
+                <Bar dataKey="revenue" fill="#00A1FF" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="profit" fill="#00CEB6" radius={[4, 4, 0, 0]} />
+
+                <Line
+                  type="monotone"
+                  dataKey="jobs"
+                  stroke="#FF6692"
+                  strokeWidth={3}
+                />
               </ResponsiveContainer>
             </div>
           </CardContent>
@@ -793,9 +754,6 @@ export function DashboardOverview() {
                 <Activity className="h-5 w-5 text-[#00A1FF]" />
                 Recent Activities
               </CardTitle>
-              {/* <Button variant="ghost" size="sm">
-                View All <ArrowRight className="h-4 w-4 ml-1" />
-              </Button> */}
             </div>
           </CardHeader>
           <CardContent>
@@ -859,7 +817,7 @@ export function DashboardOverview() {
               disabled={
                 activitiesLoading ||
                 activitiesPage >=
-                  Math.ceil(activitiesTotal / activitiesPageSize)
+                Math.ceil(activitiesTotal / activitiesPageSize)
               }
             >
               Next
@@ -875,30 +833,10 @@ export function DashboardOverview() {
                 <Timer className="h-5 w-5 text-[#00A1FF]" />
                 Financial Summary
               </CardTitle>
-              {/* <Button variant="ghost" size="sm">
-                <Plus className="h-4 w-4" />
-              </Button> */}
             </div>
           </CardHeader>
           <CardContent>
-            {/* <div className="space-y-4">
-              {upcomingTasks.map((task) => (
-                <div key={task.id} className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-medium text-sm">{task.title}</h4>
-                      <Badge className={getPriorityColor(task.priority)}>
-                        {task.priority}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{task.category} • {task.dueDate}</p>
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    <CheckCircle className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div> */}
+
             <Card className="border-0 shadow-sm">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -909,10 +847,6 @@ export function DashboardOverview() {
                     <p className="text-2xl font-bold text-foreground">
                       $84,725
                     </p>
-                    {/* <div className="flex items-center gap-1 mt-1">
-                  <TrendingUp className="h-3 w-3 text-green-600" />
-                  <span className="text-sm text-green-600">+12.5%</span>
-                </div> */}
                   </div>
                   <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
                     <DollarSign className="h-6 w-6 text-green-600" />
@@ -947,148 +881,6 @@ export function DashboardOverview() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Team Performance */}
-      {/* <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle className="flex items-center gap-2">
-              <Award className="h-5 w-5 text-[#00A1FF]" />
-              Top Performers This Month
-            </CardTitle>
-            <Button variant="outline" size="sm">
-              View Full Report <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {teamPerformanceData.map((member, index) => (
-              <div key={index} className="p-4 rounded-lg border border-border hover:shadow-md transition-shadow">
-                <div className="flex items-center gap-3 mb-3">
-                  <Avatar>
-                    <AvatarFallback className="bg-[#E6F6FF] text-[#00A1FF]">
-                      {member.name.split(' ').map(n => n[0]).join('')}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <h4 className="font-medium text-sm">{member.name}</h4>
-                    <p className="text-xs text-muted-foreground">{member.role}</p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Completed Jobs</span>
-                    <span className="font-medium">{member.completedJobs}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Rating</span>
-                    <div className="flex items-center gap-1">
-                      <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                      <span className="font-medium">{member.rating}</span>
-                    </div>
-                  </div>
-                  <Badge className={member.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}>
-                    {member.status === 'active' ? 'Available' : 'On Job'}
-                  </Badge>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card> */}
-
-      {/* Module Navigation Cards */}
-      {/* <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building className="h-5 w-5 text-[#00A1FF]" />
-            Business Modules
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {moduleCards.map((module, index) => {
-              const Icon = module.icon
-              return (
-                <div
-                  key={index}
-                  className={`relative p-6 rounded-xl bg-gradient-to-br ${module.color} text-white overflow-hidden cursor-pointer hover:scale-105 transition-transform duration-200 group`}
-                >
-                  <div className="relative z-10">
-                    <Icon className="h-8 w-8 mb-3" />
-                    <h3 className="font-semibold mb-1">{module.title}</h3>
-                    <p className="text-sm text-white/80 mb-3">{module.description}</p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{module.stats}</span>
-                      <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                    </div>
-                  </div>
-                  <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full" />
-                  <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/5 rounded-full" />
-                </div>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card> */}
-
-      {/* Financial Summary */}
-      {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-muted-foreground text-sm">Monthly Revenue</p>
-                <p className="text-2xl font-bold text-foreground">$84,725</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <TrendingUp className="h-3 w-3 text-green-600" />
-                  <span className="text-sm text-green-600">+12.5%</span>
-                </div>
-              </div>
-              <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-muted-foreground text-sm">Pending Invoices</p>
-                <p className="text-2xl font-bold text-foreground">$23,450</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <AlertCircle className="h-3 w-3 text-orange-600" />
-                  <span className="text-sm text-orange-600">15 Overdue</span>
-                </div>
-              </div>
-              <div className="w-12 h-12 bg-orange-50 rounded-lg flex items-center justify-center">
-                <CreditCard className="h-6 w-6 text-orange-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-muted-foreground text-sm">Profit Margin</p>
-                <p className="text-2xl font-bold text-foreground">36.3%</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <TrendingUp className="h-3 w-3 text-green-600" />
-                  <span className="text-sm text-green-600">Healthy</span>
-                </div>
-              </div>
-              <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
-                <BarChart3 className="h-6 w-6 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div> */}
-    </div>
+    </div >
   );
 }
