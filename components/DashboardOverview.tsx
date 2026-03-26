@@ -150,14 +150,11 @@ export function DashboardOverview() {
   const [selectedRanges, setSelectedRanges] = useState<any[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [totalRevenue, settotalRevenue] = useState("");
   const [revenueChartData, setRevenueChartData] = useState<{
     month: string;
     tm_revenue: number;
-    tm_profit: number;
-    tm_jobs: number;
-    est_revenue: number;
-    est_profit: number;
-    est_jobs: number;
+    tm_profit: number;  
   }[]>([]);
 
   useEffect(() => {
@@ -279,23 +276,7 @@ export function DashboardOverview() {
   };
 
   const kpiCards = [
-    {
-      title: "Total Revenue",
-      value:
-        typeof summary?.total_revenue === "number"
-          ? new Intl.NumberFormat("en-US", {
-            style: "currency",
-            currency: "USD",
-            minimumFractionDigits: 0,
-          }).format(summary.total_revenue)
-          : "$0",
-      change: "",
-      trend: "up",
-      period: "",
-      icon: DollarSign,
-      color: "text-green-600",
-      bgColor: "bg-green-50",
-    },
+   
     {
       title: "Active Jobs",
       value: String(summary?.active_jobs ?? 0),
@@ -358,23 +339,19 @@ export function DashboardOverview() {
       const data = await res.json();
 
       if (data?.success) {
-        const tmJobs: any[] = data.data?.revenue_analytics_by_source?.time_material_job || [];
-        const estJobs: any[] = data.data?.revenue_analytics_by_source?.estimate_job || [];
-
-        const merged = tmJobs.map((tm: any, i: number) => {
-          const est = estJobs[i] || {};
+        const tmJobs: any[] = data.data?.revenue_analytics || [];
+        // const estJobs: any[] = data.data?.revenue_analytics?.estimate_job || [];
+        const totalRev = data.data?.revenue_analytics_totals?.revenue
+        const merged = tmJobs.map((tm: any, i: number) => { 
           return {
             month: tm.month,
             tm_revenue: tm.revenue || 0,
-            tm_profit: tm.profit || 0,
-            tm_jobs: tm.jobs || 0,
-            est_revenue: est.revenue || 0,
-            est_profit: est.profit || 0,
-            est_jobs: est.jobs || 0,
+            tm_profit: tm.profit || 0, 
           };
         });
 
         setRevenueChartData(merged);
+        settotalRevenue(totalRev)
       }
     } catch (err) {
       console.error(err);
@@ -462,6 +439,29 @@ export function DashboardOverview() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <Card 
+              className="relative overflow-hidden border-0 shadow-sm hover:shadow-lg transition-all duration-300 hover:scale-105"
+            >
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div
+                        className={`w-10 h-10 rounded-lg flex items-center bg-green-50 justify-center`}
+                      >
+                        <DollarSign className={`h-5 w-5 text-green-600`} />
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Total Revenue
+                      </div>
+                    </div>
+                    <div className="text-2xl font-bold text-foreground mb-1">
+                      ${totalRevenue}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
         {kpiCards.map((kpi, index) => {
           const Icon = kpi.icon;
           return (
@@ -623,26 +623,11 @@ export function DashboardOverview() {
                             {label}
                           </p>
 
-                          {/* Estimate Job Section */}
-                          <p style={{ fontSize: 11, color: "#64748b", marginBottom: 4, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                            Estimate Job
-                          </p>
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
-                            <span style={{ fontSize: 13, color: "#00CEB6" }}>● Revenue</span>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>
-                              ${(payload.find(p => p.dataKey === "est_revenue")?.value ?? 0).toLocaleString()}
-                            </span>
-                          </div>
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-                            <span style={{ fontSize: 13, color: "#009E8E" }}>● Profit</span>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>
-                              ${(payload.find(p => p.dataKey === "est_profit")?.value ?? 0).toLocaleString()}
-                            </span>
-                          </div>
+                           
 
                           {/* T&M Job Section */}
                           <p style={{ fontSize: 11, color: "#64748b", marginBottom: 4, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                            Time &amp; Material Job
+                            Total Revenue
                           </p>
                           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
                             <span style={{ fontSize: 13, color: "#00A1FF" }}>● Revenue</span>
@@ -670,14 +655,7 @@ export function DashboardOverview() {
                   {/* Time & Material Job */}
                   <Bar dataKey="tm_revenue" name="T&M Revenue" fill="#00A1FF" radius={[6, 6, 0, 0]} maxBarSize={40} />
                   <Bar dataKey="tm_profit" name="T&M Profit" fill="#0070CC" radius={[6, 6, 0, 0]} maxBarSize={40} />
-
-                  {/* Estimate Job */}
-                  <Bar dataKey="est_revenue" name="Estimate Revenue" fill="#00CEB6" radius={[6, 6, 0, 0]} maxBarSize={40} />
-                  <Bar dataKey="est_profit" name="Estimate Profit" fill="#009E8E" radius={[6, 6, 0, 0]} maxBarSize={40} />
-
-                  {/* Hidden bars for tooltip data only */}
-                  <Bar dataKey="tm_profit" name="T&M Profit" fill="#0070CC" hide />
-                  <Bar dataKey="est_profit" name="Estimate Profit" fill="#009E8E" hide />
+  
                 </ComposedChart>
 
                 {/* 🔥 ONLY PAID JOBS DATA */}
@@ -745,9 +723,9 @@ export function DashboardOverview() {
       </div>
 
       {/* Activity and Tasks Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
         {/* Recent Activities */}
-        <Card className="border-0 shadow-sm">
+        <Card className="border-0 shadow-lg">
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle className="flex items-center gap-2">
@@ -826,7 +804,7 @@ export function DashboardOverview() {
         </Card>
 
         {/* Upcoming Tasks */}
-        <Card className="border-0 shadow-sm">
+        {/* <Card className="border-0 shadow-sm">
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle className="flex items-center gap-2">
@@ -879,7 +857,7 @@ export function DashboardOverview() {
               </CardContent>
             </Card>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
     </div >
   );
