@@ -10,6 +10,7 @@ const nextConfig = {
       'react-redux'
     ],
      isrMemoryCacheSize: 0,
+     output: 'standalone',
   },
 
   compiler: {
