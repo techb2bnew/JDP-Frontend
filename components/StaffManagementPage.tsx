@@ -669,7 +669,7 @@ export function StaffManagementPage({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
@@ -726,7 +726,7 @@ export function StaffManagementPage({
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-md border-0">
+        {/* <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-purple-100 rounded-lg">
@@ -738,7 +738,7 @@ export function StaffManagementPage({
               </div>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
       <Card className="bg-white shadow-md border-0">

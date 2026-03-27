@@ -4459,7 +4459,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                     </div>
 
                     <div className="space-y-4">
-                      <div className={`flex-1 ${!isEditing ? 'bg-[#dbdaff30] p-3 rounded-md' : ''}`}>
+                      {/* <div className={`flex-1 ${!isEditing ? 'bg-[#dbdaff30] p-3 rounded-md' : ''}`}>
                         <p className="text-sm text-gray-600">Job Type</p>
                         {isEditing ? (
                           <Select
@@ -4473,35 +4473,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                               <SelectItem value="service-based">Service-based</SelectItem>
                               <SelectItem value="contract-based">Contract-based</SelectItem>
                             </SelectContent>
-                          </Select>
-
-                          // <Input
-                          //   value={editedJob.type}
-                          //   onChange={(e) => setEditedJob({ ...editedJob, type: e.target.value })}
-                          // />
+                          </Select> 
                         ) : (
                           <p className="font-medium">{editedJob.type}</p>
                         )}
-                      </div>
-                      {!isEditing && (
-                        <div className={`flex-1 ${!isEditing ? 'bg-[#fff7ed8c] p-3 rounded-md' : ''}`}>
-                          <p className="text-sm text-gray-600">Job Estimate</p>
-                          <p className="font-medium">{formatCurrency(job.estimatedCost)}</p>
-                        </div>
-                      )}
-                      {!isEditing && (
+                      </div> */}
 
-                        <div className={`flex-1 ${!isEditing ? 'bg-[#9f6b290d] p-3 rounded-md' : ''}`}>
-                          <p className="text-sm text-gray-600">Job Title</p>
-                          <span className="inline-block  text-black-600 text-xs font-medium  ">
-                            {editedJob.title}
-                          </span>
-                        </div>
-                      )}
-
-                    </div>
-                    <div className="space-y-4">
-                      <div className={`flex-1 ${!isEditing ? 'bg-[#dbdaff30] p-3 rounded-md' : ''}`}>
+                        <div className={`flex-1 ${!isEditing ? 'bg-[#dbdaff30] p-3 rounded-md' : ''}`}>
                         <p className="text-sm text-gray-600">Status</p>
                         {isEditing ? (
                           <Select
@@ -4530,6 +4508,25 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                           <p className="font-medium">{editedJob.status}</p>
                         )}
                       </div>
+                      {!isEditing && (
+                        <div className={`flex-1 ${!isEditing ? 'bg-[#fff7ed8c] p-3 rounded-md' : ''}`}>
+                          <p className="text-sm text-gray-600">Job Estimate</p>
+                          <p className="font-medium">{formatCurrency(job.estimatedCost)}</p>
+                        </div>
+                      )}
+                      {!isEditing && (
+
+                        <div className={`flex-1 ${!isEditing ? 'bg-[#9f6b290d] p-3 rounded-md' : ''}`}>
+                          <p className="text-sm text-gray-600">Job Title</p>
+                          <span className="inline-block  text-black-600 text-xs font-medium  ">
+                            {editedJob.title}
+                          </span>
+                        </div>
+                      )}
+
+                    </div>
+                    <div className="space-y-4">
+                    
 
 
                     </div>

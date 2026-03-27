@@ -441,7 +441,9 @@ export function AddEditOrderPage() {
       const systemIp = await getSystemIP()
 
       const normalizedJobType = selectedJob?.job_type?.toLowerCase()?.replace('-', '_')
+      console.log(normalizedJobType, 'normalizedJobType')
       const isContractJob = normalizedJobType === 'contract_based'
+      console.log(isContractJob, 'isContractJobisContractJob')
       const customerOrContractorId = parseInt(orderFormData.customer_id)
 
       const payload: Record<string, any> = {
