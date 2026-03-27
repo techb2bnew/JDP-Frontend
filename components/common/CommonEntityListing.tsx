@@ -288,7 +288,7 @@ export default function CommonEntityListing({
                                           </div>
 
                                           <div className="min-w-0 flex-1">
-                                            <div className="truncate text-sm font-semibold text-slate-700">
+                                            <div className="truncate text-sm font-semibold text-slate-700 w-[100px]">
                                               {job.job_title || job.title}
                                             </div>
                                             <div className="text-xs font-medium capitalize text-slate-500">
