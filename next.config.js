@@ -9,6 +9,7 @@ const nextConfig = {
       '@reduxjs/toolkit',
       'react-redux'
     ],
+     isrMemoryCacheSize: 0,
   },
 
   compiler: {
