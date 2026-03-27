@@ -634,7 +634,8 @@ export function NotificationsPage() {
       // Extract title and body
       const title = payload.notification?.title || payload.data?.title || 'New Notification';
       const body = payload.notification?.body || payload.data?.message || payload.data?.body || '';
-
+      console.log(title,'titletitle')
+      console.log(body,'bodybodybody')
       // Show native browser notification
       try {
         if ('Notification' in window && Notification.permission === 'granted') {

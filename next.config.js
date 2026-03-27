@@ -1,6 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Enable experimental features for better performance
   experimental: {
     optimizePackageImports: [
       'lucide-react',
@@ -12,12 +11,10 @@ const nextConfig = {
     ],
   },
 
-  // Compiler optimizations
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
   },
 
-  // Image optimization
   images: {
     remotePatterns: [
       {
@@ -44,17 +41,16 @@ const nextConfig = {
     formats: ['image/webp', 'image/avif'],
   },
 
-  // API Proxy for development
+  // ✅ FIXED API REWRITE
   async rewrites() {
     return [
       {
-        source: '/api/proxy/:path*',
-        destination: 'http://localhost:8000/:path*',
+        source: '/api/:path*',
+        destination: `${process.env.NEXT_PUBLIC_API_URL}/:path*`,
       },
     ]
   },
 
-  // Redirects
   async redirects() {
     return [
       {
@@ -70,28 +66,15 @@ const nextConfig = {
     ]
   },
 
-  // Headers for security and performance
   async headers() {
     return [
       {
         source: '/(.*)',
         headers: [
-          {
-            key: 'X-Frame-Options',
-            value: 'DENY',
-          },
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
-          },
-          {
-            key: 'Referrer-Policy',
-            value: 'origin-when-cross-origin',
-          },
-          {
-            key: 'X-DNS-Prefetch-Control',
-            value: 'on',
-          },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'origin-when-cross-origin' },
+          { key: 'X-DNS-Prefetch-Control', value: 'on' },
         ],
       },
       {
@@ -106,22 +89,14 @@ const nextConfig = {
     ]
   },
 
-  // Performance optimizations
   poweredByHeader: false,
   compress: true,
-
-  // Output configuration for better deployment
-  output: 'standalone',
-
-  // Trailing slash configuration
   trailingSlash: false,
 
-  // TypeScript — ignore errors during build (saves memory)
   typescript: {
     ignoreBuildErrors: true,
   },
 
-  // ESLint — skip during build (saves memory)
   eslint: {
     ignoreDuringBuilds: true,
   },

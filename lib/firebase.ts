@@ -70,6 +70,7 @@ export async function getFCMToken(): Promise<string | null> {
 
     // Request notification permission
     const permission = await Notification.requestPermission();
+    console.log(permission, 'permissionpermission')
     if (permission !== 'granted') {
       console.warn('Notification permission not granted');
       return null;
@@ -92,6 +93,7 @@ export function onForegroundMessage(handler: (payload: any) => void) {
   try { 
     if (!messaging) { 
       const result = initFirebaseMessaging();
+      console.log(result, 'resultresult')
       if (!result) { 
         return () => {};
       }
