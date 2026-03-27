@@ -567,13 +567,10 @@ console.log(totalAmount,"amounttt");
     }))
   }
 
-  const getFilteredProducts = (query: string) => {
-    if (!query) return []
-    return productsList.filter(product =>
-      product.name?.toLowerCase().includes(query.toLowerCase()) ||
-      product.jdpSKU?.toLowerCase().includes(query.toLowerCase())
-    )
-  }
+   const getFilteredProducts = (query: string) => {
+  if (!query) return []
+  return productsList   
+}
 
   const selectProduct = (itemId: string, product: any) => {
     hasUserTouchedLineItemsRef.current = true

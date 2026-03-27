@@ -155,7 +155,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
   const [selectedJob, setSelectedJob] = useState<any>(null)
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [estimateCost, setEstimateCost] = useState(null)
- 
+
   const currentJob = selectedJob || jobs?.find((j: any) => j.id === jobId)
 
   // Inline Invoice Data State
@@ -534,12 +534,19 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
       lineItems: prev.lineItems.map(item => {
         if (item.id === itemId) {
           const updated = { ...item, [field]: value }
-          if (field === 'qty' || field === 'estimatedPrice' || field === 'rate') {
-            // Use estimated price if available, otherwise use rate
-            const priceToUse = updated.estimatedPrice && updated.estimatedPrice > 0
-              ? updated.estimatedPrice
-              : updated.rate
-            updated.total = (updated.qty || 0) * priceToUse
+
+          // Update total calculation based on the logic:
+          // If both rate and estimatedPrice are provided, use estimatedPrice
+          // If only rate is provided, use rate
+          if (field === 'qty' || field === 'rate' || field === 'estimatedPrice') {
+            const qty = updated.qty || 0
+            const rate = updated.rate || 0
+            const estimatedPrice = updated.estimatedPrice || 0
+
+            // If estimatedPrice is provided and greater than 0, use it
+            // Otherwise, use rate
+            const priceToUse = estimatedPrice > 0 ? estimatedPrice : rate
+            updated.total = qty * priceToUse
           }
           return updated
         }
@@ -577,10 +584,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
 
   const getFilteredProducts = (query: string) => {
     if (!query) return []
-    return productsList.filter(product =>
-      product.name?.toLowerCase().includes(query.toLowerCase()) ||
-      product.jdpSKU?.toLowerCase().includes(query.toLowerCase())
-    )
+    return productsList     
   }
 
   const selectProduct = (itemId: string, product: any) => {
@@ -593,7 +597,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
           // Use estimated price if available, otherwise use rate
           const priceToUse = estimatedPrice > 0 ? estimatedPrice : rate
 
-          return { 
+          return {
             ...item,
             item: product.name,
             // Keep line item id intact; store selected product id separately
@@ -1075,8 +1079,8 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
         status: 'sent',
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
         custom_products: customProducts,
-        total_amount:subtotal,
-        estimate_source_type: estimateCost? 'estimate_job' : 'time_material_job'
+        total_amount: subtotal,
+        estimate_source_type: estimateCost ? 'estimate_job' : 'time_material_job'
 
       }
 
@@ -1473,7 +1477,7 @@ export const NewInvoiceDialog = ({ open, onOpenChange, onSave, jobId, jobs, onIn
 
 
 
-console.log(jobsList,"jobsListjobsListjobsList");
+  console.log(jobsList, "jobsListjobsListjobsList");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1815,54 +1819,54 @@ console.log(jobsList,"jobsListjobsListjobsList");
                               <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             </div>
                           )}
-                          {!item.isCustomProduct && item.showSearchResults && item.searchQuery && (
-                            <div className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1">
-                              {(() => {
-                                const filtered = getFilteredProducts(item.searchQuery || '')
-
-                                return (
-                                  <>
-                                    {filtered.length > 0 ? (
-                                      filtered.map(product => (
-                                        <div
-                                          key={product.id}
-                                          onMouseDown={(e) => {
-                                            e.preventDefault()
-                                            selectProduct(item.id, product)
-                                          }}
-                                          className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100 transition-colors"
-                                        >
-                                          <div className="font-medium text-sm mb-1">{product.name}</div>
-                                          <div className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
-                                            {product.description}
-                                          </div>
-                                          <div className="text-xs text-primary mt-2">
-                                            {product.jdpSKU} • ${product.jdpPrice.toFixed(2)}
-                                            {product.estimatedPrice && product.estimatedPrice > 0 && ` • Est: $${product.estimatedPrice.toFixed(2)}`}
-                                          </div>
-                                        </div>
-                                      ))
-                                    ) : (
-                                      <div className="p-3">
-                                        <div className="text-sm text-muted-foreground mb-2">No products found</div>
-                                        <Button
-                                          size="sm"
-                                          onMouseDown={(e) => {
-                                            e.preventDefault()
-                                            addCustomProduct(item.id, item.searchQuery || '')
-                                          }}
-                                          className="w-full bg-primary hover:bg-primary/90"
-                                        >
-                                          <Plus className="h-3 w-3 mr-1" />
-                                          Add "{item.searchQuery}"
-                                        </Button>
-                                      </div>
-                                    )}
-                                  </>
-                                )
-                              })()}
-                            </div>
-                          )}
+                           {!item.isCustomProduct && item.showSearchResults && item.searchQuery && (
+                                                            <div className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1">
+                                                              {(() => {
+                                                                const filtered = getFilteredProducts(item.searchQuery || '')
+                          
+                                                                return (
+                                                                  <>
+                                                                    {filtered.length > 0 ? (
+                                                                      filtered.map(product => (
+                                                                        <div
+                                                                          key={product.id}
+                                                                          onMouseDown={(e) => {
+                                                                            e.preventDefault()
+                                                                            selectProduct(item.id, product)
+                                                                          }}
+                                                                          className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100 transition-colors"
+                                                                        >
+                                                                          <div className="font-medium text-sm mb-1">{product.name}</div>
+                                                                          <div className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
+                                                                            {product.description}
+                                                                          </div>
+                                                                          <div className="text-xs text-primary mt-2">
+                                                                            {product.jdpSKU} • ${product.jdpPrice.toFixed(2)}
+                                                                            {product.estimatedPrice && product.estimatedPrice > 0 && ` • Est: $${product.estimatedPrice.toFixed(2)}`}
+                                                                          </div>
+                                                                        </div>
+                                                                      ))
+                                                                    ) : (
+                                                                      <div className="p-3">
+                                                                        <div className="text-sm text-muted-foreground mb-2">No products found</div>
+                                                                        <Button
+                                                                          size="sm"
+                                                                          onMouseDown={(e) => {
+                                                                            e.preventDefault()
+                                                                            addCustomProduct(item.id, item.searchQuery || '')
+                                                                          }}
+                                                                          className="w-full bg-primary hover:bg-primary/90"
+                                                                        >
+                                                                          <Plus className="h-3 w-3 mr-1" />
+                                                                          Add "{item.searchQuery}"
+                                                                        </Button>
+                                                                      </div>
+                                                                    )}
+                                                                  </>
+                                                                )
+                                                              })()}
+                                                            </div>
+                                                          )}
                         </td>
                         <td className="border border-gray-300 p-1">
                           <textarea

@@ -1350,6 +1350,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
       // Replace with your actual API call
       const response = await apiClient.searchProductsByQuery(query);
       setProductSearchResults(response.data.products || []);
+      console.log(productSearchResults , 'productSearchResultsproductSearchResultsproductSearchResults ')
     } catch (error) {
       console.error('Error searching products:', error);
       toast.error('Failed to search products');
@@ -2712,13 +2713,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
     }
   }
 
-  const getFilteredProducts = (query: string) => {
-    if (!query) return []
-    return products.filter(product =>
-      product.name?.toLowerCase().includes(query.toLowerCase()) ||
-      product.jdpSKU?.toLowerCase().includes(query.toLowerCase())
-    )
-  }
+ const getFilteredProducts = (query: string) => {
+  if (!query) return []
+  return products  // ✅ API se aaye results directly use karo
+}
 
   const selectProduct = (itemId: string, product: any) => {
     // Check if product already exists in line items (by product ID, not name)
