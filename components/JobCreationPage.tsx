@@ -14,7 +14,7 @@ import { AutoScrollSelect } from './ui/AutoScrollSelect'
 import { AutoScrollMultiSelect } from './ui/AutoScrollMultiSelect'
 import { apiClient } from '../utils/api'
 import { globalApiCall } from '../utils/globalApiHandler'
-import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input'
+import PhoneInput, { isValidPhoneNumber, parsePhoneNumber } from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
 import Autocomplete from 'react-google-autocomplete'
 
@@ -205,10 +205,26 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     return rest ? `+${country}-${rest}` : `+${country}`
   }
 
-  const validatePhone = (phone: string): boolean => {
-    if (!phone) return false
-    return isValidPhoneNumber(phone)
+ const validatePhone = (phone: string): boolean => {
+  if (!phone) return false
+  
+  // Remove country code and non-digit characters
+  // phone value from PhoneInput is in E.164 format like +11234567890
+  const digitsOnly = phone.replace(/\D/g, '') // remove all non-digits
+  
+  // E.164 format includes country code, so we need to strip it
+  // Use parsePhoneNumber to extract national number
+  try {
+    const parsed = parsePhoneNumber(phone)
+    if (!parsed) return false
+    
+    // Get national number (without country code)
+    const nationalNumber = parsed.nationalNumber
+    return nationalNumber.length === 10
+  } catch {
+    return false
   }
+}
 
   const validateStep2 = (): boolean => {
     const errors: Record<string, string> = {}
