@@ -20,6 +20,7 @@
     "@fullcalendar/daygrid": "6.1.20",
     "@fullcalendar/interaction": "6.1.20",
     "@fullcalendar/react": "6.1.20",
+    "@netlify/plugin-nextjs": "5.15.9",
     "@next/bundle-analyzer": "^16.1.7",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
