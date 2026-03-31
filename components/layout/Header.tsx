@@ -1,28 +1,33 @@
-'use client'
+"use client";
 
-import { Bell, User, Search, Sun, Moon, Settings } from "lucide-react"
-import { Button } from "../ui/button"
-import { Input } from "../ui/input"
+import { Bell, User, Search, Sun, Moon, Settings } from "lucide-react";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-  DropdownMenuLabel
-} from "../ui/dropdown-menu"
-import { Badge } from "../ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip"
-import { useEffect, useState, useRef } from "react"
-import { NotificationPopup } from "../NotificationPopup"
-import { useTheme } from "../../contexts/ThemeContext"
-import { toast } from "sonner"
-import { usePermissions } from '../../contexts/PermissionContext'
-import { supabase } from '../../lib/supabase'
-import { NewInvoiceDialog } from '../invoices/NewInvoiceDialog'
-import { apiClient } from '../../utils/api'
-import { Invoice } from '../../types/invoice'
+  DropdownMenuLabel,
+} from "../ui/dropdown-menu";
+import { Badge } from "../ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../ui/tooltip";
+import { useEffect, useState, useRef } from "react";
+import { NotificationPopup } from "../NotificationPopup";
+import { useTheme } from "../../contexts/ThemeContext";
+import { toast } from "sonner";
+import { usePermissions } from "../../contexts/PermissionContext";
+import { supabase } from "../../lib/supabase";
+import { NewInvoiceDialog } from "../invoices/NewInvoiceDialog";
+import { apiClient } from "../../utils/api";
+import { Invoice } from "../../types/invoice";
 
 import {
   Plus,
@@ -34,52 +39,56 @@ import {
   FileText,
   Users,
   Briefcase,
-  CheckSquare
-} from 'lucide-react'
-import Link from "next/link"
+  CheckSquare,
+} from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 interface HeaderProps {
-  currentPath: string
-  onLogout: () => void
-  onNotificationViewAll: () => void
-  onProfileClick: () => void
+  currentPath: string;
+  onLogout: () => void;
+  onNotificationViewAll: () => void;
+  onProfileClick: () => void;
 }
 
 interface Notification {
-  id: string
-  title: string
-  message: string
-  time: string
-   type: "order" | "payment" | "inventory" | "task"
-  unread: boolean
+  id: string;
+  title: string;
+  message: string;
+  time: string;
+  type: "order" | "payment" | "inventory" | "task";
+  unread: boolean;
+  onCreateEstimateClick: () => void;
 }
 
 export function Header({
   currentPath,
   onLogout,
   onNotificationViewAll,
-  onProfileClick
+  onProfileClick,
+  onCreateEstimateClick,
 }: HeaderProps) {
-  const [showNotifications, setShowNotifications] = useState(false)
-  const { theme, toggleTheme, isLoading } = useTheme()
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
-  const { hasPermission } = usePermissions()
-   const [notifications, setNotifications] = useState<Notification[]>([])
-  const [loading, setLoading] = useState(false)
-  const hasFetchedNotifications = useRef(false)
-  const [realTimeUnreadCount, setRealTimeUnreadCount] = useState<number | null>(null)
-  const [showNewInvoiceDialog, setShowNewInvoiceDialog] = useState(false)
-  const [localJobs, setLocalJobs] = useState<any[]>([])
+  const [showNotifications, setShowNotifications] = useState(false);
+  const { theme, toggleTheme, isLoading } = useTheme();
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+  const { hasPermission } = usePermissions();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(false);
+  const hasFetchedNotifications = useRef(false);
+  const [realTimeUnreadCount, setRealTimeUnreadCount] = useState<number | null>(
+    null,
+  );
+  const [showNewInvoiceDialog, setShowNewInvoiceDialog] = useState(false);
+  const [localJobs, setLocalJobs] = useState<any[]>([]);
 
- 
   const getUserData = () => {
     try {
-      const authData = localStorage.getItem('jdp_auth');
+      const authData = localStorage.getItem("jdp_auth");
       if (authData) {
         const parsed = JSON.parse(authData);
         return parsed.user || null;
       }
     } catch (error) {
-      console.error('Error parsing user data:', error);
+      console.error("Error parsing user data:", error);
     }
     return null;
   };
@@ -90,16 +99,20 @@ export function Header({
     let loadingToastId: string | number | undefined;
 
     try {
-      loadingToastId = toast.loading('Logging out...');
+      loadingToastId = toast.loading("Logging out...");
 
-      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const token = localStorage.getItem("jdp_auth")
+        ? JSON.parse(localStorage.getItem("jdp_auth")!).token
+        : null;
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
 
       const response = await fetch(`${apiBaseUrl}/auth/logout`, {
-        method: 'POST',
+        method: "POST",
         headers,
-        body: JSON.stringify({})
+        body: JSON.stringify({}),
       });
 
       toast.dismiss(loadingToastId);
@@ -107,17 +120,17 @@ export function Header({
       if (response.ok) {
         const responseData = await response.json();
         if (responseData.success) {
-          toast.success('Logged out successfully!');
-          localStorage.removeItem('jdp_auth');
+          toast.success("Logged out successfully!");
+          localStorage.removeItem("jdp_auth");
           onLogout();
         } else {
-          toast.error(responseData.message || 'Failed to logout');
+          toast.error(responseData.message || "Failed to logout");
           // Still call onLogout to clear local state
           onLogout();
         }
       } else {
         const errorData = await response.json().catch(() => ({}));
-        toast.error(errorData.message || 'Failed to logout');
+        toast.error(errorData.message || "Failed to logout");
         // Still call onLogout to clear local state
         onLogout();
       }
@@ -125,218 +138,220 @@ export function Header({
       if (loadingToastId) {
         toast.dismiss(loadingToastId);
       }
-      console.error('Error during logout:', error);
-      toast.error('An error occurred during logout');
+      console.error("Error during logout:", error);
+      toast.error("An error occurred during logout");
       // Still call onLogout to clear local state
       onLogout();
     }
   };
 
+  const userId = userData?.id;
 
-  const userId = userData?.id
+  const fetchNotifications = async () => {
+    if (!userId) return;
 
+    // Prevent duplicate calls if already loading
+    if (loading) {
+      return;
+    }
 
-const fetchNotifications = async () => {
-  if (!userId) return;
-  
-  // Prevent duplicate calls if already loading
-  if (loading) {
-    return;
-  }
+    const authData = localStorage.getItem("jdp_auth");
+    const token = authData ? JSON.parse(authData).token : null;
+    if (!token) return;
 
-  const authData = localStorage.getItem('jdp_auth');
-  const token = authData ? JSON.parse(authData).token : null;
-  if (!token) return;
+    try {
+      setLoading(true);
 
-  try {
-    setLoading(true);
-    
-    const res = await fetch(`${apiBaseUrl}/notifications/user/${userId}?page=1&limit=20`, {
-      headers: { 'Authorization': `Bearer ${token}` },
-    });
-    if (!res.ok) throw new Error("Failed to fetch notifications");
+      const res = await fetch(
+        `${apiBaseUrl}/notifications/user/${userId}?page=1&limit=20`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      if (!res.ok) throw new Error("Failed to fetch notifications");
 
-    const json = await res.json();
-    const normalized: Notification[] = (json.data.items || []).map((item: any) => {
-      // Use read_at if notification is read, otherwise use created_at
-      const timeToUse = item.status === 'read' && item.read_at 
-        ? item.read_at 
-        : item.notification?.created_at || item.delivered_at
-      
-      return {
-        id: item.notification?.id || item.notification_id,
-        title: item.notification?.notification_title || 'Notification',
-        message: item.notification?.message || '',
-        time: timeToUse || new Date().toISOString(),
-        type: "task" as const,
-        unread: item.status === "unread"
-      }
-    });
-    setNotifications(normalized);
-    hasFetchedNotifications.current = true;
-  } catch (err) {
-    console.error(err);
-  } finally {
-    setLoading(false);
-  }
-};
+      const json = await res.json();
+      const normalized: Notification[] = (json.data.items || []).map(
+        (item: any) => {
+          // Use read_at if notification is read, otherwise use created_at
+          const timeToUse =
+            item.status === "read" && item.read_at
+              ? item.read_at
+              : item.notification?.created_at || item.delivered_at;
 
-// Fetch notifications on mount (after login)
-useEffect(() => {
-  if (userId && !hasFetchedNotifications.current) {
-    fetchNotifications();
-  }
-}, [userId]);
-
-// Set up Supabase real-time subscription for notification count
-useEffect(() => {
-  if (!userId) {
-    console.log('No userId, skipping Supabase subscription');
-    return;
-  }
-
-  console.log('Setting up Supabase real-time subscription for user:', userId);
-
-  // Initial count fetch
-  const fetchUnreadCount = async () => {
-    try { 
-      
-      // First, test the connection with a simple query
-      const { data: testData, error: testError } = await supabase
-        .from('notification_recipients')
-        .select('id')
-        .eq('user_id', userId)
-        .limit(1);
-       
-      
-      if (testError) {
-        console.error('❌ Supabase connection error:', testError);
-        console.error('Error details:', {
-          message: testError.message,
-          details: testError.details,
-          hint: testError.hint,
-          code: testError.code
-        });
-        return;
-      }
-      
-      // Now get the count
-      const { count, error } = await supabase
-        .from('notification_recipients')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('status', 'unread');
-
-      console.log('Initial count result:', { count, error });
-
-      if (error) {
-        console.error('Error fetching unread count:', error);
-        return;
-      }
-
-      if (count !== null) {
-        console.log('✅ Setting initial unread count:', count);
-        setRealTimeUnreadCount(count);
-      } else {
-        console.log('Count is null, setting to 0');
-        setRealTimeUnreadCount(0);
-      }
+          return {
+            id: item.notification?.id || item.notification_id,
+            title: item.notification?.notification_title || "Notification",
+            message: item.notification?.message || "",
+            time: timeToUse || new Date().toISOString(),
+            type: "task" as const,
+            unread: item.status === "unread",
+          };
+        },
+      );
+      setNotifications(normalized);
+      hasFetchedNotifications.current = true;
     } catch (err) {
-      console.error('❌ Exception in fetchUnreadCount:', err);
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  fetchUnreadCount();
+  // Fetch notifications on mount (after login)
+  useEffect(() => {
+    if (userId && !hasFetchedNotifications.current) {
+      fetchNotifications();
+    }
+  }, [userId]);
 
-  // Set up real-time subscription
-  console.log('Creating Supabase channel for user:', userId);
-  const channel = supabase
-    .channel(`user-${userId}-notifications`, {
-      config: {
-        broadcast: { self: true }
-      }
-    })
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'notification_recipients',
-        filter: `user_id=eq.${userId}`
-      },
-      async (payload: any) => {
-        console.log('🔔 Real-time notification change received:', payload);
-        console.log('Event type:', payload.eventType);
-        console.log('New record:', payload.new);
-        console.log('Old record:', payload.old);
-        
-        // Refetch count after any change
-        try {
-          const { count, error } = await supabase
-            .from('notification_recipients')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', userId)
-            .eq('status', 'unread');
+  // Set up Supabase real-time subscription for notification count
+  useEffect(() => {
+    if (!userId) {
+      console.log("No userId, skipping Supabase subscription");
+      return;
+    }
 
-          console.log('Updated count after change:', { count, error });
+    console.log("Setting up Supabase real-time subscription for user:", userId);
 
-          if (error) {
-            console.error('Error fetching updated count:', error);
-            return;
-          }
+    // Initial count fetch
+    const fetchUnreadCount = async () => {
+      try {
+        // First, test the connection with a simple query
+        const { data: testData, error: testError } = await supabase
+          .from("notification_recipients")
+          .select("id")
+          .eq("user_id", userId)
+          .limit(1);
 
-          if (count !== null) {
-            console.log('Updating unread count to:', count);
-            setRealTimeUnreadCount(count);
-          }
-        } catch (err) {
-          console.error('Error in count update:', err);
+        if (testError) {
+          console.error("❌ Supabase connection error:", testError);
+          console.error("Error details:", {
+            message: testError.message,
+            details: testError.details,
+            hint: testError.hint,
+            code: testError.code,
+          });
+          return;
         }
 
-        // If notification was added, refresh the notifications list
-        if (payload.eventType === 'INSERT') {
-          console.log('New notification inserted, refreshing list');
-          fetchNotifications();
-        }
-      }
-    )
-    .subscribe((status) => {
-      console.log('Supabase subscription status:', status);
-      if (status === 'SUBSCRIBED') {
-        console.log('✅ Successfully subscribed to real-time notifications');
-      } else if (status === 'CHANNEL_ERROR') {
-        console.error('❌ Channel error in Supabase subscription');
-      } else if (status === 'TIMED_OUT') {
-        console.error('❌ Subscription timed out');
-      } else if (status === 'CLOSED') {
-        console.log('Subscription closed');
-      }
-    });
+        // Now get the count
+        const { count, error } = await supabase
+          .from("notification_recipients")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId)
+          .eq("status", "unread");
 
-  // Cleanup subscription on unmount
-  return () => {
-    console.log('Cleaning up Supabase subscription');
-    supabase.removeChannel(channel);
+        console.log("Initial count result:", { count, error });
+
+        if (error) {
+          console.error("Error fetching unread count:", error);
+          return;
+        }
+
+        if (count !== null) {
+          console.log("✅ Setting initial unread count:", count);
+          setRealTimeUnreadCount(count);
+        } else {
+          console.log("Count is null, setting to 0");
+          setRealTimeUnreadCount(0);
+        }
+      } catch (err) {
+        console.error("❌ Exception in fetchUnreadCount:", err);
+      }
+    };
+
+    fetchUnreadCount();
+
+    // Set up real-time subscription
+    console.log("Creating Supabase channel for user:", userId);
+    const channel = supabase
+      .channel(`user-${userId}-notifications`, {
+        config: {
+          broadcast: { self: true },
+        },
+      })
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "notification_recipients",
+          filter: `user_id=eq.${userId}`,
+        },
+        async (payload: any) => {
+          console.log("🔔 Real-time notification change received:", payload);
+          console.log("Event type:", payload.eventType);
+          console.log("New record:", payload.new);
+          console.log("Old record:", payload.old);
+
+          // Refetch count after any change
+          try {
+            const { count, error } = await supabase
+              .from("notification_recipients")
+              .select("id", { count: "exact", head: true })
+              .eq("user_id", userId)
+              .eq("status", "unread");
+
+            console.log("Updated count after change:", { count, error });
+
+            if (error) {
+              console.error("Error fetching updated count:", error);
+              return;
+            }
+
+            if (count !== null) {
+              console.log("Updating unread count to:", count);
+              setRealTimeUnreadCount(count);
+            }
+          } catch (err) {
+            console.error("Error in count update:", err);
+          }
+
+          // If notification was added, refresh the notifications list
+          if (payload.eventType === "INSERT") {
+            console.log("New notification inserted, refreshing list");
+            fetchNotifications();
+          }
+        },
+      )
+      .subscribe((status) => {
+        console.log("Supabase subscription status:", status);
+        if (status === "SUBSCRIBED") {
+          console.log("✅ Successfully subscribed to real-time notifications");
+        } else if (status === "CHANNEL_ERROR") {
+          console.error("❌ Channel error in Supabase subscription");
+        } else if (status === "TIMED_OUT") {
+          console.error("❌ Subscription timed out");
+        } else if (status === "CLOSED") {
+          console.log("Subscription closed");
+        }
+      });
+
+    // Cleanup subscription on unmount
+    return () => {
+      console.log("Cleaning up Supabase subscription");
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
+
+  // Handle notification popup open/close
+  const handleNotificationClick = () => {
+    const newShowState = !showNotifications;
+    setShowNotifications(newShowState);
+
+    // Fetch notifications when opening the popup (always refresh on click)
+    if (newShowState) {
+      fetchNotifications();
+    }
   };
-}, [userId]);
-
-// Handle notification popup open/close
-const handleNotificationClick = () => {
-  const newShowState = !showNotifications;
-  setShowNotifications(newShowState);
-  
-  // Fetch notifications when opening the popup (always refresh on click)
-  if (newShowState) {
-    fetchNotifications();
-  }
-};
-
 
   // Use real-time count if available, otherwise fallback to local notifications count
   // If realTimeUnreadCount is 0, it might be accurate, so check if it's been set
-  const unreadCount = realTimeUnreadCount !== null && realTimeUnreadCount !== undefined 
-    ? realTimeUnreadCount 
-    : notifications.filter(n => n.unread).length
+  const unreadCount =
+    realTimeUnreadCount !== null && realTimeUnreadCount !== undefined
+      ? realTimeUnreadCount
+      : notifications.filter((n) => n.unread).length;
 
   // Fetch jobs for invoice dialog
   useEffect(() => {
@@ -354,10 +369,9 @@ const handleNotificationClick = () => {
 
   // Handle invoice save
   const handleSaveInvoice = (newInvoiceData: Partial<Invoice>) => {
-    toast.success('Invoice created successfully!');
+    toast.success("Invoice created successfully!");
     setShowNewInvoiceDialog(false);
-  }
-
+  };
 
   const getPageTitle = (path: string): string => {
     const titles: Record<string, string> = {
@@ -378,10 +392,10 @@ const handleNotificationClick = () => {
       "/profiles": "Profiles",
       "/profiles/staff": "Staff Profile",
       "/profiles/lead-labour": "Lead Labour Profile",
-      "/profiles/labour": "Labour Profile"
-    }
-    return titles[path] || "Dashboard"
-  }
+      "/profiles/labour": "Labour Profile",
+    };
+    return titles[path] || "Dashboard";
+  };
 
   // const notifications = [
   //   {
@@ -420,6 +434,9 @@ const handleNotificationClick = () => {
 
   // const unreadCount = notifications.filter(n => n.unread).length
 
+  const router = useRouter()
+
+
   return (
     <TooltipProvider>
       <header className="bg-card border-b px-6 py-4 animate-fade-in shadow-sm">
@@ -437,27 +454,27 @@ const handleNotificationClick = () => {
                 className=" pl-9 transition-all duration-200 focus:w-80 bg-[#f8f8f8]"
               />
             </div> */}
-
           </div>
 
           <div className="flex items-center space-x-3">
-              {hasPermission('jobs', 'create') && (
-            <Link href={'/jobs?create=true'}
-              className="flex items-center w-[120px] p-2 justify-center border rounded gap-2"
-            >
-              <Briefcase className="h-4 w-4" />
-              Add Jobs
-            </Link>
-              )} 
-            {hasPermission('invoices', 'create') && (
+            {hasPermission("jobs", "create") && (
+              <Link
+                href={"/jobs?create=true"}
+                className="flex items-center w-[120px] p-2 justify-center border rounded gap-2"
+              >
+                <Briefcase className="h-4 w-4" />
+                Add Jobs
+              </Link>
+            )}
+            {hasPermission("invoices", "create") && (
               <Button
-                onClick={() => setShowNewInvoiceDialog(true)}
-                className="bg-primary text-white hover:bg-[#0090e6] gap-2 text-[#fff]"
+                onClick={() => router.push("/invoices/create")}
+                className="bg-primary text-white"
               >
                 <Plus className="h-4 w-4" />
                 Create New Estimate
               </Button>
-            )} 
+            )}
 
             {/* Theme Toggle */}
             {/* <Tooltip>
@@ -484,7 +501,7 @@ const handleNotificationClick = () => {
             </Tooltip> */}
 
             {/* Notifications */}
-           {hasPermission('notification', 'view') && (
+            {hasPermission("notification", "view") && (
               <div className="relative">
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -500,21 +517,27 @@ const handleNotificationClick = () => {
                           variant="destructive"
                           className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs notification-badge animate-bounce-in"
                         >
-                          {unreadCount > 9 ? '9+' : unreadCount}
+                          {unreadCount > 9 ? "9+" : unreadCount}
                         </Badge>
                       )}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Notifications {unreadCount > 0 && `(${unreadCount} unread)`}</p>
+                    <p>
+                      Notifications{" "}
+                      {unreadCount > 0 && `(${unreadCount} unread)`}
+                    </p>
                   </TooltipContent>
                 </Tooltip>
 
                 {showNotifications && (
-                  <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)}>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowNotifications(false)}
+                  >
                     <div onClick={(e) => e.stopPropagation()}>
                       <NotificationPopup
-                      setNotifications={setNotifications} 
+                        setNotifications={setNotifications}
                         notifications={notifications}
                         onClose={() => setShowNotifications(false)}
                         onViewAll={onNotificationViewAll}
@@ -530,7 +553,10 @@ const handleNotificationClick = () => {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="profile-button">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src="/assets/images/avatars/admin-user.jpg" alt="Admin" />
+                    <AvatarImage
+                      src="/assets/images/avatars/admin-user.jpg"
+                      alt="Admin"
+                    />
                     <AvatarFallback className="bg-primary text-primary-foreground">
                       <User className="h-4 w-4" />
                     </AvatarFallback>
@@ -546,21 +572,35 @@ const handleNotificationClick = () => {
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10">
                       <AvatarImage
-                        src={userData?.photo_url || "/assets/images/avatars/admin-user.jpg"}
+                        src={
+                          userData?.photo_url ||
+                          "/assets/images/avatars/admin-user.jpg"
+                        }
                         alt={userData?.full_name || "User"}
                       />
                       <AvatarFallback className="bg-primary text-primary-foreground">
-                        {userData?.full_name ? userData.full_name.charAt(0).toUpperCase() : <User className="h-5 w-5" />}
+                        {userData?.full_name ? (
+                          userData.full_name.charAt(0).toUpperCase()
+                        ) : (
+                          <User className="h-5 w-5" />
+                        )}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-medium">{userData?.full_name || "User"}</p>
-                      <p className="text-sm text-muted-foreground">{userData?.email || "user@example.com"}</p>
+                      <p className="font-medium">
+                        {userData?.full_name || "User"}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {userData?.email || "user@example.com"}
+                      </p>
                     </div>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onProfileClick} className="cursor-pointer">
+                <DropdownMenuItem
+                  onClick={onProfileClick}
+                  className="cursor-pointer"
+                >
                   <User className="  h-4 w-4" />
                   <span>View Profile</span>
                 </DropdownMenuItem>
@@ -574,29 +614,27 @@ const handleNotificationClick = () => {
                   className="logout-button cursor-pointer"
                 >
                   <div className="flex items-center">
-                    <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    <svg
+                      className="mr-2 h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                      />
                     </svg>
                     <span>Logout</span>
                   </div>
                 </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    </div>
-
-    {/* New Invoice Dialog */}
-    <NewInvoiceDialog
-      open={showNewInvoiceDialog}
-      onOpenChange={setShowNewInvoiceDialog}
-      onSave={handleSaveInvoice}
-      jobs={localJobs}
-      onInvoiceSaved={() => {
-        setShowNewInvoiceDialog(false);
-        toast.success('Invoice created successfully!');
-      }}
-    />
-  </header>
-</TooltipProvider>
-)
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </header>
+    </TooltipProvider>
+  );
 }

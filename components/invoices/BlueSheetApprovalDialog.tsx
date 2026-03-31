@@ -170,6 +170,154 @@ export function BlueSheetApprovalDialog({
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }, [isOpen, blueSheet])
+const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
+  setEditedBlueSheet((prev: any) => {
+    if (!prev) return prev;
+
+    const syncedMaterials = lineItems
+      .filter(
+        (item: any) =>
+          item?.type !== "header" && String(item?.item || "").trim() !== ""
+      )
+      .map((item: any, index: number) => {
+        const parentHeaderKey =
+          item.parentHeaderKey ??
+          item.parent_header_key ??
+          null;
+
+        const parentHeaderName =
+          item.parentHeaderName ??
+          item.parent_header_name ??
+          item.section_name ??
+          item.headerName ??
+          null;
+
+        const existingMaterial =
+          prev.material_entries?.find(
+            (m: any) =>
+              String(m.id) === String(item.materialEntryId) ||
+              String(m.id) === String(item.id)
+          ) || null;
+
+        return {
+          ...existingMaterial,
+
+          id:
+            item.materialEntryId ||
+            (typeof item.id === "number" ? item.id : undefined) ||
+            existingMaterial?.id ||
+            `temp-material-${index}-${Math.random().toString(36).slice(2, 8)}`,
+
+          material_name: item.item,
+          unit: item.unit || existingMaterial?.unit || "piece",
+          total_ordered: Number(
+            item.total_ordered ??
+              item.totalOrdered ??
+              item.qty ??
+              existingMaterial?.total_ordered ??
+              1
+          ),
+          material_used: Number(
+            item.material_used ??
+              item.materialUsed ??
+              item.qty ??
+              existingMaterial?.material_used ??
+              1
+          ),
+          unit_cost: Number(
+            item.unit_cost ??
+              item.unitCost ??
+              item.rate ??
+              existingMaterial?.unit_cost ??
+              0
+          ),
+          total_cost:
+            Number(item.total ?? existingMaterial?.total_cost ?? 0) ||
+            Number(item.qty || 1) *
+              Number(
+                item.estimatedPrice && Number(item.estimatedPrice) > 0
+                  ? item.estimatedPrice
+                  : item.rate ??
+                      item.unit_cost ??
+                      existingMaterial?.unit_cost ??
+                      0
+              ),
+
+          supplier_order_id:
+            item.supplier_order_id || existingMaterial?.supplier_order_id || "",
+          return_to_warehouse:
+            item.return_to_warehouse ??
+            existingMaterial?.return_to_warehouse ??
+            false,
+          date:
+            item.date ||
+            existingMaterial?.date ||
+            new Date().toISOString().split("T")[0],
+
+          product_id:
+            item.productId ??
+            item.product_id ??
+            existingMaterial?.product_id ??
+            null,
+
+          supplier_id:
+            item.supplierId ??
+            item.supplier_id ??
+            existingMaterial?.supplier_id ??
+            null,
+
+          jdp_sku:
+            item.jdpSKU ||
+            item.jdp_sku ||
+            existingMaterial?.jdp_sku ||
+            "",
+
+          section_name: parentHeaderName || null,
+          section_type: parentHeaderName ? "room_header" : null,
+          parent_header_key: parentHeaderKey,
+          parent_header_name: parentHeaderName,
+
+          is_custom:
+            item.isCustomProduct === true ||
+            item.is_custom === true ||
+            !(item.productId ?? item.product_id),
+
+          product:
+            item.productId || item.product_id
+              ? {
+                  ...(existingMaterial?.product || {}),
+                  id: item.productId ?? item.product_id,
+                  supplier_id:
+                    item.supplierId ??
+                    item.supplier_id ??
+                    existingMaterial?.product?.supplier_id ??
+                    null,
+                  jdp_sku:
+                    item.jdpSKU ||
+                    item.jdp_sku ||
+                    existingMaterial?.product?.jdp_sku ||
+                    "",
+                  description:
+                    item.description ||
+                    existingMaterial?.product?.description ||
+                    "",
+                }
+              : existingMaterial?.product || null,
+        };
+      });
+
+    const newTotal = syncedMaterials.reduce(
+      (sum: number, item: any) => sum + Number(item.total_cost || 0),
+      0
+    );
+
+    return {
+      ...prev,
+      material_entries: syncedMaterials,
+      total_cost: newTotal,
+    };
+  });
+};
 
   useEffect(() => {
     if (blueSheet && !editedBlueSheet) {
@@ -370,6 +518,11 @@ export function BlueSheetApprovalDialog({
           supplier_order_id: item.supplier_order_id || '',
           return_to_warehouse: item.return_to_warehouse || false,
           date: item.date || new Date().toISOString().split('T')[0],
+          section_name: item.parent_header_name || item.section_name || null,
+          section_type:
+            item.parent_header_name || item.section_name ? "room_header" : null,
+          parent_header_key: item.parent_header_key || null,
+          parent_header_name: item.parent_header_name || null,
         }
       })
 
@@ -396,10 +549,20 @@ export function BlueSheetApprovalDialog({
         return {
           ...item,
           ...(apiMaterial?.id ? { id: apiMaterial.id } : {}),
-          product_id: item.product_id,  // preserve — API might not return it
+          product_id: item.product_id,
+          parent_header_key:
+            apiMaterial?.parent_header_key ?? item.parent_header_key ?? null,
+          parent_header_name:
+            apiMaterial?.parent_header_name ?? item.parent_header_name ?? null,
+          section_name:
+            apiMaterial?.section_name ??
+            item.section_name ??
+            item.parent_header_name ??
+            null, // preserve — API might not return it
           _isNew: false,
-          job_bluesheet_id: apiMaterial?.job_bluesheet_id || item.job_bluesheet_id,
-        }
+          job_bluesheet_id:
+            apiMaterial?.job_bluesheet_id || item.job_bluesheet_id,
+        };
       })
 
       const newTotal = newMaterials.reduce(
@@ -577,6 +740,10 @@ export function BlueSheetApprovalDialog({
       product_id: null,
       supplier_id: null,
       jdp_sku: '',
+      section_name: null,
+      section_type: null,
+      parent_header_key: null,
+      parent_header_name: null,
     }
     setEditedBlueSheet({ ...editedBlueSheet, material_entries: [...editedBlueSheet.material_entries, newMaterial] })
     toast.info('New material row added')
@@ -678,108 +845,172 @@ export function BlueSheetApprovalDialog({
   }
 
   const handleFinalApproval = async () => {
-    const finalBlueSheet = editedBlueSheet || blueSheet
-    if (!finalBlueSheet) return
-    try {
-      setIsApproving(true)
+  const finalBlueSheet = editedBlueSheet || blueSheet;
+  if (!finalBlueSheet) return;
 
-      const customProducts = finalBlueSheet.material_entries.map((item: any) => ({
-        ...(item.product?.id ? { id: item.product.id } : {}),
+  try {
+    setIsApproving(true);
+
+    const customProducts = finalBlueSheet.material_entries.map((item: any) => {
+  const parentHeaderKey =
+    item.parent_header_key ??
+    item.parentHeaderKey ??
+    null;
+
+  const parentHeaderName =
+    item.parent_header_name ??
+    item.parentHeaderName ??
+    item.section_name ??
+    null;
+
+  const sectionName = parentHeaderName;
+
+  const resolvedProductId =
+    item.product_id ??
+    item.product?.id ??
+    null;
+
+  return {
+    ...(resolvedProductId ? { id: resolvedProductId } : {}),
+    ...(resolvedProductId ? { product_id: resolvedProductId } : {}),
+    job_id: finalBlueSheet.job_id,
+    product_name: item.material_name,
+    description: item.product?.description || item.description || item.material_name,
+    supplier_id:
+      item.supplier_id ??
+      item.product?.supplier_id ??
+      item.product?.suppliers?.id ??
+      1,
+    supplier_sku: item.product?.supplier_sku || item.supplier_sku || "",
+    jdp_sku: item.product?.jdp_sku || item.jdp_sku || "",
+    unit: item.unit || "piece",
+    stock_quantity: item.total_ordered || 0,
+    unit_cost: item.unit_cost || 0,
+    estimated_price:  item.unit_cost || 0,
+    total_cost:
+      item.total_cost ??
+      (item.total_ordered || 0) * (item.unit_cost || 0),
+    jdp_price: item.jdp_price || 0,
+    total_ordered: item.total_ordered || 0,
+    material_used: item.material_used || 0,
+    is_custom: item.is_custom === true || !resolvedProductId,
+
+    section_name: sectionName,
+    section_type: sectionName ? "room_header" : null,
+    parent_header_key: parentHeaderKey,
+    parent_header_name: parentHeaderName,
+  };
+});
+
+    const laborEntriesTotalCost = (finalBlueSheet.labor_entries ?? []).reduce(
+      (sum: number, entry: any) => sum + (entry.total_cost || 0),
+      0,
+    );
+
+    if (laborEntriesTotalCost > 0) {
+      customProducts.push({
         job_id: finalBlueSheet.job_id,
-        product_name: item.material_name,
-        description: item.product?.description || item.material_name,
-        supplier_id: item.product?.supplier_id ?? item.product?.suppliers?.id ?? 1,
-        supplier_sku: item.product?.supplier_sku || '',
-        jdp_sku: item.product?.jdp_sku || item.jdp_sku || '',
-        unit: item.unit || 'piece',
-        stock_quantity: item.total_ordered || 0,
-        unit_cost: item.unit_cost || 0,
-        estimated_price: item.unit_cost || 0,
-        total_cost: item.total_cost ?? (item.total_ordered || 0) * (item.unit_cost || 0),
-        jdp_price: item.jdp_price || 0,
-        total_ordered: item.total_ordered || 0,
-        material_used: item.material_used || 0,
-        is_custom: false,
-      }))
+        product_name: "Labor total cost",
+        description: "Total labor cost from BlueSheet labor entries",
+        supplier_id: 1,
+        supplier_sku: "LABOR_TOTAL",
+        jdp_sku: `LABOR-TOTAL-${Date.now().toString(36)}`,
+        unit: "unit",
+        stock_quantity: 1,
+        unit_cost: laborEntriesTotalCost,
+        estimated_price: laborEntriesTotalCost,
+        total_cost: laborEntriesTotalCost,
+        jdp_price: laborEntriesTotalCost,
+        total_ordered: 1,
+        material_used: 0,
+        is_custom: true,
 
-      // Also push a dedicated custom product for total labor cost from labor_entries (if any)
-      const laborEntriesTotalCost = (finalBlueSheet.labor_entries ?? []).reduce(
-        (sum: number, entry: any) => sum + (entry.total_cost || 0),
-        0,
-      )
-      if (laborEntriesTotalCost > 0) {
-        customProducts.push({
-          job_id: finalBlueSheet.job_id,
-          product_name: 'Labor total cost',
-          description: 'Total labor cost from BlueSheet labor entries',
-          supplier_id: 1,
-          supplier_sku: 'LABOR_TOTAL',
-          jdp_sku: `LABOR-TOTAL-${Date.now().toString(36)}`,
-          unit: 'unit',
-          stock_quantity: 1,
-          unit_cost: laborEntriesTotalCost,
-          estimated_price: laborEntriesTotalCost,
-          total_cost: laborEntriesTotalCost,
-          jdp_price: laborEntriesTotalCost,
-          total_ordered: 1,
-          material_used: 0,
-          is_custom: true,
-        })
-      }
-
-      // Recalculate total_amount correctly: material total (from entries) + labor total + any additional charges
-      const materialTotalForEstimate = (finalBlueSheet.material_entries ?? []).reduce(
-        (sum: number, item: any) =>
-          sum + (item.total_cost || (item.total_ordered || 0) * (item.unit_cost || 0) || 0),
-        0,
-      )
-      const totalAmountForEstimate =
-        materialTotalForEstimate + laborEntriesTotalCost + (finalBlueSheet.additional_charges ?? 0)
-
-      const bluesheetIds = selectedBlueSheets.length > 0
-        ? selectedBlueSheets.map(bs => bs.id)
-        : [finalBlueSheet.id]
-      const today = new Date().toISOString().split('T')[0]
-      const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-
-      const estimatePayload = {
-        job_id: finalBlueSheet.job_id,
-        estimate_title: `BlueSheet #${finalBlueSheet.id} — ${finalBlueSheet.job.job_title}`,
-        priority: (finalBlueSheet.job.priority as 'low' | 'medium' | 'high') || 'medium',
-        service_type: finalBlueSheet.job.job_type === 'contract_based' ? 'contract_based' : 'service_based',
-        invoice_type: 'estimate',
-        status: 'draft',
-        estimate_date: today,
-        due_date: thirtyDaysLater,
-        invoice_number: `INV-BS-${finalBlueSheet.id}-${Date.now().toString().slice(-6)}`,
-        issue_date: today,
-        email_address: finalBlueSheet.job.customer?.email || finalBlueSheet.job.bill_to_email || '',
-        bill_to_address: finalBlueSheet.job.bill_to_address || finalBlueSheet.job.customer?.address || '',
-        customer_id: finalBlueSheet.job.customer?.id ?? 0,
-        po_number: `BS-${finalBlueSheet.id}`,
-        rep: finalBlueSheet.created_by_user?.full_name || '',
-        notes: finalBlueSheet.notes || '',
-        // Use recalculated material + labor + additional charges total
-        total_amount: totalAmountForEstimate,
-        location: finalBlueSheet.job.bill_to_address || finalBlueSheet.job.customer?.address || '',
-        bluesheet_ids: bluesheetIds,
-        valid_until: thirtyDaysLater,
-        description: finalBlueSheet.notes || '',
-        custom_products: customProducts,
-        invoice_source: "quickbook",
-      }
-
-      await apiClient.createEstimate(estimatePayload)
-      await apiClient.approveBluesheet(finalBlueSheet.id, 'approved')
-      onApprovalComplete(finalBlueSheet)
-      toast.success('BlueSheet approved & estimate created!')
-      onClose()
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to create estimate.')
-    } finally {
-      setIsApproving(false)
+        // no header mapping for labor summary row
+        section_name: null,
+        section_type: null,
+        parent_header_key: null,
+        parent_header_name: null,
+      });
     }
+
+    const materialTotalForEstimate = (finalBlueSheet.material_entries ?? []).reduce(
+      (sum: number, item: any) =>
+        sum +
+        (item.total_cost ||
+          (item.total_ordered || 0) * (item.unit_cost || 0) ||
+          0),
+      0,
+    );
+
+    const totalAmountForEstimate =
+      materialTotalForEstimate +
+      laborEntriesTotalCost +
+      (finalBlueSheet.additional_charges ?? 0);
+
+    const bluesheetIds =
+      selectedBlueSheets.length > 0
+        ? selectedBlueSheets.map((bs) => bs.id)
+        : [finalBlueSheet.id];
+
+    const today = new Date().toISOString().split("T")[0];
+    const thirtyDaysLater = new Date(
+      Date.now() + 30 * 24 * 60 * 60 * 1000,
+    )
+      .toISOString()
+      .split("T")[0];
+
+    const estimatePayload = {
+      job_id: finalBlueSheet.job_id,
+      estimate_title: `BlueSheet #${finalBlueSheet.id} — ${finalBlueSheet.job.job_title}`,
+      priority:
+        (finalBlueSheet.job.priority as "low" | "medium" | "high") || "medium",
+      service_type:
+        finalBlueSheet.job.job_type === "contract_based"
+          ? "contract_based"
+          : "service_based",
+      invoice_type: "estimate",
+      status: "draft",
+      estimate_date: today,
+      due_date: thirtyDaysLater,
+      invoice_number: `INV-BS-${finalBlueSheet.id}-${Date.now()
+        .toString()
+        .slice(-6)}`,
+      issue_date: today,
+      email_address:
+        finalBlueSheet.job.customer?.email ||
+        finalBlueSheet.job.bill_to_email ||
+        "",
+      bill_to_address:
+        finalBlueSheet.job.bill_to_address ||
+        finalBlueSheet.job.customer?.address ||
+        "",
+      customer_id: finalBlueSheet.job.customer?.id ?? 0,
+      po_number: `BS-${finalBlueSheet.id}`,
+      rep: finalBlueSheet.created_by_user?.full_name || "",
+      notes: finalBlueSheet.notes || "",
+      total_amount: totalAmountForEstimate,
+      location:
+        finalBlueSheet.job.bill_to_address ||
+        finalBlueSheet.job.customer?.address ||
+        "",
+      bluesheet_ids: bluesheetIds,
+      valid_until: thirtyDaysLater,
+      description: finalBlueSheet.notes || "",
+      custom_products: customProducts,
+      invoice_source: "quickbook",
+    };
+
+    await apiClient.createEstimate(estimatePayload);
+    await apiClient.approveBluesheet(finalBlueSheet.id, "approved");
+    onApprovalComplete(finalBlueSheet);
+    toast.success("BlueSheet approved & estimate created!");
+    onClose();
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to create estimate.");
+  } finally {
+    setIsApproving(false);
   }
+};
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(amount)
@@ -1898,6 +2129,7 @@ export function BlueSheetApprovalDialog({
                         previewAndSendRef.current = fn
                       }}
                       onDone={onClose}
+                      onLineItemsSync={syncCustomInvoiceLineItemsToBlueSheet}
                     />
                   </div>
 

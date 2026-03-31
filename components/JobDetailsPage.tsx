@@ -79,6 +79,8 @@ import '@wojtekmaj/react-timerange-picker/dist/TimeRangePicker.css'
 import Autocomplete from 'react-google-autocomplete'
 import ActivityLogs from './ActivityLogs'
 import { CheckCircle } from 'lucide-react'
+import { invoicesData } from '@/data/invoiceData'
+import InvoiceLineItemsManager from './common/invoice-line-items/InvoiceLineItemsManager'
 // Sample data structure - replace with your actual data
 const sampleJobData = {
   "job": {
@@ -315,7 +317,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
   const [isUpdatingChangeOrder, setIsUpdatingChangeOrder] = useState(false);
   const [changeOrderErrors, setChangeOrderErrors] = useState<Record<string, string>>({});
   const [changeOrderEstimate, setChangeOrderEstimate] = useState<number | string>('');
-
+  
   const timeLogs = Array.isArray(job.labor_timesheets) ? job.labor_timesheets : (Array.isArray(sampleJobData.timeLogs) ? sampleJobData.timeLogs : []) // Ensure timeLogs is always an array
   const invoices = sampleJobData.invoices // Keep sample data for now as we don't have invoices API
   console.log(materials, "testmaterials")
@@ -606,6 +608,26 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
     actualProjectCost: number;
   } | null>(null);
 
+  const createRowKey = () =>
+    `row_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+  const getLastHeaderMeta = (lineItems: any[] = []) => {
+    for (let i = lineItems.length - 1; i >= 0; i--) {
+      const row = lineItems[i];
+      if (row.type === "header") {
+        return {
+          parentHeaderKey: row.headerKey,
+          parentHeaderName: row.headerName || null,
+        };
+      }
+    }
+
+    return {
+      parentHeaderKey: null,
+      parentHeaderName: null,
+    };
+};
+
   // Function to parse labor IDs and fetch labor data
   const parseLaborIds = async (laborIdsString: string, isLeadLabor: boolean = false) => {
     if (!laborIdsString) return [];
@@ -758,21 +780,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
     dueDate: '',
     paymentCredits: 0,
     balanceDue: '',
-    lineItems: [{
-      id: Math.random().toString(36).substring(2, 9),
-      productId: null,
-      qty: 1,
-      item: '',
-      description: '',
-      rate: 0,
-      estimatedPrice: 0,
-      total: 0,
-      searchQuery: '',
-      showSearchResults: false,
-      supplierId: 1,
-      isCustomProduct: false,
-      estimate_product_id: null
-    }],
+    lineItems: [],
     notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
     signatureText: 'ACCEPTED BY________________DATE_____',
     invoiceType: 'Estimate',
@@ -780,7 +788,39 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
     paymentPercentage: 0,
     estimateTotal: 0,
     paymentHistory: [] as any[]
-  })
+  });
+
+  console.log(inlineInvoiceData.lineItems,"::lineeitems");
+  
+const addCustomHeader = () => {
+  setInlineInvoiceData((prev) => ({
+    ...prev,
+    lineItems: [
+      ...prev.lineItems,
+      {
+        id: Math.random().toString(36).substring(2, 9),
+        type: "header",
+        headerName: "Custom Header",
+        headerKey: createRowKey(),
+        parentHeaderKey: null,
+        parentHeaderName: null,
+        isEditingHeader: false,
+        productId: null,
+        qty: 0,
+        item: "",
+        description: "",
+        rate: 0,
+        estimatedPrice: 0,
+        total: 0,
+        searchQuery: "",
+        showSearchResults: false,
+        supplierId: selectedSupplierId || 1,
+        isCustomProduct: true,
+        estimate_product_id: null,
+      },
+    ],
+  }));
+};
 
   const allowedStatuses = ['draft', 'pending', 'active', 'in_progress', 'completed', 'cancelled', 'on_hold'];
 
@@ -1690,6 +1730,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
               estimated_price: Number(item.estimated_price || 0),
               total_cost: Number(item.total_cost || item.total || 0),
               is_custom: item.is_custom === true,
+              section_name: item.headerName || null,
+               section_type: item.type ? "room_header" : null,
+               parent_header_key: item.parentHeaderKey || null,
+               parent_header_name: item.parentHeaderName || null,
             }))
           : []
 
@@ -1763,7 +1807,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
   //     setIsDeleting(false);
   //   }
   // };
-
+  
+  console.log(inlineInvoiceData,"inlineInvoiceData");
+  
   const handleDeleteProduct = (product: any) => {
     setProductToDelete(product);
     setShowDeleteProductDialog(true);
@@ -2546,79 +2592,152 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
   }
 
   // Invoice Helper Functions
-  const calculateInvoiceSubtotal = (): number => {
-    return inlineInvoiceData.lineItems.reduce((sum, item) => sum + (item.total || 0), 0)
-  }
+  // const calculateInvoiceSubtotal = (): number => {
+  //   return inlineInvoiceData.lineItems.reduce((sum, item) => sum + (item.total || 0), 0)
+  // }
+const calculateInvoiceSubtotal = (): number => {
+  return inlineInvoiceData.lineItems.reduce((sum, item) => {
+    if (item.type === "header") return sum;
+    return sum + (item.total || 0);
+  }, 0);
+};
 
-  const updateInvoiceLineItem = (itemId: string, field: string, value: any) => {
-    setInlineInvoiceData(prev => ({
-      ...prev,
-      lineItems: prev.lineItems.map(item => {
-        if (item.id === itemId) {
-          const updated = { ...item, [field]: value }
+  // const updateInvoiceLineItem = (itemId: string, field: string, value: any) => {
+  //   setInlineInvoiceData(prev => ({
+  //     ...prev,
+  //     lineItems: prev.lineItems.map(item => {
+  //       if (item.id === itemId) {
+  //         const updated = { ...item, [field]: value }
 
-          // Update total calculation based on the logic:
-          // If both rate and estimatedPrice are provided, use estimatedPrice
-          // If only rate is provided, use rate
-          if (field === 'qty' || field === 'rate' || field === 'estimatedPrice') {
-            const qty = updated.qty || 0
-            const rate = updated.rate || 0
-            const estimatedPrice = updated.estimatedPrice || 0
+  //         // Update total calculation based on the logic:
+  //         // If both rate and estimatedPrice are provided, use estimatedPrice
+  //         // If only rate is provided, use rate
+  //         if (field === 'qty' || field === 'rate' || field === 'estimatedPrice') {
+  //           const qty = updated.qty || 0
+  //           const rate = updated.rate || 0
+  //           const estimatedPrice = updated.estimatedPrice || 0
 
-            // If estimatedPrice is provided and greater than 0, use it
-            // Otherwise, use rate
-            const priceToUse = estimatedPrice > 0 ? estimatedPrice : rate
-            updated.total = qty * priceToUse
-          }
-          return updated
+  //           // If estimatedPrice is provided and greater than 0, use it
+  //           // Otherwise, use rate
+  //           const priceToUse = estimatedPrice > 0 ? estimatedPrice : rate
+  //           updated.total = qty * priceToUse
+  //         }
+  //         return updated
+  //       }
+  //       return item
+  //     })
+  //   }))
+  // }
+const updateInvoiceLineItem = (itemId: string, field: string, value: any) => {
+  setInlineInvoiceData((prev) => {
+    const updatedLineItems = prev.lineItems.map((item) => {
+      if (item.id !== itemId) return item;
+
+      const updated = { ...item, [field]: value };
+
+      if (updated.type === "header") {
+        return updated;
+      }
+
+      if (field === "qty" || field === "rate" || field === "estimatedPrice") {
+        const qty = Number(updated.qty) || 0;
+        const rate = Number(updated.rate) || 0;
+        const estimatedPrice = Number(updated.estimatedPrice) || 0;
+        const priceToUse = estimatedPrice > 0 ? estimatedPrice : rate;
+        updated.total = qty * priceToUse;
+      }
+
+      return updated;
+    });
+
+    const changedHeader = updatedLineItems.find(
+      (row) => row.id === itemId && row.type === "header"
+    );
+
+    if (changedHeader && field === "headerName") {
+      updatedLineItems.forEach((row) => {
+        if (
+          row.type === "item" &&
+          row.parentHeaderKey === changedHeader.headerKey
+        ) {
+          row.parentHeaderName = value || null;
         }
-        return item
-      })
-    }))
-  }
+      });
+    }
 
-  const addInvoiceLineItem = () => {
-    setInlineInvoiceData(prev => ({
+    return {
       ...prev,
-      lineItems: [...prev.lineItems, {
-        id: Math.random().toString(36).substring(2, 9),
-        productId: null,
-        qty: 1,
-        item: '',
-        description: '',
-        rate: 0,
-        estimatedPrice: 0,
-        total: 0,
-        searchQuery: '',
-        showSearchResults: false,
-        supplierId: selectedSupplierId || 1,
-        isCustomProduct: false,
-        estimate_product_id: null
-      }]
-    }))
-  }
+      lineItems: updatedLineItems,
+    };
+  });
+};
+const addInvoiceLineItem = () => {
+  setInlineInvoiceData((prev) => {
+    const headerMeta = getLastHeaderMeta(prev.lineItems);
 
-  const addCustomLineItem = () => {
-    setInlineInvoiceData(prev => ({
+    return {
       ...prev,
-      lineItems: [...prev.lineItems, {
-        id: Math.random().toString(36).substring(2, 9),
-        productId: null,
-        qty: 1,
-        item: '',
-        description: '',
-        rate: 0,
-        estimatedPrice: 0,
-        total: 0,
-        searchQuery: '',
-        showSearchResults: false,
-        supplierId: selectedSupplierId || 1,
-        isCustomProduct: true,
-        estimate_product_id: null
-      }]
-    }))
-  }
+      lineItems: [
+        ...prev.lineItems,
+        {
+          id: Math.random().toString(36).substring(2, 9),
+          type: "item",
+          headerKey: null,
+          headerName: "",
+          parentHeaderKey: headerMeta.parentHeaderKey,
+          parentHeaderName: headerMeta.parentHeaderName,
+          isEditingHeader: false,
+          productId: null,
+          qty: 1,
+          item: "",
+          description: "",
+          rate: 0,
+          estimatedPrice: 0,
+          total: 0,
+          searchQuery: "",
+          showSearchResults: false,
+          supplierId: selectedSupplierId || 1,
+          isCustomProduct: false,
+          estimate_product_id: null,
+        },
+      ],
+    };
+  });
+};
 
+const addCustomLineItem = () => {
+  setInlineInvoiceData((prev) => {
+    const headerMeta = getLastHeaderMeta(prev.lineItems);
+
+    return {
+      ...prev,
+      lineItems: [
+        ...prev.lineItems,
+        {
+          id: Math.random().toString(36).substring(2, 9),
+          type: "item",
+          headerKey: null,
+          headerName: "",
+          parentHeaderKey: headerMeta.parentHeaderKey,
+          parentHeaderName: headerMeta.parentHeaderName,
+          isEditingHeader: false,
+          productId: null,
+          qty: 1,
+          item: "",
+          description: "",
+          rate: 0,
+          estimatedPrice: 0,
+          total: 0,
+          searchQuery: "",
+          showSearchResults: false,
+          supplierId: selectedSupplierId || 1,
+          isCustomProduct: true,
+          estimate_product_id: null,
+        },
+      ],
+    };
+  });
+};
   const addCustomInvoiceType = (customType: string) => {
     if (customType) {
       // Check for case-insensitive duplicates
@@ -2630,6 +2749,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
       }
     }
   }
+console.log(inlineInvoiceData,"::inlineInvoiceData");
 
   // Fetch customer data
   const fetchCustomerData = async (customerId: string) => {
@@ -2691,27 +2811,66 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
     }
   }
 
-  const removeInvoiceLineItem = async (itemId: string) => {
-    try {
-      // Find the item to get estimate_product_id
-      const itemToDelete = inlineInvoiceData.lineItems.find(item => item.id === itemId);
-      if (itemToDelete && itemToDelete.estimate_product_id) {
-        // Call delete API
-        console.log(itemToDelete.estimate_product_id, 'itemToDelete.estimate_product_id')
-        await apiClient.deleteProductFromEstimate(itemToDelete.estimate_product_id);
-        toast.success('Product removed from estimate successfully!');
-      }
+  console.log(inlineInvoiceData,"::inlineInvoiceData");
+  
+  // const removeInvoiceLineItem = async (itemId: string) => {
+  //   try {
+  //     // Find the item to get estimate_product_id
+  //     const itemToDelete = inlineInvoiceData.lineItems.find(item => item.id === itemId);
+  //     if (itemToDelete && itemToDelete.estimate_product_id) {
+  //       // Call delete API
+  //       console.log(itemToDelete.estimate_product_id, 'itemToDelete.estimate_product_id')
+  //       await apiClient.deleteProductFromEstimate(itemToDelete.estimate_product_id);
+  //       toast.success('Product removed from estimate successfully!');
+  //     }
 
-      // Remove from local state
-      setInlineInvoiceData(prev => ({
+  //     // Remove from local state
+  //     setInlineInvoiceData(prev => ({
+  //       ...prev,
+  //       lineItems: prev.lineItems.filter(item => item.id !== itemId)
+  //     }));
+  //   } catch (error) {
+  //     console.error('Error removing product from estimate:', error);
+  //     toast.error('Failed to remove product from estimate');
+  //   }
+  // }
+  const removeInvoiceLineItem = (itemId: string) => {
+  setInlineInvoiceData((prev) => {
+    const rowToRemove = prev.lineItems.find((item) => item.id === itemId);
+
+    if (!rowToRemove) return prev;
+
+    // if deleting a header, detach all child item rows from that header
+    if (rowToRemove.type === "header") {
+      const removedHeaderKey = rowToRemove.headerKey;
+
+      return {
         ...prev,
-        lineItems: prev.lineItems.filter(item => item.id !== itemId)
-      }));
-    } catch (error) {
-      console.error('Error removing product from estimate:', error);
-      toast.error('Failed to remove product from estimate');
+        lineItems: prev.lineItems
+          .filter((item) => item.id !== itemId)
+          .map((item) => {
+            if (
+              item.type === "item" &&
+              item.parentHeaderKey === removedHeaderKey
+            ) {
+              return {
+                ...item,
+                parentHeaderKey: null,
+                parentHeaderName: null,
+              };
+            }
+
+            return item;
+          }),
+      };
     }
-  }
+
+    return {
+      ...prev,
+      lineItems: prev.lineItems.filter((item) => item.id !== itemId),
+    };
+  });
+};
 
  const getFilteredProducts = (query: string) => {
   if (!query) return []
@@ -2720,14 +2879,29 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
 
   const selectProduct = (itemId: string, product: any) => {
     // Check if product already exists in line items (by product ID, not name)
-    const isDuplicate = inlineInvoiceData.lineItems.some(item =>
-      item.id !== itemId && item.productId === product.id
-    )
+      const currentItem = inlineInvoiceData.lineItems.find(
+        (item: any) => item.id === itemId,
+      );
+      const currentHeaderKey = currentItem.parentHeaderKey || null;
 
-    if (isDuplicate) {
-      toast.error('This product is already added to the invoice')
-      return
-    }
+      // Check duplicate only inside same header group
+      const isDuplicateInSameGroup = inlineInvoiceData.lineItems.some(
+        (item: any) => {
+          if (item.id === itemId) return false;
+          if (item.type === "header") return false;
+
+          return (
+            item.parentHeaderKey === currentHeaderKey &&
+            item.productId === product.id
+          );
+        },
+      );
+
+      if (isDuplicateInSameGroup) {
+        toast.error("This product is already added in this section");
+        return;
+      }
+
 
     setInlineInvoiceData(prev => ({
       ...prev,
@@ -2756,7 +2930,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
   const addCustomProduct = (itemId: string, productName: string) => {
     // Check if custom product already exists in line items (by name for custom products)
     const isDuplicate = inlineInvoiceData.lineItems.some(item =>
-      item.id !== itemId && item.productId === null && item.item.toLowerCase() === productName.toLowerCase()
+      item.id !== itemId && item.productId === product.id
     )
 
     if (isDuplicate) {
@@ -3228,6 +3402,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
       const headRect = headerEl?.getBoundingClientRect();
       const headerBandCssPx = Math.max(1, Math.ceil(((headRect?.bottom ?? 0) - rootRect.top)));
       const headerPxScaled = Math.max(1, Math.round(headerBandCssPx * scaleX));
+      log
 
       // Slice header (use scaled px)
       let headerImgData: string | null = null;
@@ -3380,7 +3555,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
     } catch (error) {
       console.error('Error fetching products:', error)
     }
-  }
+  };
+  console.log(products,"::products");
+  
 
   useEffect(() => {
     fetchProducts()
@@ -3455,6 +3632,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
           estimated_price: item.estimatedPrice || 0,
           total_cost: item.total,
           is_custom: item.isCustomProduct === true,
+          section_name: item.headerName || null,
+          section_type: item.type ? "room_header" : null,
+          parent_header_key: item.parentHeaderKey || null,
+         parent_header_name: item.parentHeaderName || null,
         }
 
         // Add product ID only for searched/selected products
@@ -3556,6 +3737,39 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
       setIsLoadingDraft(false)
     }
   }
+  const buildCustomProductsWithSections = () => {
+  let currentSectionName = "";
+
+  return inlineInvoiceData.lineItems.reduce((acc: any[], lineItem: any) => {
+    if (lineItem.type === "header") {
+      currentSectionName = (lineItem.headerName || "").trim();
+      return acc;
+    }
+
+    acc.push({
+      ...(lineItem.estimate_product_id ? { id: lineItem.estimate_product_id } : {}),
+      product_name: lineItem.item || "",
+      description: lineItem.description || "",
+      jdp_sku:
+        lineItem.jdp_sku ||
+        `JDP-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      stock_quantity: Number(lineItem.qty || 0),
+      unit: lineItem.unit || "unit",
+      job_id: Number(jobId),
+      unit_cost: Number(lineItem.rate || 0),
+      jdp_price: Number(lineItem.rate || 0),
+      estimated_price: Number(lineItem.estimatedPrice || 0),
+      total_cost: Number(lineItem.total || 0),
+      is_custom: !!lineItem.isCustomProduct,
+
+      // NEW FIELDS FOR BACKEND
+      section_name: currentSectionName || null,
+      section_type: currentSectionName ? "room_header" : null,
+    });
+
+    return acc;
+  }, []);
+};
 
   const handlePreviewAndSend = async () => {
     // Validation
@@ -3588,6 +3802,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
 
       // Only map valid line items to custom products
       const customProducts = validLineItems.map(item => {
+        console.log(item,"itemitem");
+        
         const productPayload: any = {
           product_name: item.item,
           description: item.description || '',
@@ -3600,6 +3816,11 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
           estimated_price: item.estimatedPrice || 0,
           total_cost: item.total,
           is_custom: item.isCustomProduct === true,
+              // NEW FIELDS FOR BACKEND
+          section_name: item.headerName || null,
+          section_type: item.type ? "room_header" : null,
+          parent_header_key: item.parentHeaderKey || null,
+          parent_header_name: item.parentHeaderName || null,
         }
 
         // Add product ID only for searched/selected products
@@ -3776,6 +3997,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
           estimated_price: item.estimatedPrice || 0,
           total_cost: item.total,
           is_custom: item.isCustomProduct === true,
+          section_name: item.headerName || null,
+          section_type: item.type ? "room_header" : null,
+          parent_header_key: item.parentHeaderKey || null,
+          parent_header_name: item.parentHeaderName || null,
         }
 
         // Add product ID only for searched/selected products
@@ -4205,20 +4430,23 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
           </div>
 
           <div className="flex items-center gap-3">
-           
             <div onClick={(e) => e.stopPropagation()}>
               <Button
                 variant="ghost"
                 size="sm"
-                title='Change Order'
+                title="Change Order"
                 className="  pl-2 pr-2 bg-primary text-white"
                 onClick={(e) =>
                   handleChangeOrderClick(
                     job,
-                    job.type === 'contract-based'
-                      ? (job.contractor?.toString?.() || job.contractor_id?.toString?.() || '')
-                      : (job.customer?.toString?.() || job.customer_id?.toString?.() || ''),
-                    e
+                    job.type === "contract-based"
+                      ? job.contractor?.toString?.() ||
+                          job.contractor_id?.toString?.() ||
+                          ""
+                      : job.customer?.toString?.() ||
+                          job.customer_id?.toString?.() ||
+                          "",
+                    e,
                   )
                 }
               >
@@ -4252,7 +4480,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
         {/* Job Title and Status */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">{job.title}</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">
+              {job.title}
+            </h1>
             <p className="text-sm text-gray-600">#{job.id}</p>
           </div>
         </div>
@@ -4262,7 +4492,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-blue-600">Total Hours Worked</p>
+                  <p className="text-sm font-medium text-blue-600">
+                    Total Hours Worked
+                  </p>
                   {isLoadingDashboard ? (
                     <div className="h-6 flex items-center">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
@@ -4273,7 +4505,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                     </p>
                   )}
                   <p className="text-xs text-blue-600">
-                    {isLoadingDashboard ? "Loading" : dashboardMetrics?.totalHoursWorked?.unit ?? "hours"}
+                    {isLoadingDashboard
+                      ? "Loading"
+                      : (dashboardMetrics?.totalHoursWorked?.unit ?? "hours")}
                   </p>
                 </div>
                 <Clock className="h-8 w-8 text-blue-600" />
@@ -4286,7 +4520,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-green-600">Total Material Used</p>
+                  <p className="text-sm font-medium text-green-600">
+                    Total Material Used
+                  </p>
                   {isLoadingDashboard ? (
                     <div className="h-6 flex items-center">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600" />
@@ -4297,7 +4533,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                     </p>
                   )}
                   <p className="text-xs text-green-600">
-                    {isLoadingDashboard ? "Loading" : dashboardMetrics?.totalMaterialUsed?.unit ?? "items"}
+                    {isLoadingDashboard
+                      ? "Loading"
+                      : (dashboardMetrics?.totalMaterialUsed?.unit ?? "items")}
                   </p>
                 </div>
                 <Package className="h-8 w-8 text-green-600" />
@@ -4310,7 +4548,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-purple-600">Total Labour Entries</p>
+                  <p className="text-sm font-medium text-purple-600">
+                    Total Labour Entries
+                  </p>
                   {isLoadingDashboard ? (
                     <div className="h-6 flex items-center">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600" />
@@ -4321,7 +4561,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                     </p>
                   )}
                   <p className="text-xs text-purple-600">
-                    {isLoadingDashboard ? "Loading" : dashboardMetrics?.totalLabourEntries?.unit ?? "entries"}
+                    {isLoadingDashboard
+                      ? "Loading"
+                      : (dashboardMetrics?.totalLabourEntries?.unit ??
+                        "entries")}
                   </p>
                 </div>
                 <Users className="h-8 w-8 text-purple-600" />
@@ -4334,7 +4577,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-orange-600">Number of Invoices</p>
+                  <p className="text-sm font-medium text-orange-600">
+                    Number of Invoices
+                  </p>
                   {isLoadingDashboard ? (
                     <div className="h-6 flex items-center">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-600" />
@@ -4345,7 +4590,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                     </p>
                   )}
                   <p className="text-xs text-orange-600">
-                    {isLoadingDashboard ? "Loading" : dashboardMetrics?.numberOfInvoices?.unit ?? "invoices"}
+                    {isLoadingDashboard
+                      ? "Loading"
+                      : (dashboardMetrics?.numberOfInvoices?.unit ??
+                        "invoices")}
                   </p>
                 </div>
                 <FileText className="h-8 w-8 text-orange-600" />
@@ -4354,13 +4602,11 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
           </Card>
         </div>
 
-
-
         {/* Main Content */}
         <div className="flex justify-between gap-6">
           {/* Left Column - Job Details */}
           {/* Job Details Card */}
-          <div className='w-[70%]'>
+          <div className="w-[70%]">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
                 <CardTitle className="flex items-center gap-2">
@@ -4368,7 +4614,6 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                   Job Details
                 </CardTitle>
                 <div className="flex items-center gap-3">
-
                   {!isEditing && (
                     <Button
                       variant="outline"
@@ -4385,24 +4630,26 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                     size="sm"
                     className="gap-2"
                     onClick={handleCompleteJob}
-                    disabled={isSaving || job.status === 'completed'}
+                    disabled={isSaving || job.status === "completed"}
                   >
                     Complete Job
                   </Button>
                   {!isEditing && (
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-gray-600">
-                        {showJobDetails ? 'Hide Details' : 'Show Details'}
+                        {showJobDetails ? "Hide Details" : "Show Details"}
                       </span>
                       <button
                         type="button"
-                        onClick={() => setShowJobDetails(prev => !prev)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${showJobDetails ? 'bg-[#0EA5E9]' : 'bg-gray-300'
-                          }`}
+                        onClick={() => setShowJobDetails((prev) => !prev)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          showJobDetails ? "bg-[#0EA5E9]" : "bg-gray-300"
+                        }`}
                       >
                         <span
-                          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${showJobDetails ? 'translate-x-5' : 'translate-x-1'
-                            }`}
+                          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                            showJobDetails ? "translate-x-5" : "translate-x-1"
+                          }`}
                         />
                       </button>
                     </div>
@@ -4413,40 +4660,65 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
-                      <div className={`flex items-center gap-3 ${!isEditing ? 'bg-[#f2f0f0] p-3 rounded-md' : ''}`}>
+                      <div
+                        className={`flex items-center gap-3 ${!isEditing ? "bg-[#f2f0f0] p-3 rounded-md" : ""}`}
+                      >
                         {!isEditing && (
                           <Users className="h-4 w-4 text-black-600" />
                         )}
                         <div className="flex-1">
-                          <p className="text-sm text-gray-600"> {isEditing ? "Job Title" : "Customer / Contractor"}</p>
+                          <p className="text-sm text-gray-600">
+                            {" "}
+                            {isEditing ? "Job Title" : "Customer / Contractor"}
+                          </p>
                           {isEditing ? (
                             <Input
                               value={editedJob.title}
-                              onChange={(e) => setEditedJob({ ...editedJob, title: e.target.value })}
+                              onChange={(e) =>
+                                setEditedJob({
+                                  ...editedJob,
+                                  title: e.target.value,
+                                })
+                              }
                             />
                           ) : (
-                            <p className="font-medium">{job.customerName || job.contractorName || 'No customer assigned'}</p>
+                            <p className="font-medium">
+                              {job.customerName ||
+                                job.contractorName ||
+                                "No customer assigned"}
+                            </p>
                           )}
                         </div>
                       </div>
                       {!isEditing && (
-                        <div className={`flex items-center gap-3 ${!isEditing ? 'bg-[#dae8ff80] p-3 rounded-md' : ''}`}>
+                        <div
+                          className={`flex items-center gap-3 ${!isEditing ? "bg-[#dae8ff80] p-3 rounded-md" : ""}`}
+                        >
                           <Clock className="h-4 w-4 text-black-600" />
                           <div className="flex-1">
                             <p className="text-sm text-gray-600">Created At</p>
                             {isEditing ? (
                               <Input
                                 value={editedJob.startDate}
-                                onChange={(e) => setEditedJob({ ...editedJob, startDate: e.target.value })}
+                                onChange={(e) =>
+                                  setEditedJob({
+                                    ...editedJob,
+                                    startDate: e.target.value,
+                                  })
+                                }
                               />
                             ) : (
-                              <p className="font-medium">{editedJob.startDate}</p>
+                              <p className="font-medium">
+                                {editedJob.startDate}
+                              </p>
                             )}
                           </div>
                         </div>
                       )}
                       {!isEditing && (
-                        <div className={`flex items-center gap-3 ${!isEditing ? 'bg-[#bbf7d021] p-3 rounded-md' : ''}`}>
+                        <div
+                          className={`flex items-center gap-3 ${!isEditing ? "bg-[#bbf7d021] p-3 rounded-md" : ""}`}
+                        >
                           <MapPin className="h-4 w-4 text-black-600" />
                           <div className="flex-1">
                             <p className="text-sm text-gray-600">Location</p>
@@ -4477,12 +4749,16 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                         )}
                       </div> */}
 
-                        <div className={`flex-1 ${!isEditing ? 'bg-[#dbdaff30] p-3 rounded-md' : ''}`}>
+                      <div
+                        className={`flex-1 ${!isEditing ? "bg-[#dbdaff30] p-3 rounded-md" : ""}`}
+                      >
                         <p className="text-sm text-gray-600">Status</p>
                         {isEditing ? (
                           <Select
                             value={editedJob.status}
-                            onValueChange={(value) => setEditedJob({ ...editedJob, status: value })}
+                            onValueChange={(value) =>
+                              setEditedJob({ ...editedJob, status: value })
+                            }
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Select status" />
@@ -4491,44 +4767,48 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                               <SelectItem value="draft">Draft</SelectItem>
                               <SelectItem value="pending">Pending</SelectItem>
                               <SelectItem value="active">Active</SelectItem>
-                              <SelectItem value="in_progress">In-Progress</SelectItem>
-                              <SelectItem value="completed">Completed</SelectItem>
-                              <SelectItem value="cancelled">Cancelled</SelectItem>
+                              <SelectItem value="in_progress">
+                                In-Progress
+                              </SelectItem>
+                              <SelectItem value="completed">
+                                Completed
+                              </SelectItem>
+                              <SelectItem value="cancelled">
+                                Cancelled
+                              </SelectItem>
                               <SelectItem value="on_hold">On Hold</SelectItem>
                             </SelectContent>
                           </Select>
-
+                        ) : (
                           // <Input
                           //   value={editedJob.type}
                           //   onChange={(e) => setEditedJob({ ...editedJob, type: e.target.value })}
                           // />
-                        ) : (
                           <p className="font-medium">{editedJob.status}</p>
                         )}
                       </div>
                       {!isEditing && (
-                        <div className={`flex-1 ${!isEditing ? 'bg-[#fff7ed8c] p-3 rounded-md' : ''}`}>
+                        <div
+                          className={`flex-1 ${!isEditing ? "bg-[#fff7ed8c] p-3 rounded-md" : ""}`}
+                        >
                           <p className="text-sm text-gray-600">Job Estimate</p>
-                          <p className="font-medium">{formatCurrency(job.estimatedCost)}</p>
+                          <p className="font-medium">
+                            {formatCurrency(job.estimatedCost)}
+                          </p>
                         </div>
                       )}
                       {!isEditing && (
-
-                        <div className={`flex-1 ${!isEditing ? 'bg-[#9f6b290d] p-3 rounded-md' : ''}`}>
+                        <div
+                          className={`flex-1 ${!isEditing ? "bg-[#9f6b290d] p-3 rounded-md" : ""}`}
+                        >
                           <p className="text-sm text-gray-600">Job Title</p>
                           <span className="inline-block  text-black-600 text-xs font-medium  ">
                             {editedJob.title}
                           </span>
                         </div>
                       )}
-
                     </div>
-                    <div className="space-y-4">
-                    
-
-
-                    </div>
-
+                    <div className="space-y-4"></div>
                   </div>
                   {isEditing && (
                     <div className="flex items-center gap-3">
@@ -4541,27 +4821,33 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
 
                             try {
                               // Parse address components
-                              const addressComponents = place.address_components || [];
-                              let streetNumber = '';
-                              let route = '';
-                              let city = '';
-                              let state = '';
-                              let zipCode = '';
-                              let sublocality = '';
+                              const addressComponents =
+                                place.address_components || [];
+                              let streetNumber = "";
+                              let route = "";
+                              let city = "";
+                              let state = "";
+                              let zipCode = "";
+                              let sublocality = "";
 
                               addressComponents.forEach((component: any) => {
                                 const types = component.types;
-                                if (types.includes('street_number')) {
+                                if (types.includes("street_number")) {
                                   streetNumber = component.long_name;
-                                } else if (types.includes('route')) {
+                                } else if (types.includes("route")) {
                                   route = component.long_name;
-                                } else if (types.includes('locality')) {
+                                } else if (types.includes("locality")) {
                                   city = component.long_name;
-                                } else if (types.includes('sublocality') || types.includes('sublocality_level_1')) {
+                                } else if (
+                                  types.includes("sublocality") ||
+                                  types.includes("sublocality_level_1")
+                                ) {
                                   sublocality = component.long_name;
-                                } else if (types.includes('administrative_area_level_1')) {
+                                } else if (
+                                  types.includes("administrative_area_level_1")
+                                ) {
                                   state = component.short_name;
-                                } else if (types.includes('postal_code')) {
+                                } else if (types.includes("postal_code")) {
                                   zipCode = component.long_name;
                                 }
                               });
@@ -4572,15 +4858,17 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                               }
 
                               // Build address - use street number + route, or fallback to formatted address
-                              let fullAddress = `${streetNumber} ${route}`.trim();
+                              let fullAddress =
+                                `${streetNumber} ${route}`.trim();
                               if (!fullAddress) {
-                                const formattedAddress = place.formatted_address || place.name || '';
-                                const parts = formattedAddress.split(',');
-                                fullAddress = parts[0] || '';
+                                const formattedAddress =
+                                  place.formatted_address || place.name || "";
+                                const parts = formattedAddress.split(",");
+                                fullAddress = parts[0] || "";
                               }
 
                               // Build cityZip - prioritize city, state, zip
-                              let cityZip = '';
+                              let cityZip = "";
                               if (city && state && zipCode) {
                                 cityZip = `${city}, ${state} ${zipCode}`;
                               } else if (city && state) {
@@ -4588,14 +4876,18 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                               } else if (city) {
                                 cityZip = city;
                               } else if (place.formatted_address) {
-                                const parts = place.formatted_address.split(',');
+                                const parts =
+                                  place.formatted_address.split(",");
                                 if (parts.length > 1) {
-                                  cityZip = parts.slice(1).join(',').trim();
+                                  cityZip = parts.slice(1).join(",").trim();
                                 }
                               }
 
                               // Update editedJob with parsed address components
-                              const formattedAddress = place.formatted_address || place.name || fullAddress;
+                              const formattedAddress =
+                                place.formatted_address ||
+                                place.name ||
+                                fullAddress;
                               setEditedJob({
                                 ...editedJob,
                                 location: formattedAddress,
@@ -4603,21 +4895,27 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                                 cityZip: cityZip,
                               });
                             } catch (error) {
-                              console.error('Error parsing place:', error);
+                              console.error("Error parsing place:", error);
                               // Fallback to formatted address
-                              const address = place.formatted_address || place.name || editedJob.location;
+                              const address =
+                                place.formatted_address ||
+                                place.name ||
+                                editedJob.location;
                               setEditedJob({ ...editedJob, location: address });
                             }
                           }}
                           options={{
-                            types: ['address'],
-                            componentRestrictions: { country: 'us' },
+                            types: ["address"],
+                            componentRestrictions: { country: "us" },
                           }}
                           className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                           placeholder="Start typing address..."
                           defaultValue={editedJob.location}
                           onChange={(e: any) => {
-                            setEditedJob({ ...editedJob, location: e.target.value });
+                            setEditedJob({
+                              ...editedJob,
+                              location: e.target.value,
+                            });
                           }}
                         />
                       </div>
@@ -4630,10 +4928,17 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                       <Textarea
                         value={editedJob.description}
                         maxLength={30}
-                        onChange={(e) => setEditedJob({ ...editedJob, description: e.target.value })}
+                        onChange={(e) =>
+                          setEditedJob({
+                            ...editedJob,
+                            description: e.target.value,
+                          })
+                        }
                       />
                     ) : (
-                      <p className="text-sm bg-gray-100 p-3 rounded-md">{editedJob.description}</p>
+                      <p className="text-sm bg-gray-100 p-3 rounded-md">
+                        {editedJob.description}
+                      </p>
                     )}
                   </div>
 
@@ -4646,55 +4951,73 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                     {isEditing ? (
                       <AutoScrollMultiSelect
                         selectedValues={(() => {
-                          const values = editedJob.assignedLeadLabor?.map((labor: any) => {
-                            // Handle different data structures
-                            if (typeof labor === 'string') return labor;
-                            if (labor.id) return labor.id.toString();
-                            if (labor.user?.id) return labor.user.id.toString();
-                            return labor.toString();
-                          }) || [];
-                          console.log('Lead Labor selectedValues:', values, 'Original data:', editedJob.assignedLeadLabor);
+                          const values =
+                            editedJob.assignedLeadLabor?.map((labor: any) => {
+                              // Handle different data structures
+                              if (typeof labor === "string") return labor;
+                              if (labor.id) return labor.id.toString();
+                              if (labor.user?.id)
+                                return labor.user.id.toString();
+                              return labor.toString();
+                            }) || [];
+                          console.log(
+                            "Lead Labor selectedValues:",
+                            values,
+                            "Original data:",
+                            editedJob.assignedLeadLabor,
+                          );
                           return values;
                         })()}
-                        selectedObjects={editedJob.assignedLeadLabor?.map((labor: any) => ({
-                          id: labor.id,
-                          name: labor.name || labor.user?.full_name || labor.labor_code || `Labor ${labor.id}`,
-                          labor_code: labor.labor_code,
-                          department: labor.department,
-                          specialization: labor.specialization,
-                          trade: labor.trade
-                        })) || []}
+                        selectedObjects={
+                          editedJob.assignedLeadLabor?.map((labor: any) => ({
+                            id: labor.id,
+                            name:
+                              labor.name ||
+                              labor.user?.full_name ||
+                              labor.labor_code ||
+                              `Labor ${labor.id}`,
+                            labor_code: labor.labor_code,
+                            department: labor.department,
+                            specialization: labor.specialization,
+                            trade: labor.trade,
+                          })) || []
+                        }
                         onSelectionChange={(selectedIds, selectedItems) => {
-                          console.log('Lead Labor selection changed:', { selectedIds, selectedItems });
-                          const validSelectedItems = selectedItems.filter((labor: any) => labor !== undefined);
+                          console.log("Lead Labor selection changed:", {
+                            selectedIds,
+                            selectedItems,
+                          });
+                          const validSelectedItems = selectedItems.filter(
+                            (labor: any) => labor !== undefined,
+                          );
 
                           setEditedJob((prev) => ({
                             ...prev,
                             assignedLeadLabor: validSelectedItems,
                           }));
-
                         }}
                         placeholder="Select lead labor"
                         fetchData={apiClient.getLeadLabor}
                         displayField="name"
                         valueField="id"
                       />
-
-
                     ) : (
                       <div className="flex flex-wrap gap-2 mt-2">
-                        {(editedJob.assignedLeadLabor || []).map((labor: any, index: number) => (
-                          <span
-                            key={labor.id || `labor-${index}`}
-                            className="bg-blue-50 text-blue-700 text-sm px-2 py-1 rounded-md border border-blue-200"
-                          >
-                            {labor.name || labor.user?.full_name || labor.labor_code}
-                          </span>
-                        ))}
+                        {(editedJob.assignedLeadLabor || []).map(
+                          (labor: any, index: number) => (
+                            <span
+                              key={labor.id || `labor-${index}`}
+                              className="bg-blue-50 text-blue-700 text-sm px-2 py-1 rounded-md border border-blue-200"
+                            >
+                              {labor.name ||
+                                labor.user?.full_name ||
+                                labor.labor_code}
+                            </span>
+                          ),
+                        )}
                       </div>
                     )}
                   </div>
-
 
                   <div>
                     <Label className="flex items-center gap-2 mb-2">
@@ -4705,64 +5028,75 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                     {isEditing ? (
                       <AutoScrollMultiSelect
                         selectedValues={(() => {
-                          const values = editedJob.assignedLabor?.map((labor: any) => {
-                            // Handle different data structures
-                            if (typeof labor === 'string') return labor;
-                            if (labor.id) return labor.id.toString();
-                            if (labor.user?.id) return labor.user.id.toString();
-                            return labor.toString();
-                          }) || [];
-                          console.log('Labor selectedValues:', values, 'Original data:', editedJob.assignedLabor);
+                          const values =
+                            editedJob.assignedLabor?.map((labor: any) => {
+                              // Handle different data structures
+                              if (typeof labor === "string") return labor;
+                              if (labor.id) return labor.id.toString();
+                              if (labor.user?.id)
+                                return labor.user.id.toString();
+                              return labor.toString();
+                            }) || [];
+                          console.log(
+                            "Labor selectedValues:",
+                            values,
+                            "Original data:",
+                            editedJob.assignedLabor,
+                          );
                           return values;
                         })()}
-                        selectedObjects={editedJob.assignedLabor?.map((labor: any) => ({
-                          id: labor.id,
-                          name: labor.name || labor.user?.full_name || labor.labor_code || `Labor ${labor.id}`,
-                          labor_code: labor.labor_code,
-                          trade: labor.trade,
-                          experience: labor.experience,
-                          hourly_rate: labor.hourly_rate
-                        })) || []}
+                        selectedObjects={
+                          editedJob.assignedLabor?.map((labor: any) => ({
+                            id: labor.id,
+                            name:
+                              labor.name ||
+                              labor.user?.full_name ||
+                              labor.labor_code ||
+                              `Labor ${labor.id}`,
+                            labor_code: labor.labor_code,
+                            trade: labor.trade,
+                            experience: labor.experience,
+                            hourly_rate: labor.hourly_rate,
+                          })) || []
+                        }
                         onSelectionChange={(selectedIds, selectedItems) => {
-                          console.log('Labor selection changed:', { selectedIds, selectedItems });
-                          const validSelectedItems = selectedItems.filter((labor: any) => labor !== undefined);
+                          console.log("Labor selection changed:", {
+                            selectedIds,
+                            selectedItems,
+                          });
+                          const validSelectedItems = selectedItems.filter(
+                            (labor: any) => labor !== undefined,
+                          );
 
                           setEditedJob((prev) => ({
                             ...prev,
                             assignedLabor: validSelectedItems,
                           }));
-
                         }}
                         placeholder="Select labor"
                         fetchData={apiClient.getLabor}
                         displayField="name"
                         valueField="id"
                       />
-
                     ) : (
                       <div className="flex flex-wrap gap-2 mt-2">
-                        {(editedJob.assignedLabor || []).map((labor: any, index: number) => {
-
-                          return (
-                            <span
-                              key={labor.id || `labor-${index}`}
-                              className="bg-orange-50 text-orange-700 text-sm px-2 py-1 rounded-md border border-orange-200"
-                            >
-                              {labor.name || labor.user?.full_name || labor.labor_code}
-                            </span>
-                          );
-                        })}
+                        {(editedJob.assignedLabor || []).map(
+                          (labor: any, index: number) => {
+                            return (
+                              <span
+                                key={labor.id || `labor-${index}`}
+                                className="bg-orange-50 text-orange-700 text-sm px-2 py-1 rounded-md border border-orange-200"
+                              >
+                                {labor.name ||
+                                  labor.user?.full_name ||
+                                  labor.labor_code}
+                              </span>
+                            );
+                          },
+                        )}
                       </div>
-
                     )}
-
-
                   </div>
-
-
-
-
-
 
                   {/* Assigned Labor Section */}
                   {/* {job.assignedLaborDetails && job.assignedLaborDetails.length > 0 && (
@@ -4816,7 +5150,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
               <CardFooter>
                 {isEditing && (
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="gap-1" onClick={handleCancel}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1"
+                      onClick={handleCancel}
+                    >
                       <X className="h-4 w-4" />
                       Cancel
                     </Button>
@@ -4827,9 +5166,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                       disabled={isSaving}
                     >
                       {isSaving ? (
-                        <>
-                          Saving...
-                        </>
+                        <>Saving...</>
                       ) : (
                         <>
                           <Check className="h-4 w-4" />
@@ -4843,7 +5180,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
             </Card>
           </div>
           {/* Right Column - Project Summary */}
-          <div className='w-[25%]'>
+          <div className="w-[25%]">
             <div className="space-y-6">
               <Card>
                 <CardHeader>
@@ -4856,34 +5193,49 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                   {projectSummary ? (
                     <div className="space-y-4">
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Job Estimate</span>
-                        <span className="font-medium">{formatCurrency(projectSummary.jobEstimate)}</span>
+                        <span className="text-sm text-gray-600">
+                          Job Estimate
+                        </span>
+                        <span className="font-medium">
+                          {formatCurrency(projectSummary.jobEstimate)}
+                        </span>
                       </div>
 
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Products Cost</span>
-                        <span className="font-medium">{formatCurrency(projectSummary.materialsCost)}</span>
+                        <span className="text-sm text-gray-600">
+                          Products Cost
+                        </span>
+                        <span className="font-medium">
+                          {formatCurrency(projectSummary.materialsCost)}
+                        </span>
                       </div>
 
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Labor Cost</span>
-                        <span className="font-medium">{formatCurrency(projectSummary.laborCost)}</span>
+                        <span className="text-sm text-gray-600">
+                          Labor Cost
+                        </span>
+                        <span className="font-medium">
+                          {formatCurrency(projectSummary.laborCost)}
+                        </span>
                       </div>
 
                       <hr />
 
                       <div className="flex justify-between">
                         <span className="font-medium">Actual Project Cost</span>
-                        <span className="font-bold text-lg">{formatCurrency(projectSummary.actualProjectCost)}</span>
+                        <span className="font-bold text-lg">
+                          {formatCurrency(projectSummary.actualProjectCost)}
+                        </span>
                       </div>
                     </div>
                   ) : (
-                    <p className="flex items-center justify-center py-16"> <LoadingSpinner /></p>
+                    <p className="flex items-center justify-center py-16">
+                      {" "}
+                      <LoadingSpinner />
+                    </p>
                   )}
                 </CardContent>
               </Card>
-
-
             </div>
           </div>
         </div>
@@ -4903,49 +5255,36 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                   if (!showInlineInvoiceForm) {
                     // Reset form and auto-fill when opening invoice form
                     setInlineInvoiceData({
-                      date: new Date().toISOString().split('T')[0],
-                      estimateNumber: '',
-                      customerName: job.customerName || '',
-                      customerAddress: job.address || '',
-                      billToAddress: job.billToAddress || '',
+                      date: new Date().toISOString().split("T")[0],
+                      estimateNumber: "",
+                      customerName: job.customerName || "",
+                      customerAddress: job.address || "",
+                      billToAddress: job.billToAddress || "",
                       billToAddressEnabled: true,
-                      poNumber: '',
-                      project: job.title || '',
-                      rep: '',
-                      dueDate: '',
+                      poNumber: "",
+                      project: job.title || "",
+                      rep: "",
+                      dueDate: "",
                       paymentCredits: 0,
-                      balanceDue: '',
-                      lineItems: [{
-                        id: Math.random().toString(36).substring(2, 9),
-                        productId: null,
-                        qty: 1,
-                        item: '',
-                        description: '',
-                        rate: 0,
-                        estimatedPrice: 0,
-                        total: 0,
-                        searchQuery: '',
-                        showSearchResults: false,
-                        supplierId: 1,
-                        isCustomProduct: false,
-                        estimate_product_id: null
-                      }],
-                      notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
-                      signatureText: 'ACCEPTED BY________________DATE_____',
-                      invoiceType: 'Estimate',
-                      customInvoiceType: '',
+                      balanceDue: "",
+                      lineItems: [],
+                      notes:
+                        "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
+                      signatureText: "ACCEPTED BY________________DATE_____",
+                      invoiceType: "Estimate",
+                      customInvoiceType: "",
                       paymentPercentage: 0,
                       estimateTotal: 0,
-                      paymentHistory: [] as any[]
-                    })
-                    setEditingInvoiceId(null)
-                    setInvoiceValidationErrors({})
+                      paymentHistory: [] as any[],
+                    });
+                    setEditingInvoiceId(null);
+                    setInvoiceValidationErrors({});
                   }
-                  setShowInlineInvoiceForm(!showInlineInvoiceForm)
+                  setShowInlineInvoiceForm(!showInlineInvoiceForm);
                 }}
               >
                 <PlusCircle className="h-4 w-4 mr-2" />
-                {showInlineInvoiceForm ? 'Cancel' : 'Add Invoice'}
+                {showInlineInvoiceForm ? "Cancel" : "Add Invoice"}
               </Button>
             </div>
           </CardHeader>
@@ -4962,41 +5301,69 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                   {/* Invoice Type Selector */}
                   <div className="p-6 border-b border-gray-200 bg-gray-50">
                     <div className="flex items-center gap-4">
-                      <Label className="text-primary font-semibold">Invoice Type:</Label>
+                      <Label className="text-primary font-semibold">
+                        Invoice Type:
+                      </Label>
                       <div className="relative w-[250px]">
                         <Select
                           value={inlineInvoiceData.invoiceType}
-                          onValueChange={(value) => setInlineInvoiceData(prev => ({ ...prev, invoiceType: value }))}
+                          onValueChange={(value) =>
+                            setInlineInvoiceData((prev) => ({
+                              ...prev,
+                              invoiceType: value,
+                            }))
+                          }
                         >
                           <SelectTrigger className="border-primary/30 focus:border-primary">
                             <SelectValue placeholder="Select invoice type..." />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="Estimate">Estimate</SelectItem>
-                            <SelectItem value="Downpayment Invoice">Downpayment Invoice</SelectItem>
-                            <SelectItem value="Rough Invoice">Rough Invoice</SelectItem>
-                            <SelectItem value="Progressive Invoice">Progressive Invoice</SelectItem>
-                            <SelectItem value="Final Invoice">Final Invoice</SelectItem>
+                            <SelectItem value="Downpayment Invoice">
+                              Downpayment Invoice
+                            </SelectItem>
+                            <SelectItem value="Rough Invoice">
+                              Rough Invoice
+                            </SelectItem>
+                            <SelectItem value="Progressive Invoice">
+                              Progressive Invoice
+                            </SelectItem>
+                            <SelectItem value="Final Invoice">
+                              Final Invoice
+                            </SelectItem>
                             {customInvoiceTypes.length > 0 && (
                               <>
-                                <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 border-b">Custom Types</div>
-                                {cleanCustomTypes(customInvoiceTypes).map((customType, index) => (
-                                  <SelectItem key={index} value={customType}>{customType}</SelectItem>
-                                ))}
+                                <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 border-b">
+                                  Custom Types
+                                </div>
+                                {cleanCustomTypes(customInvoiceTypes).map(
+                                  (customType, index) => (
+                                    <SelectItem key={index} value={customType}>
+                                      {customType}
+                                    </SelectItem>
+                                  ),
+                                )}
                               </>
                             )}
                             <SelectItem value="Custom">+ Add Custom</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
-                      {inlineInvoiceData.invoiceType === 'Custom' && (
+                      {inlineInvoiceData.invoiceType === "Custom" && (
                         <div className="relative w-[300px]">
                           <Input
                             value={inlineInvoiceData.customInvoiceType}
-                            onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customInvoiceType: e.target.value }))}
+                            onChange={(e) =>
+                              setInlineInvoiceData((prev) => ({
+                                ...prev,
+                                customInvoiceType: e.target.value,
+                              }))
+                            }
                             onBlur={() => {
                               if (inlineInvoiceData.customInvoiceType) {
-                                addCustomInvoiceType(inlineInvoiceData.customInvoiceType)
+                                addCustomInvoiceType(
+                                  inlineInvoiceData.customInvoiceType,
+                                );
                               }
                             }}
                             placeholder="Enter custom invoice type name..."
@@ -5012,36 +5379,51 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                     <div className="flex justify-between items-end mb-8">
                       <div className="flex-shrink-0">
                         <Image
-                          src='/assets/logos/logo-jdp.png'
+                          src="/assets/logos/logo-jdp.png"
                           alt="logo"
                           width={168}
                           height={63}
-                          className='w-[140px] '
-
+                          className="w-[140px] "
                         />
                         {/* <p className="text-sm font-semibold mt-2">952-449-1088</p> */}
                       </div>
 
                       <div className="text-right">
-                        <h1 className="text-2xl font-bold mb-4">{inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType}</h1>
+                        <h1 className="text-2xl font-bold mb-4">
+                          {inlineInvoiceData.invoiceType === "Custom"
+                            ? inlineInvoiceData.customInvoiceType
+                            : inlineInvoiceData.invoiceType}
+                        </h1>
                         <div className="grid grid-cols-2 gap-2">
-                          <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">Date</Label>
+                          <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">
+                            Date
+                          </Label>
                           <Input
                             value={inlineInvoiceData.date}
-                            onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, date: e.target.value }))}
+                            onChange={(e) =>
+                              setInlineInvoiceData((prev) => ({
+                                ...prev,
+                                date: e.target.value,
+                              }))
+                            }
                             className="px-3 py-2 text-sm"
                           />
                           {/* Invoice Number - Only show when editing */}
                           {editingInvoiceId && (
                             <>
                               <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">
-                                {inlineInvoiceData.invoiceType === 'Estimate' ? 'Estimate #' : 'Invoice #'}
+                                {inlineInvoiceData.invoiceType === "Estimate"
+                                  ? "Estimate #"
+                                  : "Invoice #"}
                               </Label>
                               <div>
                                 <Input
                                   value={inlineInvoiceData.estimateNumber}
                                   onChange={(e) => {
-                                    setInlineInvoiceData(prev => ({ ...prev, estimateNumber: e.target.value }))
+                                    setInlineInvoiceData((prev) => ({
+                                      ...prev,
+                                      estimateNumber: e.target.value,
+                                    }));
                                   }}
                                   className="px-3 py-2 text-sm"
                                   disabled={true}
@@ -5055,31 +5437,64 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                     <div className="mb-6">
                       <div className="flex items-center justify-between bg-gray-600 text-white px-3 py-2 mb-0">
                         <div className="flex items-center">
-                          <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-6a1 1 0 00-1-1H9a1 1 0 00-1 1v6a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clipRule="evenodd" />
+                          <svg
+                            className="w-4 h-4 mr-2"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-6a1 1 0 00-1-1H9a1 1 0 00-1 1v6a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z"
+                              clipRule="evenodd"
+                            />
                           </svg>
-                          <Label className="text-sm font-semibold">Bill To (Billing Address)</Label>
+                          <Label className="text-sm font-semibold">
+                            Bill To (Billing Address)
+                          </Label>
                         </div>
                         <div className="flex items-center">
                           <button
                             type="button"
-                            onClick={() => setInlineInvoiceData(prev => ({ ...prev, billToAddressEnabled: !prev.billToAddressEnabled }))}
-                            className={`mr-2 px-3 py-1 rounded text-xs font-medium transition-colors ${inlineInvoiceData.billToAddressEnabled
-                              ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                              : 'bg-green-100 text-green-700 hover:bg-green-200'
-                              }`}
+                            onClick={() =>
+                              setInlineInvoiceData((prev) => ({
+                                ...prev,
+                                billToAddressEnabled:
+                                  !prev.billToAddressEnabled,
+                              }))
+                            }
+                            className={`mr-2 px-3 py-1 rounded text-xs font-medium transition-colors ${
+                              inlineInvoiceData.billToAddressEnabled
+                                ? "bg-red-100 text-red-700 hover:bg-red-200"
+                                : "bg-green-100 text-green-700 hover:bg-green-200"
+                            }`}
                           >
                             {inlineInvoiceData.billToAddressEnabled ? (
                               <>
-                                <svg className="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                <svg
+                                  className="w-3 h-3 inline mr-1"
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                                    clipRule="evenodd"
+                                  />
                                 </svg>
                                 Disable
                               </>
                             ) : (
                               <>
-                                <svg className="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                                <svg
+                                  className="w-3 h-3 inline mr-1"
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                                    clipRule="evenodd"
+                                  />
                                 </svg>
                                 Enable
                               </>
@@ -5089,8 +5504,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                       </div>
                       {inlineInvoiceData.billToAddressEnabled && (
                         <Textarea
-                          value={inlineInvoiceData.billToAddress || ''}
-                          onChange={(e) => setInlineInvoiceData({ ...inlineInvoiceData, billToAddress: e.target.value })}
+                          value={inlineInvoiceData.billToAddress || ""}
+                          onChange={(e) =>
+                            setInlineInvoiceData({
+                              ...inlineInvoiceData,
+                              billToAddress: e.target.value,
+                            })
+                          }
                           className="mt-0 border-0 rounded-none"
                           placeholder="Enter billing address (defaults to customer/supplier address, can be edited)"
                           rows={3}
@@ -5099,10 +5519,20 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                       {!inlineInvoiceData.billToAddressEnabled && (
                         <div className="bg-gray-50 p-3 text-sm text-gray-600">
                           <div className="flex items-center">
-                            <svg className="w-4 h-4 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            <svg
+                              className="w-4 h-4 mr-2 text-yellow-500"
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                                clipRule="evenodd"
+                              />
                             </svg>
-                            This address defaults to the customer/supplier address but can be changed if billing address differs from job location
+                            This address defaults to the customer/supplier
+                            address but can be changed if billing address
+                            differs from job location
                           </div>
                         </div>
                       )}
@@ -5111,28 +5541,57 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
 
                     <div className="mb-6">
                       <Label className="block bg-gray-600 text-white px-3 py-2 mb-0 text-sm font-semibold">
-                        {job.type === 'contract-based' ? 'Contractor Name / Address' : 'Customer Name / Address'}
+                        {job.type === "contract-based"
+                          ? "Contractor Name / Address"
+                          : "Customer Name / Address"}
                       </Label>
                       <div className="border border-gray-300 p-4 min-h-[120px]">
                         <Input
-                          value={job.type === 'contract-based'
-                            ? (contractorData?.name || contractorData?.contractor_name || inlineInvoiceData.customerName)
-                            : (customerData?.name || customerData?.customer_name || inlineInvoiceData.customerName)
+                          value={
+                            job.type === "contract-based"
+                              ? contractorData?.name ||
+                                contractorData?.contractor_name ||
+                                inlineInvoiceData.customerName
+                              : customerData?.name ||
+                                customerData?.customer_name ||
+                                inlineInvoiceData.customerName
                           }
-                          onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, customerName: e.target.value }))}
+                          onChange={(e) =>
+                            setInlineInvoiceData((prev) => ({
+                              ...prev,
+                              customerName: e.target.value,
+                            }))
+                          }
                           className="mb-2 border-0 p-0 focus-visible:ring-0"
-                          placeholder={job.type === 'contract-based' ? 'Contractor Name' : 'Customer Name'}
+                          placeholder={
+                            job.type === "contract-based"
+                              ? "Contractor Name"
+                              : "Customer Name"
+                          }
                           readOnly
                         />
                         <Textarea
                           key={`customer-address-${inlineInvoiceData.customerAddress}`}
-                          value={job.type === 'contract-based' ? (contractorData?.address || contractorData?.contractor_address || inlineInvoiceData.customerAddress) : inlineInvoiceData.customerAddress}
+                          value={
+                            job.type === "contract-based"
+                              ? contractorData?.address ||
+                                contractorData?.contractor_address ||
+                                inlineInvoiceData.customerAddress
+                              : inlineInvoiceData.customerAddress
+                          }
                           onChange={(e) => {
-                            setInlineInvoiceData(prev => ({ ...prev, customerAddress: e.target.value }))
+                            setInlineInvoiceData((prev) => ({
+                              ...prev,
+                              customerAddress: e.target.value,
+                            }));
                           }}
                           className="border-0 p-0 resize-none focus-visible:ring-0"
                           rows={3}
-                          placeholder={job.type === 'contract-based' ? 'Contractor Address' : 'Customer Address'}
+                          placeholder={
+                            job.type === "contract-based"
+                              ? "Contractor Address"
+                              : "Customer Address"
+                          }
                           readOnly
                         />
                       </div>
@@ -5141,27 +5600,48 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                     {/* PO and Project */}
                     <div className="mb-6">
                       <div className="grid grid-cols-3 gap-0">
-                        <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">P.O. No.</Label>
-                        <Label className="bg-gray-600 text-white px-3 py-2 text-center text-sm font-semibold">Project</Label>
-                        <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">Rep</Label>
+                        <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">
+                          P.O. No.
+                        </Label>
+                        <Label className="bg-gray-600 text-white px-3 py-2 text-center text-sm font-semibold">
+                          Project
+                        </Label>
+                        <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">
+                          Rep
+                        </Label>
                       </div>
                       <div className="grid grid-cols-3 gap-0">
                         <div>
                           <Input
                             value={inlineInvoiceData.poNumber}
-                            onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, poNumber: e.target.value }))}
+                            onChange={(e) =>
+                              setInlineInvoiceData((prev) => ({
+                                ...prev,
+                                poNumber: e.target.value,
+                              }))
+                            }
                             className="px-3 py-2 text-sm rounded-none border-t-0"
                             placeholder="PO Number"
                           />
                         </div>
                         <Input
                           value={inlineInvoiceData.project}
-                          onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, project: e.target.value }))}
+                          onChange={(e) =>
+                            setInlineInvoiceData((prev) => ({
+                              ...prev,
+                              project: e.target.value,
+                            }))
+                          }
                           className="px-3 py-2 text-sm rounded-none border-t-0"
                         />
                         <Input
                           value={inlineInvoiceData.rep}
-                          onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, rep: e.target.value }))}
+                          onChange={(e) =>
+                            setInlineInvoiceData((prev) => ({
+                              ...prev,
+                              rep: e.target.value,
+                            }))
+                          }
                           className="px-3 py-2 text-sm rounded-none border-t-0"
                           placeholder="Rep"
                         />
@@ -5170,28 +5650,49 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
 
                     <div className="mb-6">
                       <div className="grid grid-cols-3 gap-0">
-                        <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">Due Date</Label>
-                        <Label className="bg-gray-600 text-white px-3 py-2 text-center text-sm font-semibold">Payment / Credits</Label>
-                        <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">Balance Due</Label>
+                        <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">
+                          Due Date
+                        </Label>
+                        <Label className="bg-gray-600 text-white px-3 py-2 text-center text-sm font-semibold">
+                          Payment / Credits
+                        </Label>
+                        <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">
+                          Balance Due
+                        </Label>
                       </div>
                       <div className="grid grid-cols-3 gap-0">
                         <div>
                           <Input
                             type="date"
                             value={inlineInvoiceData.dueDate}
-                            onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, dueDate: e.target.value }))}
+                            onChange={(e) =>
+                              setInlineInvoiceData((prev) => ({
+                                ...prev,
+                                dueDate: e.target.value,
+                              }))
+                            }
                             className="px-3 py-2 text-sm rounded-none border-t-0"
                           />
                         </div>
                         <Input
                           value={inlineInvoiceData.paymentCredits}
-                          onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, paymentCredits: parseFloat(e.target.value) || 0 }))}
+                          onChange={(e) =>
+                            setInlineInvoiceData((prev) => ({
+                              ...prev,
+                              paymentCredits: parseFloat(e.target.value) || 0,
+                            }))
+                          }
                           className="px-3 py-2 text-sm rounded-none border-t-0"
                           placeholder="Payment / Credits"
                         />
                         <Input
                           value={inlineInvoiceData.balanceDue}
-                          onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, balanceDue: e.target.value }))}
+                          onChange={(e) =>
+                            setInlineInvoiceData((prev) => ({
+                              ...prev,
+                              balanceDue: e.target.value,
+                            }))
+                          }
                           className="px-3 py-2 text-sm rounded-none border-t-0"
                           placeholder="Balance Due"
                         />
@@ -5199,212 +5700,43 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                     </div>
 
                     {/* Line Items Table */}
-                    <div className="mb-6 overflow-x-auto mt-4">
-                      <table className="w-full border-collapse">
-                        <thead>
-                          <tr className="bg-gray-600 text-white">
-                            <th className="border border-gray-300 px-3 py-2 w-16 text-sm font-semibold">Qty</th>
-                            <th className="border border-gray-300 px-3 py-2 w-48 text-sm font-semibold">Item</th>
-                            <th className="border border-gray-300 px-3 py-2 text-sm font-semibold">Description</th>
-                            <th className="border border-gray-300 px-3 py-2 w-28 text-sm font-semibold">Rate</th>
-                            <th className="border border-gray-300 px-3 py-2 w-32 text-sm font-semibold">Estimated Price</th>
-                            <th className="border border-gray-300 px-3 py-2 w-28 text-sm font-semibold">Total</th>
-                            <th className="border border-gray-300 px-3 py-2 w-16"></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {inlineInvoiceData.lineItems.map((item) => (
-                            <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                              <td className="border border-gray-300 p-1">
-                                <Input
-                                  type="number"
-                                  value={item.qty}
-                                  onChange={(e) => updateInvoiceLineItem(item.id, 'qty', parseFloat(e.target.value) || 0)}
-                                  className="text-center border-0 p-2"
-                                  min="0"
-                                />
-                              </td>
-                              <td className="border border-gray-300 p-1 relative">
-                                {item.isCustomProduct ? (
-                                  <Input
-                                    value={item.item}
-                                    onChange={(e) => updateInvoiceLineItem(item.id, 'item', e.target.value)}
-                                    className="border-0 p-2"
-                                    placeholder="Enter custom item name..."
-                                  />
-                                ) : (
-                                  <div className="relative product-search-container">
-                                    <Input
-                                      value={item.item}
-                                      onChange={(e) => {
-                                        const value = e.target.value
-                                        updateInvoiceLineItem(item.id, 'item', value)
-                                        updateInvoiceLineItem(item.id, 'searchQuery', value)
-                                        updateInvoiceLineItem(item.id, 'showSearchResults', true)
-                                        // Direct API call on input change - trigger on single character
-                                        if (value && value.length > 0) {
-                                          fetchProducts(value)
-                                        }
-                                      }}
-                                      onFocus={() => {
-                                        if (item.item) {
-                                          updateInvoiceLineItem(item.id, 'searchQuery', item.item)
-                                          updateInvoiceLineItem(item.id, 'showSearchResults', true)
-                                        }
-                                      }}
-                                      className="border-0 p-2 pr-8"
-                                      placeholder="Search or enter product name..."
-                                    />
-                                    <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                  </div>
-                                )}
-                                {!item.isCustomProduct && item.showSearchResults && item.searchQuery && (
-                                  <div className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1">
-                                    {(() => {
-                                      const filtered = getFilteredProducts(item.searchQuery || '')
-
-                                      return (
-                                        <>
-                                          {filtered.length > 0 ? (
-                                            filtered.map(product => (
-                                              <div
-                                                key={product.id}
-                                                onMouseDown={(e) => {
-                                                  e.preventDefault()
-                                                  selectProduct(item.id, product)
-                                                }}
-                                                className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100 transition-colors"
-                                              >
-                                                <div className="font-medium text-sm mb-1">{product.name}</div>
-                                                <div className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
-                                                  {product.description}
-                                                </div>
-                                                <div className="text-xs text-primary mt-2">
-                                                  {product.jdpSKU} • ${product.jdpPrice.toFixed(2)}
-                                                  {product.estimatedPrice && product.estimatedPrice > 0 && ` • Est: $${product.estimatedPrice.toFixed(2)}`}
-                                                </div>
-                                              </div>
-                                            ))
-                                          ) : (
-                                            <div className="p-3">
-                                              <div className="text-sm text-muted-foreground mb-2">No products found</div>
-                                              <Button
-                                                size="sm"
-                                                onMouseDown={(e) => {
-                                                  e.preventDefault()
-                                                  addCustomProduct(item.id, item.searchQuery || '')
-                                                }}
-                                                className="w-full bg-primary hover:bg-primary/90"
-                                              >
-                                                <Plus className="h-3 w-3 mr-1" />
-                                                Add "{item.searchQuery}"
-                                              </Button>
-                                            </div>
-                                          )}
-                                        </>
-                                      )
-                                    })()}
-                                  </div>
-                                )}
-                              </td>
-                              <td className="border border-gray-300 p-1">
-                                <textarea
-                                  value={item.description}
-                                  onChange={(e) => updateInvoiceLineItem(item.id, 'description', e.target.value)}
-                                  className="border-0 p-2 w-[100%]"
-                                  placeholder="Enter product description"
-                                  rows={4}
-                                />
-                              </td>
-
-                              <td className="border border-gray-300 p-1">
-                                <div className="relative">
-                                  <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
-                                  <Input
-                                    type="number"
-                                    value={item.rate}
-                                    onChange={(e) => updateInvoiceLineItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
-                                    className="text-right border-0 p-2 pl-6"
-                                    min="0"
-                                    step="0.01"
-                                  />
-                                </div>
-                              </td>
-                              <td className="border border-gray-300 p-1">
-                                <div className="relative">
-                                  <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
-                                  <Input
-                                    type="number"
-                                    value={item.estimatedPrice || ""}
-                                    onChange={(e) => updateInvoiceLineItem(item.id, 'estimatedPrice', parseFloat(e.target.value) || 0)}
-                                    className="text-right border-0 p-2 pl-6"
-                                    min="0"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                  />
-                                </div>
-                              </td>
-                              <td className="border border-gray-300 p-2 text-right">
-                                ${(item.total || 0).toFixed(2)}
-                              </td>
-                              <td className="border border-gray-300 p-1 text-center">
-                                {inlineInvoiceData.lineItems.length > 1 && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => removeInvoiceLineItem(item.id)}
-                                    className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                          {/* Subtotal Row */}
-                          <tr>
-                            <td colSpan={5} className="border border-gray-300 p-2"></td>
-                            <td className="border border-gray-300 p-2 text-right font-bold">
-                              ${calculateInvoiceSubtotal().toFixed(2)}
-                            </td>
-                            <td className="border border-gray-300 p-1"></td>
-                          </tr>
-                        </tbody>
-                      </table>
-
-                      {/* Add Buttons */}
-                      <div className="mt-4 flex gap-3">
-                        <Button
-                          onClick={addInvoiceLineItem}
-                          variant="outline"
-                          className="border-dashed border-2 border-primary text-primary hover:bg-primary/5"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Line Item
-                        </Button>
-                        <Button
-                          onClick={addCustomLineItem}
-                          variant="outline"
-                          className="border-dashed border-2 border-green-500 text-green-600 hover:bg-green-50"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Custom
-                        </Button>
-                      </div>
-                      {invoiceValidationErrors.lineItems && (
-                        <p className="text-red-500 text-xs mt-2">{invoiceValidationErrors.lineItems}</p>
-                      )}
-                    </div>
+                    <InvoiceLineItemsManager
+                      lineItems={inlineInvoiceData.lineItems}
+                      setLineItems={(updater) =>
+                        setInlineInvoiceData((prev) => ({
+                          ...prev,
+                          lineItems:
+                            typeof updater === "function"
+                              ? updater(prev.lineItems)
+                              : updater,
+                        }))
+                      }
+                      selectedSupplierId={selectedSupplierId}
+                      fetchProducts={fetchProducts}
+                      getFilteredProducts={getFilteredProducts}
+                      onSelectProductData={(rowId, product) => {
+                        // optional: agar existing autofill logic already hai
+                        selectProduct(rowId, product);
+                      }}
+                    />
 
                     {/* Notes Section */}
                     <div className="mb-6 overflow-x-auto">
                       <table className="w-full border-collapse">
                         <tbody>
                           <tr>
-                            <td className="border border-gray-300 p-3 bg-white text-sm" style={{ minHeight: '120px' }}>
+                            <td
+                              className="border border-gray-300 p-3 bg-white text-sm"
+                              style={{ minHeight: "120px" }}
+                            >
                               <Textarea
                                 value={inlineInvoiceData.notes}
-                                onChange={(e) => setInlineInvoiceData(prev => ({ ...prev, notes: e.target.value }))}
+                                onChange={(e) =>
+                                  setInlineInvoiceData((prev) => ({
+                                    ...prev,
+                                    notes: e.target.value,
+                                  }))
+                                }
                                 className="w-full min-h-[100px] border-0 p-0 focus-visible:ring-0 resize-none"
                                 placeholder="NOTES&#10;JDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE"
                               />
@@ -5418,9 +5750,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                     <div className="mb-6">
                       <div className="border border-gray-300 p-3 text-xs text-center bg-white">
                         <p>
-                          JDP is not responsible for repair of lamps & landscaping, house owner utilities including
-                          cables, sprinkler systems, television or telephone cables, etc. that may be cut or damaged
-                          during installation. Price are subject to change prior to receipt of down payment.
+                          JDP is not responsible for repair of lamps &
+                          landscaping, house owner utilities including cables,
+                          sprinkler systems, television or telephone cables,
+                          etc. that may be cut or damaged during installation.
+                          Price are subject to change prior to receipt of down
+                          payment.
                         </p>
                       </div>
                       <div className="flex justify-end mt-4">
@@ -5428,13 +5763,23 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                           <div className="flex items-center gap-4">
                             <span className="text-xl font-bold">Total</span>
                             <span className="text-2xl font-bold">
-                              ${calculateInvoiceSubtotal().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              $
+                              {calculateInvoiceSubtotal().toLocaleString(
+                                "en-US",
+                                {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                },
+                              )}
                             </span>
                           </div>
                         </div>
                       </div>
-                      <div className='text-center text-sm text-blue-500 font-bold'>
-                        <p>1432 Oakpointe Drive Waconia, MN 55387 paul@jdpelectric.us</p>
+                      <div className="text-center text-sm text-blue-500 font-bold">
+                        <p>
+                          1432 Oakpointe Drive Waconia, MN 55387
+                          paul@jdpelectric.us
+                        </p>
                       </div>
                     </div>
                     <div className="secnacher">
@@ -5446,33 +5791,44 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                         {/* Customer Acceptance Header */}
                         <div className="flex justify-between items-center mb-5">
                           <div className="flex flex-col">
-                            <div className="text-sm font-medium text-gray-700 mb-1">Customer Acceptance</div>
-                            <div className="text-sm font-medium text-gray-700">Authorized Signature</div>
+                            <div className="text-sm font-medium text-gray-700 mb-1">
+                              Customer Acceptance
+                            </div>
+                            <div className="text-sm font-medium text-gray-700">
+                              Authorized Signature
+                            </div>
                           </div>
-                          <div className="text-sm font-medium text-gray-700">Date</div>
+                          <div className="text-sm font-medium text-gray-700">
+                            Date
+                          </div>
                         </div>
 
                         {/* Signature Fields */}
                         <div className="flex justify-between items-center mb-5">
                           <div className="flex flex-col w-3/5">
                             <div className="border-b border-gray-800 h-0.5 mb-2"></div>
-                            <div className="text-xs text-gray-700 text-center">Signature</div>
+                            <div className="text-xs text-gray-700 text-center">
+                              Signature
+                            </div>
                           </div>
                           <div className="flex flex-col w-1/3">
                             <div className="border-b border-gray-800 h-0.5 mb-2"></div>
-                            <div className="text-xs text-gray-700 text-center">Date</div>
+                            <div className="text-xs text-gray-700 text-center">
+                              Date
+                            </div>
                           </div>
                         </div>
 
                         {/* Disclaimer Box */}
                         <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mt-5">
                           <div className="text-xs text-gray-700 leading-relaxed">
-                            By signing above, you agree to the terms and pricing outlined in this estimate. This becomes a binding agreement upon signature.
+                            By signing above, you agree to the terms and pricing
+                            outlined in this estimate. This becomes a binding
+                            agreement upon signature.
                           </div>
                         </div>
                       </div>
                     </div>
-
                   </div>
 
                   {/* Action Buttons */}
@@ -5481,47 +5837,53 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                       <Button
                         variant="outline"
                         onClick={() => {
-                          setShowInlineInvoiceForm(false)
-                          setEditingInvoiceId(null)
-                          setInvoiceValidationErrors({})
+                          setShowInlineInvoiceForm(false);
+                          setEditingInvoiceId(null);
+                          setInvoiceValidationErrors({});
 
                           // Reset form data
                           setInlineInvoiceData({
-                            date: new Date().toISOString().split('T')[0],
-                            estimateNumber: '',
-                            customerName: job.customerName || '',
-                            customerAddress: job.address || '',
-                            billToAddress: job.billToAddress || '',
+                            date: new Date().toISOString().split("T")[0],
+                            estimateNumber: "",
+                            customerName: job.customerName || "",
+                            customerAddress: job.address || "",
+                            billToAddress: job.billToAddress || "",
                             billToAddressEnabled: true,
-                            poNumber: '',
-                            project: job.title || '',
-                            rep: '',
-                            dueDate: '',
+                            poNumber: "",
+                            project: job.title || "",
+                            rep: "",
+                            dueDate: "",
                             paymentCredits: 0,
-                            balanceDue: '',
-                            lineItems: [{
-                              id: Math.random().toString(36).substring(2, 9),
-                              productId: null,
-                              qty: 1,
-                              item: '',
-                              description: '',
-                              rate: 0,
-                              estimatedPrice: 0,
-                              total: 0,
-                              searchQuery: '',
-                              showSearchResults: false,
-                              supplierId: 1,
-                              isCustomProduct: false,
-                              estimate_product_id: null
-                            }],
-                            notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
-                            signatureText: 'ACCEPTED BY________________DATE_____',
-                            invoiceType: 'Estimate',
-                            customInvoiceType: '',
+                            balanceDue: "",
+                            lineItems: [
+                              {
+                                id: Math.random().toString(36).substring(2, 9),
+                                headerName: "",
+                                type: "",
+                                productId: null,
+                                qty: 1,
+                                item: "",
+                                description: "",
+                                rate: 0,
+                                estimatedPrice: 0,
+                                total: 0,
+                                searchQuery: "",
+                                showSearchResults: false,
+                                supplierId: 1,
+                                isCustomProduct: false,
+                                estimate_product_id: null,
+                              },
+                            ],
+                            notes:
+                              "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
+                            signatureText:
+                              "ACCEPTED BY________________DATE_____",
+                            invoiceType: "Estimate",
+                            customInvoiceType: "",
                             paymentPercentage: 0,
                             estimateTotal: 0,
-                            paymentHistory: [] as any[]
-                          })
+                            paymentHistory: [] as any[],
+                          });
                         }}
                         className="border-gray-300"
                       >
@@ -5529,7 +5891,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                         Cancel
                       </Button>
                       <div className="flex gap-3">
-                        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                        <motion.div
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
                           <Button
                             onClick={handleSaveInvoiceAsDraft}
                             variant="outline"
@@ -5551,7 +5916,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                           </Button>
                         </motion.div>
 
-                        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                        <motion.div
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
                           <Button
                             onClick={handlePreviewAndSend}
                             size="lg"
@@ -5580,7 +5948,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
 
             <div className="space-y-4">
               {isLoadingEstimates ? (
-                <div className="flex justify-center py-8"><LoadingSpinner /></div>
+                <div className="flex justify-center py-8">
+                  <LoadingSpinner />
+                </div>
               ) : estimates.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <Receipt className="h-12 w-12 mx-auto mb-4 text-gray-300" />
@@ -5588,7 +5958,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                 </div>
               ) : (
                 estimates.map((invoice: any) => (
-                  <div key={invoice.id} className="p-4 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow bg-gradient-to-r from-white to-gray-50/30">
+                  <div
+                    key={invoice.id}
+                    className="p-4 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow bg-gradient-to-r from-white to-gray-50/30"
+                  >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         <div className="w-14 h-14 bg-primary/10 rounded-lg flex items-center justify-center">
@@ -5596,24 +5969,46 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                         </div>
                         <div>
                           <div className="flex items-center gap-3 mb-1">
-                            <h4 className="font-semibold text-foreground capitalize">{invoice.invoice_type || 'Estimate'}</h4>
-                            <Badge className={`${getInvoiceTypeColor(invoice.invoice_type)} text-xs font-medium capitalize`} variant="outline">
-                              {invoice.invoice_type || 'Estimate'}
+                            <h4 className="font-semibold text-foreground capitalize">
+                              {invoice.invoice_type || "Estimate"}
+                            </h4>
+                            <Badge
+                              className={`${getInvoiceTypeColor(invoice.invoice_type)} text-xs font-medium capitalize`}
+                              variant="outline"
+                            >
+                              {invoice.invoice_type || "Estimate"}
                             </Badge>
                           </div>
-                          <p className="text-sm text-muted-foreground mb-2">{invoice.description || invoice.estimate_title}</p>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            {invoice.description || invoice.estimate_title}
+                          </p>
                           <div className="flex items-center gap-4 text-xs text-muted-foreground">
                             <span>#{invoice.invoice_number}</span>
-                            <span>Created : {formatDate(invoice.estimate_date || invoice.created_at)}</span>
-                            <span>Updated : {formatDate(invoice.updated_at || invoice.updated_at)}</span>
+                            <span>
+                              Created :{" "}
+                              {formatDate(
+                                invoice.estimate_date || invoice.created_at,
+                              )}
+                            </span>
+                            <span>
+                              Updated :{" "}
+                              {formatDate(
+                                invoice.updated_at || invoice.updated_at,
+                              )}
+                            </span>
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-right">
-                          <p className="font-semibold text-lg text-foreground">{formatCurrency(invoice.total_amount || 0)}</p>
-                          <Badge className={getStatusBadgeColor(invoice.status)} variant="outline">
-                            {invoice.status || 'draft'}
+                          <p className="font-semibold text-lg text-foreground">
+                            {formatCurrency(invoice.total_amount || 0)}
+                          </p>
+                          <Badge
+                            className={getStatusBadgeColor(invoice.status)}
+                            variant="outline"
+                          >
+                            {invoice.status || "draft"}
                           </Badge>
                         </div>
                         <DropdownMenu>
@@ -5627,7 +6022,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48">
-                            {invoice.status === 'draft' && (
+                            {invoice.status === "draft" && (
                               <DropdownMenuItem
                                 onClick={() => handleEditInvoice(invoice)}
                                 className="cursor-pointer"
@@ -5657,33 +6052,39 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                               <FileText className="h-4 w-4 mr-2 text-green-600" />
                               <span>Duplicate</span>
                             </DropdownMenuItem>
-                             {/* {( */}
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  if (String(invoice.status || '').toLowerCase() !== 'paid') {
-                                    handleMarkAsPaid(invoice)
-                                  }
-                                }}
-                                className={`cursor-pointer ${
-                                  String(invoice.status || '').toLowerCase() === 'paid'
-                                    ? 'opacity-60 cursor-default'
-                                    : ''
-                                }`}
-                                disabled={
-                                  isMarkingPaidId === invoice.id ||
-                                  String(invoice.status || '').toLowerCase() === 'paid'
+                            {/* {( */}
+                            <DropdownMenuItem
+                              onClick={() => {
+                                if (
+                                  String(invoice.status || "").toLowerCase() !==
+                                  "paid"
+                                ) {
+                                  handleMarkAsPaid(invoice);
                                 }
-                              >
-                                <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
-                                <span>
-                                  {String(invoice.status || '').toLowerCase() === 'paid'
-                                    ? 'Already Paid'
-                                    : isMarkingPaidId === invoice.id
-                                    ? 'Marking...'
-                                    : 'Mark As Paid'}
-                                </span>
-                              </DropdownMenuItem>
-                                                            {/* // )} */}
+                              }}
+                              className={`cursor-pointer ${
+                                String(invoice.status || "").toLowerCase() ===
+                                "paid"
+                                  ? "opacity-60 cursor-default"
+                                  : ""
+                              }`}
+                              disabled={
+                                isMarkingPaidId === invoice.id ||
+                                String(invoice.status || "").toLowerCase() ===
+                                  "paid"
+                              }
+                            >
+                              <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                              <span>
+                                {String(invoice.status || "").toLowerCase() ===
+                                "paid"
+                                  ? "Already Paid"
+                                  : isMarkingPaidId === invoice.id
+                                    ? "Marking..."
+                                    : "Mark As Paid"}
+                              </span>
+                            </DropdownMenuItem>
+                            {/* // )} */}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               onClick={() => handleDeleteInvoice(invoice.id)}
@@ -5704,25 +6105,33 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
             {totalEstimates > 0 && (
               <div className="flex items-center justify-between px-4 py-3 border-t">
                 <div className="text-sm text-muted-foreground">
-                  Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalEstimates)} of {totalEstimates} invoices
+                  Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
+                  {Math.min(currentPage * itemsPerPage, totalEstimates)} of{" "}
+                  {totalEstimates} invoices
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.max(1, prev - 1))
+                    }
                     disabled={currentPage === 1 || isLoadingEstimates}
                   >
                     Previous
                   </Button>
                   <span className="text-sm">
-                    Page {currentPage} of {Math.ceil(totalEstimates / itemsPerPage) || 1}
+                    Page {currentPage} of{" "}
+                    {Math.ceil(totalEstimates / itemsPerPage) || 1}
                   </span>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentPage(prev => prev + 1)}
-                    disabled={currentPage >= Math.ceil(totalEstimates / itemsPerPage) || isLoadingEstimates}
+                    onClick={() => setCurrentPage((prev) => prev + 1)}
+                    disabled={
+                      currentPage >= Math.ceil(totalEstimates / itemsPerPage) ||
+                      isLoadingEstimates
+                    }
                   >
                     Next
                   </Button>
@@ -5730,7 +6139,6 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
               </div>
             )}
           </CardContent>
-
         </Card>
 
         {/* Bluesheets Data */}
@@ -5752,13 +6160,15 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                 disabled={selectedBluesheetIds.length === 0}
                 className="gap-2"
                 onClick={() => {
-                  const selectedSheets = bluesheets.filter(
-                    (s: any) => selectedBluesheetIds.includes(s.id)
+                  const selectedSheets = bluesheets.filter((s: any) =>
+                    selectedBluesheetIds.includes(s.id),
                   );
                   if (selectedSheets.length === 0) return;
 
                   // If any selected sheet is already invoiced, show confirmation first
-                  const hasInvoiced = selectedSheets.some((s: any) => s.materials_invoiced);
+                  const hasInvoiced = selectedSheets.some(
+                    (s: any) => s.materials_invoiced,
+                  );
                   if (hasInvoiced) {
                     setPendingReviewSheets(selectedSheets);
                     setShowReinvoiceAlert(true);
@@ -5766,35 +6176,39 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                   }
 
                   const firstSheet = selectedSheets[0];
-                  const mergedMaterials = selectedSheets.flatMap(
-                    (sheet: any) =>
-                      (sheet.material_entries ?? []).map((m: any) => ({
-                        ...m,
-                        // preserve or attach source bluesheet id so the dialog can show correct BS-XX
-                        job_bluesheet_id:
-                          m.job_bluesheet_id ?? m.bluesheet_id ?? m.bluesheetId ?? sheet.id,
-                      }))
+                  const mergedMaterials = selectedSheets.flatMap((sheet: any) =>
+                    (sheet.material_entries ?? []).map((m: any) => ({
+                      ...m,
+                      // preserve or attach source bluesheet id so the dialog can show correct BS-XX
+                      job_bluesheet_id:
+                        m.job_bluesheet_id ??
+                        m.bluesheet_id ??
+                        m.bluesheetId ??
+                        sheet.id,
+                    })),
                   );
                   const mergedLabor = selectedSheets.flatMap(
-                    (sheet: any) => sheet.labor_entries ?? []
+                    (sheet: any) => sheet.labor_entries ?? [],
                   );
                   const mergedTotalCost = selectedSheets.reduce(
                     (sum: number, sheet: any) => sum + (sheet.total_cost ?? 0),
-                    0
+                    0,
                   );
                   const mergedNotes = selectedSheets
                     .map((sheet: any) => sheet.notes)
                     .filter(Boolean)
-                    .join(' | ');
+                    .join(" | ");
 
                   const dialogSheet: DialogBlueSheetItem = {
                     ...(firstSheet as any),
                     id: firstSheet.id ?? firstSheet.latest_bluesheet_id ?? 0,
-                    date: firstSheet.date ?? firstSheet.latest_bluesheet_date ?? '',
-                    notes: mergedNotes || firstSheet.notes || '',
+                    date:
+                      firstSheet.date ?? firstSheet.latest_bluesheet_date ?? "",
+                    notes: mergedNotes || firstSheet.notes || "",
                     additional_charges: selectedSheets.reduce(
-                      (sum: number, s: any) => sum + (s.additional_charges ?? 0),
-                      0
+                      (sum: number, s: any) =>
+                        sum + (s.additional_charges ?? 0),
+                      0,
                     ),
                     total_cost: mergedTotalCost,
                     labor_entries: mergedLabor,
@@ -5812,7 +6226,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
           </CardHeader>
           <CardContent>
             {isLoadingBluesheets ? (
-              <p className="text-sm text-gray-500 py-4">Loading bluesheets...</p>
+              <p className="text-sm text-gray-500 py-4">
+                Loading bluesheets...
+              </p>
             ) : Array.isArray(bluesheets) && bluesheets.length > 0 ? (
               <div className="space-y-3">
                 {bluesheets.map((sheet: any) => (
@@ -5827,21 +6243,26 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                           setSelectedBluesheetIds((prev) =>
                             checked
                               ? [...prev, sheet.id]
-                              : prev.filter((id) => id !== sheet.id)
+                              : prev.filter((id) => id !== sheet.id),
                           );
                         }}
                         className="mt-1"
                       />
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium">Bluesheet #{sheet.id}</span>
+                          <span className="font-medium">
+                            Bluesheet #{sheet.id}
+                          </span>
                           <span
-                            className={`px-2 py-0.5 text-xs rounded-full ${sheet.status === 'approved'
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-yellow-100 text-yellow-700'
-                              }`}
+                            className={`px-2 py-0.5 text-xs rounded-full ${
+                              sheet.status === "approved"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-yellow-100 text-yellow-700"
+                            }`}
                           >
-                            {sheet.status === 'approved' ? 'Approved' : 'Pending'}
+                            {sheet.status === "approved"
+                              ? "Approved"
+                              : "Pending"}
                           </span>
                           {sheet.materials_invoiced === true && (
                             <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
@@ -5850,7 +6271,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                           )}
                         </div>
                         <p className="text-xs text-gray-500 mt-0.5">
-                          Date: {sheet.date || sheet.created_at || 'N/A'}
+                          Date: {sheet.date || sheet.created_at || "N/A"}
                         </p>
                       </div>
                     </div>
@@ -5865,7 +6286,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                             setShowReinvoiceAlert(true);
                             return;
                           }
-                          setSelectedBlueSheetForReview(sheet as DialogBlueSheetItem);
+                          setSelectedBlueSheetForReview(
+                            sheet as DialogBlueSheetItem,
+                          );
                           setIsBlueSheetDialogOpen(true);
                         }}
                       >
@@ -5876,17 +6299,23 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-500 py-4">No bluesheets found for this job.</p>
+              <p className="text-sm text-gray-500 py-4">
+                No bluesheets found for this job.
+              </p>
             )}
           </CardContent>
         </Card>
-        <AlertDialog open={showReinvoiceAlert} onOpenChange={setShowReinvoiceAlert}>
+        <AlertDialog
+          open={showReinvoiceAlert}
+          onOpenChange={setShowReinvoiceAlert}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Invoice already submitted</AlertDialogTitle>
               <AlertDialogDescription>
-                One or more selected BlueSheets are already marked as invoiced. Are you sure you
-                want to review and invoice these BlueSheets again?
+                One or more selected BlueSheets are already marked as invoiced.
+                Are you sure you want to review and invoice these BlueSheets
+                again?
                 {pendingReviewSheets && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {pendingReviewSheets
@@ -5923,29 +6352,37 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                         (sheet.material_entries ?? []).map((m: any) => ({
                           ...m,
                           job_bluesheet_id:
-                            m.job_bluesheet_id ?? m.bluesheet_id ?? m.bluesheetId ?? sheet.id,
-                        }))
+                            m.job_bluesheet_id ??
+                            m.bluesheet_id ??
+                            m.bluesheetId ??
+                            sheet.id,
+                        })),
                     );
                     const mergedLabor = selectedSheets.flatMap(
-                      (sheet: any) => sheet.labor_entries ?? []
+                      (sheet: any) => sheet.labor_entries ?? [],
                     );
                     const mergedTotalCost = selectedSheets.reduce(
-                      (sum: number, sheet: any) => sum + (sheet.total_cost ?? 0),
-                      0
+                      (sum: number, sheet: any) =>
+                        sum + (sheet.total_cost ?? 0),
+                      0,
                     );
                     const mergedNotes = selectedSheets
                       .map((sheet: any) => sheet.notes)
                       .filter(Boolean)
-                      .join(' | ');
+                      .join(" | ");
 
                     const dialogSheet: DialogBlueSheetItem = {
                       ...(firstSheet as any),
                       id: firstSheet.id ?? firstSheet.latest_bluesheet_id ?? 0,
-                      date: firstSheet.date ?? firstSheet.latest_bluesheet_date ?? '',
-                      notes: mergedNotes || firstSheet.notes || '',
+                      date:
+                        firstSheet.date ??
+                        firstSheet.latest_bluesheet_date ??
+                        "",
+                      notes: mergedNotes || firstSheet.notes || "",
                       additional_charges: selectedSheets.reduce(
-                        (sum: number, s: any) => sum + (s.additional_charges ?? 0),
-                        0
+                        (sum: number, s: any) =>
+                          sum + (s.additional_charges ?? 0),
+                        0,
                       ),
                       total_cost: mergedTotalCost,
                       labor_entries: mergedLabor,
@@ -6201,7 +6638,6 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
           </CardContent>
         </Card> */}
 
-
         {/* Job Documents */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
@@ -6211,7 +6647,8 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
             </CardTitle>
             <div className="flex items-center gap-4">
               <span className="text-sm text-gray-600">
-                Total: {jobDocuments.length} document{jobDocuments.length !== 1 ? 's' : ''}
+                Total: {jobDocuments.length} document
+                {jobDocuments.length !== 1 ? "s" : ""}
               </span>
               <Button
                 variant="outline"
@@ -6257,8 +6694,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900 truncate">{doc.title}</p>
-                      <p className="text-sm text-gray-600 truncate">{doc.fileName}</p>
+                      <p className="font-semibold text-gray-900 truncate">
+                        {doc.title}
+                      </p>
+                      <p className="text-sm text-gray-600 truncate">
+                        {doc.fileName}
+                      </p>
                       <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
                         <Clock className="h-3 w-3" />
                         {formatDocumentTimestamp(doc.uploadedAt)}
@@ -6270,10 +6711,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                         size="sm"
                         onClick={() => {
                           if (!doc.fileUrl) {
-                            toast.error('Document URL not available');
+                            toast.error("Document URL not available");
                             return;
                           }
-                          window.open(doc.fileUrl, '_blank');
+                          window.open(doc.fileUrl, "_blank");
                         }}
                         className="gap-2"
                       >
@@ -6287,8 +6728,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                         disabled={downloadingDocumentIds.includes(doc.id)}
                         className="gap-2 border-blue-500 text-blue-600 hover:bg-blue-50"
                       >
-                        <Download className={`h-4 w-4 ${downloadingDocumentIds.includes(doc.id) ? 'animate-spin' : ''}`} />
-                        {downloadingDocumentIds.includes(doc.id) ? 'Downloading...' : 'Download'}
+                        <Download
+                          className={`h-4 w-4 ${downloadingDocumentIds.includes(doc.id) ? "animate-spin" : ""}`}
+                        />
+                        {downloadingDocumentIds.includes(doc.id)
+                          ? "Downloading..."
+                          : "Download"}
                       </Button>
                       <Button
                         variant="ghost"
@@ -6297,7 +6742,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                         disabled={deletingDocumentIds.includes(doc.id)}
                         className="text-red-600 hover:text-red-700 hover:bg-red-50"
                       >
-                        <Trash2 className={`h-4 w-4 ${deletingDocumentIds.includes(doc.id) ? 'animate-pulse' : ''}`} />
+                        <Trash2
+                          className={`h-4 w-4 ${deletingDocumentIds.includes(doc.id) ? "animate-pulse" : ""}`}
+                        />
                       </Button>
                     </div>
                   </div>
@@ -6306,11 +6753,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
             )}
           </CardContent>
         </Card>
-
       </div>
 
       {/* Upload Document Modal */}
-      <Dialog open={showUploadDocumentModal} onOpenChange={setShowUploadDocumentModal}>
+      <Dialog
+        open={showUploadDocumentModal}
+        onOpenChange={setShowUploadDocumentModal}
+      >
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Upload Job Document</DialogTitle>
@@ -6325,7 +6774,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                 id="document-title"
                 placeholder="e.g., Project Blueprint, Safety Certificate, etc."
                 value={documentFormData.title}
-                onChange={(e) => setDocumentFormData({ ...documentFormData, title: e.target.value })}
+                onChange={(e) =>
+                  setDocumentFormData({
+                    ...documentFormData,
+                    title: e.target.value,
+                  })
+                }
                 className="mt-2"
               />
             </div>
@@ -6336,14 +6790,23 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                 onClick={() => documentFileInputRef.current?.click()}
                 onDragOver={(e) => {
                   e.preventDefault();
-                  e.currentTarget.classList.add('border-blue-500', 'bg-blue-50');
+                  e.currentTarget.classList.add(
+                    "border-blue-500",
+                    "bg-blue-50",
+                  );
                 }}
                 onDragLeave={(e) => {
-                  e.currentTarget.classList.remove('border-blue-500', 'bg-blue-50');
+                  e.currentTarget.classList.remove(
+                    "border-blue-500",
+                    "bg-blue-50",
+                  );
                 }}
                 onDrop={(e) => {
                   e.preventDefault();
-                  e.currentTarget.classList.remove('border-blue-500', 'bg-blue-50');
+                  e.currentTarget.classList.remove(
+                    "border-blue-500",
+                    "bg-blue-50",
+                  );
                   const file = e.dataTransfer.files[0];
                   if (file) {
                     setDocumentFormData({ ...documentFormData, file });
@@ -6381,7 +6844,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
               variant="outline"
               onClick={() => {
                 setShowUploadDocumentModal(false);
-                setDocumentFormData({ title: '', file: null });
+                setDocumentFormData({ title: "", file: null });
               }}
             >
               Cancel
@@ -6392,12 +6855,11 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
               className="gap-2 text-white"
             >
               <Upload className="h-4 w-4" />
-              {isUploadingDocument ? 'Uploading...' : 'Upload Document'}
+              {isUploadingDocument ? "Uploading..." : "Upload Document"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
 
       {/* Add Invoice Modal */}
       <NewInvoiceDialog
@@ -6474,16 +6936,21 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
       </Dialog> */}
 
       {/* Add Material Modal */}
-      <Dialog open={showAddMaterialModal} onOpenChange={(open) => {
-        setShowAddMaterialModal(open);
-        if (!open) {
-          resetForm();
-        }
-      }}>
+      <Dialog
+        open={showAddMaterialModal}
+        onOpenChange={(open) => {
+          setShowAddMaterialModal(open);
+          if (!open) {
+            resetForm();
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[900px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Products to Job</DialogTitle>
-            <DialogDescription>Select multiple products to add to this job</DialogDescription>
+            <DialogDescription>
+              Select multiple products to add to this job
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -6501,13 +6968,28 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                         setShowProductDropdown(true);
                       }}
                       placeholder="Type to search products..."
-                      className={`pr-10 ${materialErrors.product ? 'border-red-500' : ''}`}
+                      className={`pr-10 ${materialErrors.product ? "border-red-500" : ""}`}
                     />
                     {isSearchingProducts && (
                       <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        <svg
+                          className="w-4 h-4 animate-spin"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                            fill="none"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                          />
                         </svg>
                       </div>
                     )}
@@ -6518,12 +7000,15 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                 {showProductDropdown && productSearchResults.length > 0 && (
                   <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-80 overflow-y-auto">
                     {productSearchResults.map((product: Product) => {
-                      const isSelected = selectedProducts.some(p => p.id === product.id);
+                      const isSelected = selectedProducts.some(
+                        (p) => p.id === product.id,
+                      );
                       return (
                         <div
                           key={product.id}
-                          className={`p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-200 last:border-b-0 ${isSelected ? 'bg-blue-50' : ''
-                            }`}
+                          className={`p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-200 last:border-b-0 ${
+                            isSelected ? "bg-blue-50" : ""
+                          }`}
                           onClick={() => handleProductSelect(product)}
                         >
                           <div className="flex items-center gap-2">
@@ -6531,11 +7016,14 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                               <Check className="w-4 h-4 text-blue-600" />
                             )}
                             <div className="flex-1">
-                              <div className="font-medium">{product.product_name || product.name}</div>
+                              <div className="font-medium">
+                                {product.product_name || product.name}
+                              </div>
                               <div className="text-sm text-gray-600">
-                                SKU: {product.sku || product.supplier_sku || 'N/A'} •
-                                Unit: {product.unit || 'N/A'} •
-                                Cost: ${product.unit_cost || product.price || 0} •
+                                SKU:{" "}
+                                {product.sku || product.supplier_sku || "N/A"} •
+                                Unit: {product.unit || "N/A"} • Cost: $
+                                {product.unit_cost || product.price || 0} •
                                 Stock: {product.stock_quantity || 0}
                               </div>
                             </div>
@@ -6547,7 +7035,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                 )}
               </div>
               {materialErrors.product && (
-                <p className="text-xs text-red-600 mt-1">{materialErrors.product}</p>
+                <p className="text-xs text-red-600 mt-1">
+                  {materialErrors.product}
+                </p>
               )}
             </div>
 
@@ -6555,7 +7045,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
             {selectedProducts.length > 0 && (
               <div className="border rounded-md p-3">
                 <div className="flex items-center justify-between mb-2">
-                  <Label className="font-medium">Selected Products ({selectedProducts.length})</Label>
+                  <Label className="font-medium">
+                    Selected Products ({selectedProducts.length})
+                  </Label>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -6574,9 +7066,12 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                     <div key={product.id} className="bg-gray-50 p-3 rounded-md">
                       <div className="flex items-center justify-between mb-2">
                         <div>
-                          <span className="font-medium">{product.product_name || product.name}</span>
+                          <span className="font-medium">
+                            {product.product_name || product.name}
+                          </span>
                           <span className="text-sm text-gray-600 ml-2">
-                            (SKU: {product.sku || product.supplier_sku || 'N/A'})
+                            (SKU: {product.sku || product.supplier_sku || "N/A"}
+                            )
                           </span>
                         </div>
                         <button
@@ -6590,19 +7085,32 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                       <div className="grid grid-cols-2 gap-3 text-sm">
                         <div>
                           <Label className="text-xs">Unit Cost</Label>
-                          <div className="font-medium">${product.unit_cost || product.price || 0}</div>
+                          <div className="font-medium">
+                            ${product.unit_cost || product.price || 0}
+                          </div>
                         </div>
                         <div>
                           <Label className="text-xs">Available Stock</Label>
-                          <div className="font-medium">{product.stock_quantity || 0} {product.unit || 'units'}</div>
+                          <div className="font-medium">
+                            {product.stock_quantity || 0}{" "}
+                            {product.unit || "units"}
+                          </div>
                         </div>
                         <div>
                           <Label className="text-xs mb-2">Total Ordered</Label>
                           <Input
                             type="number"
-                            value={productQuantities[product.id]?.total_ordered || ''}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                              handleQuantityChange(product.id, 'total_ordered', e.target.value)
+                            value={
+                              productQuantities[product.id]?.total_ordered || ""
+                            }
+                            onChange={(
+                              e: React.ChangeEvent<HTMLInputElement>,
+                            ) =>
+                              handleQuantityChange(
+                                product.id,
+                                "total_ordered",
+                                e.target.value,
+                              )
                             }
                             placeholder="Qty"
                             className="h-8 text-sm"
@@ -6612,9 +7120,17 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                           <Label className="text-xs mb-2">Material Used</Label>
                           <Input
                             type="number"
-                            value={productQuantities[product.id]?.material_used || ''}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                              handleQuantityChange(product.id, 'material_used', e.target.value)
+                            value={
+                              productQuantities[product.id]?.material_used || ""
+                            }
+                            onChange={(
+                              e: React.ChangeEvent<HTMLInputElement>,
+                            ) =>
+                              handleQuantityChange(
+                                product.id,
+                                "material_used",
+                                e.target.value,
+                              )
                             }
                             placeholder="Used"
                             className="h-8 text-sm"
@@ -6625,21 +7141,33 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                       {/* Return to Warehouse Checkbox for each product */}
                       {productQuantities[product.id]?.total_ordered !==
                         productQuantities[product.id]?.material_used && (
-                          <div className="mt-2 flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              id={`return_${product.id}`}
-                              checked={productQuantities[product.id]?.return_to_warehouse || false}
-                              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                handleQuantityChange(product.id, 'return_to_warehouse', e.target.checked)
-                              }
-                              className="rounded border-gray-300"
-                            />
-                            <Label htmlFor={`return_${product.id}`} className="text-xs">
-                              Return to Warehouse
-                            </Label>
-                          </div>
-                        )}
+                        <div className="mt-2 flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`return_${product.id}`}
+                            checked={
+                              productQuantities[product.id]
+                                ?.return_to_warehouse || false
+                            }
+                            onChange={(
+                              e: React.ChangeEvent<HTMLInputElement>,
+                            ) =>
+                              handleQuantityChange(
+                                product.id,
+                                "return_to_warehouse",
+                                e.target.checked,
+                              )
+                            }
+                            className="rounded border-gray-300"
+                          />
+                          <Label
+                            htmlFor={`return_${product.id}`}
+                            className="text-xs"
+                          >
+                            Return to Warehouse
+                          </Label>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -6653,21 +7181,30 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                 type="date"
                 value={materialFormData.date}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setMaterialFormData({ ...materialFormData, date: e.target.value })
+                  setMaterialFormData({
+                    ...materialFormData,
+                    date: e.target.value,
+                  })
                 }
-                className={materialErrors.date ? 'border-red-500' : ''}
+                className={materialErrors.date ? "border-red-500" : ""}
               />
               {materialErrors.date && (
-                <p className="text-xs text-red-600 mt-1">{materialErrors.date}</p>
+                <p className="text-xs text-red-600 mt-1">
+                  {materialErrors.date}
+                </p>
               )}
             </div>
           </div>
 
           <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={() => {
-              resetForm();
-              setShowAddMaterialModal(false);
-            }} disabled={isLoading}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                resetForm();
+                setShowAddMaterialModal(false);
+              }}
+              disabled={isLoading}
+            >
               Cancel
             </Button>
             <Button
@@ -6678,13 +7215,25 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
               {isLoading ? (
                 <div className="flex items-center gap-2">
                   <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
                   </svg>
                   Adding...
                 </div>
               ) : (
-                `Add ${selectedProducts.length} Product${selectedProducts.length > 1 ? 's' : ''}`
+                `Add ${selectedProducts.length} Product${selectedProducts.length > 1 ? "s" : ""}`
               )}
             </Button>
           </DialogFooter>
@@ -6696,14 +7245,16 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>
-              {timeLogModalMode === 'create' && 'Add Labor Time Log'}
-              {timeLogModalMode === 'edit' && 'Edit Labor Time Log'}
-              {timeLogModalMode === 'view' && 'View Labor Time Log'}
+              {timeLogModalMode === "create" && "Add Labor Time Log"}
+              {timeLogModalMode === "edit" && "Edit Labor Time Log"}
+              {timeLogModalMode === "view" && "View Labor Time Log"}
             </DialogTitle>
             <DialogDescription>
-              {timeLogModalMode === 'create' && 'Add a new labor time entry for this job'}
-              {timeLogModalMode === 'edit' && 'Edit the labor time entry'}
-              {timeLogModalMode === 'view' && 'View the labor time entry details'}
+              {timeLogModalMode === "create" &&
+                "Add a new labor time entry for this job"}
+              {timeLogModalMode === "edit" && "Edit the labor time entry"}
+              {timeLogModalMode === "view" &&
+                "View the labor time entry details"}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -6720,10 +7271,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                       const searchQuery = e.target.value;
                       setLaborInputValue(searchQuery);
 
-                      if (searchQuery === '') {
+                      if (searchQuery === "") {
                         setTimeLogFormData({
                           ...timeLogFormData,
-                          selectedLabor: null
+                          selectedLabor: null,
                         });
                         setShowLaborDropdown(false);
                       } else {
@@ -6732,7 +7283,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                       }
                     }}
                     onFocus={() => setShowLaborDropdown(true)}
-                    disabled={timeLogModalMode === 'view' || !!timeLogFormData.selectedLeadLabor}
+                    disabled={
+                      timeLogModalMode === "view" ||
+                      !!timeLogFormData.selectedLeadLabor
+                    }
                   />
                   {showLaborDropdown && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
@@ -6750,14 +7304,17 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                                 setTimeLogFormData({
                                   ...timeLogFormData,
                                   selectedLabor: labor,
-                                  selectedLeadLabor: null // Disable lead labor when labor is selected
+                                  selectedLeadLabor: null, // Disable lead labor when labor is selected
                                 });
-                                setLaborInputValue(labor.users?.full_name || labor.labor_code);
+                                setLaborInputValue(
+                                  labor.users?.full_name || labor.labor_code,
+                                );
                                 setShowLaborDropdown(false);
                               }}
                             >
                               <span className="text-sm font-medium">
-                                {labor.users?.full_name || labor.labor_code} - {labor.labor_code}
+                                {labor.users?.full_name || labor.labor_code} -{" "}
+                                {labor.labor_code}
                               </span>
                             </div>
                           ))}
@@ -6772,7 +7329,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                   )}
                 </div>
                 {timeLogValidationErrors.laborSelection && (
-                  <p className="text-red-500 text-xs mt-1">{timeLogValidationErrors.laborSelection}</p>
+                  <p className="text-red-500 text-xs mt-1">
+                    {timeLogValidationErrors.laborSelection}
+                  </p>
                 )}
               </div>
 
@@ -6788,10 +7347,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                       const searchQuery = e.target.value;
                       setLeadLaborInputValue(searchQuery);
 
-                      if (searchQuery === '') {
+                      if (searchQuery === "") {
                         setTimeLogFormData({
                           ...timeLogFormData,
-                          selectedLeadLabor: null
+                          selectedLeadLabor: null,
                         });
                         setShowLeadLaborDropdown(false);
                       } else {
@@ -6800,7 +7359,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                       }
                     }}
                     onFocus={() => setShowLeadLaborDropdown(true)}
-                    disabled={timeLogModalMode === 'view' || !!timeLogFormData.selectedLabor}
+                    disabled={
+                      timeLogModalMode === "view" ||
+                      !!timeLogFormData.selectedLabor
+                    }
                   />
                   {showLeadLaborDropdown && (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
@@ -6818,14 +7380,17 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                                 setTimeLogFormData({
                                   ...timeLogFormData,
                                   selectedLeadLabor: labor,
-                                  selectedLabor: null // Disable labor when lead labor is selected
+                                  selectedLabor: null, // Disable labor when lead labor is selected
                                 });
-                                setLeadLaborInputValue(labor.users?.full_name || labor.labor_code);
+                                setLeadLaborInputValue(
+                                  labor.users?.full_name || labor.labor_code,
+                                );
                                 setShowLeadLaborDropdown(false);
                               }}
                             >
                               <span className="text-sm font-medium">
-                                {labor.users?.full_name || labor.labor_code} - {labor.labor_code}
+                                {labor.users?.full_name || labor.labor_code} -{" "}
+                                {labor.labor_code}
                               </span>
                             </div>
                           ))}
@@ -6840,7 +7405,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                   )}
                 </div>
                 {timeLogValidationErrors.laborSelection && (
-                  <p className="text-red-500 text-xs mt-1">{timeLogValidationErrors.laborSelection}</p>
+                  <p className="text-red-500 text-xs mt-1">
+                    {timeLogValidationErrors.laborSelection}
+                  </p>
                 )}
               </div>
             </div>
@@ -6850,45 +7417,77 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
               <Input
                 type="date"
                 value={timeLogFormData.date}
-                onChange={(e) => setTimeLogFormData({ ...timeLogFormData, date: e.target.value })}
-                disabled={timeLogModalMode === 'view'}
+                onChange={(e) =>
+                  setTimeLogFormData({
+                    ...timeLogFormData,
+                    date: e.target.value,
+                  })
+                }
+                disabled={timeLogModalMode === "view"}
               />
               {timeLogValidationErrors.date && (
-                <p className="text-red-500 text-xs mt-1">{timeLogValidationErrors.date}</p>
+                <p className="text-red-500 text-xs mt-1">
+                  {timeLogValidationErrors.date}
+                </p>
               )}
             </div>
 
             {/* Hours Worked */}
             <div>
               <Label className="mb-2">Hours Worked *</Label>
-              <div className="timerange-picker-wrapper" style={{ zIndex: 1000, borderRadius: '0.5rem', border: '1px solid #e0e0e0', padding: '0.5rem' }}>
+              <div
+                className="timerange-picker-wrapper"
+                style={{
+                  zIndex: 1000,
+                  borderRadius: "0.5rem",
+                  border: "1px solid #e0e0e0",
+                  padding: "0.5rem",
+                }}
+              >
                 <TimeRangePicker
                   // @ts-ignore - TimeRangePicker types may vary
                   onChange={(value: any) => {
-                    console.log('TimeRangePicker onChange:', value, 'Type:', typeof value, 'IsArray:', Array.isArray(value));
+                    console.log(
+                      "TimeRangePicker onChange:",
+                      value,
+                      "Type:",
+                      typeof value,
+                      "IsArray:",
+                      Array.isArray(value),
+                    );
                     // Set flag to prevent useEffect from overwriting user selection
                     timeRangeValueRef.current = true;
                     setTimeRangeValue(value);
 
-                    if (value && Array.isArray(value) && value.length === 2 && value[0] && value[1]) {
+                    if (
+                      value &&
+                      Array.isArray(value) &&
+                      value.length === 2 &&
+                      value[0] &&
+                      value[1]
+                    ) {
                       try {
-                        let startHours = 0, startMinutes = 0, startSeconds = 0;
-                        let endHours = 0, endMinutes = 0, endSeconds = 0;
+                        let startHours = 0,
+                          startMinutes = 0,
+                          startSeconds = 0;
+                        let endHours = 0,
+                          endMinutes = 0,
+                          endSeconds = 0;
 
                         // Parse start time - can be Date object or time string (HH:MM or HH:MM:SS)
                         if (value[0] instanceof Date) {
                           startHours = value[0].getHours();
                           startMinutes = value[0].getMinutes();
                           startSeconds = value[0].getSeconds();
-                        } else if (typeof value[0] === 'string') {
+                        } else if (typeof value[0] === "string") {
                           // Parse time string like "08:34" or "08:34:00" or "10:00 AM"
                           let timeStr = value[0].trim();
                           // Handle 12-hour format with AM/PM
-                          const isPM = timeStr.toUpperCase().includes('PM');
-                          const isAM = timeStr.toUpperCase().includes('AM');
+                          const isPM = timeStr.toUpperCase().includes("PM");
+                          const isAM = timeStr.toUpperCase().includes("AM");
                           if (isPM || isAM) {
-                            timeStr = timeStr.replace(/[AP]M/gi, '').trim();
-                            const parts = timeStr.split(':');
+                            timeStr = timeStr.replace(/[AP]M/gi, "").trim();
+                            const parts = timeStr.split(":");
                             let parsedHours = parseInt(parts[0]) || 0;
                             if (isPM && parsedHours !== 12) {
                               parsedHours += 12;
@@ -6900,7 +7499,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                             startSeconds = parseInt(parts[2]) || 0;
                           } else {
                             // 24-hour format
-                            const startParts = timeStr.split(':');
+                            const startParts = timeStr.split(":");
                             startHours = parseInt(startParts[0]) || 0;
                             startMinutes = parseInt(startParts[1]) || 0;
                             startSeconds = parseInt(startParts[2]) || 0;
@@ -6913,8 +7512,14 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                             startMinutes = startDate.getMinutes();
                             startSeconds = startDate.getSeconds();
                           } else {
-                            console.error('Invalid start time format:', value[0]);
-                            setTimeLogFormData({ ...timeLogFormData, hoursWorked: '' });
+                            console.error(
+                              "Invalid start time format:",
+                              value[0],
+                            );
+                            setTimeLogFormData({
+                              ...timeLogFormData,
+                              hoursWorked: "",
+                            });
                             return;
                           }
                         }
@@ -6924,15 +7529,15 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                           endHours = value[1].getHours();
                           endMinutes = value[1].getMinutes();
                           endSeconds = value[1].getSeconds();
-                        } else if (typeof value[1] === 'string') {
+                        } else if (typeof value[1] === "string") {
                           // Parse time string like "20:45" or "20:45:00" or "8:00 PM"
                           let timeStr = value[1].trim();
                           // Handle 12-hour format with AM/PM
-                          const isPM = timeStr.toUpperCase().includes('PM');
-                          const isAM = timeStr.toUpperCase().includes('AM');
+                          const isPM = timeStr.toUpperCase().includes("PM");
+                          const isAM = timeStr.toUpperCase().includes("AM");
                           if (isPM || isAM) {
-                            timeStr = timeStr.replace(/[AP]M/gi, '').trim();
-                            const parts = timeStr.split(':');
+                            timeStr = timeStr.replace(/[AP]M/gi, "").trim();
+                            const parts = timeStr.split(":");
                             let parsedHours = parseInt(parts[0]) || 0;
                             if (isPM && parsedHours !== 12) {
                               parsedHours += 12;
@@ -6944,7 +7549,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                             endSeconds = parseInt(parts[2]) || 0;
                           } else {
                             // 24-hour format
-                            const endParts = timeStr.split(':');
+                            const endParts = timeStr.split(":");
                             endHours = parseInt(endParts[0]) || 0;
                             endMinutes = parseInt(endParts[1]) || 0;
                             endSeconds = parseInt(endParts[2]) || 0;
@@ -6957,22 +7562,40 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                             endMinutes = endDate.getMinutes();
                             endSeconds = endDate.getSeconds();
                           } else {
-                            console.error('Invalid end time format:', value[1]);
-                            setTimeLogFormData({ ...timeLogFormData, hoursWorked: '' });
+                            console.error("Invalid end time format:", value[1]);
+                            setTimeLogFormData({
+                              ...timeLogFormData,
+                              hoursWorked: "",
+                            });
                             return;
                           }
                         }
 
                         // Validate parsed time components
-                        if (isNaN(startHours) || isNaN(startMinutes) || isNaN(endHours) || isNaN(endMinutes)) {
-                          console.error('Invalid time components:', { startHours, startMinutes, endHours, endMinutes });
-                          setTimeLogFormData({ ...timeLogFormData, hoursWorked: '' });
+                        if (
+                          isNaN(startHours) ||
+                          isNaN(startMinutes) ||
+                          isNaN(endHours) ||
+                          isNaN(endMinutes)
+                        ) {
+                          console.error("Invalid time components:", {
+                            startHours,
+                            startMinutes,
+                            endHours,
+                            endMinutes,
+                          });
+                          setTimeLogFormData({
+                            ...timeLogFormData,
+                            hoursWorked: "",
+                          });
                           return;
                         }
 
                         // Calculate total minutes for each time
-                        const startTotalMinutes = startHours * 60 + startMinutes + startSeconds / 60;
-                        const endTotalMinutes = endHours * 60 + endMinutes + endSeconds / 60;
+                        const startTotalMinutes =
+                          startHours * 60 + startMinutes + startSeconds / 60;
+                        const endTotalMinutes =
+                          endHours * 60 + endMinutes + endSeconds / 60;
 
                         // Calculate difference in minutes
                         let diffMinutes = endTotalMinutes - startTotalMinutes;
@@ -6980,65 +7603,114 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                         // Handle case where end time is before start time (next day)
                         if (diffMinutes < 0) {
                           // If end is before start, assume it's next day (add 24 hours)
-                          diffMinutes = (24 * 60) + diffMinutes;
+                          diffMinutes = 24 * 60 + diffMinutes;
                         }
 
                         // Convert minutes to hours
                         const diffHours = diffMinutes / 60;
 
-                        console.log('Time calculation:', {
-                          startHours, startMinutes, startSeconds,
-                          endHours, endMinutes, endSeconds,
-                          startTotalMinutes, endTotalMinutes,
-                          diffMinutes, diffHours
+                        console.log("Time calculation:", {
+                          startHours,
+                          startMinutes,
+                          startSeconds,
+                          endHours,
+                          endMinutes,
+                          endSeconds,
+                          startTotalMinutes,
+                          endTotalMinutes,
+                          diffMinutes,
+                          diffHours,
                         });
 
                         // Validate calculated hours
-                        if (isNaN(diffHours) || !isFinite(diffHours) || diffHours < 0) {
-                          console.error('Invalid hours calculation:', diffHours);
-                          setTimeLogFormData({ ...timeLogFormData, hoursWorked: '' });
+                        if (
+                          isNaN(diffHours) ||
+                          !isFinite(diffHours) ||
+                          diffHours < 0
+                        ) {
+                          console.error(
+                            "Invalid hours calculation:",
+                            diffHours,
+                          );
+                          setTimeLogFormData({
+                            ...timeLogFormData,
+                            hoursWorked: "",
+                          });
                           return;
                         }
 
                         // Convert to HH:MM:SS format
                         const h = Math.floor(diffHours);
-                        const remainingMinutes = diffMinutes - (h * 60);
+                        const remainingMinutes = diffMinutes - h * 60;
                         const m = Math.floor(remainingMinutes);
                         const s = Math.floor((remainingMinutes - m) * 60);
 
-                        console.log('Time components:', { h, m, s, diffHours, diffMinutes });
+                        console.log("Time components:", {
+                          h,
+                          m,
+                          s,
+                          diffHours,
+                          diffMinutes,
+                        });
 
                         // Validate all values are numbers
                         if (isNaN(h) || isNaN(m) || isNaN(s)) {
-                          console.error('Invalid time components:', { h, m, s, diffHours, diffMinutes });
-                          setTimeLogFormData({ ...timeLogFormData, hoursWorked: '' });
+                          console.error("Invalid time components:", {
+                            h,
+                            m,
+                            s,
+                            diffHours,
+                            diffMinutes,
+                          });
+                          setTimeLogFormData({
+                            ...timeLogFormData,
+                            hoursWorked: "",
+                          });
                           return;
                         }
 
-                        const formattedTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-                        console.log('Formatted time:', formattedTime);
+                        const formattedTime = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+                        console.log("Formatted time:", formattedTime);
 
-                        setTimeLogFormData({ ...timeLogFormData, hoursWorked: formattedTime });
+                        setTimeLogFormData({
+                          ...timeLogFormData,
+                          hoursWorked: formattedTime,
+                        });
                       } catch (error) {
-                        console.error('Error calculating hours from time range:', error, value);
-                        setTimeLogFormData({ ...timeLogFormData, hoursWorked: '' });
+                        console.error(
+                          "Error calculating hours from time range:",
+                          error,
+                          value,
+                        );
+                        setTimeLogFormData({
+                          ...timeLogFormData,
+                          hoursWorked: "",
+                        });
                       }
                     } else if (value === null || !value) {
-                      console.log('TimeRangePicker value cleared');
-                      setTimeLogFormData({ ...timeLogFormData, hoursWorked: '' });
+                      console.log("TimeRangePicker value cleared");
+                      setTimeLogFormData({
+                        ...timeLogFormData,
+                        hoursWorked: "",
+                      });
                     } else {
-                      console.log('Invalid TimeRangePicker value format:', value);
+                      console.log(
+                        "Invalid TimeRangePicker value format:",
+                        value,
+                      );
                     }
                   }}
                   value={timeRangeValue}
-                  disabled={timeLogModalMode === 'view'}
+                  disabled={timeLogModalMode === "view"}
                   format="h:mm a"
                   clearIcon={null}
                   clockIcon={null}
                 />
               </div>
               {timeLogValidationErrors.hoursWorked && (
-                <p className="text-red-500 text-xs mt-1">{timeLogValidationErrors.hoursWorked}</p>
+                <p className="text-red-500 text-xs mt-1">
+                  {timeLogValidationErrors.hoursWorked}
+                </p>
               )}
             </div>
 
@@ -7047,37 +7719,50 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
               <Label className="mb-2">Description</Label>
               <Textarea
                 value={timeLogFormData.description}
-                onChange={(e) => setTimeLogFormData({ ...timeLogFormData, description: e.target.value })}
+                onChange={(e) =>
+                  setTimeLogFormData({
+                    ...timeLogFormData,
+                    description: e.target.value,
+                  })
+                }
                 placeholder="Describe the work performed"
                 rows={3}
-                disabled={timeLogModalMode === 'view'}
+                disabled={timeLogModalMode === "view"}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowTimeLogModal(false);
-              setCurrentTimeLog(null);
-              resetTimeLogForm();
-            }}>
-              {timeLogModalMode === 'view' ? 'Close' : 'Cancel'}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowTimeLogModal(false);
+                setCurrentTimeLog(null);
+                resetTimeLogForm();
+              }}
+            >
+              {timeLogModalMode === "view" ? "Close" : "Cancel"}
             </Button>
-            {timeLogModalMode !== 'view' && (
-              <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleSaveTimeLog}>
-                {timeLogModalMode === 'create' ? 'Add Time Log' : 'Update Time Log'}
+            {timeLogModalMode !== "view" && (
+              <Button
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+                onClick={handleSaveTimeLog}
+              >
+                {timeLogModalMode === "create"
+                  ? "Add Time Log"
+                  : "Update Time Log"}
               </Button>
             )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-
       <Dialog open={showInvoiceModal} onOpenChange={setShowInvoiceModal}>
         <DialogContent className="w-[500px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-primary">Invoice Details</DialogTitle>
             <DialogDescription>
-              {selectedInvoice && `${selectedInvoice.invoice_type?.charAt(0).toUpperCase() + selectedInvoice.invoice_type?.slice(1).replace('_', ' ')} - ${selectedInvoice.invoice_number}`}
+              {selectedInvoice &&
+                `${selectedInvoice.invoice_type?.charAt(0).toUpperCase() + selectedInvoice.invoice_type?.slice(1).replace("_", " ")} - ${selectedInvoice.invoice_number}`}
             </DialogDescription>
           </DialogHeader>
           {selectedInvoice && (
@@ -7086,11 +7771,27 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                 <div>
                   <Label className="text-primary">Invoice Information</Label>
                   <div className="mt-2 space-y-2">
-                    <p><span className="font-medium">Type:</span> {selectedInvoice.invoice_type?.charAt(0).toUpperCase() + selectedInvoice.invoice_type?.slice(1).replace('_', ' ')}</p>
-                    <p><span className="font-medium">Number:</span> {selectedInvoice.invoice_number}</p>
-                    <p><span className="font-medium">Amount:</span> {formatCurrency(selectedInvoice.total_amount)}</p>
-                    <p><span className="font-medium">Status:</span>
-                      <Badge className={`ml-2 ${getStatusBadgeColor(selectedInvoice.status)}`} variant="outline">
+                    <p>
+                      <span className="font-medium">Type:</span>{" "}
+                      {selectedInvoice.invoice_type?.charAt(0).toUpperCase() +
+                        selectedInvoice.invoice_type
+                          ?.slice(1)
+                          .replace("_", " ")}
+                    </p>
+                    <p>
+                      <span className="font-medium">Number:</span>{" "}
+                      {selectedInvoice.invoice_number}
+                    </p>
+                    <p>
+                      <span className="font-medium">Amount:</span>{" "}
+                      {formatCurrency(selectedInvoice.total_amount)}
+                    </p>
+                    <p>
+                      <span className="font-medium">Status:</span>
+                      <Badge
+                        className={`ml-2 ${getStatusBadgeColor(selectedInvoice.status)}`}
+                        variant="outline"
+                      >
                         {selectedInvoice.status}
                       </Badge>
                     </p>
@@ -7099,24 +7800,35 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                 <div>
                   <Label className="text-primary">Dates</Label>
                   <div className="mt-2 space-y-2">
-                    <p><span className="font-medium">Created:</span> {formatDate(selectedInvoice.created_at)}</p>
+                    <p>
+                      <span className="font-medium">Created:</span>{" "}
+                      {formatDate(selectedInvoice.created_at)}
+                    </p>
                     {selectedInvoice.due_date && (
-                      <p><span className="font-medium">Due Date:</span> {formatDate(selectedInvoice.due_date)}</p>
+                      <p>
+                        <span className="font-medium">Due Date:</span>{" "}
+                        {formatDate(selectedInvoice.due_date)}
+                      </p>
                     )}
                   </div>
                 </div>
               </div>
               <div>
                 <Label className="text-primary">Description</Label>
-                <p className="mt-2 p-4 bg-gray-50 rounded-lg">{selectedInvoice.notes}</p>
+                <p className="mt-2 p-4 bg-gray-50 rounded-lg">
+                  {selectedInvoice.notes}
+                </p>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowInvoiceModal(false)
-              setSelectedInvoice(null)
-            }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowInvoiceModal(false);
+                setSelectedInvoice(null);
+              }}
+            >
               Close
             </Button>
             {/* {selectedInvoice && (
@@ -7129,33 +7841,36 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
         </DialogContent>
       </Dialog>
 
-
       {selectedInvoiceId && (
         <div
           ref={printRef}
           aria-hidden="true"
           style={{
-            position: 'absolute',
-            left: '-10000px',
+            position: "absolute",
+            left: "-10000px",
             top: 0,
-            width: '22cm',
-            background: '#ffffff',
-            padding: '24px',
-            pointerEvents: 'none',
+            width: "22cm",
+            background: "#ffffff",
+            padding: "24px",
+            pointerEvents: "none",
           }}
         >
           <InvoiceTemplate invoiceId={selectedInvoiceId} />
         </div>
       )}
 
-
-
-      <AlertDialog open={showDeleteProductDialog} onOpenChange={setShowDeleteProductDialog}>
+      <AlertDialog
+        open={showDeleteProductDialog}
+        onOpenChange={setShowDeleteProductDialog}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure you want to delete this product?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Are you sure you want to delete this product?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the product.
+              This action cannot be undone. This will permanently delete the
+              product.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -7165,19 +7880,25 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
               disabled={isDeleting}
               className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
             >
-              {isDeleting ? 'Deleting...' : 'Yes, delete'}
+              {isDeleting ? "Deleting..." : "Yes, delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-
-      <AlertDialog open={showDeleteEstimateDialog} onOpenChange={setShowDeleteEstimateDialog}>
+      <AlertDialog
+        open={showDeleteEstimateDialog}
+        onOpenChange={setShowDeleteEstimateDialog}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure you want to delete this estimate?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Are you sure you want to delete this estimate?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the estimate &quot;{estimateToDelete?.name || estimateToDelete?.id}&quot; from your records.
+              This action cannot be undone. This will permanently delete the
+              estimate &quot;{estimateToDelete?.name || estimateToDelete?.id}
+              &quot; from your records.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -7187,7 +7908,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
               disabled={isDeleting}
               className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
             >
-              {isDeleting ? 'Deleting...' : 'Yes, delete'}
+              {isDeleting ? "Deleting..." : "Yes, delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -7198,31 +7919,43 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
         <DialogContent className="min-w-[80%] max-h-[90vh] overflow-y-auto p-0">
           <div className="bg-gray-100 p-6">
             {/* Print-ready Invoice Design */}
-            <div id="invoice-preview-print" className="bg-white p-8 shadow-lg"  >
+            <div id="invoice-preview-print" className="bg-white p-8 shadow-lg">
               {/* Header */}
               <div className="flex justify-between items-start mb-8">
                 <div>
                   {/* <Logo /> */}
                   <Image
-                    src='/assets/logos/logo-jdp.png'
+                    src="/assets/logos/logo-jdp.png"
                     alt="logo"
                     width={168}
                     height={63}
-                    className='w-[140px] '
-
+                    className="w-[140px] "
                   />
                   <p className="text-sm text-gray-600 mt-2">952-449-1088</p>
                   {/* Invoice Number Display */}
-
                 </div>
                 <div className="text-right">
                   <div className="text-center flex justify-center items-center">
-                    <div className="text-lg font-bold bg-gray-800 text-white p-[14px] w-[200px]">Date</div>
-                    <div className="text-sm border border-gray-800 p-[17px] w-[200px]">{new Date(inlineInvoiceData.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</div>
+                    <div className="text-lg font-bold bg-gray-800 text-white p-[14px] w-[200px]">
+                      Date
+                    </div>
+                    <div className="text-sm border border-gray-800 p-[17px] w-[200px]">
+                      {new Date(inlineInvoiceData.date).toLocaleDateString(
+                        "en-US",
+                        { month: "2-digit", day: "2-digit", year: "numeric" },
+                      )}
+                    </div>
                   </div>
                   <div className="text-center mb-2 flex justify-center items-center">
-                    <div className="text-lg font-bold bg-gray-800 text-white p-[14px] w-[200px]">{(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType) || 'ESTIMATE'} #</div>
-                    <div className="text-sm border border-gray-800 p-[17px] w-[200px]">{InvoioiceNumber}</div>
+                    <div className="text-lg font-bold bg-gray-800 text-white p-[14px] w-[200px]">
+                      {(inlineInvoiceData.invoiceType === "Custom"
+                        ? inlineInvoiceData.customInvoiceType
+                        : inlineInvoiceData.invoiceType) || "ESTIMATE"}{" "}
+                      #
+                    </div>
+                    <div className="text-sm border border-gray-800 p-[17px] w-[200px]">
+                      {InvoioiceNumber}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -7232,7 +7965,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                     <div className="text-sm font-bold ">Bill TO</div>
                   </div>
                   {inlineInvoiceData.billToAddress && (
-                    <div className="text-gray-600 mt-2 font-medium border border-gray-800 p-3"> {inlineInvoiceData.billToAddress}</div>
+                    <div className="text-gray-600 mt-2 font-medium border border-gray-800 p-3">
+                      {" "}
+                      {inlineInvoiceData.billToAddress}
+                    </div>
                   )}
                 </>
               )}
@@ -7242,28 +7978,43 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
               </div>
               <div className="mb-6 border border-gray-800 p-3">
                 <div className="font-semibold">
-                  {job.type === 'contract-based'
-                    ? (contractorData?.name || contractorData?.contractor_name || 'Contractor')
-                    : (customerData?.customer_name || customerData?.company_name || inlineInvoiceData.customerName || 'Customer')
-                  }
+                  {job.type === "contract-based"
+                    ? contractorData?.name ||
+                      contractorData?.contractor_name ||
+                      "Contractor"
+                    : customerData?.customer_name ||
+                      customerData?.company_name ||
+                      inlineInvoiceData.customerName ||
+                      "Customer"}
                 </div>
                 <div className="text-gray-600">
-                  {job.type === 'contract-based'
-                    ? (contractorData?.address || inlineInvoiceData.customerAddress || '')
-                    : (customerData?.address || inlineInvoiceData.customerAddress || '')
-                  }
+                  {job.type === "contract-based"
+                    ? contractorData?.address ||
+                      inlineInvoiceData.customerAddress ||
+                      ""
+                    : customerData?.address ||
+                      inlineInvoiceData.customerAddress ||
+                      ""}
                 </div>
               </div>
 
               {/* Project Details */}
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div>
-                  <div className="text-sm font-semibold border border-gray-800 p-3">P.O. No.</div>
-                  <div className="text-gray-600 border border-gray-800 p-3">{inlineInvoiceData.poNumber}</div>
+                  <div className="text-sm font-semibold border border-gray-800 p-3">
+                    P.O. No.
+                  </div>
+                  <div className="text-gray-600 border border-gray-800 p-3">
+                    {inlineInvoiceData.poNumber}
+                  </div>
                 </div>
                 <div>
-                  <div className="bg-gray-800 text-white text-sm font-semibold border border-gray-800 p-3">Project</div>
-                  <div className="text-gray-600 border border-gray-800 p-3">{inlineInvoiceData.project}</div>
+                  <div className="bg-gray-800 text-white text-sm font-semibold border border-gray-800 p-3">
+                    Project
+                  </div>
+                  <div className="text-gray-600 border border-gray-800 p-3">
+                    {inlineInvoiceData.project}
+                  </div>
                 </div>
               </div>
 
@@ -7272,14 +8023,27 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                 <table className="w-full border-collapse border border-gray-300">
                   <thead>
                     <tr className="bg-gray-100">
-                      <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Rep</th>
-                      <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Due Date</th>
+                      <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                        Rep
+                      </th>
+                      <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                        Due Date
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td className="border border-gray-300 px-3 py-2">{inlineInvoiceData.rep || 'JDP'}</td>
-                      <td className="border border-gray-300 px-3 py-2">{inlineInvoiceData.dueDate || new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</td>
+                      <td className="border border-gray-300 px-3 py-2">
+                        {inlineInvoiceData.rep || "JDP"}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2">
+                        {inlineInvoiceData.dueDate ||
+                          new Date().toLocaleDateString("en-US", {
+                            month: "2-digit",
+                            day: "2-digit",
+                            year: "numeric",
+                          })}
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -7290,15 +8054,25 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                 <table className="w-full border-collapse border border-gray-300">
                   <thead>
                     <tr className="bg-gray-800 text-white">
-                      <th className="border border-gray-300 px-3 py-2 text-left">Qty</th>
-                      <th className="border border-gray-300 px-3 py-2 text-left">Item</th>
-                      <th className="border border-gray-300 px-3 py-2 text-left">Description</th>
-                      <th className="border border-gray-300 px-3 py-2 text-right">Rate</th>
-                      <th className="border border-gray-300 px-3 py-2 text-right">Amount</th>
+                      <th className="border border-gray-300 px-3 py-2 text-left">
+                        Qty
+                      </th>
+                      <th className="border border-gray-300 px-3 py-2 text-left">
+                        Item
+                      </th>
+                      <th className="border border-gray-300 px-3 py-2 text-left">
+                        Description
+                      </th>
+                      <th className="border border-gray-300 px-3 py-2 text-right">
+                        Rate
+                      </th>
+                      <th className="border border-gray-300 px-3 py-2 text-right">
+                        Amount
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {inlineInvoiceData.lineItems.map((item, index) => (
+                    {/* {inlineInvoiceData.lineItems.map((item, index) => (
                       <tr key={item.id} className="hover:bg-gray-50">
                         <td className="border border-gray-300 px-3 py-2">{item.qty}</td>
                         <td className="border border-gray-300 px-3 py-2 font-medium">{item.item}</td>
@@ -7306,14 +8080,293 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                         <td className="border border-gray-300 px-3 py-2 text-right">${((item.estimatedPrice && item.estimatedPrice > 0) ? item.estimatedPrice : (item.rate || 0)).toFixed(2)}</td>
                         <td className="border border-gray-300 px-3 py-2 text-right font-medium">${(item.total || 0).toFixed(2)}</td>
                       </tr>
-                    ))}
+                    ))} */}
+                    {inlineInvoiceData.lineItems.map((lineItem, index) => {
+                      console.log(
+                        lineItem.type,
+                        "headerNameheaderNameheaderName",
+                      );
+
+                      if (lineItem.type === "header") {
+                        return (
+                          <tr key={lineItem.id} className="bg-blue-50">
+                            <td
+                              colSpan={7}
+                              className="px-3 py-3 border border-gray-300"
+                            >
+                              <div className="flex items-center gap-3 w-full">
+                                <Input
+                                  value={lineItem.headerName || ""}
+                                  onChange={(e) =>
+                                    updateInvoiceLineItem(
+                                      lineItem.id,
+                                      "headerName",
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder="Enter section name like Kitchen, Hall, Bathroom"
+                                  className="w-full h-10 font-medium border-blue-200 focus-visible:ring-blue-500"
+                                />
+
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  className="shrink-0 text-red-500 hover:text-red-700"
+                                  onClick={() =>
+                                    removeInvoiceLineItem(lineItem.id)
+                                  }
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      } else {
+                        return (
+                          <tr
+                            key={lineItem.id}
+                            className="hover:bg-gray-50 transition-colors"
+                          >
+                            <td className="border border-gray-300 p-1">
+                              <Input
+                                type="number"
+                                value={lineItem.qty}
+                                onChange={(e) =>
+                                  updateInvoiceLineItem(
+                                    lineItem.id,
+                                    "qty",
+                                    parseFloat(e.target.value) || 0,
+                                  )
+                                }
+                                className="text-center border-0 p-2"
+                                min="0"
+                              />
+                            </td>
+
+                            <td className="border border-gray-300 p-1 relative">
+                              {lineItem.isCustomProduct ? (
+                                <Input
+                                  value={lineItem.item}
+                                  onChange={(e) =>
+                                    updateInvoiceLineItem(
+                                      lineItem.id,
+                                      "item",
+                                      e.target.value,
+                                    )
+                                  }
+                                  className="border-0 p-2"
+                                  placeholder="Enter custom item name."
+                                />
+                              ) : (
+                                <div className="relative product-search-container">
+                                  <Input
+                                    value={lineItem.item}
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      updateInvoiceLineItem(
+                                        lineItem.id,
+                                        "item",
+                                        value,
+                                      );
+                                      updateInvoiceLineItem(
+                                        lineItem.id,
+                                        "searchQuery",
+                                        value,
+                                      );
+                                      updateInvoiceLineItem(
+                                        lineItem.id,
+                                        "showSearchResults",
+                                        true,
+                                      );
+
+                                      if (value && value.length > 0) {
+                                        fetchProducts(value);
+                                      }
+                                    }}
+                                    onFocus={() => {
+                                      if (lineItem.item) {
+                                        updateInvoiceLineItem(
+                                          lineItem.id,
+                                          "searchQuery",
+                                          lineItem.item,
+                                        );
+                                        updateInvoiceLineItem(
+                                          lineItem.id,
+                                          "showSearchResults",
+                                          true,
+                                        );
+                                      }
+                                    }}
+                                    className="border-0 p-2 pr-8"
+                                    placeholder="Search or enter product name."
+                                  />
+                                  <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                </div>
+                              )}
+
+                              {!lineItem.isCustomProduct &&
+                                lineItem.showSearchResults &&
+                                lineItem.searchQuery && (
+                                  <div className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1">
+                                    {(() => {
+                                      const filtered = getFilteredProducts(
+                                        lineItem.searchQuery || "",
+                                      );
+
+                                      if (filtered.length === 0) {
+                                        return (
+                                          <div className="p-3 text-sm text-gray-500">
+                                            No products found
+                                          </div>
+                                        );
+                                      }
+
+                                      return filtered.map((product: any) => (
+                                        <div
+                                          key={product.id}
+                                          className="p-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
+                                          onClick={() => {
+                                            updateInvoiceLineItem(
+                                              lineItem.id,
+                                              "productId",
+                                              product.id,
+                                            );
+                                            updateInvoiceLineItem(
+                                              lineItem.id,
+                                              "item",
+                                              product.product_name ||
+                                                product.name ||
+                                                "",
+                                            );
+                                            updateInvoiceLineItem(
+                                              lineItem.id,
+                                              "description",
+                                              product.description || "",
+                                            );
+                                            updateInvoiceLineItem(
+                                              lineItem.id,
+                                              "rate",
+                                              Number(
+                                                product.unit_cost ||
+                                                  product.price ||
+                                                  0,
+                                              ),
+                                            );
+                                            updateInvoiceLineItem(
+                                              lineItem.id,
+                                              "estimatedPrice",
+                                              Number(
+                                                product.estimated_price ||
+                                                  product.unit_cost ||
+                                                  product.price ||
+                                                  0,
+                                              ),
+                                            );
+                                            updateInvoiceLineItem(
+                                              lineItem.id,
+                                              "showSearchResults",
+                                              false,
+                                            );
+                                            updateInvoiceLineItem(
+                                              lineItem.id,
+                                              "searchQuery",
+                                              "",
+                                            );
+                                          }}
+                                        >
+                                          <div className="font-medium">
+                                            {product.product_name ||
+                                              product.name}
+                                          </div>
+                                          <div className="text-xs text-gray-500">
+                                            SKU:{" "}
+                                            {product.sku ||
+                                              product.supplier_sku ||
+                                              "N/A"}
+                                          </div>
+                                        </div>
+                                      ));
+                                    })()}
+                                  </div>
+                                )}
+                            </td>
+
+                            <td className="border border-gray-300 p-1">
+                              <Textarea
+                                value={lineItem.description}
+                                onChange={(e) =>
+                                  updateInvoiceLineItem(
+                                    lineItem.id,
+                                    "description",
+                                    e.target.value,
+                                  )
+                                }
+                                className="border-0 p-2 min-h-[80px]"
+                                placeholder="Enter product description"
+                              />
+                            </td>
+
+                            <td className="border border-gray-300 p-1">
+                              <Input
+                                type="number"
+                                value={lineItem.rate}
+                                onChange={(e) =>
+                                  updateInvoiceLineItem(
+                                    lineItem.id,
+                                    "rate",
+                                    parseFloat(e.target.value) || 0,
+                                  )
+                                }
+                                className="text-right border-0 p-2"
+                                min="0"
+                              />
+                            </td>
+
+                            <td className="border border-gray-300 p-1">
+                              <Input
+                                type="number"
+                                value={lineItem.estimatedPrice}
+                                onChange={(e) =>
+                                  updateInvoiceLineItem(
+                                    lineItem.id,
+                                    "estimatedPrice",
+                                    parseFloat(e.target.value) || 0,
+                                  )
+                                }
+                                className="text-right border-0 p-2"
+                                min="0"
+                              />
+                            </td>
+
+                            <td className="border border-gray-300 px-3 py-2 text-right font-medium">
+                              ${(lineItem.total || 0).toFixed(2)}
+                            </td>
+
+                            <td className="border border-gray-300 px-3 py-2 text-center">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  removeInvoiceLineItem(lineItem.id)
+                                }
+                                className="text-red-500 hover:text-red-700"
+                              >
+                                <Trash2 className="h-4 w-4 mx-auto" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      }
+                    })}
                   </tbody>
                 </table>
 
                 {/* Subtotal */}
                 <div className="flex justify-end mt-4">
                   <div className="text-right">
-                    <div className="font-bold text-lg">${calculateInvoiceSubtotal().toFixed(2)}</div>
+                    <div className="font-bold text-lg">
+                      ${calculateInvoiceSubtotal().toFixed(2)}
+                    </div>
                   </div>
                 </div>
 
@@ -7321,12 +8374,22 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                 <div className="flex justify-end mt-4">
                   <div className="text-right w-64">
                     <div className="flex justify-between mb-2">
-                      <span className="text-sm text-gray-600">Payments / Credits:</span>
-                      <span className="text-sm text-gray-600">${(inlineInvoiceData.paymentCredits || 0).toFixed(2)}</span>
+                      <span className="text-sm text-gray-600">
+                        Payments / Credits:
+                      </span>
+                      <span className="text-sm text-gray-600">
+                        ${(inlineInvoiceData.paymentCredits || 0).toFixed(2)}
+                      </span>
                     </div>
                     <div className="flex justify-between bg-gray-100 p-2 rounded">
                       <span className="font-bold text-sm">Balance Due:</span>
-                      <span className="font-bold text-sm">${(calculateInvoiceSubtotal() - (inlineInvoiceData.paymentCredits || 0)).toFixed(2)}</span>
+                      <span className="font-bold text-sm">
+                        $
+                        {(
+                          calculateInvoiceSubtotal() -
+                          (inlineInvoiceData.paymentCredits || 0)
+                        ).toFixed(2)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -7335,16 +8398,21 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
               {/* Notes Section */}
               <div className="border-t pt-4 mb-6">
                 <div className="bg-gray-100 p-3 rounded text-center">
-                  <div className="text-sm font-medium whitespace-pre-line">{inlineInvoiceData.notes || 'Final payment to complete project billing'}</div>
+                  <div className="text-sm font-medium whitespace-pre-line">
+                    {inlineInvoiceData.notes ||
+                      "Final payment to complete project billing"}
+                  </div>
                 </div>
               </div>
 
               {/* Disclaimer */}
               <div className="text-xs text-gray-600 mb-6">
                 <p className="mb-2">
-                  JDP is not responsible for repair of lamps & landscaping, house owner utilities including cables,
-                  sprinkler systems, television or telephone cables, etc. that may be cut or damaged during installation.
-                  Price are subject to change prior to receipt of down payment.
+                  JDP is not responsible for repair of lamps & landscaping,
+                  house owner utilities including cables, sprinkler systems,
+                  television or telephone cables, etc. that may be cut or
+                  damaged during installation. Price are subject to change prior
+                  to receipt of down payment.
                 </p>
               </div>
 
@@ -7364,28 +8432,40 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                   {/* Customer Acceptance Header */}
                   <div className="flex justify-between items-center mb-5">
                     <div className="flex flex-col">
-                      <div className="text-sm font-medium text-gray-700 mb-1">Customer Acceptance</div>
-                      <div className="text-sm font-medium text-gray-700">Authorized Signature</div>
+                      <div className="text-sm font-medium text-gray-700 mb-1">
+                        Customer Acceptance
+                      </div>
+                      <div className="text-sm font-medium text-gray-700">
+                        Authorized Signature
+                      </div>
                     </div>
-                    <div className="text-sm font-medium text-gray-700">Date</div>
+                    <div className="text-sm font-medium text-gray-700">
+                      Date
+                    </div>
                   </div>
 
                   {/* Signature Fields */}
                   <div className="flex justify-between items-center mb-5">
                     <div className="flex flex-col w-3/5">
                       <div className="border-b border-gray-800 h-0.5 mb-2"></div>
-                      <div className="text-xs text-gray-700 text-center">Signature</div>
+                      <div className="text-xs text-gray-700 text-center">
+                        Signature
+                      </div>
                     </div>
                     <div className="flex flex-col w-1/3">
                       <div className="border-b border-gray-800 h-0.5 mb-2"></div>
-                      <div className="text-xs text-gray-700 text-center">Date</div>
+                      <div className="text-xs text-gray-700 text-center">
+                        Date
+                      </div>
                     </div>
                   </div>
 
                   {/* Disclaimer Box */}
                   <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mt-5">
                     <div className="text-xs text-gray-700 leading-relaxed">
-                      By signing above, you agree to the terms and pricing outlined in this estimate. This becomes a binding agreement upon signature.
+                      By signing above, you agree to the terms and pricing
+                      outlined in this estimate. This becomes a binding
+                      agreement upon signature.
                     </div>
                   </div>
                 </div>
@@ -7398,49 +8478,54 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
             <Button
               variant="outline"
               onClick={() => {
-                setShowPreviewDialog(false)
+                setShowPreviewDialog(false);
                 // Reset form when closing preview
                 if (!editingInvoiceId) {
-                  setShowInlineInvoiceForm(false)
-                  setEditingInvoiceId(null)
-                  setInvoiceValidationErrors({})
+                  setShowInlineInvoiceForm(false);
+                  setEditingInvoiceId(null);
+                  setInvoiceValidationErrors({});
 
                   setInlineInvoiceData({
-                    date: new Date().toISOString().split('T')[0],
-                    estimateNumber: '',
-                    customerName: job.customerName || '',
-                    customerAddress: job.address || '',
-                    billToAddress: job.billToAddress || '',
+                    date: new Date().toISOString().split("T")[0],
+                    estimateNumber: "",
+                    customerName: job.customerName || "",
+                    customerAddress: job.address || "",
+                    billToAddress: job.billToAddress || "",
                     billToAddressEnabled: true,
-                    poNumber: '',
-                    project: job.title || '',
-                    rep: '',
-                    dueDate: '',
+                    poNumber: "",
+                    project: job.title || "",
+                    rep: "",
+                    dueDate: "",
                     paymentCredits: 0,
-                    balanceDue: '',
-                    lineItems: [{
-                      id: Math.random().toString(36).substring(2, 9),
-                      productId: null,
-                      qty: 1,
-                      item: '',
-                      description: '',
-                      rate: 0,
-                      estimatedPrice: 0,
-                      total: 0,
-                      searchQuery: '',
-                      showSearchResults: false,
-                      supplierId: 1,
-                      isCustomProduct: false,
-                      estimate_product_id: null
-                    }],
-                    notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
-                    signatureText: 'ACCEPTED BY________________DATE_____',
-                    invoiceType: 'Estimate',
-                    customInvoiceType: '',
+                    balanceDue: "",
+                    lineItems: [
+                      {
+                        id: Math.random().toString(36).substring(2, 9),
+                        productId: null,
+                        headerName: "",
+                        type: "",
+                        qty: 1,
+                        item: "",
+                        description: "",
+                        rate: 0,
+                        estimatedPrice: 0,
+                        total: 0,
+                        searchQuery: "",
+                        showSearchResults: false,
+                        supplierId: 1,
+                        isCustomProduct: false,
+                        estimate_product_id: null,
+                      },
+                    ],
+                    notes:
+                      "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
+                    signatureText: "ACCEPTED BY________________DATE_____",
+                    invoiceType: "Estimate",
+                    customInvoiceType: "",
                     paymentPercentage: 0,
                     estimateTotal: 0,
-                    paymentHistory: [] as any[]
-                  })
+                    paymentHistory: [] as any[],
+                  });
                 }
               }}
               className="flex items-center gap-2"
@@ -7455,7 +8540,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
               className="bg-gray-800 hover:bg-gray-900 text-white flex items-center gap-2"
             >
               <Send className="h-4 w-4" />
-              {isLoading ? 'Sending...' : 'Send Invoice'}
+              {isLoading ? "Sending..." : "Send Invoice"}
             </Button>
           </div>
         </DialogContent>
@@ -7469,7 +8554,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
           setSelectedBlueSheetForReview(null);
         }}
         blueSheet={selectedBlueSheetForReview}
-        selectedBlueSheets={selectedBlueSheetForReview ? [selectedBlueSheetForReview] : []}
+        selectedBlueSheets={
+          selectedBlueSheetForReview ? [selectedBlueSheetForReview] : []
+        }
         onApprovalComplete={() => {
           setIsBlueSheetDialogOpen(false);
           setSelectedBlueSheetForReview(null);
@@ -7477,7 +8564,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
       />
 
       {/* Change Order Modal */}
-      <Dialog open={showChangeOrderModal} onOpenChange={setShowChangeOrderModal}>
+      <Dialog
+        open={showChangeOrderModal}
+        onOpenChange={setShowChangeOrderModal}
+      >
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Change Order</DialogTitle>
@@ -7488,7 +8578,9 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
             <div className="space-y-2">
               <Label className="text-sm text-gray-500">Job ID</Label>
               <div className="bg-gray-50 p-2 rounded-md border border-gray-200">
-                <p className="text-sm font-medium">{changeOrderJob?.id || 'N/A'}</p>
+                <p className="text-sm font-medium">
+                  {changeOrderJob?.id || "N/A"}
+                </p>
               </div>
             </div>
 
@@ -7503,24 +8595,31 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                 onChange={(e) => {
                   setChangeOrderTitle(e.target.value);
                   if (changeOrderErrors.title) {
-                    setChangeOrderErrors({ ...changeOrderErrors, title: '' });
+                    setChangeOrderErrors({ ...changeOrderErrors, title: "" });
                   }
                 }}
                 placeholder="Enter new job title"
-                className={changeOrderErrors.title ? 'border-red-500' : ''}
+                className={changeOrderErrors.title ? "border-red-500" : ""}
                 autoFocus
               />
               {changeOrderErrors.title && (
-                <p className="text-red-500 text-xs mt-1">{changeOrderErrors.title}</p>
+                <p className="text-red-500 text-xs mt-1">
+                  {changeOrderErrors.title}
+                </p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="changeOrderEstimate" className="text-sm font-medium">
+              <Label
+                htmlFor="changeOrderEstimate"
+                className="text-sm font-medium"
+              >
                 Estimate Amount ($) <span className="text-red-500">*</span>
               </Label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                  $
+                </span>
                 <Input
                   id="changeOrderEstimate"
                   type="number"
@@ -7530,15 +8629,20 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                   onChange={(e) => {
                     setChangeOrderEstimate(e.target.value);
                     if (changeOrderErrors.estimate) {
-                      setChangeOrderErrors({ ...changeOrderErrors, estimate: '' });
+                      setChangeOrderErrors({
+                        ...changeOrderErrors,
+                        estimate: "",
+                      });
                     }
                   }}
                   placeholder="0.00"
-                  className={`pl-7 ${changeOrderErrors.estimate ? 'border-red-500' : ''}`}
+                  className={`pl-7 ${changeOrderErrors.estimate ? "border-red-500" : ""}`}
                 />
               </div>
               {changeOrderErrors.estimate && (
-                <p className="text-red-500 text-xs mt-1">{changeOrderErrors.estimate}</p>
+                <p className="text-red-500 text-xs mt-1">
+                  {changeOrderErrors.estimate}
+                </p>
               )}
             </div>
           </div>
@@ -7549,7 +8653,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
               onClick={() => {
                 setShowChangeOrderModal(false);
                 setChangeOrderJob(null);
-                setChangeOrderTitle('');
+                setChangeOrderTitle("");
                 setChangeOrderErrors({});
               }}
               disabled={isUpdatingChangeOrder}
@@ -7567,7 +8671,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
                   Submitting...
                 </>
               ) : (
-                'Submit Change Order'
+                "Submit Change Order"
               )}
             </Button>
           </DialogFooter>
@@ -7575,7 +8679,7 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
       </Dialog>
       <ActivityLogs jobId={jobId} />
     </div>
-  )
+  );
 }
 
 export default JobDetailsPage
