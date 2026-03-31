@@ -224,7 +224,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
           throw new Error('User data not found. Please login again.')
         }
 
-        // Extract staff ID from user data - try multiple possible locations
+        // Extract staff ID from user data - try multiple  possible locations
         const staffId = 
           userData.user.staff_id || 
           (userData.user.staff && Array.isArray(userData.user.staff) && userData.user.staff.length > 0 ? userData.user.staff[0].id : null) ||
