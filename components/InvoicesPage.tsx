@@ -906,7 +906,8 @@ export function InvoicesPage() {
         </div>
         {hasPermission('invoices', 'create') && (
           <Button
-            onClick={() => setShowNewInvoiceDialog(true)}
+            // onClick={() => setShowNewInvoiceDialog(true)}
+            onClick={() => router.push("/invoices/create")}
             className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
             <Plus className="w-4 h-4 mr-2" />

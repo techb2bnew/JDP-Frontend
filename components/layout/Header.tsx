@@ -65,7 +65,6 @@ export function Header({
   onLogout,
   onNotificationViewAll,
   onProfileClick,
-  onCreateEstimateClick,
 }: HeaderProps) {
   const [showNotifications, setShowNotifications] = useState(false);
   const { theme, toggleTheme, isLoading } = useTheme();

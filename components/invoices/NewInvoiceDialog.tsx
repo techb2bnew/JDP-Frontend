@@ -58,6 +58,7 @@ interface NewInvoiceDialogProps {
   onInvoiceSaved?: (invoice: any) => void;
   isViewMode?: boolean;
   viewInvoiceData?: any;
+  renderInline?: boolean;
 }
 
 export interface CreateEstimatePayload {
@@ -126,7 +127,6 @@ interface ProductFormData {
   supplierId: number | null;
   supplierName?: string;
   description?: string;
-  renderInline?: boolean;
 }
 
 export const NewInvoiceDialog = ({

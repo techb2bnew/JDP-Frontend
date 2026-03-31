@@ -6863,6 +6863,7 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
 
       {/* Add Invoice Modal */}
       <NewInvoiceDialog
+        renderInline={true}
         open={showNewInvoiceDialog}
         onOpenChange={setShowNewInvoiceDialog}
         onSave={handleSaveInvoice}

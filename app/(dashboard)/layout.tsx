@@ -187,7 +187,6 @@ export default function DashboardLayout({
           onLogout={handleLogout}
           onNotificationViewAll={handleNotificationViewAll}
           onProfileClick={handleProfileClick}
-          onCreateEstimateClick={() => setShowEstimatePage(true)}
         />
         <main className="flex-1">
           {showEstimatePage ? (
