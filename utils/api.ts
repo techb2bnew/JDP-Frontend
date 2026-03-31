@@ -1328,7 +1328,7 @@ export const apiClient = {
   },
 
   // Global search across customers & jobs
-  globalSearch: async (query: string, page = 1, limit = 10) => {
+  globalSearch: async (query:  string, page = 1, limit = 10) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
     const token = getAuthToken();
 
