@@ -429,7 +429,7 @@ export const CustomInvoiceDialog = ({
                         type: "item",
                         headerKey: null,
                         headerName: "",
-                        parentHeaderKey: product.parent_header_key || null,
+                        // parentHeaderKey: product.parent_header_key || null,
                         parentHeaderName: product.parent_header_name || null,
                         productId: product.product_id ?? product.id ?? null,
                         qty,
@@ -870,7 +870,7 @@ console.log(totalAmount,"amounttt");
             // group/header support
             section_name: sectionName,
             section_type: sectionName ? "room_header" : null,
-            parent_header_key: item.parentHeaderKey || null,
+            // parent_header_key: item.parentHeaderKey || null,
             parent_header_name: item.parentHeaderName || null,
 
             material_used: item.material_used,
@@ -915,7 +915,7 @@ console.log(totalAmount,"amounttt");
             // group/header support
             section_name: sectionName,
             section_type: sectionName ? "room_header" : null,
-            parent_header_key: m.parent_header_key || null,
+            // parent_header_key: m.parent_header_key || null,
             parent_header_name: m.parent_header_name || null,
           };
 

@@ -158,6 +158,8 @@ export const NewInvoiceDialog = ({
   >([]);
   const [products, setProducts] = useState<ProductFormData[]>([]);
 
+  console.log(jobs, "jobsjobs");
+
   const [customers, setCustomers] = useState<any[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const dispatch = useDispatch();
@@ -177,6 +179,8 @@ export const NewInvoiceDialog = ({
     taxRate: 0.08,
     priority: "medium",
   });
+
+  console.log(products, "products", isViewMode, "isViewMode");
 
   const [suppliersList, setSuppliersList] = useState<any[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState<number>(1);
@@ -337,7 +341,7 @@ export const NewInvoiceDialog = ({
                 type: "item",
                 headerKey: null,
                 headerName: "",
-                parentHeaderKey: product.parent_header_key || null,
+                // parentHeaderKey: product.parent_header_key || null,
                 parentHeaderName: product.parent_header_name || null,
                 productId: product.id,
                 qty: product.stock_quantity || 1,
@@ -404,24 +408,48 @@ export const NewInvoiceDialog = ({
     })),
     "dialog-line-items",
   );
+console.log(inlineInvoiceData,"inlineInvoiceData.lineItems");
 
-  const itemsTotal =
-    newInvoice.items?.reduce((sum, i) => sum + i.total_cost, 0) || 0;
-  const laborTotal =
-    newInvoice.labor?.reduce((sum, l) => sum + l.total_cost, 0) || 0;
-  const additionalTotal =
-    newInvoice.additionalCosts?.reduce((sum, c) => sum + c.amount, 0) || 0;
+const itemsTotal =
+  (inlineInvoiceData.lineItems || [])
+    .filter((item: any) => item.type !== "header")
+    .reduce((sum: number, item: any) => {
+      return sum + Number(item.total || 0);
+    }, 0);
 
-  const subtotal = itemsTotal + laborTotal + additionalTotal;
-  const taxAmount = subtotal * (newInvoice.taxRate || 0);
-  const totalAmount = subtotal + taxAmount;
+const laborTotal =
+  newInvoice.labor?.reduce((sum, l) => sum + l.total_cost, 0) || 0;
+
+const additionalTotal =
+  newInvoice.additionalCosts?.reduce((sum, c) => sum + c.amount, 0) || 0;
+
+const calculateInvoiceSubtotal = () => {
+  return (
+    (inlineInvoiceData.lineItems || [])
+      .filter((item: any) => item.type !== "header")
+      .reduce((sum: number, item: any) => {
+        return sum + Number(item.total || 0);
+      }, 0) +
+    laborTotal +
+    additionalTotal
+  );
+};
+
+const subtotal = calculateInvoiceSubtotal();
+
+const taxRate = Number(
+  inlineInvoiceData.taxRate ?? newInvoice.taxRate ?? 0
+);
+
+const taxAmount = Number((subtotal * taxRate).toFixed(2));
+const totalAmount = Number((subtotal + taxAmount).toFixed(2));
 
   // Invoice Helper Functions
-  const calculateInvoiceSubtotal = () => {
-    return inlineInvoiceData.lineItems
-      .filter((item: any) => item.type !== "header")
-      .reduce((sum, item) => sum + (Number(item.total) || 0), 0);
-  };
+  // const calculateInvoiceSubtotal = () => {
+  //   return inlineInvoiceData.lineItems
+  //     .filter((item: any) => item.type !== "header")
+  //     .reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+  // };
 
   // Send invoice to customer function
   const sendInvoiceToCustomer = async (invoiceId: number) => {
@@ -857,12 +885,13 @@ export const NewInvoiceDialog = ({
     const invoiceItemRows = inlineInvoiceData.lineItems.filter(
       (item: any) => item.type !== "header",
     );
-    console.log(inlineInvoiceData.lineItems,"inlineInvoiceData.lineItems");
-    
+    console.log(inlineInvoiceData.lineItems, "inlineInvoiceData.lineItems");
 
     if (invoiceItemRows.length === 0) {
       errors.lineItems = "Please add at least one product item";
     }
+    console.log(errors,"errors");
+    
 
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
@@ -895,7 +924,7 @@ export const NewInvoiceDialog = ({
           total_cost: item.total,
           is_custom: item.isCustomProduct === true,
           section_name: item.parentHeaderName || null,
-          parent_header_key: item.parentHeaderKey || null,
+          // parent_header_key: item.parentHeaderKey || null,
           parent_header_name: item.parentHeaderName || null,
         } as any;
 
@@ -1052,15 +1081,18 @@ export const NewInvoiceDialog = ({
       errors.jobId = "Please select a job first";
     }
 
-    console.log( inlineInvoiceData.lineItems.length === 0 ,
-      inlineInvoiceData.lineItems[0],"inlineInvoiceData.lineItems");
-    
+    console.log(
+      inlineInvoiceData.lineItems.length === 0,
+      inlineInvoiceData.lineItems[0],
+      "inlineInvoiceData.lineItems",
+    );
+
     if (!inlineInvoiceData.project) {
       errors.project = "Project field is required";
     }
 
     if (
-      inlineInvoiceData.lineItems.length === 0 
+      inlineInvoiceData.lineItems.length === 0
       // !inlineInvoiceData.lineItems[0].item
     ) {
       errors.lineItems = "Please add at least one product item";
@@ -1097,7 +1129,7 @@ export const NewInvoiceDialog = ({
           total_cost: item.total,
           is_custom: item.isCustomProduct === true,
           section_name: item.parentHeaderName || null,
-          parent_header_key: item.parentHeaderKey || null,
+          // parent_header_key: item.parentHeaderKey || null,
           parent_header_name: item.parentHeaderName || null,
         } as any;
 
@@ -2022,24 +2054,178 @@ export const NewInvoiceDialog = ({
           {/* Line Items Table */}
           <div className="mb-6 overflow-x-auto mt-4">
             {/* Line Items Table */}
-            <InvoiceLineItemsManager
-              lineItems={inlineInvoiceData.lineItems}
-              setLineItems={(updater) =>
-                setInlineInvoiceData((prev) => ({
-                  ...prev,
-                  lineItems:
-                    typeof updater === "function"
-                      ? updater(prev.lineItems)
-                      : updater,
-                }))
-              }
-              selectedSupplierId={selectedSupplierId}
-              fetchProducts={fetchProducts}
-              getFilteredProducts={getFilteredProducts}
-              onSelectProductData={(rowId, product) => {
-                selectProduct(rowId, product);
-              }}
-            />
+            {isViewMode ? (
+              <div className="overflow-x-auto mt-4">
+                <table className="w-full border-collapse border border-gray-300">
+                  <thead>
+                    <tr className="bg-gray-700 text-white">
+                      <th className="border border-gray-300 px-3 py-3 text-left text-sm font-semibold w-[100px]">
+                        Qty
+                      </th>
+                      <th className="border border-gray-300 px-3 py-3 text-left text-sm font-semibold">
+                        Item
+                      </th>
+                      <th className="border border-gray-300 px-3 py-3 text-left text-sm font-semibold">
+                        Description
+                      </th>
+                      <th className="border border-gray-300 px-3 py-3 text-right text-sm font-semibold w-[140px]">
+                        Rate
+                      </th>
+                      <th className="border border-gray-300 px-3 py-3 text-right text-sm font-semibold w-[160px]">
+                        Estimated Price
+                      </th>
+                      <th className="border border-gray-300 px-3 py-3 text-right text-sm font-semibold w-[140px]">
+                        Total
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const lineItems = inlineInvoiceData.lineItems || [];
+
+                      const getHeaderName = (item: any) =>
+                        item.parent_header_name ||
+                        item.parentHeaderName ||
+                        null;
+
+                      const normalizedItems = lineItems
+                        .filter((item: any) => item.type !== "header")
+                        .map((item: any) => ({
+                          ...item,
+                          qty: item.qty ?? item.stock_quantity ?? 0,
+                          item: item.item ?? item.product_name ?? "-",
+                          rate: item.rate ?? item.unit_cost ?? 0,
+                          estimatedPrice:
+                            item.estimatedPrice ?? item.estimated_price ?? 0,
+                          total: item.total ?? item.total_cost ?? 0,
+                          parent_header_name: getHeaderName(item),
+                        }));
+
+                      const directItems = normalizedItems.filter(
+                        (item: any) => !item.parent_header_name,
+                      );
+
+                      const groupedMap = normalizedItems.reduce(
+                        (acc: Record<string, any[]>, item: any) => {
+                          const headerName = item.parent_header_name;
+                          if (!headerName) return acc;
+
+                          if (!acc[headerName]) {
+                            acc[headerName] = [];
+                          }
+
+                          acc[headerName].push(item);
+                          return acc;
+                        },
+                        {},
+                      );
+
+                      const orderedRows: any[] = [
+                        ...directItems,
+                        ...Object.entries(groupedMap).flatMap(
+                          ([headerName, items]) => [
+                            {
+                              id: `header-${headerName}`,
+                              type: "synthetic-header",
+                              headerName,
+                            },
+                            ...items,
+                          ],
+                        ),
+                      ];
+
+                      return orderedRows.map((lineItem: any, index: number) => {
+                        if (lineItem.type === "synthetic-header") {
+                          return (
+                            <tr key={lineItem.id} className="bg-transparent">
+                              <td
+                                colSpan={6}
+                                className="px-3 py-3 border border-gray-300 bg-white"
+                              >
+                                <div className="flex items-center justify-between w-full rounded-2xl bg-slate-700 px-4 py-4 text-white shadow-sm">
+                                  <div className="flex items-center gap-3">
+                                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-green-400" />
+                                    <span className="text-base font-semibold">
+                                      {lineItem.headerName || "Custom Header"}
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return (
+                          <tr
+                            key={lineItem.id || index}
+                            className="bg-white transition-colors hover:bg-gray-50"
+                          >
+                            <td className="border border-gray-300 px-3 py-2 text-center align-middle">
+                              <span>{lineItem.qty || 0}</span>
+                            </td>
+
+                            <td className="border border-gray-300 px-3 py-2 align-middle">
+                              <span className="text-sm font-medium text-gray-900">
+                                {lineItem.item || "-"}
+                              </span>
+                            </td>
+
+                            <td className="border border-gray-300 px-3 py-2 align-top">
+                              <div className="max-h-[90px] overflow-y-auto pr-1 text-sm leading-6 text-gray-700">
+                                {lineItem.description || "-"}
+                              </div>
+                            </td>
+
+                            <td className="border border-gray-300 px-3 py-2 text-right align-middle">
+                              ${Number(lineItem.rate || 0).toFixed(2)}
+                            </td>
+
+                            <td className="border border-gray-300 px-3 py-2 text-right align-middle">
+                              ${Number(lineItem.estimatedPrice || 0).toFixed(2)}
+                            </td>
+
+                            <td className="border border-gray-300 px-3 py-2 text-right font-medium align-middle">
+                              ${(lineItem.total || 0).toFixed(2)}
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="border border-gray-300 px-3 py-2"
+                      />
+                      <td className="border border-gray-300 px-3 py-2 text-right font-bold">
+                        ${subtotal.toFixed(2)}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2" />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            ) : (
+              <InvoiceLineItemsManager
+                lineItems={inlineInvoiceData.lineItems}
+                setLineItems={(updater) =>
+                  setInlineInvoiceData((prev) => ({
+                    ...prev,
+                    lineItems:
+                      typeof updater === "function"
+                        ? updater(prev.lineItems)
+                        : updater,
+                  }))
+                }
+                selectedSupplierId={selectedSupplierId}
+                fetchProducts={fetchProducts}
+                getFilteredProducts={getFilteredProducts}
+                onSelectProductData={(rowId, product) => {
+                  selectProduct(rowId, product);
+                }}
+              />
+            )}
 
             <div className="flex justify-end mt-4">
               <div className="text-right min-w-[200px]">

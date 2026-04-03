@@ -1,12 +1,24 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { apiClient } from '../utils/api'
-import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { Checkbox } from './ui/checkbox'
-import { addInvoice } from '@/redux/slices/jobsSlice'
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
+import { apiClient } from "../utils/api";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "./ui/checkbox";
+import { addInvoice } from "@/redux/slices/jobsSlice";
 import {
   ArrowLeft,
   Edit,
@@ -33,9 +45,12 @@ import {
   Download,
   File,
   MoreVertical,
-  Briefcase
-} from 'lucide-react'
-import { BlueSheetApprovalDialog, type BlueSheetItem as DialogBlueSheetItem } from './invoices/BlueSheetApprovalDialog'
+  Briefcase,
+} from "lucide-react";
+import {
+  BlueSheetApprovalDialog,
+  type BlueSheetItem as DialogBlueSheetItem,
+} from "./invoices/BlueSheetApprovalDialog";
 import {
   Dialog,
   DialogContent,
@@ -61,167 +76,180 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { AutoScrollMultiSelect } from './ui/AutoScrollMultiSelect'
-import { useDispatch } from 'react-redux'
-import { addProduct, deleteProduct, deleteInvoice } from '@/redux/slices/jobsSlice'
-import { NewInvoiceDialog } from './invoices/NewInvoiceDialog'
-import { InvoiceTemplate } from './invoices/InvoiceTemplate'
-import html2canvas from 'html2canvas'
-import jsPDF from 'jspdf'
-import { Invoice, CreateEstimatePayload } from '@/types/invoice'
-import { LoadingSpinner } from './common/LoadingSpinner'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog'
-import { motion } from 'framer-motion'
-import { Logo } from './common/Logo'
-import Image from 'next/image'
-import TimeRangePicker from '@wojtekmaj/react-timerange-picker'
-import '@wojtekmaj/react-timerange-picker/dist/TimeRangePicker.css'
-import Autocomplete from 'react-google-autocomplete'
-import ActivityLogs from './ActivityLogs'
-import { CheckCircle } from 'lucide-react'
-import { invoicesData } from '@/data/invoiceData'
-import InvoiceLineItemsManager from './common/invoice-line-items/InvoiceLineItemsManager'
+import { AutoScrollMultiSelect } from "./ui/AutoScrollMultiSelect";
+import { useDispatch } from "react-redux";
+import {
+  addProduct,
+  deleteProduct,
+  deleteInvoice,
+} from "@/redux/slices/jobsSlice";
+import { NewInvoiceDialog } from "./invoices/NewInvoiceDialog";
+import { InvoiceTemplate } from "./invoices/InvoiceTemplate";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+import { Invoice, CreateEstimatePayload } from "@/types/invoice";
+import { LoadingSpinner } from "./common/LoadingSpinner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
+import { motion } from "framer-motion";
+import { Logo } from "./common/Logo";
+import Image from "next/image";
+import TimeRangePicker from "@wojtekmaj/react-timerange-picker";
+import "@wojtekmaj/react-timerange-picker/dist/TimeRangePicker.css";
+import Autocomplete from "react-google-autocomplete";
+import ActivityLogs from "./ActivityLogs";
+import { CheckCircle } from "lucide-react";
+import { invoicesData } from "@/data/invoiceData";
+import InvoiceLineItemsManager from "./common/invoice-line-items/InvoiceLineItemsManager";
 // Sample data structure - replace with your actual data
 const sampleJobData = {
-  "job": {
-    "id": "JOB-2025-001",
-    "title": "Electrical Panel Installation",
-    "type": "service-based",
-    "status": "in-progress",
-    "assignedLabor": [],
-    "contractor": "ABC Corporation",
-    "customer": "ABC Corporation",
-    "description": "Install new electrical panel and upgrade wiring system",
-    "createdDate": "2025-01-10",
-    "dueDate": "2025-01-30",
-    "estimatedHours": 40,
-    "actualHours": 32,
-    "estimatedCost": 5000,
-    "actualCost": 5330,
-    "location": "123 Business Ave, New York",
-    "priority": "high",
-    "billingStatus": "invoiced"
+  job: {
+    id: "JOB-2025-001",
+    title: "Electrical Panel Installation",
+    type: "service-based",
+    status: "in-progress",
+    assignedLabor: [],
+    contractor: "ABC Corporation",
+    customer: "ABC Corporation",
+    description: "Install new electrical panel and upgrade wiring system",
+    createdDate: "2025-01-10",
+    dueDate: "2025-01-30",
+    estimatedHours: 40,
+    actualHours: 32,
+    estimatedCost: 5000,
+    actualCost: 5330,
+    location: "123 Business Ave, New York",
+    priority: "high",
+    billingStatus: "invoiced",
   },
-  "materials": [
+  materials: [
     {
-      "id": "1",
-      "name": "Electrical Panel",
-      "quantity": 1,
-      "unit": "unit",
-      "unitCost": 450,
-      "totalCost": 450,
-      "supplier": "ElectroSupply Co"
+      id: "1",
+      name: "Electrical Panel",
+      quantity: 1,
+      unit: "unit",
+      unitCost: 450,
+      totalCost: 450,
+      supplier: "ElectroSupply Co",
     },
     {
-      "id": "2",
-      "name": "Copper Wire - 12 AWG",
-      "quantity": 500,
-      "unit": "feet",
-      "unitCost": 2.5,
-      "totalCost": 1250,
-      "supplier": "Wire World"
+      id: "2",
+      name: "Copper Wire - 12 AWG",
+      quantity: 500,
+      unit: "feet",
+      unitCost: 2.5,
+      totalCost: 1250,
+      supplier: "Wire World",
     },
     {
-      "id": "3",
-      "name": "Circuit Breakers - 20A",
-      "quantity": 6,
-      "unit": "unit",
-      "unitCost": 35,
-      "totalCost": 210,
-      "supplier": "ElectroSupply Co"
-    }
+      id: "3",
+      name: "Circuit Breakers - 20A",
+      quantity: 6,
+      unit: "unit",
+      unitCost: 35,
+      totalCost: 210,
+      supplier: "ElectroSupply Co",
+    },
   ],
-  "timeLogs": [
+  timeLogs: [
     {
-      "id": "1",
-      "laborName": "Mike Johnson",
-      "date": "2025-01-18",
-      "hoursWorked": 8,
-      "description": "Panel installation and wiring",
-      "billable": true
+      id: "1",
+      laborName: "Mike Johnson",
+      date: "2025-01-18",
+      hoursWorked: 8,
+      description: "Panel installation and wiring",
+      billable: true,
     },
     {
-      "id": "2",
-      "laborName": "David Wilson",
-      "date": "2025-01-20",
-      "hoursWorked": 6,
-      "description": "Assisted with panel installation",
-      "billable": true
+      id: "2",
+      laborName: "David Wilson",
+      date: "2025-01-20",
+      hoursWorked: 6,
+      description: "Assisted with panel installation",
+      billable: true,
     },
     {
-      "id": "3",
-      "laborName": "Mike Johnson",
-      "date": "2025-01-21",
-      "hoursWorked": 10,
-      "description": "Circuit breaker installation",
-      "billable": true
+      id: "3",
+      laborName: "Mike Johnson",
+      date: "2025-01-21",
+      hoursWorked: 10,
+      description: "Circuit breaker installation",
+      billable: true,
     },
     {
-      "id": "4",
-      "laborName": "Sarah Davis",
-      "date": "2025-01-22",
-      "hoursWorked": 6,
-      "description": "Final connections and cleanup",
-      "billable": false
-    }
+      id: "4",
+      laborName: "Sarah Davis",
+      date: "2025-01-22",
+      hoursWorked: 6,
+      description: "Final connections and cleanup",
+      billable: false,
+    },
   ],
-  "invoices": [
+  invoices: [
     {
-      "id": "INV-2025-001",
-      "type": "Estimate",
-      "description": "Initial project estimate with detailed breakdown",
-      "amount": 15000,
-      "status": "Sent",
-      "createdDate": "2025-01-14",
-      "dueDate": "2025-01-28"
+      id: "INV-2025-001",
+      type: "Estimate",
+      description: "Initial project estimate with detailed breakdown",
+      amount: 15000,
+      status: "Sent",
+      createdDate: "2025-01-14",
+      dueDate: "2025-01-28",
     },
     {
-      "id": "INV-2025-002",
-      "type": "Proposal Invoice",
-      "description": "Project proposal accepted by client",
-      "amount": 15000,
-      "status": "Paid",
-      "createdDate": "2025-01-16",
-      "dueDate": "2025-01-30"
+      id: "INV-2025-002",
+      type: "Proposal Invoice",
+      description: "Project proposal accepted by client",
+      amount: 15000,
+      status: "Paid",
+      createdDate: "2025-01-16",
+      dueDate: "2025-01-30",
     },
     {
-      "id": "INV-2025-003",
-      "type": "Progressive Invoice",
-      "description": "50% completion milestone payment",
-      "amount": 7500,
-      "status": "Paid",
-      "createdDate": "2025-01-30",
-      "dueDate": "2025-02-13"
+      id: "INV-2025-003",
+      type: "Progressive Invoice",
+      description: "50% completion milestone payment",
+      amount: 7500,
+      status: "Paid",
+      createdDate: "2025-01-30",
+      dueDate: "2025-02-13",
     },
     {
-      "id": "INV-2025-004",
-      "type": "Final Invoice",
-      "description": "Project completion final payment",
-      "amount": 7500,
-      "status": "Paid",
-      "createdDate": "2025-02-15",
-      "dueDate": "2025-03-01"
-    }
-  ]
-}
+      id: "INV-2025-004",
+      type: "Final Invoice",
+      description: "Project completion final payment",
+      amount: 7500,
+      status: "Paid",
+      createdDate: "2025-02-15",
+      dueDate: "2025-03-01",
+    },
+  ],
+};
 
 interface JobDetailsPageProps {
-  jobId: string
-  onBack: () => void
-  jobs: any[]
-  setJobs: (jobs: any[]) => void
-  onJobsRefresh?: () => void
+  jobId: string;
+  onBack: () => void;
+  jobs: any[];
+  setJobs: (jobs: any[]) => void;
+  onJobsRefresh?: () => void;
 }
 
 type JobDocumentItem = {
-  id: number
-  jobId: number
-  title: string
-  fileUrl: string | null
-  fileName: string
-  uploadedAt: string
-  updatedAt?: string
-}
+  id: number;
+  jobId: number;
+  title: string;
+  fileUrl: string | null;
+  fileName: string;
+  uploadedAt: string;
+  updatedAt?: string;
+};
 
 // Add these interfaces at the top of your file or in a types file
 interface Product {
@@ -290,55 +318,117 @@ interface CompleteBluesheetPayload {
   material_entries: MaterialEntry[];
 }
 
-export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: JobDetailsPageProps) {
-
-
-
+export function JobDetailsPage({
+  jobId,
+  onBack,
+  jobs,
+  setJobs,
+  onJobsRefresh,
+}: JobDetailsPageProps) {
   // Find the job from your jobs array or use sample data
-  const job = jobs.find(j => j.id === jobId) || sampleJobData.job
+  const job = jobs.find((j) => j.id === jobId) || sampleJobData.job;
 
-  console.log('Job data:', job)
-  console.log('Labor timesheets:', job.labor_timesheets)
-  console.log('Bluesheets data:', job.bluesheets)
+  console.log("Job data:", job);
+  console.log("Labor timesheets:", job.labor_timesheets);
+  console.log("Bluesheets data:", job.bluesheets);
 
   // Use real job data for materials, timeLogs, and invoices
   // const materials = job.assignedMaterialsDetails || sampleJobData.materials
   // console.log(materials,"testmateris")
-  const [materials, setMaterials] = useState<any[]>(job.assignedMaterialsDetails || sampleJobData.materials || []);
+  const [materials, setMaterials] = useState<any[]>(
+    job.assignedMaterialsDetails || sampleJobData.materials || [],
+  );
   const [bluesheets, setBluesheets] = useState<any[]>(job.bluesheets || []);
   const [isLoadingBluesheets, setIsLoadingBluesheets] = useState(false);
-  const [selectedBlueSheetForReview, setSelectedBlueSheetForReview] = useState<DialogBlueSheetItem | null>(null);
+  const [selectedBlueSheetForReview, setSelectedBlueSheetForReview] =
+    useState<DialogBlueSheetItem | null>(null);
   const [isBlueSheetDialogOpen, setIsBlueSheetDialogOpen] = useState(false);
-  const [selectedBluesheetIds, setSelectedBluesheetIds] = useState<number[]>([]);
+  const [selectedBluesheetIds, setSelectedBluesheetIds] = useState<number[]>(
+    [],
+  );
 
   const [showChangeOrderModal, setShowChangeOrderModal] = useState(false);
   const [changeOrderJob, setChangeOrderJob] = useState<any>(null);
-  const [changeOrderTitle, setChangeOrderTitle] = useState('');
+  const [changeOrderTitle, setChangeOrderTitle] = useState("");
   const [isUpdatingChangeOrder, setIsUpdatingChangeOrder] = useState(false);
-  const [changeOrderErrors, setChangeOrderErrors] = useState<Record<string, string>>({});
-  const [changeOrderEstimate, setChangeOrderEstimate] = useState<number | string>('');
-  
-  const timeLogs = Array.isArray(job.labor_timesheets) ? job.labor_timesheets : (Array.isArray(sampleJobData.timeLogs) ? sampleJobData.timeLogs : []) // Ensure timeLogs is always an array
-  const invoices = sampleJobData.invoices // Keep sample data for now as we don't have invoices API
-  console.log(materials, "testmaterials")
+  const [changeOrderErrors, setChangeOrderErrors] = useState<
+    Record<string, string>
+  >({});
+  const [changeOrderEstimate, setChangeOrderEstimate] = useState<
+    number | string
+  >("");
+
+  const timeLogs = Array.isArray(job.labor_timesheets)
+    ? job.labor_timesheets
+    : Array.isArray(sampleJobData.timeLogs)
+      ? sampleJobData.timeLogs
+      : []; // Ensure timeLogs is always an array
+  const invoices = sampleJobData.invoices; // Keep sample data for now as we don't have invoices API
+  console.log(materials, "testmaterials");
   // Calculate totals using real job data
   const totalMaterialCost = materials.reduce(
     (sum: number, material: any) =>
       sum +
-      ((Number(material.stock_quantity ?? material.quantity ?? 0) || 0) *
-        (Number(material.unit_cost ?? material.unitCost ?? material.price ?? 0) || 0)),
-    0
+      (Number(material.stock_quantity ?? material.quantity ?? 0) || 0) *
+        (Number(
+          material.unit_cost ?? material.unitCost ?? material.price ?? 0,
+        ) || 0),
+    0,
   );
 
-  const totalLaborCost =
-    [...(job.assignedLaborDetails || []), ...(job.customLabor || [])].reduce(
-      (sum: number, labor: any) => {
-        const rate = Number(labor.hourly_rate ?? 0);
-        const hours = Number(labor.hours_worked ?? 0);
-        return sum + rate * hours;
-      },
-      0
-    );
+  const totalLaborCost = [
+    ...(job.assignedLaborDetails || []),
+    ...(job.customLabor || []),
+  ].reduce((sum: number, labor: any) => {
+    const rate = Number(labor.hourly_rate ?? 0);
+    const hours = Number(labor.hours_worked ?? 0);
+    return sum + rate * hours;
+  }, 0);
+
+    const sanitizeCustomProductsForPayload = (products: any[] = [], jobId: number) => {
+      return products
+        .filter((item: any) => {
+          const productName = String(item.product_name || item.item || "").trim();
+
+          // header / empty rows payload me nahi jani chahiye
+          if (!productName) return false;
+
+          return true;
+        })
+        .map((item: any) => {
+          const productPayload: any = {
+            product_name: String(item.product_name || item.item || "").trim(),
+            description: item.description || "",
+            jdp_sku:
+              item.jdp_sku ||
+              `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            stock_quantity: Number(item.stock_quantity || item.qty || 1),
+            unit: item.unit || "unit",
+            job_id: Number(jobId),
+            unit_cost: Number(item.unit_cost || item.rate || 0),
+            jdp_price: Number(item.jdp_price || item.rate || 0),
+            estimated_price: Number(item.estimated_price || item.estimatedPrice || 0),
+            total_cost: Number(item.total_cost || item.total || 0),
+            is_custom: item.is_custom === true || item.isCustomProduct === true,
+            section_name: null,
+            section_type: null,
+            parent_header_name:
+              item.parent_header_name || item.parentHeaderName || null,
+          };
+
+          // searched/selected products ke liye id bhejo
+          if (item.isCustomProduct !== true && item.productId) {
+            productPayload.id = item.productId;
+          }
+
+          // existing backend product id ho to usko bhi preserve karo
+          if (!productPayload.id && item.id && !item.type) {
+            productPayload.id = item.id;
+          }
+
+          return productPayload;
+        });
+    };
 
   // Refresh bluesheets for this job from API whenever jobId changes
   useEffect(() => {
@@ -349,30 +439,35 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
         const numericJobId = Number(jobId);
         const response = await apiClient.getJobBluesheets(numericJobId);
         const responseData = response.data || response;
-        const blues = responseData?.bluesheets || responseData?.data || responseData || [];
+        const blues =
+          responseData?.bluesheets || responseData?.data || responseData || [];
         const totalLaborCost = responseData?.total_labor_cost;
 
-        const normalized = (Array.isArray(blues) ? blues : []).map((sheet: any) => ({
-          ...sheet,
-          id: sheet.id ?? sheet.latest_bluesheet_id,
-          date: sheet.date ?? sheet.latest_bluesheet_date ?? '',
-          status: sheet.status ?? (sheet.approved_by ? 'approved' : 'pending'),
-          notes: sheet.notes ?? '',
-          additional_charges: sheet.additional_charges ?? 0,
-          created_by: sheet.created_by ?? sheet.submitted_by?.id ?? 0,
-          created_by_user: sheet.created_by_user ?? sheet.submitted_by ?? { id: 0, email: '', full_name: 'N/A' },
-          labor_entries: sheet.labor_entries ?? [],
-          material_entries: sheet.material_entries ?? [],
-          materials_invoiced: sheet.materials_invoiced,
-          total_labor_hours: sheet.total_labor_hours ?? null,
-          total_labor_cost: sheet.total_labor_cost ?? totalLaborCost ?? 0,
-          created_at: sheet.created_at ?? '',
-          updated_at: sheet.updated_at ?? '',
-        }));
+        const normalized = (Array.isArray(blues) ? blues : []).map(
+          (sheet: any) => ({
+            ...sheet,
+            id: sheet.id ?? sheet.latest_bluesheet_id,
+            date: sheet.date ?? sheet.latest_bluesheet_date ?? "",
+            status:
+              sheet.status ?? (sheet.approved_by ? "approved" : "pending"),
+            notes: sheet.notes ?? "",
+            additional_charges: sheet.additional_charges ?? 0,
+            created_by: sheet.created_by ?? sheet.submitted_by?.id ?? 0,
+            created_by_user: sheet.created_by_user ??
+              sheet.submitted_by ?? { id: 0, email: "", full_name: "N/A" },
+            labor_entries: sheet.labor_entries ?? [],
+            material_entries: sheet.material_entries ?? [],
+            materials_invoiced: sheet.materials_invoiced,
+            total_labor_hours: sheet.total_labor_hours ?? null,
+            total_labor_cost: sheet.total_labor_cost ?? totalLaborCost ?? 0,
+            created_at: sheet.created_at ?? "",
+            updated_at: sheet.updated_at ?? "",
+          }),
+        );
 
         setBluesheets(normalized);
       } catch (error) {
-        console.error('Error fetching job bluesheets:', error);
+        console.error("Error fetching job bluesheets:", error);
         setBluesheets(job.bluesheets || []);
       } finally {
         setIsLoadingBluesheets(false);
@@ -382,13 +477,21 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
     fetchJobBluesheets();
   }, [jobId, job.bluesheets]);
 
-  job.estimatedCost || 0
-  const totalHours = timeLogs.reduce((sum: number, log: any) => sum + log.hoursWorked, 0)
-  const totalMaterialItems = materials.reduce((sum: number, material: any) => sum + (material.stock_quantity || material.quantity || 0), 0)
-  const totalLaborEntries = job.assignedLaborDetails ? job.assignedLaborDetails.length : timeLogs.length;
+  job.estimatedCost || 0;
+  const totalHours = timeLogs.reduce(
+    (sum: number, log: any) => sum + log.hoursWorked,
+    0,
+  );
+  const totalMaterialItems = materials.reduce(
+    (sum: number, material: any) =>
+      sum + (material.stock_quantity || material.quantity || 0),
+    0,
+  );
+  const totalLaborEntries = job.assignedLaborDetails
+    ? job.assignedLaborDetails.length
+    : timeLogs.length;
   const totalInvoices = invoices.length;
   const [showEditJobModal, setShowEditJobModal] = useState(false);
-
 
   const [refreshMaterials, setRefreshMaterials] = useState(false);
   const [isLoadingMaterials, setIsLoadingMaterials] = useState(false);
@@ -399,13 +502,15 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
   const [isEditing, setIsEditing] = useState(false);
   const [showJobDetails, setShowJobDetails] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [suppliers, setSuppliers] = useState<{
-    id: number;
-    company_name: string;
-    users: {
-      full_name: string;
-    };
-  }[]>([]);
+  const [suppliers, setSuppliers] = useState<
+    {
+      id: number;
+      company_name: string;
+      users: {
+        full_name: string;
+      };
+    }[]
+  >([]);
   const dispatch = useDispatch();
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingDraft, setIsLoadingDraft] = useState(false);
@@ -421,42 +526,47 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
   const [jobDocuments, setJobDocuments] = useState<JobDocumentItem[]>([]);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
   const [deletingDocumentIds, setDeletingDocumentIds] = useState<number[]>([]);
-  const [downloadingDocumentIds, setDownloadingDocumentIds] = useState<number[]>([]);
+  const [downloadingDocumentIds, setDownloadingDocumentIds] = useState<
+    number[]
+  >([]);
   const [showUploadDocumentModal, setShowUploadDocumentModal] = useState(false);
 
-
-
-
   const [documentFormData, setDocumentFormData] = useState({
-    title: '',
-    file: null as File | null
+    title: "",
+    file: null as File | null,
   });
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
   const documentFileInputRef = useRef<HTMLInputElement>(null);
   const documentsApiClient = apiClient as typeof apiClient & {
     getJobDocuments: (jobId: number) => Promise<any>;
-    uploadJobDocument: (params: { jobId: number; title: string; file: File }) => Promise<any>;
+    uploadJobDocument: (params: {
+      jobId: number;
+      title: string;
+      file: File;
+    }) => Promise<any>;
     deleteJobDocument: (documentId: number) => Promise<any>;
   };
   const [showReinvoiceAlert, setShowReinvoiceAlert] = useState(false);
-  const [pendingReviewSheets, setPendingReviewSheets] = useState<any[] | null>(null);
+  const [pendingReviewSheets, setPendingReviewSheets] = useState<any[] | null>(
+    null,
+  );
 
   const extractDocumentFileName = (fileUrl: string | null): string => {
-    if (!fileUrl) return 'Document';
+    if (!fileUrl) return "Document";
     try {
       const decodedUrl = decodeURIComponent(fileUrl);
-      const segments = decodedUrl.split('/').filter(Boolean);
+      const segments = decodedUrl.split("/").filter(Boolean);
       const lastSegment = segments[segments.length - 1];
-      return lastSegment || 'Document';
+      return lastSegment || "Document";
     } catch (error) {
-      console.error('Failed to parse document file name:', error);
-      return 'Document';
+      console.error("Failed to parse document file name:", error);
+      return "Document";
     }
   };
 
   const formatDocumentTimestamp = (timestamp?: string): string => {
     if (!timestamp) {
-      return '—';
+      return "—";
     }
 
     const date = new Date(timestamp);
@@ -464,10 +574,10 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
       return timestamp;
     }
 
-    return date.toLocaleDateString('en-US', {
-      month: '2-digit',
-      day: '2-digit',
-      year: 'numeric'
+    return date.toLocaleDateString("en-US", {
+      month: "2-digit",
+      day: "2-digit",
+      year: "numeric",
     });
   };
 
@@ -490,20 +600,26 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
           ? response
           : [];
 
-      const formattedDocuments: JobDocumentItem[] = documents.map((doc: any) => ({
-        id: doc.id,
-        jobId: doc.job_id,
-        title: doc.document_title || 'Untitled Document',
-        fileUrl: doc.document_file || null,
-        fileName: extractDocumentFileName(doc.document_file || null),
-        uploadedAt: doc.created_at || '',
-        updatedAt: doc.updated_at,
-      }));
+      const formattedDocuments: JobDocumentItem[] = documents.map(
+        (doc: any) => ({
+          id: doc.id,
+          jobId: doc.job_id,
+          title: doc.document_title || "Untitled Document",
+          fileUrl: doc.document_file || null,
+          fileName: extractDocumentFileName(doc.document_file || null),
+          uploadedAt: doc.created_at || "",
+          updatedAt: doc.updated_at,
+        }),
+      );
 
       setJobDocuments(formattedDocuments);
     } catch (error) {
-      console.error('Failed to fetch job documents:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to fetch job documents');
+      console.error("Failed to fetch job documents:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to fetch job documents",
+      );
     } finally {
       setIsLoadingDocuments(false);
     }
@@ -515,13 +631,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
 
   const handleUploadDocument = useCallback(async () => {
     if (!documentFormData.title || !documentFormData.file) {
-      toast.error('Please fill in all fields');
+      toast.error("Please fill in all fields");
       return;
     }
 
     const numericJobId = Number(jobId);
     if (Number.isNaN(numericJobId)) {
-      toast.error('Invalid job ID. Unable to upload document.');
+      toast.error("Invalid job ID. Unable to upload document.");
       return;
     }
 
@@ -533,68 +649,92 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
         file: documentFormData.file,
       });
 
-      toast.success('Document uploaded successfully');
+      toast.success("Document uploaded successfully");
       setShowUploadDocumentModal(false);
-      setDocumentFormData({ title: '', file: null });
+      setDocumentFormData({ title: "", file: null });
       await fetchJobDocuments();
     } catch (error) {
-      console.error('Failed to upload document:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to upload document');
+      console.error("Failed to upload document:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to upload document",
+      );
     } finally {
       setIsUploadingDocument(false);
     }
-  }, [documentFormData.file, documentFormData.title, documentsApiClient, fetchJobDocuments, jobId]);
+  }, [
+    documentFormData.file,
+    documentFormData.title,
+    documentsApiClient,
+    fetchJobDocuments,
+    jobId,
+  ]);
 
-  const handleDeleteDocument = useCallback(async (documentId: number) => {
-    setDeletingDocumentIds(prev => (prev.includes(documentId) ? prev : [...prev, documentId]));
-    try {
-      await documentsApiClient.deleteJobDocument(documentId);
-      setJobDocuments(prev => prev.filter(doc => doc.id !== documentId));
-      toast.success('Document deleted successfully');
-    } catch (error) {
-      console.error('Failed to delete document:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to delete document');
-    } finally {
-      setDeletingDocumentIds(prev => prev.filter(id => id !== documentId));
-    }
-  }, [documentsApiClient]);
+  const handleDeleteDocument = useCallback(
+    async (documentId: number) => {
+      setDeletingDocumentIds((prev) =>
+        prev.includes(documentId) ? prev : [...prev, documentId],
+      );
+      try {
+        await documentsApiClient.deleteJobDocument(documentId);
+        setJobDocuments((prev) => prev.filter((doc) => doc.id !== documentId));
+        toast.success("Document deleted successfully");
+      } catch (error) {
+        console.error("Failed to delete document:", error);
+        toast.error(
+          error instanceof Error ? error.message : "Failed to delete document",
+        );
+      } finally {
+        setDeletingDocumentIds((prev) =>
+          prev.filter((id) => id !== documentId),
+        );
+      }
+    },
+    [documentsApiClient],
+  );
 
   const handleDownloadDocument = useCallback((doc: JobDocumentItem) => {
     if (!doc.fileUrl) {
-      toast.error('Document URL not available');
+      toast.error("Document URL not available");
       return;
     }
 
-    setDownloadingDocumentIds(prev => (prev.includes(doc.id) ? prev : [...prev, doc.id]));
+    setDownloadingDocumentIds((prev) =>
+      prev.includes(doc.id) ? prev : [...prev, doc.id],
+    );
     try {
-      const resolvedName = doc.fileName?.trim() || 'document';
+      const resolvedName = doc.fileName?.trim() || "document";
       const encodedUrl = encodeURIComponent(doc.fileUrl);
       const encodedName = encodeURIComponent(resolvedName);
       const proxyUrl = `/api/job-documents/download?fileUrl=${encodedUrl}&fileName=${encodedName}`;
       const hasExtension = /\.[A-Za-z0-9]{2,6}$/.test(resolvedName);
       const finalFileName = hasExtension ? resolvedName : `${resolvedName}.pdf`;
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = proxyUrl;
-      link.setAttribute('download', finalFileName);
-      link.rel = 'noopener noreferrer';
+      link.setAttribute("download", finalFileName);
+      link.rel = "noopener noreferrer";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } catch (error) {
-      console.error('Failed to download document:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to download document');
+      console.error("Failed to download document:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to download document",
+      );
     } finally {
-      setDownloadingDocumentIds(prev => prev.filter(id => id !== doc.id));
+      setDownloadingDocumentIds((prev) => prev.filter((id) => id !== doc.id));
     }
   }, []);
   const [dashboardMetrics, setDashboardMetrics] = useState<any>(null);
-  const [showNewInvoiceDialog, setShowNewInvoiceDialog] = useState(false)
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState<number | null>(null)
+  const [showNewInvoiceDialog, setShowNewInvoiceDialog] = useState(false);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<number | null>(
+    null,
+  );
   const printRef = useRef<HTMLDivElement>(null);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [showDeleteProductDialog, setShowDeleteProductDialog] = useState(false);
   const [productToDelete, setProductToDelete] = useState<any | null>(null);
-  const [showDeleteEstimateDialog, setShowDeleteEstimateDialog] = useState(false);
+  const [showDeleteEstimateDialog, setShowDeleteEstimateDialog] =
+    useState(false);
   const [estimateToDelete, setEstimateToDelete] = useState<any | null>(null);
   const [printInvoiceId, setPrintInvoiceId] = useState<number | null>(null);
   const [showPrintMount, setShowPrintMount] = useState(false);
@@ -607,9 +747,6 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
     laborCost: number;
     actualProjectCost: number;
   } | null>(null);
-
-  const createRowKey = () =>
-    `row_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
   const getLastHeaderMeta = (lineItems: any[] = []) => {
     for (let i = lineItems.length - 1; i >= 0; i--) {
@@ -626,10 +763,13 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
       parentHeaderKey: null,
       parentHeaderName: null,
     };
-};
+  };
 
   // Function to parse labor IDs and fetch labor data
-  const parseLaborIds = async (laborIdsString: string, isLeadLabor: boolean = false) => {
+  const parseLaborIds = async (
+    laborIdsString: string,
+    isLeadLabor: boolean = false,
+  ) => {
     if (!laborIdsString) return [];
 
     try {
@@ -642,57 +782,67 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
           if (isLeadLabor) {
             // For lead labor, we'll fetch all and filter by ID since getLeadLaborById doesn't exist
             const response = await apiClient.getLeadLabor(1, 100); // Get a large number to find the specific ID
-            const leadLabor = response.data.find((item: any) => item.id.toString() === id.toString());
+            const leadLabor = response.data.find(
+              (item: any) => item.id.toString() === id.toString(),
+            );
             if (leadLabor) {
               laborData.push({
                 id: leadLabor.id,
                 name: leadLabor.name || leadLabor.users?.full_name,
-                user: { full_name: leadLabor.name || leadLabor.users?.full_name }
+                user: {
+                  full_name: leadLabor.name || leadLabor.users?.full_name,
+                },
               });
             }
           } else {
-            console.log('Fetching labor by ID:', id);
+            console.log("Fetching labor by ID:", id);
             const response = await apiClient.getLaborById(id.toString());
-            console.log('Labor API response:', response);
+            console.log("Labor API response:", response);
             if (response) {
               laborData.push({
                 id: response.id,
-                name: response.users?.full_name || response.name || response.labor_code,
+                name:
+                  response.users?.full_name ||
+                  response.name ||
+                  response.labor_code,
                 user: response.users,
-                labor_code: response.labor_code
+                labor_code: response.labor_code,
               });
             }
           }
         } catch (error) {
-          console.error(`Error fetching ${isLeadLabor ? 'lead labor' : 'labor'} with ID ${id}:`, error);
+          console.error(
+            `Error fetching ${isLeadLabor ? "lead labor" : "labor"} with ID ${id}:`,
+            error,
+          );
         }
       }
-      console.log('Final labor data:', laborData);
+      console.log("Final labor data:", laborData);
       return laborData;
     } catch (error) {
-      console.error('Error parsing labor IDs:', error);
+      console.error("Error parsing labor IDs:", error);
       return [];
     }
   };
 
   // Normalize status helper function
   const normalizeStatus = (status: string | undefined): string => {
-    if (!status) return 'draft';
+    if (!status) return "draft";
     // Convert hyphen to underscore for consistency
-    if (status === 'in-progress') return 'in_progress';
+    if (status === "in-progress") return "in_progress";
     return status;
   };
 
   const [editedJob, setEditedJob] = useState({
     title: job.title,
     type: job.type,
-    location: job.location || `${job.address || ''}, ${job.cityZip || ''}`,
-    address: job.address || '',
-    cityZip: job.cityZip || '',
+    location: job.location || `${job.address || ""}, ${job.cityZip || ""}`,
+    address: job.address || "",
+    cityZip: job.cityZip || "",
     description: job.description,
     contractor: job.contractor || job.customer,
-    startDate: '01/15/2025',
-    priority: 'High',
+    startDate: "01/15/2025",
+    priority: "High",
     status: normalizeStatus(job.status),
     assignedLabor: job.assignedLaborDetails || [],
     assignedLeadLabor: job.assignedLeadLaborDetails || [],
@@ -704,25 +854,28 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
       try {
         // Parse and load lead labor data
         if (job.assigned_lead_labor_ids) {
-          const leadLaborData = await parseLaborIds(job.assigned_lead_labor_ids, true);
-          setEditedJob(prev => ({
+          const leadLaborData = await parseLaborIds(
+            job.assigned_lead_labor_ids,
+            true,
+          );
+          setEditedJob((prev) => ({
             ...prev,
-            assignedLeadLabor: leadLaborData
+            assignedLeadLabor: leadLaborData,
           }));
         }
 
         // Parse and load regular labor data
         if (job.assigned_labor_ids) {
-          console.log('Loading regular labor data:', job.assigned_labor_ids);
+          console.log("Loading regular labor data:", job.assigned_labor_ids);
           const laborData = await parseLaborIds(job.assigned_labor_ids, false);
-          console.log('Parsed labor data:', laborData);
-          setEditedJob(prev => ({
+          console.log("Parsed labor data:", laborData);
+          setEditedJob((prev) => ({
             ...prev,
-            assignedLabor: laborData
+            assignedLabor: laborData,
           }));
         }
       } catch (error) {
-        console.error('Error loading labor data:', error);
+        console.error("Error loading labor data:", error);
       }
     };
 
@@ -730,118 +883,180 @@ export function JobDetailsPage({ jobId, onBack, jobs, setJobs, onJobsRefresh }: 
   }, [job.assigned_lead_labor_ids, job.assigned_labor_ids]);
 
   // Form states
-  const [showAddInvoiceDialog, setShowAddInvoiceDialog] = useState(false)
-  const [showInlineInvoiceForm, setShowInlineInvoiceForm] = useState(false)
-  const [showAddMaterialDialog, setShowAddMaterialDialog] = useState(false)
-  const [showAddLaborDialog, setShowAddLaborDialog] = useState(false)
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null)
-  const [showInvoiceViewDialog, setShowInvoiceViewDialog] = useState(false)
-  const [showPreviewDialog, setShowPreviewDialog] = useState(false)
-  const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null)
-  const [selectedEstimateId, setSelectedEstimateId] = useState<string | null>(null)
-  const [products, setProducts] = useState<any[]>([])
-  const [suppliersList, setSuppliersList] = useState<any[]>([])
-  const [selectedSupplierId, setSelectedSupplierId] = useState<number>(1)
-  const [invoiceValidationErrors, setInvoiceValidationErrors] = useState<Record<string, string>>({})
-  const [customInvoiceTypes, setCustomInvoiceTypes] = useState<string[]>([])
-  const [customerData, setCustomerData] = useState<any>(null)
-  const [contractorData, setContractorData] = useState<any>(null)
-  const [InvoioiceNumber, setInvoioiceNumber] = useState('');
+  const [showAddInvoiceDialog, setShowAddInvoiceDialog] = useState(false);
+  const [showInlineInvoiceForm, setShowInlineInvoiceForm] = useState(false);
+  const [showAddMaterialDialog, setShowAddMaterialDialog] = useState(false);
+  const [showAddLaborDialog, setShowAddLaborDialog] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [showInvoiceViewDialog, setShowInvoiceViewDialog] = useState(false);
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+  const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
+  const [selectedEstimateId, setSelectedEstimateId] = useState<string | null>(
+    null,
+  );
+  const [products, setProducts] = useState<any[]>([]);
+  const [suppliersList, setSuppliersList] = useState<any[]>([]);
+  const [selectedSupplierId, setSelectedSupplierId] = useState<number>(1);
+  const [invoiceValidationErrors, setInvoiceValidationErrors] = useState<
+    Record<string, string>
+  >({});
+  const [customInvoiceTypes, setCustomInvoiceTypes] = useState<string[]>([]);
+  const [customerData, setCustomerData] = useState<any>(null);
+  const [contractorData, setContractorData] = useState<any>(null);
+  const [InvoioiceNumber, setInvoioiceNumber] = useState("");
   const [isMarkingPaidId, setIsMarkingPaidId] = useState<number | null>(null);
-  const [isPaidLoading,setIsPaidLoading] = useState(false);
+  const [isPaidLoading, setIsPaidLoading] = useState(false);
+  const [isApprovingId, setIsApprovingId] = useState<number | null>(null);
+  const handleApproveInvoice = async (invoice: any) => {
+    if (!invoice?.id) {
+      toast.error("Invoice ID not found");
+      return;
+    }
+
+    const invoiceStatus = String(invoice.status || "").toLowerCase();
+    if (invoiceStatus === "approved") {
+      return;
+    }
+
+    try {
+      setIsApprovingId(invoice.id);
+
+      const estimateResponse = await apiClient.getEstimateById(invoice.id);
+      const estimateData = estimateResponse?.data || estimateResponse;
+
+      const customProducts = sanitizeCustomProductsForPayload(
+        Array.isArray(estimateData?.products) ? estimateData.products : [],
+        Number(estimateData.job_id),
+      );
+
+      const payload = {
+        job_id: Number(estimateData.job_id),
+        estimate_title: estimateData.estimate_title || "",
+        ...(estimateData.contractor_id
+          ? { contractor_id: Number(estimateData.contractor_id) }
+          : { customer_id: Number(estimateData.customer_id) }),
+        priority: estimateData.priority || "medium",
+        service_type: estimateData.service_type || "service_based",
+        email_address: estimateData.email_address || "",
+        estimate_date: estimateData.estimate_date || "",
+        po_number: estimateData.po_number || "",
+        rep: estimateData.rep || "",
+        due_date: estimateData.due_date || "",
+        payment_credits: Number(estimateData.payment_credits || 0),
+        balance_due: estimateData.balance_due || "",
+        ...(estimateData.bill_to_address && {
+          bill_to_address: estimateData.bill_to_address,
+        }),
+        invoice_type: estimateData.invoice_type || "estimate",
+        notes: estimateData.notes || "",
+        custom_products: customProducts,
+        status: "approved",
+      };
+
+      await apiClient.updateEstimate(Number(invoice.id), payload as any);
+
+      setEstimates((prev) =>
+        prev.map((item: any) =>
+          Number(item.id) === Number(invoice.id)
+            ? { ...item, status: "approved" }
+            : item,
+        ),
+      );
+
+      toast.success("Invoice approved successfully");
+      await fetchEstimates();
+      onJobsRefresh?.();
+    } catch (error: any) {
+      const apiMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to approve invoice";
+      toast.error(apiMessage);
+    } finally {
+      setIsApprovingId(null);
+    }
+  };
 
   // Clean duplicate custom types (case-insensitive)
   const cleanCustomTypes = (types: string[]) => {
-    const seen = new Set<string>()
-    return types.filter(type => {
-      const lower = type.toLowerCase()
+    const seen = new Set<string>();
+    return types.filter((type) => {
+      const lower = type.toLowerCase();
       if (seen.has(lower)) {
-        return false
+        return false;
       }
-      seen.add(lower)
-      return true
-    })
-  }
+      seen.add(lower);
+      return true;
+    });
+  };
 
   // Debug: Log job data to see structure
-  console.log('Job data:', job)
+  console.log("Job data:", job);
 
   // Inline Invoice Data State
   const [inlineInvoiceData, setInlineInvoiceData] = useState({
-    date: new Date().toISOString().split('T')[0],
-    estimateNumber: '',
-    customerName: job.customerName || '',
-    customerAddress: '', // Initialize as empty, will be set by fetchCustomerData
-    billToAddress: job.billToAddress || '',
+    date: new Date().toISOString().split("T")[0],
+    estimateNumber: "",
+    customerName: job.customerName || "",
+    customerAddress: "", // Initialize as empty, will be set by fetchCustomerData
+    billToAddress: job.billToAddress || "",
     billToAddressEnabled: true,
-    poNumber: '',
-    project: job.title || '',
-    rep: '',
-    dueDate: '',
+    poNumber: "",
+    project: job.title || "",
+    rep: "",
+    dueDate: "",
     paymentCredits: 0,
-    balanceDue: '',
+    balanceDue: "",
     lineItems: [],
-    notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
-    signatureText: 'ACCEPTED BY________________DATE_____',
-    invoiceType: 'Estimate',
-    customInvoiceType: '',
+    notes: "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
+    signatureText: "ACCEPTED BY________________DATE_____",
+    invoiceType: "Estimate",
+    customInvoiceType: "",
     paymentPercentage: 0,
     estimateTotal: 0,
-    paymentHistory: [] as any[]
+    paymentHistory: [] as any[],
   });
 
-  console.log(inlineInvoiceData.lineItems,"::lineeitems");
-  
-const addCustomHeader = () => {
-  setInlineInvoiceData((prev) => ({
-    ...prev,
-    lineItems: [
-      ...prev.lineItems,
-      {
-        id: Math.random().toString(36).substring(2, 9),
-        type: "header",
-        headerName: "Custom Header",
-        headerKey: createRowKey(),
-        parentHeaderKey: null,
-        parentHeaderName: null,
-        isEditingHeader: false,
-        productId: null,
-        qty: 0,
-        item: "",
-        description: "",
-        rate: 0,
-        estimatedPrice: 0,
-        total: 0,
-        searchQuery: "",
-        showSearchResults: false,
-        supplierId: selectedSupplierId || 1,
-        isCustomProduct: true,
-        estimate_product_id: null,
-      },
-    ],
-  }));
-};
+  console.log(inlineInvoiceData.lineItems, "::lineeitems");
 
-  const allowedStatuses = ['draft', 'pending', 'active', 'in_progress', 'completed', 'cancelled', 'on_hold'];
+  const allowedStatuses = [
+    "draft",
+    "pending",
+    "active",
+    "in_progress",
+    "completed",
+    "cancelled",
+    "on_hold",
+  ];
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
       const status = allowedStatuses.includes(editedJob.status)
         ? editedJob.status
-        : 'draft';
+        : "draft";
       const updatePayload = {
         job_title: editedJob.title,
-        job_type: editedJob.type === 'service_based' ? 'service_based' : 'contract_based',
+        job_type:
+          editedJob.type === "service_based"
+            ? "service_based"
+            : "contract_based",
         // Only send customer_id for service-based jobs, contractor_id for contract-based jobs
-        ...(editedJob.type === 'contract_based'
-          ? { contractor_id: job.contractor ? Number(job.contractor) : undefined }
-          : { customer_id: job.customer ? Number(job.customer?.id || job.customer) : undefined }
-        ),
+        ...(editedJob.type === "contract_based"
+          ? {
+              contractor_id: job.contractor
+                ? Number(job.contractor)
+                : undefined,
+            }
+          : {
+              customer_id: job.customer
+                ? Number(job.customer?.id || job.customer)
+                : undefined,
+            }),
         description: editedJob.description,
         priority: editedJob.priority.toLowerCase(),
-        address: editedJob.address || job.address || '',
-        city_zip: editedJob.cityZip || job.cityZip || '',
+        address: editedJob.address || job.address || "",
+        city_zip: editedJob.cityZip || job.cityZip || "",
         phone: job.phone || undefined,
         email: job.email || undefined,
         bill_to_address: job.billToAddress || undefined,
@@ -849,21 +1064,28 @@ const addCustomHeader = () => {
         bill_to_phone: job.billToPhone || undefined,
         bill_to_email: job.billToEmail || undefined,
         same_as_address: job.sameAsAddress || false,
-        due_date: job.dueDate || '',
+        due_date: job.dueDate || "",
         estimated_hours: job.estimatedHours || undefined,
         estimated_cost: job.estimatedCost || undefined,
 
-        assigned_labor_ids: (editedJob.assignedLabor || []).length > 0
-          ? JSON.stringify(editedJob.assignedLabor.map((labor: any) => labor.id))
-          : undefined,
+        assigned_labor_ids:
+          (editedJob.assignedLabor || []).length > 0
+            ? JSON.stringify(
+                editedJob.assignedLabor.map((labor: any) => labor.id),
+              )
+            : undefined,
 
-        assigned_lead_labor_ids: (editedJob.assignedLeadLabor || []).length > 0
-          ? JSON.stringify(editedJob.assignedLeadLabor.map((labor: any) => labor.id))
-          : undefined,
+        assigned_lead_labor_ids:
+          (editedJob.assignedLeadLabor || []).length > 0
+            ? JSON.stringify(
+                editedJob.assignedLeadLabor.map((labor: any) => labor.id),
+              )
+            : undefined,
 
-        assigned_material_ids: job.materials && job.materials.length > 0
-          ? JSON.stringify(job.materials)
-          : undefined,
+        assigned_material_ids:
+          job.materials && job.materials.length > 0
+            ? JSON.stringify(job.materials)
+            : undefined,
         status,
 
         // status: ['pending', 'in-progress', 'completed'].includes(job.status)
@@ -875,7 +1097,6 @@ const addCustomHeader = () => {
         //   : 'unknown',
       };
 
-
       const response = await apiClient.updateJob(jobId, updatePayload);
 
       // Update the job data with the new labor assignments
@@ -883,48 +1104,56 @@ const addCustomHeader = () => {
         ...job,
         ...editedJob,
         assigned_labor_ids: updatePayload.assigned_labor_ids,
-        assigned_lead_labor_ids: updatePayload.assigned_lead_labor_ids
+        assigned_lead_labor_ids: updatePayload.assigned_lead_labor_ids,
       };
 
       const updatedJobs = jobs.map((j: any) =>
-        j.id === jobId ? updatedJob : j
+        j.id === jobId ? updatedJob : j,
       );
       setJobs(updatedJobs);
 
       setIsEditing(false);
       setIsSaving(false);
-      toast.success('Job updated successfully!');
+      toast.success("Job updated successfully!");
 
       // Refresh the labor data asynchronously after save completes (don't block UI)
       try {
         if (updatePayload.assigned_lead_labor_ids) {
-          const leadLaborData = await parseLaborIds(updatePayload.assigned_lead_labor_ids, true);
-          setEditedJob(prev => ({
+          const leadLaborData = await parseLaborIds(
+            updatePayload.assigned_lead_labor_ids,
+            true,
+          );
+          setEditedJob((prev) => ({
             ...prev,
-            assignedLeadLabor: leadLaborData
+            assignedLeadLabor: leadLaborData,
           }));
         }
 
         if (updatePayload.assigned_labor_ids) {
-          const laborData = await parseLaborIds(updatePayload.assigned_labor_ids, false);
-          setEditedJob(prev => ({
+          const laborData = await parseLaborIds(
+            updatePayload.assigned_labor_ids,
+            false,
+          );
+          setEditedJob((prev) => ({
             ...prev,
-            assignedLabor: laborData
+            assignedLabor: laborData,
           }));
         }
       } catch (error) {
-        console.error('Error refreshing labor data after save:', error);
+        console.error("Error refreshing labor data after save:", error);
       }
     } catch (error) {
-      console.error('Error updating job:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to update job');
+      console.error("Error updating job:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update job",
+      );
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleCompleteJob = async () => {
-    if (job.status === 'completed') {
+    if (job.status === "completed") {
       return;
     }
 
@@ -933,20 +1162,30 @@ const addCustomHeader = () => {
 
       const updatedJob = {
         ...job,
-        status: 'completed',
+        status: "completed",
       };
 
       await apiClient.updateJob(jobId, {
         job_title: updatedJob.title,
-        job_type: updatedJob.type === 'service_based' ? 'service_based' : 'contract_based',
-        ...(updatedJob.type === 'contract-based'
-          ? { contractor_id: job.contractor ? Number(job.contractor) : undefined }
-          : { customer_id: job.customer ? Number(job.customer?.id || job.customer) : undefined }
-        ),
+        job_type:
+          updatedJob.type === "service_based"
+            ? "service_based"
+            : "contract_based",
+        ...(updatedJob.type === "contract-based"
+          ? {
+              contractor_id: job.contractor
+                ? Number(job.contractor)
+                : undefined,
+            }
+          : {
+              customer_id: job.customer
+                ? Number(job.customer?.id || job.customer)
+                : undefined,
+            }),
         description: updatedJob.description,
         priority: updatedJob.priority.toLowerCase(),
-        address: updatedJob.address || job.address || '',
-        city_zip: updatedJob.cityZip || job.cityZip || '',
+        address: updatedJob.address || job.address || "",
+        city_zip: updatedJob.cityZip || job.cityZip || "",
         phone: job.phone || undefined,
         email: job.email || undefined,
         bill_to_address: job.billToAddress || undefined,
@@ -954,57 +1193,62 @@ const addCustomHeader = () => {
         bill_to_phone: job.billToPhone || undefined,
         bill_to_email: job.billToEmail || undefined,
         same_as_address: job.sameAsAddress || false,
-        due_date: job.dueDate || '',
+        due_date: job.dueDate || "",
         estimated_hours: job.estimatedHours || undefined,
         estimated_cost: job.estimatedCost || undefined,
-        assigned_labor_ids: (updatedJob.assignedLabor || []).length > 0
-          ? JSON.stringify(updatedJob.assignedLabor.map((labor: any) => labor.id))
-          : undefined,
-        assigned_lead_labor_ids: (updatedJob.assignedLeadLabor || []).length > 0
-          ? JSON.stringify(updatedJob.assignedLeadLabor.map((labor: any) => labor.id))
-          : undefined,
-        assigned_material_ids: job.materials && job.materials.length > 0
-          ? JSON.stringify(job.materials)
-          : undefined,
+        assigned_labor_ids:
+          (updatedJob.assignedLabor || []).length > 0
+            ? JSON.stringify(
+                updatedJob.assignedLabor.map((labor: any) => labor.id),
+              )
+            : undefined,
+        assigned_lead_labor_ids:
+          (updatedJob.assignedLeadLabor || []).length > 0
+            ? JSON.stringify(
+                updatedJob.assignedLeadLabor.map((labor: any) => labor.id),
+              )
+            : undefined,
+        assigned_material_ids:
+          job.materials && job.materials.length > 0
+            ? JSON.stringify(job.materials)
+            : undefined,
         status: updatedJob.status,
       });
 
       const updatedJobs = jobs.map((j: any) =>
-        j.id === jobId ? updatedJob : j
+        j.id === jobId ? updatedJob : j,
       );
       setJobs(updatedJobs);
 
-      toast.success('Job marked as completed');
+      toast.success("Job marked as completed");
     } catch (error) {
-      console.error('Error completing job:', error);
-      toast.error('Failed to complete job', {
-        description: error instanceof Error ? error.message : 'Failed to complete job',
+      console.error("Error completing job:", error);
+      toast.error("Failed to complete job", {
+        description:
+          error instanceof Error ? error.message : "Failed to complete job",
       });
     } finally {
       setIsSaving(false);
     }
   };
 
-
-  const currentInvoice = selectedInvoiceId == null
-    ? undefined
-    : estimates.find(inv => Number(inv.id) === selectedInvoiceId);
-
-
-
+  const currentInvoice =
+    selectedInvoiceId == null
+      ? undefined
+      : estimates.find((inv) => Number(inv.id) === selectedInvoiceId);
 
   const handleCancel = async () => {
     // Reset base fields
     setEditedJob({
       title: job.title,
       type: job.type,
-      location: job.location || `${job.address || ''}, ${job.cityZip || ''}`,
-      address: job.address || '',
-      cityZip: job.cityZip || '',
+      location: job.location || `${job.address || ""}, ${job.cityZip || ""}`,
+      address: job.address || "",
+      cityZip: job.cityZip || "",
       description: job.description,
       contractor: job.contractor || job.customer,
-      startDate: '01/15/2025',
-      priority: 'High',
+      startDate: "01/15/2025",
+      priority: "High",
       status: job.status,
       assignedLabor: job.assignedLaborDetails || [],
       assignedLeadLabor: job.assignedLeadLaborDetails || [],
@@ -1012,57 +1256,70 @@ const addCustomHeader = () => {
 
     // If detailed arrays are missing, hydrate from stored ID strings
     try {
-      if ((!job.assignedLeadLaborDetails || job.assignedLeadLaborDetails.length === 0) && job.assigned_lead_labor_ids) {
-        const leadLaborData = await parseLaborIds(job.assigned_lead_labor_ids, true);
-        setEditedJob(prev => ({ ...prev, assignedLeadLabor: leadLaborData }));
+      if (
+        (!job.assignedLeadLaborDetails ||
+          job.assignedLeadLaborDetails.length === 0) &&
+        job.assigned_lead_labor_ids
+      ) {
+        const leadLaborData = await parseLaborIds(
+          job.assigned_lead_labor_ids,
+          true,
+        );
+        setEditedJob((prev) => ({ ...prev, assignedLeadLabor: leadLaborData }));
       }
-      if ((!job.assignedLaborDetails || job.assignedLaborDetails.length === 0) && job.assigned_labor_ids) {
+      if (
+        (!job.assignedLaborDetails || job.assignedLaborDetails.length === 0) &&
+        job.assigned_labor_ids
+      ) {
         const laborData = await parseLaborIds(job.assigned_labor_ids, false);
-        setEditedJob(prev => ({ ...prev, assignedLabor: laborData }));
+        setEditedJob((prev) => ({ ...prev, assignedLabor: laborData }));
       }
     } catch (e) {
       // swallow errors here, view will just show what we have
-      console.error('Failed to hydrate labor data on cancel', e);
+      console.error("Failed to hydrate labor data on cancel", e);
     }
 
     setIsEditing(false);
   };
 
-
-
   const validateTimeLogForm = () => {
     const errors: Record<string, string> = {};
 
     if (!timeLogFormData.selectedLabor && !timeLogFormData.selectedLeadLabor) {
-      errors.laborSelection = 'Please select either Labor or Lead Labor';
+      errors.laborSelection = "Please select either Labor or Lead Labor";
     }
 
-    if (!timeLogFormData.hoursWorked || timeLogFormData.hoursWorked === '') {
-      errors.hoursWorked = 'Hours worked is required';
+    if (!timeLogFormData.hoursWorked || timeLogFormData.hoursWorked === "") {
+      errors.hoursWorked = "Hours worked is required";
     } else {
       // Validate hoursWorked format - should be HH:MM:SS and not contain NaN
-      if (timeLogFormData.hoursWorked.includes('NaN') || timeLogFormData.hoursWorked.includes('NaN')) {
-        errors.hoursWorked = 'Invalid time format. Please select a valid time range.';
+      if (
+        timeLogFormData.hoursWorked.includes("NaN") ||
+        timeLogFormData.hoursWorked.includes("NaN")
+      ) {
+        errors.hoursWorked =
+          "Invalid time format. Please select a valid time range.";
       } else {
         // Check if it's in HH:MM:SS format
         const timePattern = /^\d{2}:\d{2}:\d{2}$/;
         if (!timePattern.test(timeLogFormData.hoursWorked)) {
-          errors.hoursWorked = 'Invalid time format. Expected format: HH:MM:SS';
+          errors.hoursWorked = "Invalid time format. Expected format: HH:MM:SS";
         } else {
           // Validate that all parts are valid numbers
-          const parts = timeLogFormData.hoursWorked.split(':');
+          const parts = timeLogFormData.hoursWorked.split(":");
           const h = parseInt(parts[0]);
           const m = parseInt(parts[1]);
           const s = parseInt(parts[2]);
           if (isNaN(h) || isNaN(m) || isNaN(s)) {
-            errors.hoursWorked = 'Invalid time values. Please select a valid time range.';
+            errors.hoursWorked =
+              "Invalid time values. Please select a valid time range.";
           }
         }
       }
     }
 
     if (!timeLogFormData.date) {
-      errors.date = 'Please select a date';
+      errors.date = "Please select a date";
     }
 
     setTimeLogValidationErrors(errors);
@@ -1070,94 +1327,118 @@ const addCustomHeader = () => {
   };
 
   const handleSaveTimeLog = async () => {
-    if (timeLogModalMode === 'view') {
+    if (timeLogModalMode === "view") {
       setShowTimeLogModal(false);
       setCurrentTimeLog(null);
       return;
     }
 
     if (!validateTimeLogForm()) {
-      toast.error('Please fix the validation errors');
+      toast.error("Please fix the validation errors");
       return;
     }
 
     try {
-      const selectedLabor = timeLogFormData.selectedLabor || timeLogFormData.selectedLeadLabor;
+      const selectedLabor =
+        timeLogFormData.selectedLabor || timeLogFormData.selectedLeadLabor;
       const isLeadLabor = !!timeLogFormData.selectedLeadLabor;
 
       // Find the bluesheet ID based on the selected date
-      const selectedBluesheet = bluesheets.find((bluesheet: any) =>
-        bluesheet.date === timeLogFormData.date
+      const selectedBluesheet = bluesheets.find(
+        (bluesheet: any) => bluesheet.date === timeLogFormData.date,
       );
 
       if (selectedBluesheet) {
         // Add labor to existing bluesheet
-        if (timeLogModalMode === 'create') {
+        if (timeLogModalMode === "create") {
           // Validate hoursWorked before sending
-          const hoursWorked = timeLogFormData.hoursWorked && !timeLogFormData.hoursWorked.includes('NaN')
-            ? timeLogFormData.hoursWorked
-            : '00:00:00';
+          const hoursWorked =
+            timeLogFormData.hoursWorked &&
+            !timeLogFormData.hoursWorked.includes("NaN")
+              ? timeLogFormData.hoursWorked
+              : "00:00:00";
 
           const timeLogPayload = {
-            [isLeadLabor ? 'lead_labor_id' : 'labor_id']: selectedLabor?.id,
-            employee_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
-            role: isLeadLabor ? 'lead_labor' : 'labor',
+            [isLeadLabor ? "lead_labor_id" : "labor_id"]: selectedLabor?.id,
+            employee_name:
+              selectedLabor?.users?.full_name ||
+              selectedLabor?.labor_code ||
+              "",
+            role: isLeadLabor ? "lead_labor" : "labor",
             regular_hours: hoursWorked,
             hourly_rate: selectedLabor?.hourly_rate || 0,
             date: timeLogFormData.date,
-            description: timeLogFormData.description || '',
-            status: 'approved'
+            description: timeLogFormData.description || "",
+            status: "approved",
           };
 
           // Call the bluesheet API
-          await apiClient.addLaborToBluesheet(selectedBluesheet.id, timeLogPayload);
-          toast.success('Labor time log added to existing bluesheet successfully!');
-        } else if (timeLogModalMode === 'edit') {
+          await apiClient.addLaborToBluesheet(
+            selectedBluesheet.id,
+            timeLogPayload,
+          );
+          toast.success(
+            "Labor time log added to existing bluesheet successfully!",
+          );
+        } else if (timeLogModalMode === "edit") {
           // For edit, we might need a different API endpoint
           // Validate hoursWorked before sending
-          const hoursWorked = timeLogFormData.hoursWorked && !timeLogFormData.hoursWorked.includes('NaN')
-            ? timeLogFormData.hoursWorked
-            : '00:00:00';
+          const hoursWorked =
+            timeLogFormData.hoursWorked &&
+            !timeLogFormData.hoursWorked.includes("NaN")
+              ? timeLogFormData.hoursWorked
+              : "00:00:00";
 
           const updatePayload = {
-            [isLeadLabor ? 'lead_labor_id' : 'labor_id']: selectedLabor?.id,
-            employee_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
-            role: isLeadLabor ? 'lead_labor' : 'labor',
+            [isLeadLabor ? "lead_labor_id" : "labor_id"]: selectedLabor?.id,
+            employee_name:
+              selectedLabor?.users?.full_name ||
+              selectedLabor?.labor_code ||
+              "",
+            role: isLeadLabor ? "lead_labor" : "labor",
             regular_hours: hoursWorked,
             hourly_rate: selectedLabor?.hourly_rate || 0,
             date: timeLogFormData.date,
-            description: timeLogFormData.description || '',
+            description: timeLogFormData.description || "",
           };
 
           // You might need to implement updateLaborInBluesheet API method
-          await apiClient.updateLaborInBluesheet(currentTimeLog.id, updatePayload);
-          toast.success('Labor time log updated successfully!');
+          await apiClient.updateLaborInBluesheet(
+            currentTimeLog.id,
+            updatePayload,
+          );
+          toast.success("Labor time log updated successfully!");
         }
       } else {
         // Create new complete bluesheet with labor
         const completeBluesheetPayload = {
           job_id: job.id,
           date: timeLogFormData.date,
-          notes: `Daily work bluesheet for ${job.title || 'construction site'}`,
+          notes: `Daily work bluesheet for ${job.title || "construction site"}`,
           additional_charges: 0,
-          status: 'approved',
+          status: "approved",
           labor_entries: [
             {
-              [isLeadLabor ? 'lead_labor_id' : 'labor_id']: selectedLabor?.id,
-              employee_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
-              role: isLeadLabor ? 'lead_labor' : 'labor',
-              regular_hours: timeLogFormData.hoursWorked && !timeLogFormData.hoursWorked.includes('NaN')
-                ? timeLogFormData.hoursWorked
-                : '00:00:00',
-              overtime_hours: '0h',
+              [isLeadLabor ? "lead_labor_id" : "labor_id"]: selectedLabor?.id,
+              employee_name:
+                selectedLabor?.users?.full_name ||
+                selectedLabor?.labor_code ||
+                "",
+              role: isLeadLabor ? "lead_labor" : "labor",
+              regular_hours:
+                timeLogFormData.hoursWorked &&
+                !timeLogFormData.hoursWorked.includes("NaN")
+                  ? timeLogFormData.hoursWorked
+                  : "00:00:00",
+              overtime_hours: "0h",
               hourly_rate: selectedLabor?.hourly_rate || 0,
-            }
+            },
           ],
-          material_entries: [] // Empty material entries for now
+          material_entries: [], // Empty material entries for now
         };
 
         await apiClient.createCompleteBluesheet(completeBluesheetPayload);
-        toast.success('New bluesheet created with labor successfully!');
+        toast.success("New bluesheet created with labor successfully!");
       }
 
       setShowTimeLogModal(false);
@@ -1167,8 +1448,12 @@ const addCustomHeader = () => {
       // Refresh job data to show the new/updated labor time log
       await refreshJobData();
     } catch (error) {
-      console.error('Error saving labor time log:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to save labor time log');
+      console.error("Error saving labor time log:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to save labor time log",
+      );
     }
   };
 
@@ -1177,20 +1462,20 @@ const addCustomHeader = () => {
     if (!hoursString) return 0;
 
     // Handle "8h" format
-    if (hoursString.includes('h')) {
-      return parseFloat(hoursString.replace('h', ''));
+    if (hoursString.includes("h")) {
+      return parseFloat(hoursString.replace("h", ""));
     }
 
     // Handle "00:01:48" format (HH:MM:SS)
-    if (hoursString.includes(':')) {
-      const parts = hoursString.split(':');
+    if (hoursString.includes(":")) {
+      const parts = hoursString.split(":");
       if (parts.length === 3) {
         const hours = parseInt(parts[0]) || 0;
         const minutes = parseInt(parts[1]) || 0;
         const seconds = parseInt(parts[2]) || 0;
 
         // Convert to decimal hours
-        return hours + (minutes / 60) + (seconds / 3600);
+        return hours + minutes / 60 + seconds / 3600;
       }
     }
 
@@ -1199,11 +1484,11 @@ const addCustomHeader = () => {
   };
 
   const handleViewTimeLog = async (labor: any) => {
-    console.log('View button clicked, labor:', labor);
+    console.log("View button clicked, labor:", labor);
     try {
       // Fetch the full labor entry details from the API
       const response = await apiClient.getLaborEntryById(labor.id);
-      console.log('API Response for labor entry (view):', response);
+      console.log("API Response for labor entry (view):", response);
 
       const laborEntry = response.data;
 
@@ -1217,17 +1502,17 @@ const addCustomHeader = () => {
       // Keep hoursWorked in HH:MM:SS format for TimeRangePicker
       // If it's already in HH:MM:SS format, use it directly
       // Otherwise, convert from other formats
-      let hoursWorkedStr = '';
+      let hoursWorkedStr = "";
       if (laborEntry.regular_hours) {
-        if (laborEntry.regular_hours.includes(':')) {
+        if (laborEntry.regular_hours.includes(":")) {
           // Already in HH:MM:SS or HH:MM format
-          const parts = laborEntry.regular_hours.split(':');
+          const parts = laborEntry.regular_hours.split(":");
           if (parts.length === 2) {
             // HH:MM format, add seconds
-            hoursWorkedStr = `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:00`;
+            hoursWorkedStr = `${parts[0].padStart(2, "0")}:${parts[1].padStart(2, "0")}:00`;
           } else if (parts.length === 3) {
             // HH:MM:SS format, use as is (ensure proper padding)
-            hoursWorkedStr = `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:${parts[2].padStart(2, '0')}`;
+            hoursWorkedStr = `${parts[0].padStart(2, "0")}:${parts[1].padStart(2, "0")}:${parts[2].padStart(2, "0")}`;
           } else {
             hoursWorkedStr = laborEntry.regular_hours;
           }
@@ -1237,7 +1522,7 @@ const addCustomHeader = () => {
           const h = Math.floor(hours);
           const m = Math.floor((hours - h) * 60);
           const s = Math.floor(((hours - h) * 60 - m) * 60);
-          hoursWorkedStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+          hoursWorkedStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
         }
       }
 
@@ -1245,105 +1530,109 @@ const addCustomHeader = () => {
         selectedLabor: isLeadLabor ? null : laborData,
         selectedLeadLabor: isLeadLabor ? laborData : null,
         hoursWorked: hoursWorkedStr,
-        description: laborEntry.description || '',
-        date: laborEntry.date || new Date().toISOString().split('T')[0]
+        description: laborEntry.description || "",
+        date: laborEntry.date || new Date().toISOString().split("T")[0],
       });
 
       // Set input values based on the fetched data
       if (isLeadLabor) {
-        setLeadLaborInputValue(laborData?.users?.full_name || laborData?.labor_code || '');
-        setLaborInputValue('');
+        setLeadLaborInputValue(
+          laborData?.users?.full_name || laborData?.labor_code || "",
+        );
+        setLaborInputValue("");
       } else {
-        setLaborInputValue(laborData?.users?.full_name || laborData?.labor_code || '');
-        setLeadLaborInputValue('');
+        setLaborInputValue(
+          laborData?.users?.full_name || laborData?.labor_code || "",
+        );
+        setLeadLaborInputValue("");
       }
 
       // Reset the ref to allow useEffect to sync timeRangeValue
       timeRangeValueRef.current = false;
 
-      setTimeLogModalMode('view');
+      setTimeLogModalMode("view");
       setShowTimeLogModal(true);
-      console.log('View modal should be open now with fetched data');
+      console.log("View modal should be open now with fetched data");
     } catch (error) {
-      console.error('Error viewing labor time log:', error);
-      toast.error('Failed to load labor entry details');
+      console.error("Error viewing labor time log:", error);
+      toast.error("Failed to load labor entry details");
     }
   };
 
-  const handleEditTimeLog = async (labor: any) => {
-    try {
-      console.log('Edit button clicked, labor entry:', labor);
+  // const handleEditTimeLog = async (labor: any) => {
+  //   try {
+  //     console.log('Edit button clicked, labor entry:', labor);
 
-      // Fetch the full labor entry details from the API
-      const response = await apiClient.getLaborEntryById(labor.id);
-      console.log('API Response for labor entry:', response);
+  //     // Fetch the full labor entry details from the API
+  //     const response = await apiClient.getLaborEntryById(labor.id);
+  //     console.log('API Response for labor entry:', response);
 
-      const laborEntry = response.data;
+  //     const laborEntry = response.data;
 
-      // Set the current time log data
-      setCurrentTimeLog(laborEntry);
+  //     // Set the current time log data
+  //     setCurrentTimeLog(laborEntry);
 
-      // Determine if it's labor or lead labor based on the API response
-      const isLeadLabor = laborEntry.lead_labor_id !== null;
-      const laborData = isLeadLabor ? laborEntry.lead_labor : laborEntry.labor;
+  //     // Determine if it's labor or lead labor based on the API response
+  //     const isLeadLabor = laborEntry.lead_labor_id !== null;
+  //     const laborData = isLeadLabor ? laborEntry.lead_labor : laborEntry.labor;
 
-      // Keep hoursWorked in HH:MM:SS format for TimeRangePicker
-      // If it's already in HH:MM:SS format, use it directly
-      // Otherwise, convert from other formats
-      let hoursWorkedStr = '';
-      if (laborEntry.regular_hours) {
-        if (laborEntry.regular_hours.includes(':')) {
-          // Already in HH:MM:SS or HH:MM format
-          const parts = laborEntry.regular_hours.split(':');
-          if (parts.length === 2) {
-            // HH:MM format, add seconds
-            hoursWorkedStr = `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:00`;
-          } else if (parts.length === 3) {
-            // HH:MM:SS format, use as is (ensure proper padding)
-            hoursWorkedStr = `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:${parts[2].padStart(2, '0')}`;
-          } else {
-            hoursWorkedStr = laborEntry.regular_hours;
-          }
-        } else {
-          // Convert from "8h" or decimal format to HH:MM:SS
-          const hours = parseHoursFromString(laborEntry.regular_hours);
-          const h = Math.floor(hours);
-          const m = Math.floor((hours - h) * 60);
-          const s = Math.floor(((hours - h) * 60 - m) * 60);
-          hoursWorkedStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-        }
-      }
+  //     // Keep hoursWorked in HH:MM:SS format for TimeRangePicker
+  //     // If it's already in HH:MM:SS format, use it directly
+  //     // Otherwise, convert from other formats
+  //     let hoursWorkedStr = '';
+  //     if (laborEntry.regular_hours) {
+  //       if (laborEntry.regular_hours.includes(':')) {
+  //         // Already in HH:MM:SS or HH:MM format
+  //         const parts = laborEntry.regular_hours.split(':');
+  //         if (parts.length === 2) {
+  //           // HH:MM format, add seconds
+  //           hoursWorkedStr = `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:00`;
+  //         } else if (parts.length === 3) {
+  //           // HH:MM:SS format, use as is (ensure proper padding)
+  //           hoursWorkedStr = `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:${parts[2].padStart(2, '0')}`;
+  //         } else {
+  //           hoursWorkedStr = laborEntry.regular_hours;
+  //         }
+  //       } else {
+  //         // Convert from "8h" or decimal format to HH:MM:SS
+  //         const hours = parseHoursFromString(laborEntry.regular_hours);
+  //         const h = Math.floor(hours);
+  //         const m = Math.floor((hours - h) * 60);
+  //         const s = Math.floor(((hours - h) * 60 - m) * 60);
+  //         hoursWorkedStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  //       }
+  //     }
 
-      setTimeLogFormData({
-        selectedLabor: isLeadLabor ? null : laborData,
-        selectedLeadLabor: isLeadLabor ? laborData : null,
-        hoursWorked: hoursWorkedStr,
-        description: laborEntry.description || '',
-        date: laborEntry.date || new Date().toISOString().split('T')[0]
-      });
+  //     setTimeLogFormData({
+  //       selectedLabor: isLeadLabor ? null : laborData,
+  //       selectedLeadLabor: isLeadLabor ? laborData : null,
+  //       hoursWorked: hoursWorkedStr,
+  //       description: laborEntry.description || '',
+  //       date: laborEntry.date || new Date().toISOString().split('T')[0]
+  //     });
 
-      // Set input values based on the fetched data
-      if (isLeadLabor) {
-        setLeadLaborInputValue(laborData?.users?.full_name || laborData?.labor_code || '');
-        setLaborInputValue('');
-      } else {
-        setLaborInputValue(laborData?.users?.full_name || laborData?.labor_code || '');
-        setLeadLaborInputValue('');
-      }
+  //     // Set input values based on the fetched data
+  //     if (isLeadLabor) {
+  //       setLeadLaborInputValue(laborData?.users?.full_name || laborData?.labor_code || '');
+  //       setLaborInputValue('');
+  //     } else {
+  //       setLaborInputValue(laborData?.users?.full_name || laborData?.labor_code || '');
+  //       setLeadLaborInputValue('');
+  //     }
 
-      setTimeLogModalMode('edit');
-      setShowTimeLogModal(true);
-      console.log('Edit modal should be open now with fetched data');
-    } catch (error) {
-      console.error('Error editing labor time log:', error);
-      toast.error('Failed to load labor entry details');
-    }
-  };
+  //     setTimeLogModalMode('edit');
+  //     setShowTimeLogModal(true);
+  //     console.log('Edit modal should be open now with fetched data');
+  //   } catch (error) {
+  //     console.error('Error editing labor time log:', error);
+  //     toast.error('Failed to load labor entry details');
+  //   }
+  // };
 
   const handleCreateTimeLog = () => {
     setCurrentTimeLog(null);
     resetTimeLogForm();
-    setTimeLogModalMode('create');
+    setTimeLogModalMode("create");
     setShowTimeLogModal(true);
   };
 
@@ -1376,9 +1665,6 @@ const addCustomHeader = () => {
     return true;
   };
 
-
-
-
   const searchProducts = async (query: string): Promise<void> => {
     if (!query.trim()) {
       setProductSearchResults([]);
@@ -1390,10 +1676,13 @@ const addCustomHeader = () => {
       // Replace with your actual API call
       const response = await apiClient.searchProductsByQuery(query);
       setProductSearchResults(response.data.products || []);
-      console.log(productSearchResults , 'productSearchResultsproductSearchResultsproductSearchResults ')
+      console.log(
+        productSearchResults,
+        "productSearchResultsproductSearchResultsproductSearchResults ",
+      );
     } catch (error) {
-      console.error('Error searching products:', error);
-      toast.error('Failed to search products');
+      console.error("Error searching products:", error);
+      toast.error("Failed to search products");
     } finally {
       setIsSearchingProducts(false);
     }
@@ -1401,7 +1690,7 @@ const addCustomHeader = () => {
   // Handle product selection
   const handleProductSelect = (product: Product): void => {
     // Check if product already selected
-    const exists = selectedProducts.some(p => p.id === product.id);
+    const exists = selectedProducts.some((p) => p.id === product.id);
 
     if (!exists) {
       setSelectedProducts([...selectedProducts, product]);
@@ -1412,13 +1701,13 @@ const addCustomHeader = () => {
           total_ordered: 0,
           material_used: 0,
           return_to_warehouse: false,
-          unit_cost: product.unit_cost || product.price || 0
-        }
+          unit_cost: product.unit_cost || product.price || 0,
+        },
       });
     }
 
     // Clear search and close dropdown
-    setProductSearchQuery('');
+    setProductSearchQuery("");
     setProductSearchResults([]);
     setShowProductDropdown(false);
   };
@@ -1432,55 +1721,63 @@ const addCustomHeader = () => {
     try {
       // Find existing bluesheet by date
       const existingBluesheet = job.bluesheets?.find(
-        (bluesheet: any) => bluesheet.date === materialFormData.date
+        (bluesheet: any) => bluesheet.date === materialFormData.date,
       );
 
       // Prepare bulk material entries
-      const materialEntries: MaterialEntry[] = selectedProducts.map(product => ({
-        product_id: product.id,
-        material_name: product.product_name || product.name || '',
-        quantity: product.stock_quantity || 0,
-        unit: product.unit || 'pieces',
-        total_ordered: Number(productQuantities[product.id]?.total_ordered) || 0,
-        material_used: Number(productQuantities[product.id]?.material_used) || 0,
-        supplier_order_id: product.supplier_order_id || '',
-        return_to_warehouse: productQuantities[product.id]?.return_to_warehouse || false,
-        unit_cost: Number(product.unit_cost || product.price || 0),
-      }));
+      const materialEntries: MaterialEntry[] = selectedProducts.map(
+        (product) => ({
+          product_id: product.id,
+          material_name: product.product_name || product.name || "",
+          quantity: product.stock_quantity || 0,
+          unit: product.unit || "pieces",
+          total_ordered:
+            Number(productQuantities[product.id]?.total_ordered) || 0,
+          material_used:
+            Number(productQuantities[product.id]?.material_used) || 0,
+          supplier_order_id: product.supplier_order_id || "",
+          return_to_warehouse:
+            productQuantities[product.id]?.return_to_warehouse || false,
+          unit_cost: Number(product.unit_cost || product.price || 0),
+        }),
+      );
 
       if (existingBluesheet) {
         // Add multiple materials to existing bluesheet
         const bulkPayload: BulkMaterialPayload = {
-          materials: materialEntries
+          materials: materialEntries,
         };
         const completeBluesheetPayload: CompleteBluesheetPayload = {
           job_id: job.id,
           date: materialFormData.date,
-          notes: `Daily work bluesheet for ${job.title || 'construction site'}`,
+          notes: `Daily work bluesheet for ${job.title || "construction site"}`,
           additional_charges: 0,
-          status: 'approved',
+          status: "approved",
           labor_entries: [],
-          material_entries: materialEntries
+          material_entries: materialEntries,
         };
         // await apiClient.createBulkBluesheetMaterials(bulkPayload, existingBluesheet.id);
         await apiClient.createCompleteBluesheet(completeBluesheetPayload);
 
-        toast.success(`${selectedProducts.length} product(s) added to existing bluesheet successfully!`);
-      }
-      else {
+        toast.success(
+          `${selectedProducts.length} product(s) added to existing bluesheet successfully!`,
+        );
+      } else {
         // Create new complete bluesheet with multiple materials
         const completeBluesheetPayload: CompleteBluesheetPayload = {
           job_id: job.id,
           date: materialFormData.date,
-          notes: `Daily work bluesheet for ${job.title || 'construction site'}`,
+          notes: `Daily work bluesheet for ${job.title || "construction site"}`,
           additional_charges: 0,
-          status: 'approved',
+          status: "approved",
           labor_entries: [],
-          material_entries: materialEntries
+          material_entries: materialEntries,
         };
 
         await apiClient.createCompleteBluesheet(completeBluesheetPayload);
-        toast.success(`New bluesheet created with ${selectedProducts.length} product(s) successfully!`);
+        toast.success(
+          `New bluesheet created with ${selectedProducts.length} product(s) successfully!`,
+        );
       }
 
       // Close modal and reset
@@ -1490,8 +1787,8 @@ const addCustomHeader = () => {
       // Refresh job data
       await refreshJobData();
     } catch (error) {
-      console.error('Error adding materials:', error);
-      toast.error('Failed to add materials');
+      console.error("Error adding materials:", error);
+      toast.error("Failed to add materials");
     } finally {
       setIsLoading(false);
     }
@@ -1503,22 +1800,22 @@ const addCustomHeader = () => {
     setProductQuantities({});
     setMaterialFormData({
       product_id: null,
-      material_name: '',
+      material_name: "",
       quantity: 0,
-      unit: 'pieces',
+      unit: "pieces",
       total_ordered: 0,
       material_used: 0,
-      supplier_order_id: '',
+      supplier_order_id: "",
       return_to_warehouse: false,
       unit_cost: 0,
-      date: new Date().toISOString().split('T')[0]
+      date: new Date().toISOString().split("T")[0],
     });
-    setProductSearchQuery('');
+    setProductSearchQuery("");
     setMaterialErrors({});
   };
 
   const removeSelectedProduct = (productId: number): void => {
-    setSelectedProducts(selectedProducts.filter(p => p.id !== productId));
+    setSelectedProducts(selectedProducts.filter((p) => p.id !== productId));
     const newQuantities = { ...productQuantities };
     delete newQuantities[productId];
     setProductQuantities(newQuantities);
@@ -1527,9 +1824,8 @@ const addCustomHeader = () => {
   const handleQuantityChange = (
     productId: number,
     field: keyof ProductQuantity,
-    value: string | number | boolean
+    value: string | number | boolean,
   ): void => {
-
     const existing = productQuantities[productId] || {};
 
     let updatedValue =
@@ -1537,7 +1833,7 @@ const addCustomHeader = () => {
 
     let updatedData = {
       ...existing,
-      [field]: updatedValue
+      [field]: updatedValue,
     };
 
     const totalOrdered =
@@ -1557,7 +1853,7 @@ const addCustomHeader = () => {
 
     setProductQuantities({
       ...productQuantities,
-      [productId]: updatedData
+      [productId]: updatedData,
     });
   };
 
@@ -1565,23 +1861,28 @@ const addCustomHeader = () => {
     const errors: MaterialErrors = {};
 
     if (!materialFormData.date) {
-      errors.date = 'Date is required';
+      errors.date = "Date is required";
       setMaterialErrors(errors);
-      toast.error('Please select a date');
+      toast.error("Please select a date");
       return false;
     }
 
     // Check if any products are selected
     if (selectedProducts.length === 0) {
-      toast.error('Please select at least one product');
+      toast.error("Please select at least one product");
       return false;
     }
 
     // Validate each product has required fields
     for (const product of selectedProducts) {
       const quantities = productQuantities[product.id];
-      if (!quantities || (!quantities.total_ordered && !quantities.material_used)) {
-        toast.error(`Please enter quantities for ${product.product_name || product.name}`);
+      if (
+        !quantities ||
+        (!quantities.total_ordered && !quantities.material_used)
+      ) {
+        toast.error(
+          `Please enter quantities for ${product.product_name || product.name}`,
+        );
         return false;
       }
     }
@@ -1591,36 +1892,55 @@ const addCustomHeader = () => {
   };
 
   const validateMaterialForm = () => {
-    const errors: any = { product: '', date: '', total_ordered: '', material_used: '' };
+    const errors: any = {
+      product: "",
+      date: "",
+      total_ordered: "",
+      material_used: "",
+    };
     if (!materialFormData.product_id) {
-      errors.product = 'Please select a product';
+      errors.product = "Please select a product";
     }
     if (!materialFormData.date) {
-      errors.date = 'Please select a date';
+      errors.date = "Please select a date";
     }
-    if (!materialFormData.total_ordered || materialFormData.total_ordered <= 0) {
-      errors.total_ordered = 'Enter total ordered greater than 0';
+    if (
+      !materialFormData.total_ordered ||
+      materialFormData.total_ordered <= 0
+    ) {
+      errors.total_ordered = "Enter total ordered greater than 0";
     }
-    if (materialFormData.material_used == null || materialFormData.material_used < 0) {
-      errors.material_used = 'Material used cannot be negative';
-    } else if (materialFormData.total_ordered && materialFormData.material_used > materialFormData.total_ordered) {
-      errors.material_used = 'Material used cannot exceed total ordered';
+    if (
+      materialFormData.material_used == null ||
+      materialFormData.material_used < 0
+    ) {
+      errors.material_used = "Material used cannot be negative";
+    } else if (
+      materialFormData.total_ordered &&
+      materialFormData.material_used > materialFormData.total_ordered
+    ) {
+      errors.material_used = "Material used cannot exceed total ordered";
     }
     setMaterialErrors(errors);
-    return !errors.product && !errors.date && !errors.total_ordered && !errors.material_used;
+    return (
+      !errors.product &&
+      !errors.date &&
+      !errors.total_ordered &&
+      !errors.material_used
+    );
   };
 
   const handleAddProduct = async () => {
     if (!validateMaterialForm()) {
-      toast.error('Please fix the validation errors');
+      toast.error("Please fix the validation errors");
       return;
     }
 
     setIsLoading(true);
     try {
       // Find existing bluesheet by date
-      const existingBluesheet = job.bluesheets?.find((bluesheet: any) =>
-        bluesheet.date === materialFormData.date
+      const existingBluesheet = job.bluesheets?.find(
+        (bluesheet: any) => bluesheet.date === materialFormData.date,
       );
 
       if (existingBluesheet) {
@@ -1628,44 +1948,49 @@ const addCustomHeader = () => {
         const materialPayload = {
           product_id: materialFormData.product_id,
           material_name: materialFormData.material_name,
-          quantity: selectedProduct?.stock_quantity || materialFormData.quantity, // Use stock_quantity from selected product
+          quantity:
+            selectedProduct?.stock_quantity || materialFormData.quantity, // Use stock_quantity from selected product
           unit: materialFormData.unit,
           total_ordered: materialFormData.total_ordered,
           material_used: materialFormData.material_used,
           supplier_order_id: materialFormData.supplier_order_id,
           return_to_warehouse: materialFormData.return_to_warehouse,
           unit_cost: materialFormData.unit_cost,
-          status: 'approved'
+          status: "approved",
         };
 
-        await apiClient.createBluesheetMaterial(materialPayload, existingBluesheet.id);
-        toast.success('Material added to existing bluesheet successfully!');
+        await apiClient.createBluesheetMaterial(
+          materialPayload,
+          existingBluesheet.id,
+        );
+        toast.success("Material added to existing bluesheet successfully!");
       } else {
         // Create new complete bluesheet with material
         const completeBluesheetPayload = {
           job_id: job.id,
           date: materialFormData.date,
-          notes: `Daily work bluesheet for ${job.title || 'construction site'}`,
+          notes: `Daily work bluesheet for ${job.title || "construction site"}`,
           additional_charges: 0,
-          status: 'approved',
+          status: "approved",
           labor_entries: [], // Empty labor entries for now
           material_entries: [
             {
               product_id: materialFormData.product_id,
               material_name: materialFormData.material_name,
-              quantity: selectedProduct?.stock_quantity || materialFormData.quantity, // Use stock_quantity from selected product
+              quantity:
+                selectedProduct?.stock_quantity || materialFormData.quantity, // Use stock_quantity from selected product
               unit: materialFormData.unit,
               total_ordered: materialFormData.total_ordered,
               material_used: materialFormData.material_used,
               supplier_order_id: materialFormData.supplier_order_id,
               return_to_warehouse: materialFormData.return_to_warehouse,
               unit_cost: materialFormData.unit_cost,
-            }
-          ]
+            },
+          ],
         };
 
         await apiClient.createCompleteBluesheet(completeBluesheetPayload);
-        toast.success('New bluesheet created with material successfully!');
+        toast.success("New bluesheet created with material successfully!");
       }
 
       // Close modal first
@@ -1674,121 +1999,104 @@ const addCustomHeader = () => {
       // Reset form
       setMaterialFormData({
         product_id: null,
-        material_name: '',
+        material_name: "",
         quantity: 0,
-        unit: 'pieces',
+        unit: "pieces",
         total_ordered: 0,
         material_used: 0,
-        supplier_order_id: '',
+        supplier_order_id: "",
         return_to_warehouse: false,
         unit_cost: 0,
-        date: new Date().toISOString().split('T')[0]
+        date: new Date().toISOString().split("T")[0],
       });
       setSelectedProduct(null);
-      setProductSearchQuery('');
+      setProductSearchQuery("");
 
       // Refresh job data to show updated materials
       await refreshJobData();
     } catch (error) {
-      console.error('Error adding material:', error);
-      toast.error('Failed to add material');
+      console.error("Error adding material:", error);
+      toast.error("Failed to add material");
     } finally {
       setIsLoading(false);
     }
   };
 
-
-    const handleMarkAsPaid = async (invoice: any) => {
-      if (!invoice?.id) {
-        toast.error('Invoice ID not found')
-        return
-      }
-
-      const invoiceStatus = String(invoice.status || '').toLowerCase()
-      if (invoiceStatus === 'paid') {
-        return
-      }
-
-      try {
-        setIsPaidLoading(true)
-        setIsMarkingPaidId(invoice.id)
-
-        const estimateResponse = await apiClient.getEstimateById(invoice.id)
-        const estimateData = estimateResponse?.data || estimateResponse
-
-        const customProducts = Array.isArray(estimateData?.products)
-          ? estimateData.products.map((item: any) => ({
-              ...(item.id ? { id: item.id } : {}),
-              product_name: item.product_name || item.item || '',
-              description: item.description || '',
-              jdp_sku: item.jdp_sku || '',
-              stock_quantity: Number(item.stock_quantity || item.qty || 1),
-              unit: item.unit || 'unit',
-              job_id: Number(estimateData.job_id),
-              unit_cost: Number(item.unit_cost || item.rate || 0),
-              jdp_price: Number(item.jdp_price || item.rate || 0),
-              estimated_price: Number(item.estimated_price || 0),
-              total_cost: Number(item.total_cost || item.total || 0),
-              is_custom: item.is_custom === true,
-              section_name: item.headerName || null,
-               section_type: item.type ? "room_header" : null,
-               parent_header_key: item.parentHeaderKey || null,
-               parent_header_name: item.parentHeaderName || null,
-            }))
-          : []
-
-        const payload = {
-          job_id: Number(estimateData.job_id),
-          estimate_title: estimateData.estimate_title || '',
-          ...(estimateData.contractor_id
-            ? { contractor_id: Number(estimateData.contractor_id) }
-            : { customer_id: Number(estimateData.customer_id) }),
-          priority: estimateData.priority || 'medium',
-          service_type: estimateData.service_type || 'service_based',
-          email_address: estimateData.email_address || '',
-          estimate_date: estimateData.estimate_date || '',
-          po_number: estimateData.po_number || '',
-          rep: estimateData.rep || '',
-          due_date: estimateData.due_date || '',
-          payment_credits: Number(estimateData.payment_credits || 0),
-          balance_due: estimateData.balance_due || '',
-          ...(estimateData.bill_to_address && {
-            bill_to_address: estimateData.bill_to_address,
-          }),
-          invoice_type: estimateData.invoice_type || 'estimate',
-          notes: estimateData.notes || '',
-          custom_products: customProducts,
-
-          status: 'paid',
-        }
-
-        await apiClient.updateEstimate(Number(invoice.id), payload as any)
-
-        setEstimates((prev) =>
-          prev.map((item: any) =>
-            Number(item.id) === Number(invoice.id)
-              ? { ...item, status: 'paid' }
-              : item
-          )
-        )
-        setIsPaidLoading(false)
-        toast.success('Invoice marked as paid')
-        await fetchEstimates()
-        onJobsRefresh?.()
-      } catch (error: any) {
-        setIsPaidLoading(false);
-        console.error('Error marking invoice as paid:', error)
-
-        const apiMessage =
-          error?.response?.data?.message ||
-          error?.message ||
-          'Failed to mark invoice as paid'
-
-        toast.error(apiMessage)
-      } finally {
-        setIsMarkingPaidId(null)
-      }
+  const handleMarkAsPaid = async (invoice: any) => {
+    if (!invoice?.id) {
+      toast.error("Invoice ID not found");
+      return;
     }
+
+    const invoiceStatus = String(invoice.status || "").toLowerCase();
+    if (invoiceStatus === "paid") {
+      return;
+    }
+
+    try {
+      setIsPaidLoading(true);
+      setIsMarkingPaidId(invoice.id);
+
+      const estimateResponse = await apiClient.getEstimateById(invoice.id);
+      const estimateData = estimateResponse?.data || estimateResponse;
+
+      const customProducts = sanitizeCustomProductsForPayload(
+  Array.isArray(estimateData?.products) ? estimateData.products : [],
+  Number(estimateData.job_id)
+);
+
+      const payload = {
+        job_id: Number(estimateData.job_id),
+        estimate_title: estimateData.estimate_title || "",
+        ...(estimateData.contractor_id
+          ? { contractor_id: Number(estimateData.contractor_id) }
+          : { customer_id: Number(estimateData.customer_id) }),
+        priority: estimateData.priority || "medium",
+        service_type: estimateData.service_type || "service_based",
+        email_address: estimateData.email_address || "",
+        estimate_date: estimateData.estimate_date || "",
+        po_number: estimateData.po_number || "",
+        rep: estimateData.rep || "",
+        due_date: estimateData.due_date || "",
+        payment_credits: Number(estimateData.payment_credits || 0),
+        balance_due: estimateData.balance_due || "",
+        ...(estimateData.bill_to_address && {
+          bill_to_address: estimateData.bill_to_address,
+        }),
+        invoice_type: estimateData.invoice_type || "estimate",
+        notes: estimateData.notes || "",
+        custom_products: customProducts,
+
+        status: "paid",
+      };
+
+      await apiClient.updateEstimate(Number(invoice.id), payload as any);
+
+      setEstimates((prev) =>
+        prev.map((item: any) =>
+          Number(item.id) === Number(invoice.id)
+            ? { ...item, status: "paid" }
+            : item,
+        ),
+      );
+      setIsPaidLoading(false);
+      toast.success("Invoice marked as paid");
+      await fetchEstimates();
+      onJobsRefresh?.();
+    } catch (error: any) {
+      setIsPaidLoading(false);
+      console.error("Error marking invoice as paid:", error);
+
+      const apiMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to mark invoice as paid";
+
+      toast.error(apiMessage);
+    } finally {
+      setIsMarkingPaidId(null);
+    }
+  };
   // const handleDeleteProduct = async (productId: string | number) => {
   //   try {
   //     const confirmDelete = window.confirm("Are you sure you want to delete this product?");
@@ -1807,9 +2115,9 @@ const addCustomHeader = () => {
   //     setIsDeleting(false);
   //   }
   // };
-  
-  console.log(inlineInvoiceData,"inlineInvoiceData");
-  
+
+  console.log(inlineInvoiceData, "inlineInvoiceData");
+
   const handleDeleteProduct = (product: any) => {
     setProductToDelete(product);
     setShowDeleteProductDialog(true);
@@ -1838,21 +2146,19 @@ const addCustomHeader = () => {
     }
   };
 
-
   const fetchEstimates = async () => {
     setIsLoadingEstimates(true);
     try {
       const response = await apiClient.getEstimatesByJob(jobId, 1, 10);
       setEstimates(response.data.estimates || []);
       setTotalEstimates(response.data.total || 0);
-      setInvoioiceNumber(response.data.estimates[0]?.invoice_number || '')
+      setInvoioiceNumber(response.data.estimates[0]?.invoice_number || "");
     } catch (error) {
-      console.error('Failed to fetch estimates:', error);
+      console.error("Failed to fetch estimates:", error);
     } finally {
       setIsLoadingEstimates(false);
     }
   };
-
 
   useEffect(() => {
     fetchEstimates();
@@ -1862,48 +2168,45 @@ const addCustomHeader = () => {
     if (showAddMaterialModal) {
       setMaterialFormData({
         product_id: null,
-        material_name: '',
+        material_name: "",
         quantity: 0,
-        unit: 'pieces',
+        unit: "pieces",
         total_ordered: 0,
         material_used: 0,
-        supplier_order_id: '',
+        supplier_order_id: "",
         return_to_warehouse: false,
         unit_cost: 0,
-        date: new Date().toISOString().split('T')[0]
+        date: new Date().toISOString().split("T")[0],
       });
       setSelectedProduct(null);
-      setProductSearchQuery('');
+      setProductSearchQuery("");
     }
   }, [showAddMaterialModal]);
 
-
-
   const handlePrint = async (currentInvoice: any) => {
-    console.log('1')
+    console.log("1");
     if (!printRef.current) return;
-    console.log('2')
+    console.log("2");
 
     try {
       const canvas = await html2canvas(printRef.current, {
         scale: 2,
         useCORS: true,
-        backgroundColor: '#ffffff',
+        backgroundColor: "#ffffff",
         ignoreElements: (element) => {
-          return element.classList.contains('no-export');
-        }
+          return element.classList.contains("no-export");
+        },
       });
 
-      const imageData = canvas.toDataURL('image/png');
+      const imageData = canvas.toDataURL("image/png");
 
-      const printWindow = window.open('', '_blank');
+      const printWindow = window.open("", "_blank");
       if (!printWindow) return;
-
 
       printWindow.document.write(`
       <html>
         <head>
-          <title>Invoice #${currentInvoice?.invoice_number || ''}</title>
+          <title>Invoice #${currentInvoice?.invoice_number || ""}</title>
           <style>
             body, html {
               margin: 0;
@@ -1931,10 +2234,9 @@ const addCustomHeader = () => {
         }, 500);
       };
     } catch (err) {
-      console.error('Print error:', err);
+      console.error("Print error:", err);
     }
   };
-
 
   const handleSaveInvoice = async (newInvoice: Partial<Invoice>) => {
     setIsLoading(true);
@@ -1965,19 +2267,19 @@ const addCustomHeader = () => {
       const itemsTotal =
         newInvoice.items?.reduce(
           (sum, item) => sum + (item.quantity ?? 0) * (item.unitPrice ?? 0),
-          0
+          0,
         ) || 0;
 
       const laborTotal =
         newInvoice.labor?.reduce(
           (sum, labor) => sum + (labor.hours ?? 0) * (labor.hourlyRate ?? 0),
-          0
+          0,
         ) || 0;
 
       const additionalTotal =
         newInvoice.additionalCosts?.reduce(
           (sum, cost) => sum + (cost.amount ?? 0),
-          0
+          0,
         ) || 0;
 
       const subtotal = itemsTotal + laborTotal + additionalTotal;
@@ -1990,7 +2292,9 @@ const addCustomHeader = () => {
       const payload: CreateEstimatePayload = {
         estimate_title: "New Estimate",
         customer_id: Number(newInvoice.customerId),
-        priority: isPriority(newInvoice.priority) ? newInvoice.priority : "medium",
+        priority: isPriority(newInvoice.priority)
+          ? newInvoice.priority
+          : "medium",
         valid_until: newInvoice.dueDate || "",
         location: newInvoice.location || "N/A",
         description: newInvoice.notes || "",
@@ -2016,16 +2320,16 @@ const addCustomHeader = () => {
 
         additional_cost: newInvoice.additionalCosts?.length
           ? {
-            description: newInvoice.additionalCosts[0].description || "",
-            amount: newInvoice.additionalCosts.reduce(
-              (sum, c) => sum + c.amount,
-              0
-            ),
-          }
+              description: newInvoice.additionalCosts[0].description || "",
+              amount: newInvoice.additionalCosts.reduce(
+                (sum, c) => sum + c.amount,
+                0,
+              ),
+            }
           : { description: "", amount: 0 },
 
         custom_labor: laborPayload,
-        custom_products: productsPayload, 
+        custom_products: productsPayload,
       };
 
       const createdInvoice = await apiClient.createEstimate(payload);
@@ -2034,7 +2338,6 @@ const addCustomHeader = () => {
       toast.success("Invoice created successfully!");
       fetchEstimates();
       setShowNewInvoiceDialog(false);
-
     } catch (error) {
       console.error("Error creating invoice:", error);
       toast.error("Failed to create invoice");
@@ -2043,12 +2346,9 @@ const addCustomHeader = () => {
     }
   };
 
-
   const triggerRefresh = () => {
-    setRefreshInvoices(prev => !prev);
+    setRefreshInvoices((prev) => !prev);
   };
-
-
 
   // const handleDeleteEstimate = async (estimateId: any) => {
   //   try {
@@ -2080,7 +2380,7 @@ const addCustomHeader = () => {
       await apiClient.deleteEstimate(estimateToDelete.id);
       dispatch(deleteInvoice(String(estimateToDelete.id)));
       toast.success("Estimate deleted successfully!");
-      setRefreshInvoices(prev => !prev);
+      setRefreshInvoices((prev) => !prev);
     } catch (error) {
       console.error("Error deleting estimate:", error);
       toast.error("Failed to delete estimate");
@@ -2091,55 +2391,60 @@ const addCustomHeader = () => {
     }
   };
 
-
-
-
-
   const handleUpdateTimeLog = async () => {
     if (!validateTimeLogForm() || !currentTimeLog) {
-      toast.error('Please fix the validation errors');
+      toast.error("Please fix the validation errors");
       return;
     }
 
     try {
-      const selectedLabor = timeLogFormData.selectedLabor || timeLogFormData.selectedLeadLabor;
+      const selectedLabor =
+        timeLogFormData.selectedLabor || timeLogFormData.selectedLeadLabor;
       const isLeadLabor = !!timeLogFormData.selectedLeadLabor;
 
       const updatePayload = {
         job_id: jobId,
-        labor_id: selectedLabor?.id?.toString() || '',
-        full_name: selectedLabor?.users?.full_name || selectedLabor?.labor_code || '',
-        email: selectedLabor?.users?.email || '',
-        role: isLeadLabor ? 'lead_labor' : 'labor',
+        labor_id: selectedLabor?.id?.toString() || "",
+        full_name:
+          selectedLabor?.users?.full_name || selectedLabor?.labor_code || "",
+        email: selectedLabor?.users?.email || "",
+        role: isLeadLabor ? "lead_labor" : "labor",
         hours_worked: parseFloat(timeLogFormData.hoursWorked) || 0,
         hourly_rate: selectedLabor?.hourly_rate || 0,
         notes: timeLogFormData.description,
         date_of_joining: timeLogFormData.date,
-        is_custom: selectedLabor?.is_custom || false
+        is_custom: selectedLabor?.is_custom || false,
       };
 
       await apiClient.updateLaborTimeLog(currentTimeLog.id, updatePayload);
-      toast.success('Labor time log updated successfully!');
+      toast.success("Labor time log updated successfully!");
       setShowTimeLogModal(false);
       setCurrentTimeLog(null);
       resetTimeLogForm();
     } catch (error) {
-      console.error('Error updating labor time log:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to update labor time log');
+      console.error("Error updating labor time log:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to update labor time log",
+      );
     }
   };
-
 
   const handleDeleteTimeLog = async (timeLogId: string) => {
     try {
       await apiClient.deleteLaborTimeLog(timeLogId);
-      toast.success('Labor time log deleted successfully!');
+      toast.success("Labor time log deleted successfully!");
 
       // Refresh job data to remove the deleted labor time log
       await refreshJobData();
     } catch (error) {
-      console.error('Error deleting labor time log:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to delete labor time log');
+      console.error("Error deleting labor time log:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to delete labor time log",
+      );
     }
   };
 
@@ -2148,12 +2453,12 @@ const addCustomHeader = () => {
     setTimeLogFormData({
       selectedLabor: null,
       selectedLeadLabor: null,
-      hoursWorked: '',
-      description: '',
-      date: new Date().toISOString().split('T')[0]
+      hoursWorked: "",
+      description: "",
+      date: new Date().toISOString().split("T")[0],
     });
-    setLaborInputValue('');
-    setLeadLaborInputValue('');
+    setLaborInputValue("");
+    setLeadLaborInputValue("");
     setLaborSearchResults([]);
     setLeadLaborSearchResults([]);
     setShowLaborDropdown(false);
@@ -2167,7 +2472,9 @@ const addCustomHeader = () => {
       isRefreshingMaterialsRef.current = true;
 
       const updatedJobData = await apiClient.getJobById(jobId);
-      const updatedJobs = jobs.map((j: any) => j.id === jobId ? updatedJobData : j);
+      const updatedJobs = jobs.map((j: any) =>
+        j.id === jobId ? updatedJobData : j,
+      );
       setJobs(updatedJobs);
 
       // Update the current job from the updated jobs array
@@ -2182,18 +2489,24 @@ const addCustomHeader = () => {
         const bluesheetMaterials: any[] = [];
         if (currentJob.bluesheets && currentJob.bluesheets.length > 0) {
           currentJob.bluesheets.forEach((bluesheet: any) => {
-            if (bluesheet.material_entries && bluesheet.material_entries.length > 0) {
+            if (
+              bluesheet.material_entries &&
+              bluesheet.material_entries.length > 0
+            ) {
               bluesheet.material_entries.forEach((entry: any) => {
                 bluesheetMaterials.push({
                   id: entry.id,
                   material_name: entry.material_name,
-                  product_name: entry.product?.product_name || entry.product?.name,
+                  product_name:
+                    entry.product?.product_name || entry.product?.name,
                   quantity: entry.quantity,
                   unit: entry.unit,
                   unit_cost: entry.unit_cost,
                   unitCost: entry.unit_cost,
                   price: entry.unit_cost,
-                  supplier: entry.product?.supplier?.company_name || entry.product?.supplier,
+                  supplier:
+                    entry.product?.supplier?.company_name ||
+                    entry.product?.supplier,
                   supplier_sku: entry.product?.supplier_sku,
                   jdp_sku: entry.product?.jdp_sku,
                   sku: entry.product?.sku,
@@ -2203,7 +2516,7 @@ const addCustomHeader = () => {
                   bluesheet_notes: bluesheet.notes,
                   product: entry.product,
                   jdp_price: entry.product?.jdp_price,
-                  is_bluesheet_material: true
+                  is_bluesheet_material: true,
                 });
               });
             }
@@ -2217,14 +2530,12 @@ const addCustomHeader = () => {
       setTimeout(() => {
         isRefreshingMaterialsRef.current = false;
       }, 100);
-
     } catch (error) {
-      console.error('Error refreshing job data:', error);
-      toast.error('Failed to refresh job data');
+      console.error("Error refreshing job data:", error);
+      toast.error("Failed to refresh job data");
       isRefreshingMaterialsRef.current = false;
     }
   };
-
 
   const fetchMaterials = async () => {
     setIsLoadingMaterials(true);
@@ -2233,18 +2544,24 @@ const addCustomHeader = () => {
       const bluesheetMaterials: any[] = [];
       if (job.bluesheets && job.bluesheets.length > 0) {
         job.bluesheets.forEach((bluesheet: any) => {
-          if (bluesheet.material_entries && bluesheet.material_entries.length > 0) {
+          if (
+            bluesheet.material_entries &&
+            bluesheet.material_entries.length > 0
+          ) {
             bluesheet.material_entries.forEach((entry: any) => {
               bluesheetMaterials.push({
                 id: entry.id,
                 material_name: entry.material_name,
-                product_name: entry.product?.product_name || entry.product?.name,
+                product_name:
+                  entry.product?.product_name || entry.product?.name,
                 quantity: entry.quantity,
                 unit: entry.unit,
                 unit_cost: entry.unit_cost,
                 unitCost: entry.unit_cost,
                 price: entry.unit_cost,
-                supplier: entry.product?.supplier?.company_name || entry.product?.supplier,
+                supplier:
+                  entry.product?.supplier?.company_name ||
+                  entry.product?.supplier,
                 supplier_sku: entry.product?.supplier_sku,
                 jdp_sku: entry.product?.jdp_sku,
                 sku: entry.product?.sku,
@@ -2254,7 +2571,7 @@ const addCustomHeader = () => {
                 bluesheet_notes: bluesheet.notes,
                 product: entry.product, // Include full product object
                 jdp_price: entry.product?.jdp_price, // Add jdp_price at root level
-                is_bluesheet_material: true
+                is_bluesheet_material: true,
               });
             });
           }
@@ -2264,7 +2581,7 @@ const addCustomHeader = () => {
       // Set only bluesheet materials
       setMaterials(bluesheetMaterials);
     } catch (error) {
-      console.error('Failed to fetch materials:', error);
+      console.error("Failed to fetch materials:", error);
     } finally {
       setIsLoadingMaterials(false);
     }
@@ -2282,40 +2599,40 @@ const addCustomHeader = () => {
     }
   }, [job.id, job.bluesheets]);
 
-
   const triggerRefreshMaterials = () => {
-    setRefreshMaterials(prev => !prev);
+    setRefreshMaterials((prev) => !prev);
   };
 
   const [jobFormData, setJobFormData] = useState({
     title: job.title,
     type: job.type,
-    location: job.location || `${job.address || ''}, ${job.cityZip || ''}`,
-    description: job.description
+    location: job.location || `${job.address || ""}, ${job.cityZip || ""}`,
+    description: job.description,
   });
 
   // Update editedJob when job data changes
   useEffect(() => {
     // Normalize status: convert "in-progress" to "in_progress" if needed
     const normalizeStatus = (status: string | undefined): string => {
-      if (!status) return 'draft';
+      if (!status) return "draft";
       // Convert hyphen to underscore for consistency
-      if (status === 'in-progress') return 'in_progress';
+      if (status === "in-progress") return "in_progress";
       return status;
     };
 
     setEditedJob({
       title: job.title,
       type: job.type,
-      location: job.location || `${job.address || ''}, ${job.cityZip || ''}`,
-      address: job.address || '',
-      cityZip: job.cityZip || '',
+      location: job.location || `${job.address || ""}, ${job.cityZip || ""}`,
+      address: job.address || "",
+      cityZip: job.cityZip || "",
       description: job.description,
       contractor: job.contractor || job.customer,
-      startDate: (job.created_at && formatDate(job.created_at))
-        || (job.createdDate && formatDate(job.createdDate))
-        || '',
-      priority: job.priority || 'High',
+      startDate:
+        (job.created_at && formatDate(job.created_at)) ||
+        (job.createdDate && formatDate(job.createdDate)) ||
+        "",
+      priority: job.priority || "High",
       status: normalizeStatus(job.status),
       assignedLabor: job.assignedLaborDetails || [],
       assignedLeadLabor: job.assignedLeadLaborDetails || [],
@@ -2326,7 +2643,7 @@ const addCustomHeader = () => {
   useEffect(() => {
     if (job.bluesheets) {
       setBluesheets(job.bluesheets);
-      console.log('Updated bluesheets:', job.bluesheets);
+      console.log("Updated bluesheets:", job.bluesheets);
     }
   }, [job.bluesheets]);
 
@@ -2338,13 +2655,12 @@ const addCustomHeader = () => {
 
         setSuppliers(response.data.data);
       } catch (error) {
-        console.error('Error fetching suppliers:', error);
+        console.error("Error fetching suppliers:", error);
       }
     };
 
     fetchSuppliers();
   }, []);
-
 
   // useEffect(() => {
   //   if (job.assignedMaterialsDetails) {
@@ -2352,21 +2668,18 @@ const addCustomHeader = () => {
   //   }
   // }, [job.assignedMaterialsDetails]);
 
-
   useEffect(() => {
     const fetchProjectSummary = async () => {
       try {
         const res = await apiClient.getProjectSummary(jobId);
         setProjectSummary(res.data.projectSummary);
       } catch (error) {
-        console.error('Failed to fetch project summary', error);
+        console.error("Failed to fetch project summary", error);
       }
     };
 
     if (jobId) fetchProjectSummary();
   }, [jobId]);
-
-
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -2384,17 +2697,14 @@ const addCustomHeader = () => {
     if (jobId) fetchDashboard();
   }, [jobId]);
 
-
-
-
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
         const rolesData = await apiClient.getRoles();
         setRoles(rolesData);
       } catch (error) {
-        console.error('Error fetching initial data:', error);
-        toast.error('Failed to load initial data');
+        console.error("Error fetching initial data:", error);
+        toast.error("Failed to load initial data");
       }
     };
 
@@ -2402,55 +2712,65 @@ const addCustomHeader = () => {
   }, [jobId]);
 
   const [invoiceFormData, setInvoiceFormData] = useState({
-    type: 'Estimate',
-    dueDate: '',
-    description: '',
-    amount: 0
+    type: "Estimate",
+    dueDate: "",
+    description: "",
+    amount: 0,
   });
 
   const [materialFormData, setMaterialFormData] = useState({
     product_id: null as number | null,
-    material_name: '',
+    material_name: "",
     quantity: 0,
-    unit: 'pieces',
+    unit: "pieces",
     total_ordered: 0,
     material_used: 0,
-    supplier_order_id: '',
+    supplier_order_id: "",
     return_to_warehouse: false,
     unit_cost: 0,
-    date: new Date().toISOString().split('T')[0]
+    date: new Date().toISOString().split("T")[0],
   });
 
-  // Product search states 
+  // Product search states
   const [isSearchingProducts, setIsSearchingProducts] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
-  const [productQuantities, setProductQuantities] = useState<Record<number, ProductQuantity>>({});
-  const [productSearchResults, setProductSearchResults] = useState<Product[]>([]);
-  const [showProductDropdown, setShowProductDropdown] = useState<boolean>(false);
-  const [productSearchQuery, setProductSearchQuery] = useState<string>('');
+  const [productQuantities, setProductQuantities] = useState<
+    Record<number, ProductQuantity>
+  >({});
+  const [productSearchResults, setProductSearchResults] = useState<Product[]>(
+    [],
+  );
+  const [showProductDropdown, setShowProductDropdown] =
+    useState<boolean>(false);
+  const [productSearchQuery, setProductSearchQuery] = useState<string>("");
   const [materialErrors, setMaterialErrors] = useState<MaterialErrors>({});
-
 
   const [timeLogFormData, setTimeLogFormData] = useState({
     selectedLabor: null as any,
     selectedLeadLabor: null as any,
-    hoursWorked: '',
-    description: '',
-    date: new Date().toISOString().split('T')[0]
+    hoursWorked: "",
+    description: "",
+    date: new Date().toISOString().split("T")[0],
   });
 
   // State for time range picker value
-  const [timeRangeValue, setTimeRangeValue] = useState<[Date, Date] | null>(null);
+  const [timeRangeValue, setTimeRangeValue] = useState<[Date, Date] | null>(
+    null,
+  );
   // Flag to prevent useEffect from overwriting user-selected time range
   const timeRangeValueRef = useRef(false);
 
   // Sync timeRangeValue when hoursWorked changes (for edit mode only, not when user selects time)
   useEffect(() => {
     // Only sync if timeRangeValueRef is false (meaning change came from edit mode, not from user selection)
-    if (!timeRangeValueRef.current && timeLogFormData.hoursWorked && timeLogFormData.hoursWorked.includes(':')) {
+    if (
+      !timeRangeValueRef.current &&
+      timeLogFormData.hoursWorked &&
+      timeLogFormData.hoursWorked.includes(":")
+    ) {
       try {
-        const parts = timeLogFormData.hoursWorked.split(':');
+        const parts = timeLogFormData.hoursWorked.split(":");
         const h = parseInt(parts[0]) || 0;
         const m = parseInt(parts[1]) || 0;
         const s = parseInt(parts[2]) || 0;
@@ -2459,25 +2779,30 @@ const addCustomHeader = () => {
         const startTime = new Date();
         startTime.setHours(9, 0, 0, 0);
         const endTime = new Date(startTime);
-        endTime.setHours(startTime.getHours() + h, startTime.getMinutes() + m, startTime.getSeconds() + s, 0);
+        endTime.setHours(
+          startTime.getHours() + h,
+          startTime.getMinutes() + m,
+          startTime.getSeconds() + s,
+          0,
+        );
 
         // Convert to time strings for TimeRangePicker (format: "HH:MM")
-        const startTimeStr = `${String(startTime.getHours()).padStart(2, '0')}:${String(startTime.getMinutes()).padStart(2, '0')}`;
-        const endTimeStr = `${String(endTime.getHours()).padStart(2, '0')}:${String(endTime.getMinutes()).padStart(2, '0')}`;
+        const startTimeStr = `${String(startTime.getHours()).padStart(2, "0")}:${String(startTime.getMinutes()).padStart(2, "0")}`;
+        const endTimeStr = `${String(endTime.getHours()).padStart(2, "0")}:${String(endTime.getMinutes()).padStart(2, "0")}`;
 
         // TimeRangePicker accepts time strings or Date objects
         // Try using time strings first
         setTimeRangeValue([startTimeStr, endTimeStr] as any);
 
-        console.log('Syncing timeRangeValue from hoursWorked:', {
+        console.log("Syncing timeRangeValue from hoursWorked:", {
           hoursWorked: timeLogFormData.hoursWorked,
           startTimeStr,
           endTimeStr,
           startTime: startTime.toString(),
-          endTime: endTime.toString()
+          endTime: endTime.toString(),
         });
       } catch (e) {
-        console.error('Error syncing timeRangeValue:', e);
+        console.error("Error syncing timeRangeValue:", e);
         setTimeRangeValue(null);
       }
     } else if (!timeLogFormData.hoursWorked && !timeRangeValueRef.current) {
@@ -2489,13 +2814,15 @@ const addCustomHeader = () => {
 
   // Search functionality for labor and lead labor
   const [laborSearchResults, setLaborSearchResults] = useState<any[]>([]);
-  const [leadLaborSearchResults, setLeadLaborSearchResults] = useState<any[]>([]);
+  const [leadLaborSearchResults, setLeadLaborSearchResults] = useState<any[]>(
+    [],
+  );
   const [showLaborDropdown, setShowLaborDropdown] = useState(false);
   const [showLeadLaborDropdown, setShowLeadLaborDropdown] = useState(false);
   const [isLoadingLabor, setIsLoadingLabor] = useState(false);
   const [isLoadingLeadLabor, setIsLoadingLeadLabor] = useState(false);
-  const [laborInputValue, setLaborInputValue] = useState('');
-  const [leadLaborInputValue, setLeadLaborInputValue] = useState('');
+  const [laborInputValue, setLaborInputValue] = useState("");
+  const [leadLaborInputValue, setLeadLaborInputValue] = useState("");
 
   // Search functions
   const searchLabor = async (query: string) => {
@@ -2506,7 +2833,7 @@ const addCustomHeader = () => {
       const response = await apiClient.searchLaborByQuery(query, 1, 20);
       setLaborSearchResults(response.data?.labor || []);
     } catch (error) {
-      console.error('Error searching labor:', error);
+      console.error("Error searching labor:", error);
       setLaborSearchResults([]);
     } finally {
       setIsLoadingLabor(false);
@@ -2521,7 +2848,7 @@ const addCustomHeader = () => {
       const response = await apiClient.searchLeadLaborByQuery(query, 1, 20);
       setLeadLaborSearchResults(response.data?.leadLabor || []);
     } catch (error) {
-      console.error('Error searching lead labor:', error);
+      console.error("Error searching lead labor:", error);
       setLeadLaborSearchResults([]);
     } finally {
       setIsLoadingLeadLabor(false);
@@ -2532,15 +2859,18 @@ const addCustomHeader = () => {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      if (!target.closest('.labor-dropdown') && !target.closest('.lead-labor-dropdown')) {
+      if (
+        !target.closest(".labor-dropdown") &&
+        !target.closest(".lead-labor-dropdown")
+      ) {
         setShowLaborDropdown(false);
         setShowLeadLaborDropdown(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -2549,35 +2879,47 @@ const addCustomHeader = () => {
   const [roles, setRoles] = useState<any[]>([]);
   const [isLoadingTimeLogs, setIsLoadingTimeLogs] = useState(false);
   const [showTimeLogModal, setShowTimeLogModal] = useState(false);
-  const [timeLogModalMode, setTimeLogModalMode] = useState<'create' | 'edit' | 'view'>('create');
+  const [timeLogModalMode, setTimeLogModalMode] = useState<
+    "create" | "edit" | "view"
+  >("create");
   const [currentTimeLog, setCurrentTimeLog] = useState<any>(null);
-  const [timeLogValidationErrors, setTimeLogValidationErrors] = useState<Record<string, string>>({});
+  const [timeLogValidationErrors, setTimeLogValidationErrors] = useState<
+    Record<string, string>
+  >({});
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2
-    }).format(amount)
-  }
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+    }).format(amount);
+  };
 
-  type StatusType = 'in-progress' | 'sent' | 'paid' | 'approved' | 'pending';
+  type StatusType = "in-progress" | "sent" | "paid" | "approved" | "pending";
 
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<StatusType, { color: string; text: string }> = {
-      'in-progress': { color: 'bg-blue-100 text-blue-800', text: 'In Progress' },
-      'sent': { color: 'bg-gray-100 text-gray-800', text: 'Sent' },
-      'paid': { color: 'bg-green-100 text-green-800', text: 'Paid' },
-      'approved': { color: 'bg-green-100 text-green-800', text: 'Approved' },
-      'pending': { color: 'bg-yellow-100 text-yellow-800', text: 'Pending' }
+      "in-progress": {
+        color: "bg-blue-100 text-blue-800",
+        text: "In Progress",
+      },
+      sent: { color: "bg-gray-100 text-gray-800", text: "Sent" },
+      paid: { color: "bg-green-100 text-green-800", text: "Paid" },
+      approved: { color: "bg-green-100 text-green-800", text: "Approved" },
+      pending: { color: "bg-yellow-100 text-yellow-800", text: "Pending" },
     };
 
     // Type assertion for known status values
     const normalizedStatus = status.toLowerCase() as StatusType;
-    const config = statusConfig[normalizedStatus] || { color: 'bg-gray-100 text-gray-800', text: status };
+    const config = statusConfig[normalizedStatus] || {
+      color: "bg-gray-100 text-gray-800",
+      text: status,
+    };
 
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}
+      >
         {config.text}
       </span>
     );
@@ -2588,886 +2930,1921 @@ const addCustomHeader = () => {
       <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
         High Priority
       </span>
-    )
-  }
+    );
+  };
 
   // Invoice Helper Functions
   // const calculateInvoiceSubtotal = (): number => {
   //   return inlineInvoiceData.lineItems.reduce((sum, item) => sum + (item.total || 0), 0)
   // }
-const calculateInvoiceSubtotal = (): number => {
-  return inlineInvoiceData.lineItems.reduce((sum, item) => {
-    if (item.type === "header") return sum;
-    return sum + (item.total || 0);
-  }, 0);
-};
+  const calculateInvoiceSubtotal = (): number => {
+    return inlineInvoiceData.lineItems.reduce((sum, item) => {
+      if (item.type === "header") return sum;
+      return sum + (item.total || 0);
+    }, 0);
+  };
 
-  // const updateInvoiceLineItem = (itemId: string, field: string, value: any) => {
-  //   setInlineInvoiceData(prev => ({
-  //     ...prev,
-  //     lineItems: prev.lineItems.map(item => {
-  //       if (item.id === itemId) {
-  //         const updated = { ...item, [field]: value }
-
-  //         // Update total calculation based on the logic:
-  //         // If both rate and estimatedPrice are provided, use estimatedPrice
-  //         // If only rate is provided, use rate
-  //         if (field === 'qty' || field === 'rate' || field === 'estimatedPrice') {
-  //           const qty = updated.qty || 0
-  //           const rate = updated.rate || 0
-  //           const estimatedPrice = updated.estimatedPrice || 0
-
-  //           // If estimatedPrice is provided and greater than 0, use it
-  //           // Otherwise, use rate
-  //           const priceToUse = estimatedPrice > 0 ? estimatedPrice : rate
-  //           updated.total = qty * priceToUse
-  //         }
-  //         return updated
-  //       }
-  //       return item
-  //     })
-  //   }))
-  // }
-const updateInvoiceLineItem = (itemId: string, field: string, value: any) => {
-  setInlineInvoiceData((prev) => {
-    const updatedLineItems = prev.lineItems.map((item) => {
-      if (item.id !== itemId) return item;
-
-      const updated = { ...item, [field]: value };
-
-      if (updated.type === "header") {
-        return updated;
-      }
-
-      if (field === "qty" || field === "rate" || field === "estimatedPrice") {
-        const qty = Number(updated.qty) || 0;
-        const rate = Number(updated.rate) || 0;
-        const estimatedPrice = Number(updated.estimatedPrice) || 0;
-        const priceToUse = estimatedPrice > 0 ? estimatedPrice : rate;
-        updated.total = qty * priceToUse;
-      }
-
-      return updated;
-    });
-
-    const changedHeader = updatedLineItems.find(
-      (row) => row.id === itemId && row.type === "header"
-    );
-
-    if (changedHeader && field === "headerName") {
-      updatedLineItems.forEach((row) => {
-        if (
-          row.type === "item" &&
-          row.parentHeaderKey === changedHeader.headerKey
-        ) {
-          row.parentHeaderName = value || null;
-        }
-      });
-    }
-
-    return {
-      ...prev,
-      lineItems: updatedLineItems,
-    };
-  });
-};
-const addInvoiceLineItem = () => {
-  setInlineInvoiceData((prev) => {
-    const headerMeta = getLastHeaderMeta(prev.lineItems);
-
-    return {
-      ...prev,
-      lineItems: [
-        ...prev.lineItems,
-        {
-          id: Math.random().toString(36).substring(2, 9),
-          type: "item",
-          headerKey: null,
-          headerName: "",
-          parentHeaderKey: headerMeta.parentHeaderKey,
-          parentHeaderName: headerMeta.parentHeaderName,
-          isEditingHeader: false,
-          productId: null,
-          qty: 1,
-          item: "",
-          description: "",
-          rate: 0,
-          estimatedPrice: 0,
-          total: 0,
-          searchQuery: "",
-          showSearchResults: false,
-          supplierId: selectedSupplierId || 1,
-          isCustomProduct: false,
-          estimate_product_id: null,
-        },
-      ],
-    };
-  });
-};
-
-const addCustomLineItem = () => {
-  setInlineInvoiceData((prev) => {
-    const headerMeta = getLastHeaderMeta(prev.lineItems);
-
-    return {
-      ...prev,
-      lineItems: [
-        ...prev.lineItems,
-        {
-          id: Math.random().toString(36).substring(2, 9),
-          type: "item",
-          headerKey: null,
-          headerName: "",
-          parentHeaderKey: headerMeta.parentHeaderKey,
-          parentHeaderName: headerMeta.parentHeaderName,
-          isEditingHeader: false,
-          productId: null,
-          qty: 1,
-          item: "",
-          description: "",
-          rate: 0,
-          estimatedPrice: 0,
-          total: 0,
-          searchQuery: "",
-          showSearchResults: false,
-          supplierId: selectedSupplierId || 1,
-          isCustomProduct: true,
-          estimate_product_id: null,
-        },
-      ],
-    };
-  });
-};
   const addCustomInvoiceType = (customType: string) => {
     if (customType) {
       // Check for case-insensitive duplicates
-      const isDuplicate = customInvoiceTypes.some(existing =>
-        existing.toLowerCase() === customType.toLowerCase()
-      )
+      const isDuplicate = customInvoiceTypes.some(
+        (existing) => existing.toLowerCase() === customType.toLowerCase(),
+      );
       if (!isDuplicate) {
-        setCustomInvoiceTypes(prev => [...prev, customType])
+        setCustomInvoiceTypes((prev) => [...prev, customType]);
       }
     }
-  }
-console.log(inlineInvoiceData,"::inlineInvoiceData");
+  };
+  console.log(inlineInvoiceData, "::inlineInvoiceData");
 
   // Fetch customer data
   const fetchCustomerData = async (customerId: string) => {
     try {
-      const response = await apiClient.getCustomers(1, 100) // Get all customers 
-      const customers = response.data?.customers || response.data?.data || response.data || []
-      const customer = customers.find((c: any) => c.id === Number(customerId))
+      const response = await apiClient.getCustomers(1, 100); // Get all customers
+      const customers =
+        response.data?.customers || response.data?.data || response.data || [];
+      const customer = customers.find((c: any) => c.id === Number(customerId));
       if (customer) {
-        setCustomerData(customer)
+        setCustomerData(customer);
         // Update customer address in inline invoice data
-        const newAddress = customer.address || customer.customer_address || ''
+        const newAddress = customer.address || customer.customer_address || "";
 
         // Force update with setTimeout to ensure state update
         setTimeout(() => {
-          setInlineInvoiceData(prev => {
+          setInlineInvoiceData((prev) => {
             const updated = {
               ...prev,
-              customerAddress: newAddress
-            }
-            return updated
-          })
-        }, 100)
+              customerAddress: newAddress,
+            };
+            return updated;
+          });
+        }, 100);
       } else {
-        setCustomerData(null)
+        setCustomerData(null);
       }
     } catch (error) {
-      console.error('Error fetching customer data:', error)
-      setCustomerData(null)
+      console.error("Error fetching customer data:", error);
+      setCustomerData(null);
     }
-  }
+  };
 
   const fetchContractorData = async (contractorId: string) => {
     try {
-      const response = await apiClient.getContractors(1, 100) // Get all contractors
-      const contractors = response.data?.contractors || response.data?.data || response.data || []
-      const contractor = contractors.find((c: any) => c.id === Number(contractorId))
+      const response = await apiClient.getContractors(1, 100); // Get all contractors
+      const contractors =
+        response.data?.contractors ||
+        response.data?.data ||
+        response.data ||
+        [];
+      const contractor = contractors.find(
+        (c: any) => c.id === Number(contractorId),
+      );
       if (contractor) {
-        setContractorData(contractor)
-        console.log(contractor, 'contractor')
+        setContractorData(contractor);
+        console.log(contractor, "contractor");
         // Update contractor address in inline invoice data
-        const newAddress = contractor.address || contractor.contractor_address || ''
-        console.log(newAddress, 'newAddress')
+        const newAddress =
+          contractor.address || contractor.contractor_address || "";
+        console.log(newAddress, "newAddress");
         // Force update with setTimeout to ensure state update
         setTimeout(() => {
-          setInlineInvoiceData(prev => {
+          setInlineInvoiceData((prev) => {
             const updated = {
               ...prev,
-              customerAddress: newAddress
-            }
-            return updated
-          })
-        }, 100)
+              customerAddress: newAddress,
+            };
+            return updated;
+          });
+        }, 100);
       } else {
-        setContractorData(null)
+        setContractorData(null);
       }
     } catch (error) {
-      console.error('Error fetching contractor data:', error)
-      setContractorData(null)
+      console.error("Error fetching contractor data:", error);
+      setContractorData(null);
     }
-  }
+  };
 
-  console.log(inlineInvoiceData,"::inlineInvoiceData");
-  
-  // const removeInvoiceLineItem = async (itemId: string) => {
-  //   try {
-  //     // Find the item to get estimate_product_id
-  //     const itemToDelete = inlineInvoiceData.lineItems.find(item => item.id === itemId);
-  //     if (itemToDelete && itemToDelete.estimate_product_id) {
-  //       // Call delete API
-  //       console.log(itemToDelete.estimate_product_id, 'itemToDelete.estimate_product_id')
-  //       await apiClient.deleteProductFromEstimate(itemToDelete.estimate_product_id);
-  //       toast.success('Product removed from estimate successfully!');
-  //     }
+  console.log(inlineInvoiceData, "::inlineInvoiceData");
 
-  //     // Remove from local state
-  //     setInlineInvoiceData(prev => ({
-  //       ...prev,
-  //       lineItems: prev.lineItems.filter(item => item.id !== itemId)
-  //     }));
-  //   } catch (error) {
-  //     console.error('Error removing product from estimate:', error);
-  //     toast.error('Failed to remove product from estimate');
-  //   }
-  // }
-  const removeInvoiceLineItem = (itemId: string) => {
-  setInlineInvoiceData((prev) => {
-    const rowToRemove = prev.lineItems.find((item) => item.id === itemId);
-
-    if (!rowToRemove) return prev;
-
-    // if deleting a header, detach all child item rows from that header
-    if (rowToRemove.type === "header") {
-      const removedHeaderKey = rowToRemove.headerKey;
-
-      return {
-        ...prev,
-        lineItems: prev.lineItems
-          .filter((item) => item.id !== itemId)
-          .map((item) => {
-            if (
-              item.type === "item" &&
-              item.parentHeaderKey === removedHeaderKey
-            ) {
-              return {
-                ...item,
-                parentHeaderKey: null,
-                parentHeaderName: null,
-              };
-            }
-
-            return item;
-          }),
-      };
-    }
-
-    return {
-      ...prev,
-      lineItems: prev.lineItems.filter((item) => item.id !== itemId),
-    };
-  });
-};
-
- const getFilteredProducts = (query: string) => {
-  if (!query) return []
-  return products  // ✅ API se aaye results directly use karo
-}
+  const getFilteredProducts = (query: string) => {
+    if (!query) return [];
+    return products; // ✅ API se aaye results directly use karo
+  };
 
   const selectProduct = (itemId: string, product: any) => {
     // Check if product already exists in line items (by product ID, not name)
-      const currentItem = inlineInvoiceData.lineItems.find(
-        (item: any) => item.id === itemId,
-      );
-      const currentHeaderKey = currentItem.parentHeaderKey || null;
+    const currentItem = inlineInvoiceData.lineItems.find(
+      (item: any) => item.id === itemId,
+    );
+    const currentHeaderKey = currentItem.parentHeaderKey || null;
 
-      // Check duplicate only inside same header group
-      const isDuplicateInSameGroup = inlineInvoiceData.lineItems.some(
-        (item: any) => {
-          if (item.id === itemId) return false;
-          if (item.type === "header") return false;
+    // Check duplicate only inside same header group
+    const isDuplicateInSameGroup = inlineInvoiceData.lineItems.some(
+      (item: any) => {
+        if (item.id === itemId) return false;
+        if (item.type === "header") return false;
 
-          return (
-            item.parentHeaderKey === currentHeaderKey &&
-            item.productId === product.id
-          );
-        },
-      );
+        return (
+          item.parentHeaderKey === currentHeaderKey &&
+          item.productId === product.id
+        );
+      },
+    );
 
-      if (isDuplicateInSameGroup) {
-        toast.error("This product is already added in this section");
-        return;
-      }
+    if (isDuplicateInSameGroup) {
+      toast.error("This product is already added in this section");
+      return;
+    }
 
-
-    setInlineInvoiceData(prev => ({
+    setInlineInvoiceData((prev) => ({
       ...prev,
-      lineItems: prev.lineItems.map(item => {
+      lineItems: prev.lineItems.map((item) => {
         if (item.id === itemId) {
           return {
             ...item,
             productId: product.id,
             item: product.name,
-            description: product.description || '',
+            description: product.description || "",
             rate: product.jdpPrice || 0,
             estimatedPrice: product.estimatedPrice || product.jdpPrice || 0,
-            total: (item.qty || 1) * (product.estimatedPrice || product.jdpPrice || 0),
+            total:
+              (item.qty || 1) *
+              (product.estimatedPrice || product.jdpPrice || 0),
             showSearchResults: false,
-            searchQuery: '',
+            searchQuery: "",
             supplierId: product.supplierId || selectedSupplierId || 1,
             // Searched/selected product => not custom
             isCustomProduct: false,
-          }
+          };
         }
-        return item
-      })
-    }))
-  }
+        return item;
+      }),
+    }));
+  };
 
-  const addCustomProduct = (itemId: string, productName: string) => {
-    // Check if custom product already exists in line items (by name for custom products)
-    const isDuplicate = inlineInvoiceData.lineItems.some(item =>
-      item.id !== itemId && item.productId === product.id
-    )
+  // const addCustomProduct = (itemId: string, productName: string) => {
+  //   // Check if custom product already exists in line items (by name for custom products)
+  //   const isDuplicate = inlineInvoiceData.lineItems.some(item =>
+  //     item.id !== itemId && item.productId === product.id
+  //   )
 
-    if (isDuplicate) {
-      toast.error('This custom product is already added to the invoice')
-      return
-    }
+  //   if (isDuplicate) {
+  //     toast.error('This custom product is already added to the invoice')
+  //     return
+  //   }
 
-    setInlineInvoiceData(prev => ({
-      ...prev,
-      lineItems: prev.lineItems.map(item => {
-        if (item.id === itemId) {
-          return {
-            ...item,
-            item: productName,
-            // Manual/custom product => mark custom and remove any selected product reference
-            productId: null,
-            isCustomProduct: true,
-            showSearchResults: false,
-            searchQuery: ''
-          }
-        }
-        return item
-      })
-    }))
-  }
+  //   setInlineInvoiceData(prev => ({
+  //     ...prev,
+  //     lineItems: prev.lineItems.map(item => {
+  //       if (item.id === itemId) {
+  //         return {
+  //           ...item,
+  //           item: productName,
+  //           // Manual/custom product => mark custom and remove any selected product reference
+  //           productId: null,
+  //           isCustomProduct: true,
+  //           showSearchResults: false,
+  //           searchQuery: ''
+  //         }
+  //       }
+  //       return item
+  //     })
+  //   }))
+  // }
 
-  const getAvailableEstimates = () => {
-    return estimates.filter((est: any) => est.invoice_type === 'Estimate')
-  }
+  // const getAvailableEstimates = () => {
+  //   return estimates.filter((est: any) => est.invoice_type === 'Estimate')
+  // }
 
-  const handleEstimateSelection = (estimateId: string) => {
-    setSelectedEstimateId(estimateId)
-    const estimate: any = estimates.find((e: any) => e.id === estimateId)
-    if (estimate) {
-      setInlineInvoiceData(prev => ({
-        ...prev,
-        estimateTotal: estimate.total_amount || 0,
-        paymentHistory: estimate.paymentHistory || []
-      }))
-    }
-  }
+  // const handleEstimateSelection = (estimateId: string) => {
+  //   setSelectedEstimateId(estimateId)
+  //   const estimate: any = estimates.find((e: any) => e.id === estimateId)
+  //   if (estimate) {
+  //     setInlineInvoiceData(prev => ({
+  //       ...prev,
+  //       estimateTotal: estimate.total_amount || 0,
+  //       paymentHistory: estimate.paymentHistory || []
+  //     }))
+  //   }
+  // }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    })
-  }
+    return new Date(dateString).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
 
   const getInvoiceTypeColor = (type: string) => {
     const colors: any = {
-      'Estimate': 'border-blue-200 bg-blue-50 text-blue-700',
-      'Downpayment Invoice': 'border-green-200 bg-green-50 text-green-700',
-      'Rough Invoice': 'border-orange-200 bg-orange-50 text-orange-700',
-      'Progressive Invoice': 'border-purple-200 bg-purple-50 text-purple-700',
-      'Final Invoice': 'border-gray-200 bg-gray-50 text-gray-700'
-    }
-    return colors[type] || 'border-gray-200 bg-gray-50 text-gray-700'
-  }
+      Estimate: "border-blue-200 bg-blue-50 text-blue-700",
+      "Downpayment Invoice": "border-green-200 bg-green-50 text-green-700",
+      "Rough Invoice": "border-orange-200 bg-orange-50 text-orange-700",
+      "Progressive Invoice": "border-purple-200 bg-purple-50 text-purple-700",
+      "Final Invoice": "border-gray-200 bg-gray-50 text-gray-700",
+    };
+    return colors[type] || "border-gray-200 bg-gray-50 text-gray-700";
+  };
 
   const getStatusBadgeColor = (status: string) => {
     const colors: any = {
-      'Draft': 'border-gray-300 bg-gray-100 text-gray-700',
-      'Sent': 'border-blue-300 bg-blue-100 text-blue-700',
-      'Paid': 'border-green-300 bg-green-100 text-green-700'
-    }
-    return colors[status] || 'border-gray-300 bg-gray-100 text-gray-700'
-  }
+      Draft: "border-gray-300 bg-gray-100 text-gray-700",
+      Sent: "border-blue-300 bg-blue-100 text-blue-700",
+      Paid: "border-green-300 bg-green-100 text-green-700",
+    };
+    return colors[status] || "border-gray-300 bg-gray-100 text-gray-700";
+  };
 
   const handleViewInvoice = async (invoice: any) => {
     try {
-      setIsLoading(true)
-      const response = await apiClient.getEstimateById(invoice.id)
-      const invoiceData = response?.data || response
+      setIsLoading(true);
+      const response = await apiClient.getEstimateById(invoice.id);
+      const invoiceData = response?.data || response;
+
+      console.log(invoiceData.products, "invoiceData.products");
 
       // Populate the inline invoice form with the fetched invoice data
       setInlineInvoiceData({
-        date: invoiceData.estimate_date || new Date().toISOString().split('T')[0],
-        estimateNumber: invoiceData.invoice_number || '',
-        customerName: invoiceData.customer_name || invoiceData.contractor?.contractor_name || '',
-        customerAddress: invoiceData.customer_address || invoiceData.contractor?.address || '',
-        billToAddress: invoiceData.bill_to_address || '',
+        date:
+          invoiceData.estimate_date || new Date().toISOString().split("T")[0],
+        estimateNumber: invoiceData.invoice_number || "",
+        customerName:
+          invoiceData.customer_name ||
+          invoiceData.contractor?.contractor_name ||
+          "",
+        customerAddress:
+          invoiceData.customer_address || invoiceData.contractor?.address || "",
+        billToAddress: invoiceData.bill_to_address || "",
         billToAddressEnabled: !!invoiceData.bill_to_address,
-        poNumber: invoiceData.po_number || '',
-        project: invoiceData.estimate_title || '',
-        rep: invoiceData.rep || 'JDP',
-        dueDate: invoiceData.due_date || '',
+        poNumber: invoiceData.po_number || "",
+        project: invoiceData.estimate_title || "",
+        rep: invoiceData.rep || "JDP",
+        dueDate: invoiceData.due_date || "",
         paymentCredits: invoiceData.payment_credits || 0,
-        balanceDue: invoiceData.balance_due || '',
+        balanceDue: invoiceData.balance_due || "",
         lineItems: invoiceData.products?.map((product: any) => ({
           id: Math.random().toString(36).substring(2, 9),
           productId: product.id,
           qty: product.stock_quantity || 1,
-          item: product.product_name || '',
-          description: product.description || '',
+          item: product.product_name || "",
+          description: product.description || "",
           rate: product.jdp_price || 0,
           estimatedPrice: product.estimated_price || 0,
           total: product.total_cost || 0,
-          searchQuery: '',
+          searchQuery: "",
           showSearchResults: false,
           supplierId: product.supplier_id || 1,
           isCustomProduct: true,
-          estimate_product_id: product.estimate_product_id || null
-        })) || [{
-          id: Math.random().toString(36).substring(2, 9),
-          productId: null,
-          qty: 1,
-          item: '',
-          description: '',
-          rate: 0,
-          estimatedPrice: 0,
-          total: 0,
-          searchQuery: '',
-          showSearchResults: false,
-          supplierId: 1,
-          isCustomProduct: false,
-          estimate_product_id: null
-        }],
-        notes: invoiceData.notes || 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
-        signatureText: invoiceData.signature_text || 'ACCEPTED BY________________DATE_____',
+          estimate_product_id: product.estimate_product_id || null,
+          parent_header_name: product.parent_header_name,
+        })) || [
+          {
+            id: Math.random().toString(36).substring(2, 9),
+            productId: null,
+            qty: 1,
+            item: "",
+            description: "",
+            rate: 0,
+            estimatedPrice: 0,
+            total: 0,
+            searchQuery: "",
+            showSearchResults: false,
+            supplierId: 1,
+            isCustomProduct: false,
+            estimate_product_id: null,
+            parent_header_name: "",
+          },
+        ],
+        notes:
+          invoiceData.notes ||
+          "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
+        signatureText:
+          invoiceData.signature_text || "ACCEPTED BY________________DATE_____",
         invoiceType: (() => {
-          if (!invoiceData.invoice_type) return 'Estimate'
+          if (!invoiceData.invoice_type) return "Estimate";
 
           const typeMapping: { [key: string]: string } = {
-            'down_payment': 'Downpayment Invoice',
-            'rough_invoice': 'Rough Invoice',
-            'progressive_invoice': 'Progressive Invoice',
-            'final_invoice': 'Final Invoice',
-            'estimate': 'Estimate'
-          }
+            down_payment: "Downpayment Invoice",
+            rough_invoice: "Rough Invoice",
+            progressive_invoice: "Progressive Invoice",
+            final_invoice: "Final Invoice",
+            estimate: "Estimate",
+          };
 
-          return typeMapping[invoiceData.invoice_type] || invoiceData.invoice_type.charAt(0).toUpperCase() + invoiceData.invoice_type.slice(1)
+          return (
+            typeMapping[invoiceData.invoice_type] ||
+            invoiceData.invoice_type.charAt(0).toUpperCase() +
+              invoiceData.invoice_type.slice(1)
+          );
         })(),
-        customInvoiceType: invoiceData.custom_invoice_type || '',
+        customInvoiceType: invoiceData.custom_invoice_type || "",
         paymentPercentage: 0,
         estimateTotal: invoiceData.total_amount || 0,
-        paymentHistory: []
-      })
+        paymentHistory: [],
+      });
 
       // Show the preview dialog
-      setShowPreviewDialog(true)
+      setShowPreviewDialog(true);
     } catch (error) {
-      console.error('Error fetching invoice details:', error)
-      toast.error('Failed to load invoice details')
+      console.error("Error fetching invoice details:", error);
+      toast.error("Failed to load invoice details");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleDuplicateInvoice = (invoice: any) => {
-    console.log('Duplicating invoice:', invoice)
+    console.log("Duplicating invoice:", invoice);
 
     // Populate the inline invoice form with the existing invoice data
     setInlineInvoiceData({
-      date: invoice.date || new Date().toISOString().split('T')[0],
-      estimateNumber: invoice.estimate_number || '',
-      customerName: invoice.customer_name || invoice.contractor?.contractor_name || '',
-      customerAddress: invoice.customer_address || invoice.contractor?.address || '',
-      billToAddress: invoice.bill_to_address || '',
+      date: invoice.date || new Date().toISOString().split("T")[0],
+      estimateNumber: invoice.estimate_number || "",
+      customerName:
+        invoice.customer_name || invoice.contractor?.contractor_name || "",
+      customerAddress:
+        invoice.customer_address || invoice.contractor?.address || "",
+      billToAddress: invoice.bill_to_address || "",
       billToAddressEnabled: !!invoice.bill_to_address,
-      poNumber: invoice.po_number || '',
-      project: invoice.estimate_title || '',
-      rep: invoice.rep || '',
-      dueDate: invoice.due_date || '',
+      poNumber: invoice.po_number || "",
+      project: invoice.estimate_title || "",
+      rep: invoice.rep || "",
+      dueDate: invoice.due_date || "",
       paymentCredits: invoice.payment_credits || 0,
-      balanceDue: invoice.balance_due || '',
+      balanceDue: invoice.balance_due || "",
       lineItems: invoice.products?.map((product: any) => ({
         id: Math.random().toString(36).substring(2, 9),
         productId: product.id,
         qty: product.stock_quantity || 1,
-        item: product.product_name || '',
-        description: product.description || '',
+        item: product.product_name || "",
+        description: product.description || "",
         rate: product.jdp_price || 0,
         estimatedPrice: product.estimated_price || 0,
         total: product.total_cost || 0,
-        searchQuery: '',
+        searchQuery: "",
         showSearchResults: false,
         supplierId: product.supplier_id || 1,
         isCustomProduct: true,
-        estimate_product_id: product.estimate_product_id || null
-      })) || [{
-        id: Math.random().toString(36).substring(2, 9),
-        productId: null,
-        qty: 1,
-        item: '',
-        description: '',
-        rate: 0,
-        estimatedPrice: 0,
-        total: 0,
-        searchQuery: '',
-        showSearchResults: false,
-        supplierId: 1,
-        isCustomProduct: false
-      }],
-      notes: invoice.notes || 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
-      signatureText: invoice.signature_text || 'ACCEPTED BY________________DATE_____',
+        estimate_product_id: product.estimate_product_id || null,
+      })) || [
+        {
+          id: Math.random().toString(36).substring(2, 9),
+          productId: null,
+          qty: 1,
+          item: "",
+          description: "",
+          rate: 0,
+          estimatedPrice: 0,
+          total: 0,
+          searchQuery: "",
+          showSearchResults: false,
+          supplierId: 1,
+          isCustomProduct: false,
+        },
+      ],
+      notes:
+        invoice.notes ||
+        "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
+      signatureText:
+        invoice.signature_text || "ACCEPTED BY________________DATE_____",
       invoiceType: (() => {
-        if (!invoice.invoice_type) return 'Estimate'
+        if (!invoice.invoice_type) return "Estimate";
 
         // Map API values to form values
         const typeMapping: { [key: string]: string } = {
-          'down_payment': 'Downpayment Invoice',
-          'rough_invoice': 'Rough Invoice',
-          'progressive_invoice': 'Progressive Invoice',
-          'final_invoice': 'Final Invoice',
-          'estimate': 'Estimate'
-        }
+          down_payment: "Downpayment Invoice",
+          rough_invoice: "Rough Invoice",
+          progressive_invoice: "Progressive Invoice",
+          final_invoice: "Final Invoice",
+          estimate: "Estimate",
+        };
 
-        return typeMapping[invoice.invoice_type] || invoice.invoice_type.charAt(0).toUpperCase() + invoice.invoice_type.slice(1)
+        return (
+          typeMapping[invoice.invoice_type] ||
+          invoice.invoice_type.charAt(0).toUpperCase() +
+            invoice.invoice_type.slice(1)
+        );
       })(),
-      customInvoiceType: invoice.custom_invoice_type || '',
+      customInvoiceType: invoice.custom_invoice_type || "",
       paymentPercentage: 0,
       estimateTotal: invoice.total || 0,
-      paymentHistory: []
-    })
+      paymentHistory: [],
+    });
 
     const mappedInvoiceType = (() => {
-      if (!invoice.invoice_type) return 'Estimate'
+      if (!invoice.invoice_type) return "Estimate";
 
       const typeMapping: { [key: string]: string } = {
-        'down_payment': 'Downpayment Invoice',
-        'rough_invoice': 'Rough Invoice',
-        'progressive_invoice': 'Progressive Invoice',
-        'final_invoice': 'Final Invoice',
-        'estimate': 'Estimate'
-      }
+        down_payment: "Downpayment Invoice",
+        rough_invoice: "Rough Invoice",
+        progressive_invoice: "Progressive Invoice",
+        final_invoice: "Final Invoice",
+        estimate: "Estimate",
+      };
 
-      return typeMapping[invoice.invoice_type] || invoice.invoice_type.charAt(0).toUpperCase() + invoice.invoice_type.slice(1)
-    })()
+      return (
+        typeMapping[invoice.invoice_type] ||
+        invoice.invoice_type.charAt(0).toUpperCase() +
+          invoice.invoice_type.slice(1)
+      );
+    })();
 
-    console.log('Set invoice type to:', mappedInvoiceType)
-    console.log('Set customer name to:', invoice.customer_name || invoice.contractor?.company_name || invoice.contractor?.email || '')
-    console.log('Set customer address to:', invoice.customer_address || invoice.contractor?.address || '')
+    console.log("Set invoice type to:", mappedInvoiceType);
+    console.log(
+      "Set customer name to:",
+      invoice.customer_name ||
+        invoice.contractor?.company_name ||
+        invoice.contractor?.email ||
+        "",
+    );
+    console.log(
+      "Set customer address to:",
+      invoice.customer_address || invoice.contractor?.address || "",
+    );
 
     // Show the inline invoice form
-    setShowInlineInvoiceForm(true)
-  }
+    setShowInlineInvoiceForm(true);
+  };
+const buildGroupedInvoiceRowsForPrint = (products: any[] = []) => {
+  const directItems: any[] = [];
+  const groupedMap: Record<string, any[]> = {};
 
-  const handlePrintInvoice = async (invoice: any) => {
-    console.log(invoice, 'invoice')
-    try {
-      // Temp container (same)
-      const tempElement = document.createElement('div');
-      tempElement.id = 'temp-invoice-preview';
-      tempElement.style.position = 'absolute';
-      tempElement.style.left = '-10000px';
-      tempElement.style.top = '0';
-      tempElement.style.width = '8.5in';
-      tempElement.style.background = '#ffffff';
-      tempElement.style.padding = '32px';
-      tempElement.style.pointerEvents = 'none';
-      tempElement.style.fontFamily = 'Arial, sans-serif';
-      tempElement.style.lineHeight = '1.1';
-      tempElement.style.boxSizing = 'border-box';
+  products.forEach((item: any) => {
+    const productName = String(item.product_name || item.item || "").trim();
 
-      // === SAME HTML ===
-      // === SAME HTML ===
-      const invoiceHtml = `
-      <div style="font-family: Arial, sans-serif; page-break-inside: avoid;">
-        <!-- Header (wrapped) -->
-        <div id="print-header">
-          <div style="display:flex;justify-content:space-between;margin-bottom:24px;">
+    // print me blank/header placeholder product rows skip kar do
+    if (!productName) return;
+
+    const headerName =
+      item.parent_header_name ||
+      item.parentHeaderName ||
+      null;
+
+    const normalizedItem = {
+      qty: Number(item.stock_quantity || item.qty || 1),
+      item: productName,
+      description: item.description || "",
+      rate: Number(item.unit_cost || item.jdp_price || item.rate || 0),
+      total: Number(item.total_cost || item.total || 0),
+      parent_header_name: headerName,
+    };
+
+    if (!headerName) {
+      directItems.push(normalizedItem);
+    } else {
+      if (!groupedMap[headerName]) {
+        groupedMap[headerName] = [];
+      }
+      groupedMap[headerName].push(normalizedItem);
+    }
+  });
+
+  return [
+    ...directItems,
+    ...Object.entries(groupedMap).flatMap(([headerName, items]) => [
+      {
+        type: "synthetic-header",
+        headerName,
+      },
+      ...items,
+    ]),
+  ];
+};
+
+const escapeHtml = (value: any) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+//   const handlePrintInvoice = async (invoice: any) => {
+//     console.log(invoice, "invoice");
+//     try {
+//       // Temp container (same)
+//       const tempElement = document.createElement("div");
+//       tempElement.id = "temp-invoice-preview";
+//       tempElement.style.position = "absolute";
+//       tempElement.style.left = "-10000px";
+//       tempElement.style.top = "0";
+//       tempElement.style.width = "8.5in";
+//       tempElement.style.background = "#ffffff";
+//       tempElement.style.padding = "32px";
+//       tempElement.style.pointerEvents = "none";
+//       tempElement.style.fontFamily = "Arial, sans-serif";
+//       tempElement.style.lineHeight = "1.1";
+//       tempElement.style.boxSizing = "border-box";
+//       const groupedPrintRows = buildGroupedInvoiceRowsForPrint(
+//         invoice.products || [],
+//       );
+//        console.log(groupedPrintRows,"groupedPrintRows");
+       
+//       // === SAME HTML ===
+//       // === SAME HTML ===
+//         const invoiceHtml = `
+//         <div style="
+//           font-family: Arial, sans-serif;
+//           color:#374151;
+//           background:#ffffff;
+//           box-sizing:border-box;
+//           width:100%;
+//         ">
+//           <div id="print-header" style="margin-bottom:24px;">
+//             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:24px; margin-bottom:24px;">
+//               <div>
+//                 <div style="
+//                   width:200px;
+//                   height:60px;
+//                   background:url('/assets/logos/logo-jdp.png') no-repeat center center;
+//                   background-size:contain;
+//                 "></div>
+//                 <div style="margin-top:8px; font-size:14px; color:#6b7280;">
+//                   952-449-1088
+//                 </div>
+//               </div>
+
+//               <div style="min-width:400px;">
+//                 <div style="display:flex;">
+//                   <div style="
+//                     background:#1f2937;
+//                     color:#fff;
+//                     height:40px;
+//                     display:flex;
+//                     align-items:center;
+//                     justify-content:center;
+//                     border:2px solid #1f2937;
+//                     width:200px;
+//                     font-size:16px;
+//                     font-weight:700;
+//                   ">
+//                     Date
+//                   </div>
+//                   <div style="
+//                     background:#fff;
+//                     color:#374151;
+//                     height:40px;
+//                     display:flex;
+//                     align-items:center;
+//                     justify-content:center;
+//                     border:2px solid #e5e7eb;
+//                     width:200px;
+//                     font-size:16px;
+//                     font-weight:700;
+//                   ">
+//                     ${new Date(inlineInvoiceData.date).toLocaleDateString("en-US", {
+//                       month: "2-digit",
+//                       day: "2-digit",
+//                       year: "numeric",
+//                     })}
+//                   </div>
+//                 </div>
+
+//                 <div style="display:flex;">
+//                   <div style="
+//                     background:#1f2937;
+//                     color:#fff;
+//                     height:40px;
+//                     display:flex;
+//                     align-items:center;
+//                     justify-content:center;
+//                     border:2px solid #1f2937;
+//                     width:200px;
+//                     font-size:16px;
+//                     font-weight:700;
+//                     text-transform:capitalize;
+//                   ">
+//                     ${invoice.invoice_type || "Estimate"} #
+//                   </div>
+//                   <div style="
+//                     background:#fff;
+//                     color:#374151;
+//                     height:40px;
+//                     display:flex;
+//                     align-items:center;
+//                     justify-content:center;
+//                     border:2px solid #e5e7eb;
+//                     width:200px;
+//                     font-size:16px;
+//                     font-weight:700;
+//                   ">
+//                     ${InvoioiceNumber || "INV-2025-029"}
+//                   </div>
+//                 </div>
+//               </div>
+//             </div>
+//           </div>
+
+//           ${
+//             invoice.bill_to_address || invoice.billing_address
+//               ? `
+//             <div style="
+//               background:#1f2937;
+//               color:#fff;
+//               height:36px;
+//               display:flex;
+//               align-items:center;
+//               margin-bottom:8px;
+//               padding:0 16px;
+//               font-size:14px;
+//               font-weight:700;
+//             ">
+//               Bill To
+//             </div>
+//             <div style="
+//               background:#fff;
+//               border:2px solid #e5e7eb;
+//               padding:12px 14px;
+//               color:#374151;
+//               font-size:14px;
+//               margin-bottom:16px;
+//               font-weight:600;
+//             ">
+//               ${invoice.bill_to_address || invoice.billing_address}
+//             </div>
+//           `
+//               : ""
+//           }
+
+//           <div style="
+//             background:#1f2937;
+//             color:#fff;
+//             height:36px;
+//             display:flex;
+//             align-items:center;
+//             margin-bottom:8px;
+//             padding:0 16px;
+//             font-size:14px;
+//             font-weight:700;
+//             ${invoice.bill_to_address || invoice.billing_address ? "" : "margin-top:15px;"}
+//           ">
+//             To
+//           </div>
+
+//           <div style="
+//             background:#fff;
+//             border:2px solid #e5e7eb;
+//             padding:14px;
+//             margin-bottom:24px;
+//           ">
+//             <div style="font-weight:600; font-size:16px; color:#374151;">
+//               ${
+//                 job.type === "contract-based"
+//                   ? contractorData?.name ||
+//                     contractorData?.contractor_name ||
+//                     invoice.customer_name ||
+//                     "Contractor"
+//                   : invoice.customer_name ||
+//                     invoice.customer?.name ||
+//                     job.customerName ||
+//                     "Customer"
+//               }
+//             </div>
+//             <div style="color:#6b7280; font-size:14px; margin-top:4px; line-height:1.5;">
+//               ${inlineInvoiceData.customerAddress || invoice.customer_address || invoice.customer?.address || job.location || "Address"}
+//             </div>
+//           </div>
+
+//           <div style="
+//             display:grid;
+//             grid-template-columns:1fr 1fr;
+//             gap:24px;
+//             margin-bottom:32px;
+//           ">
+//             <div>
+//               <div style="
+//                 background:#1f2937;
+//                 color:#fff;
+//                 height:36px;
+//                 display:flex;
+//                 align-items:center;
+//                 margin-bottom:8px;
+//                 padding:0 16px;
+//                 font-size:14px;
+//                 font-weight:700;
+//               ">
+//                 P.O. No.
+//               </div>
+//               <div style="
+//                 background:#fff;
+//                 border:2px solid #e5e7eb;
+//                 padding:12px 14px;
+//                 color:#374151;
+//                 font-size:14px;
+//               ">
+//                 ${invoice.po_number || "DFRG-678"}
+//               </div>
+//             </div>
+
+//             <div>
+//               <div style="
+//                 background:#1f2937;
+//                 color:#fff;
+//                 height:36px;
+//                 display:flex;
+//                 align-items:center;
+//                 margin-bottom:8px;
+//                 padding:0 16px;
+//                 font-size:14px;
+//                 font-weight:700;
+//               ">
+//                 Project
+//               </div>
+//               <div style="
+//                 background:#fff;
+//                 border:2px solid #e5e7eb;
+//                 padding:12px 14px;
+//                 color:#374151;
+//                 font-size:14px;
+//               ">
+//                 ${invoice.estimate_title || invoice.job_title || job.title || "tech-gb-job"}
+//               </div>
+//             </div>
+//           </div>
+
+//           <div style="margin-bottom:24px;">
+//             <table style="width:100%; border-collapse:collapse; border:1px solid #d1d5db;">
+//               <thead>
+//                 <tr style="background:#f3f4f6;">
+//                   <th style="
+//                     border:1px solid #d1d5db;
+//                     padding:10px 12px;
+//                     text-align:left;
+//                     font-size:14px;
+//                     font-weight:600;
+//                     color:#374151;
+//                   ">
+//                     Rep
+//                   </th>
+//                   <th style="
+//                     border:1px solid #d1d5db;
+//                     padding:10px 12px;
+//                     text-align:left;
+//                     font-size:14px;
+//                     font-weight:600;
+//                     color:#374151;
+//                   ">
+//                     Due Date
+//                   </th>
+//                 </tr>
+//               </thead>
+//               <tbody>
+//                 <tr>
+//                   <td style="
+//                     border:1px solid #d1d5db;
+//                     padding:10px 12px;
+//                     font-size:14px;
+//                     color:#374151;
+//                   ">
+//                     ${inlineInvoiceData.rep || "JDP"}
+//                   </td>
+//                   <td style="
+//                     border:1px solid #d1d5db;
+//                     padding:10px 12px;
+//                     font-size:14px;
+//                     color:#374151;
+//                   ">
+//                     ${
+//                       inlineInvoiceData.dueDate
+//                         ? new Date(inlineInvoiceData.dueDate).toLocaleDateString("en-US", {
+//                             month: "2-digit",
+//                             day: "2-digit",
+//                             year: "numeric",
+//                           })
+//                         : "10/17/2025"
+//                     }
+//                   </td>
+//                 </tr>
+//               </tbody>
+//             </table>
+//           </div>
+
+//           <div style="margin-bottom:32px; page-break-inside:auto;">
+//             <table style="
+//               width:100%;
+//               border-collapse:collapse;
+//               table-layout:fixed;
+//               border:1px solid #d1d5db;
+//               margin-bottom:16px;
+//             ">
+//               <thead>
+//                 <tr style="background:#1f2937; color:#fff;">
+//                   <th style="
+//                     width:8%;
+//                     border:1px solid #d1d5db;
+//                     padding:10px 12px;
+//                     text-align:left;
+//                     font-size:14px;
+//                     font-weight:600;
+//                   ">
+//                     Qty
+//                   </th>
+//                   <th style="
+//                     width:18%;
+//                     border:1px solid #d1d5db;
+//                     padding:10px 12px;
+//                     text-align:left;
+//                     font-size:14px;
+//                     font-weight:600;
+//                   ">
+//                     Item
+//                   </th>
+//                   <th style="
+//                     width:46%;
+//                     border:1px solid #d1d5db;
+//                     padding:10px 12px;
+//                     text-align:left;
+//                     font-size:14px;
+//                     font-weight:600;
+//                   ">
+//                     Description
+//                   </th>
+//                   <th style="
+//                     width:14%;
+//                     border:1px solid #d1d5db;
+//                     padding:10px 12px;
+//                     text-align:right;
+//                     font-size:14px;
+//                     font-weight:600;
+//                   ">
+//                     Rate
+//                   </th>
+//                   <th style="
+//                     width:14%;
+//                     border:1px solid #d1d5db;
+//                     padding:10px 12px;
+//                     text-align:right;
+//                     font-size:14px;
+//                     font-weight:600;
+//                   ">
+//                     Total
+//                   </th>
+//                 </tr>
+//               </thead>
+//               <tbody>
+//                 ${groupedPrintRows
+//                   .map((row: any) => {
+//                     if (row.type === "synthetic-header") {
+//                       return `
+//                         <tr style="page-break-inside:avoid;">
+//                           <td colspan="5" style="
+//                             border:1px solid #d1d5db;
+//                             background:#374151;
+//                             color:#ffffff;
+//                             padding:0px 10px 20px 14px;
+//                             font-size:14px;
+//                             font-weight:700;
+//                             text-align:left;
+//                           ">
+//                             ${escapeHtml(row.headerName || "Custom Header")}
+//                           </td>
+//                         </tr>
+//                       `;
+//                     }
+
+//                     return `
+//                       <tr style="page-break-inside:avoid;">
+//                         <td style="
+//                           border:1px solid #d1d5db;
+//                           padding:14px 12px;
+//                           vertical-align:top;
+//                           font-size:14px;
+//                           color:#111827;
+//                         ">
+//                           ${row.qty || 0}
+//                         </td>
+//                         <td style="
+//                           border:1px solid #d1d5db;
+//                           padding:14px 12px;
+//                           vertical-align:top;
+//                           font-size:14px;
+//                           font-weight:600;
+//                           color:#111827;
+//                           word-break:break-word;
+//                           white-space:normal;
+//                         ">
+//                           ${escapeHtml(row.item || "-")}
+//                         </td>
+//                         <td style="
+//                           border:1px solid #d1d5db;
+//                           padding:14px 12px;
+//                           vertical-align:top;
+//                           font-size:13px;
+//                           color:#4b5563;
+//                           line-height:1.5;
+//                           word-break:break-word;
+//                           white-space:normal;
+//                         ">
+//                           ${escapeHtml(row.description || "")}
+//                         </td>
+//                         <td style="
+//                           border:1px solid #d1d5db;
+//                           padding:14px 12px;
+//                           vertical-align:top;
+//                           text-align:right;
+//                           font-size:14px;
+//                           font-weight:500;
+//                           color:#111827;
+//                           white-space:nowrap;
+//                         ">
+//                           $${Number(row.rate || 0).toFixed(2)}
+//                         </td>
+//                         <td style="
+//                           border:1px solid #d1d5db;
+//                           padding:14px 12px;
+//                           vertical-align:top;
+//                           text-align:right;
+//                           font-size:14px;
+//                           font-weight:700;
+//                           color:#111827;
+//                           white-space:nowrap;
+//                         ">
+//                           $${Number(row.total || 0).toFixed(2)}
+//                         </td>
+//                       </tr>
+//                     `;
+//                   })
+//                   .join("")}
+//               </tbody>
+//             </table>
+
+//             <div style="display:flex; justify-content:flex-end; margin-top:20px;">
+//               <div style="text-align:right;">
+//                 <div style="font-weight:700; font-size:20px; color:#1f2937;">
+//                   $${(invoice.total_amount || 0).toFixed(2)}
+//                 </div>
+//               </div>
+//             </div>
+
+//             <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+//               <div style="text-align:right; min-width:220px;">
+//                 <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+//                   <span style="font-size:14px; color:#374151;">Payments / Credits:</span>
+//                   <span style="font-size:14px; color:#374151;">$${(invoice.payment_credits || 0).toFixed(2)}</span>
+//                 </div>
+//                 <div style="
+//                   display:flex;
+//                   justify-content:space-between;
+//                   background:#f3f4f6;
+//                   padding:10px 12px;
+//                   border-radius:4px;
+//                 ">
+//                   <span style="font-weight:700; font-size:14px; color:#374151;">
+//                     Balance Due:
+//                   </span>
+//                   <span style="font-weight:700; font-size:14px; color:#374151;">
+//                     $${parseFloat(invoice.balance_due || (invoice.total_amount || 0).toString()).toFixed(2)}
+//                   </span>
+//                 </div>
+//               </div>
+//             </div>
+//           </div>
+
+//           <div style="
+//             border-top:2px solid #e5e7eb;
+//             padding-top:20px;
+//             margin-bottom:32px;
+//           ">
+//             <div style="
+//               background:#f3f4f6;
+//               padding:16px;
+//               border-radius:6px;
+//               text-align:center;
+//               border:1px solid #e5e7eb;
+//             ">
+//               <div style="
+//                 font-size:14px;
+//                 font-weight:500;
+//                 white-space:pre-line;
+//                 color:#374151;
+//                 line-height:1.5;
+//               ">
+//                 ${invoice.notes || "Final payment to complete project billing"}
+//               </div>
+//             </div>
+//           </div>
+
+//           <div style="margin-bottom:32px; page-break-inside:avoid;">
+//             <div style="
+//               font-size:11px;
+//               color:#6b7280;
+//               margin-bottom:32px;
+//               line-height:1.5;
+//             ">
+//               <p style="margin:0;">
+//                 JDP is not responsible for repair of lamps & landscaping, house owner
+//                 utilities including cables, sprinkler systems, television or telephone
+//                 cables, etc. that may be cut or damaged during installation. Price are
+//                 subject to change prior to receipt of down payment.
+//               </p>
+//             </div>
+
+//             <div style="text-align:center; margin-bottom:32px;">
+//               <div style="font-size:14px; color:blue; font-weight:500;">
+//                 EMAIL: jen@jdpelectric.us 952-449-1088
+//               </div>
+//             </div>
+
+//             <div style="border-top:1px solid #e5e7eb; margin-bottom:24px;"></div>
+
+//             <div style="
+//               display:flex;
+//               justify-content:space-between;
+//               align-items:center;
+//               margin-bottom:20px;
+//             ">
+//               <div style="display:flex; flex-direction:column;">
+//                 <div style="font-size:14px; font-weight:500; color:#374151; margin-bottom:4px;">
+//                   Customer Acceptance
+//                 </div>
+//                 <div style="font-size:14px; font-weight:500; color:#374151;">
+//                   Authorized Signature
+//                 </div>
+//               </div>
+//               <div style="font-size:14px; font-weight:500; color:#374151;">Date</div>
+//             </div>
+
+//             <div style="
+//               display:flex;
+//               justify-content:space-between;
+//               align-items:center;
+//               margin-bottom:20px;
+//             ">
+//               <div style="display:flex; flex-direction:column; width:60%;">
+//                 <div style="border-bottom:1px solid #374151; height:2px; margin-bottom:8px;"></div>
+//                 <div style="font-size:12px; color:#374151; text-align:center;">Signature</div>
+//               </div>
+//               <div style="display:flex; flex-direction:column; width:30%;">
+//                 <div style="border-bottom:1px solid #374151; height:2px; margin-bottom:8px;"></div>
+//                 <div style="font-size:12px; color:#374151; text-align:center;">Date</div>
+//               </div>
+//             </div>
+
+//             <div style="
+//               background:#e0f2fe;
+//               border:1px solid #81d4fa;
+//               border-radius:6px;
+//               padding:16px;
+//               margin-top:20px;
+//             ">
+//               <div style="font-size:12px; color:#374151; line-height:1.4;">
+//                 By signing above, you agree to the terms and pricing outlined in this
+//                 estimate. This becomes a binding agreement upon signature.
+//               </div>
+//             </div>
+//           </div>
+//         </div>
+//       `;
+//       tempElement.innerHTML = invoiceHtml;
+//       const printTableRows = Array.from(
+//         tempElement.querySelectorAll("tbody tr")
+//       ) as HTMLElement[];
+//       document.body.appendChild(tempElement);
+
+//       // Header height in CSS px
+//       const headerEl = tempElement.querySelector(
+//         "#print-header",
+//       ) as HTMLElement | null;
+//       const headerCssPx = Math.ceil(
+//         headerEl?.getBoundingClientRect().height || 0,
+//       );
+
+//       // Render to canvas
+//       const canvas = await html2canvas(tempElement, {
+//         scale: 2,
+//         useCORS: true,
+//         allowTaint: true,
+//         backgroundColor: "#ffffff",
+//         logging: false,
+//         width: tempElement.scrollWidth,
+//         height: tempElement.scrollHeight,
+//         scrollX: 0,
+//         scrollY: 0,
+//         windowWidth: tempElement.scrollWidth,
+//         windowHeight: tempElement.scrollHeight,
+//       });
+
+//       const scaleX = canvas.width / tempElement.scrollWidth;
+//       const rootRect = tempElement.getBoundingClientRect();
+//       const headRect = headerEl?.getBoundingClientRect();
+//       const headerBandCssPx = Math.max(
+//         1,
+//         Math.ceil((headRect?.bottom ?? 0) - rootRect.top),
+//       );
+//       const headerPxScaled = Math.max(1, Math.round(headerBandCssPx * scaleX));
+
+//       // Slice header (use scaled px)
+//       let headerImgData: string | null = null;
+//       if (headerPxScaled > 0) {
+//         const headerCanvas = document.createElement("canvas");
+//         headerCanvas.width = canvas.width;
+//         headerCanvas.height = headerPxScaled;
+//         const hctx = headerCanvas.getContext("2d")!;
+//         hctx.drawImage(
+//           canvas,
+//           0,
+//           0,
+//           canvas.width,
+//           headerPxScaled,
+//           0,
+//           0,
+//           canvas.width,
+//           headerPxScaled,
+//         );
+//         headerImgData = headerCanvas.toDataURL("image/png");
+//       }
+
+//       const imageData = canvas.toDataURL("image/png");
+
+//       const pdf = new jsPDF("p", "mm", "a4");
+//       const imgWidth = 210;
+// const pageHeight = 297;
+// const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+// const pxToMm = imgWidth / canvas.width;
+
+// // more breathing space top + bottom
+// const topPaddingMM = 10;
+// const bottomPaddingMM = 14;
+
+// // keep some extra safe space so content doesn't touch bottom
+// const usablePageHeight = pageHeight - topPaddingMM - bottomPaddingMM;
+
+// let yPosition = 0;
+// const pageHeightPx = Math.floor(usablePageHeight / pxToMm);
+
+// // first page
+// {
+//   const firstPageCanvas = document.createElement("canvas");
+//   firstPageCanvas.width = canvas.width;
+//   firstPageCanvas.height = pageHeightPx;
+
+//   const firstCtx = firstPageCanvas.getContext("2d")!;
+//   firstCtx.fillStyle = "#fff";
+//   firstCtx.fillRect(0, 0, firstPageCanvas.width, firstPageCanvas.height);
+//   firstCtx.drawImage(
+//     canvas,
+//     0,
+//     0,
+//     canvas.width,
+//     pageHeightPx,
+//     0,
+//     0,
+//     canvas.width,
+//     pageHeightPx,
+//   );
+
+//   const firstPageImg = firstPageCanvas.toDataURL("image/png");
+//   pdf.addImage(
+//     firstPageImg,
+//     "PNG",
+//     0,
+//     topPaddingMM,
+//     imgWidth,
+//     pageHeightPx * pxToMm,
+//   );
+
+//   yPosition += pageHeightPx;
+// }
+
+// // remaining pages
+// while (yPosition < canvas.height) {
+//   pdf.addPage();
+
+//   const remainingHeightPx = Math.min(pageHeightPx, canvas.height - yPosition);
+
+//   const pageCanvas = document.createElement("canvas");
+//   pageCanvas.width = canvas.width;
+//   pageCanvas.height = remainingHeightPx;
+
+//   const pageCtx = pageCanvas.getContext("2d")!;
+//   pageCtx.fillStyle = "#fff";
+//   pageCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+
+//   pageCtx.drawImage(
+//     canvas,
+//     0,
+//     yPosition,
+//     canvas.width,
+//     remainingHeightPx,
+//     0,
+//     0,
+//     canvas.width,
+//     remainingHeightPx,
+//   );
+
+//   const pageImg = pageCanvas.toDataURL("image/png");
+//   pdf.addImage(
+//     pageImg,
+//     "PNG",
+//     0,
+//     topPaddingMM,
+//     imgWidth,
+//     remainingHeightPx * pxToMm,
+//   );
+
+//   yPosition += remainingHeightPx;
+// }
+     
+
+//       const pdfBlob = pdf.output("blob");
+//       const pdfUrl = URL.createObjectURL(pdfBlob);
+//       const printWindow = window.open(pdfUrl, "_blank");
+//       if (printWindow) {
+//         printWindow.onload = () => setTimeout(() => printWindow.print(), 1000);
+//       }
+
+//       document.body.removeChild(tempElement);
+//       setTimeout(() => URL.revokeObjectURL(pdfUrl), 10000);
+//     } catch (err) {
+//       console.error("Print error:", err);
+//       toast.error("Failed to print invoice");
+//     }
+//   };
+const handlePrintInvoice = async (invoice: any) => {
+  console.log(invoice, "invoice");
+
+  try {
+    const tempElement = document.createElement("div");
+    tempElement.id = "temp-invoice-preview";
+    tempElement.style.position = "absolute";
+    tempElement.style.left = "-10000px";
+    tempElement.style.top = "0";
+    tempElement.style.width = "8.5in";
+    tempElement.style.background = "#ffffff";
+    tempElement.style.padding = "32px";
+    tempElement.style.pointerEvents = "none";
+    tempElement.style.fontFamily = "Arial, sans-serif";
+    tempElement.style.lineHeight = "1.2";
+    tempElement.style.boxSizing = "border-box";
+
+    const groupedPrintRows = buildGroupedInvoiceRowsForPrint(
+      invoice.products || []
+    );
+
+    const invoiceHtml = `
+      <div style="
+        font-family: Arial, sans-serif;
+        color:#374151;
+        background:#ffffff;
+        box-sizing:border-box;
+        width:100%;
+      ">
+        <div id="print-header" style="margin-bottom:24px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:24px; margin-bottom:24px;">
             <div>
-              <div style="width:200px;height:60px;background:url('/assets/logos/logo-jdp.png') no-repeat center center;background-size:contain;"></div>
-              <div style="margin-top:8px;font-size:14px;color:#6b7280;">952-449-1088</div>
-            </div>
-            <div>
-            <div style="display:flex;">
-              <div style="background:#1f2937;color:#fff;height:40px;text-align:center;border:2px solid #1f2937;width:200px;">
-                <div style="font-size:16px;font-weight:bold;">Date</div>
-              </div>
-              <div style="background:#fff;color:#374151; height:40px;text-align:center;border:2px solid #e5e7eb;width:200px;">
-                <div style="font-size:16px;font-weight:bold;">${new Date(inlineInvoiceData.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</div>
+              <div style="
+                width:200px;
+                height:60px;
+                background:url('/assets/logos/logo-jdp.png') no-repeat center center;
+                background-size:contain;
+              "></div>
+              <div style="margin-top:8px; font-size:14px; color:#6b7280;">
+                952-449-1088
               </div>
             </div>
-            <div style="display:flex;">
-              <div style="background:#1f2937;color:#fff;height:40px;text-align:center;border:2px solid #1f2937;width:200px;">
-                <div style="font-size:16px;font-weight:bold;text-transform: capitalize;">${invoice.invoice_type || 'Estimate'} #</div>
+
+            <div style="min-width:400px;">
+              <div style="display:flex;">
+                <div style="
+                  background:#1f2937;
+                  color:#fff;
+                  height:40px;
+                  display:flex;
+                  align-items:center;
+                  justify-content:center;
+                  border:2px solid #1f2937;
+                  width:200px;
+                  font-size:16px;
+                  font-weight:700;
+                ">
+                  Date
+                </div>
+                <div style="
+                  background:#fff;
+                  color:#374151;
+                  height:40px;
+                  display:flex;
+                  align-items:center;
+                  justify-content:center;
+                  border:2px solid #e5e7eb;
+                  width:200px;
+                  font-size:16px;
+                  font-weight:700;
+                ">
+                  ${new Date(inlineInvoiceData.date).toLocaleDateString("en-US", {
+                    month: "2-digit",
+                    day: "2-digit",
+                    year: "numeric",
+                  })}
+                </div>
               </div>
-              <div style="background:#fff;color:#374151;height:40px;text-align:center;border:2px solid #e5e7eb;width:200px;">
-                <div style="font-size:16px;font-weight:bold;">${InvoioiceNumber || 'INV-2025-029'}</div>
+
+              <div style="display:flex;">
+                <div style="
+                  background:#1f2937;
+                  color:#fff;
+                  height:40px;
+                  display:flex;
+                  align-items:center;
+                  justify-content:center;
+                  border:2px solid #1f2937;
+                  width:200px;
+                  font-size:16px;
+                  font-weight:700;
+                  text-transform:capitalize;
+                ">
+                  ${invoice.invoice_type || "Estimate"} #
+                </div>
+                <div style="
+                  background:#fff;
+                  color:#374151;
+                  height:40px;
+                  display:flex;
+                  align-items:center;
+                  justify-content:center;
+                  border:2px solid #e5e7eb;
+                  width:200px;
+                  font-size:16px;
+                  font-weight:700;
+                ">
+                  ${InvoioiceNumber || "INV-2025-029"}
+                </div>
               </div>
             </div>
           </div>
-          </div>
-  
         </div>
- 
-        ${(invoice.bill_to_address || invoice.billing_address) ? `
-        <div style="background:#1f2937;color:#fff;height:36px;display:flex;align-items:center;margin-bottom:8px;">
-          <div style="font-size:14px;font-weight:bold;margin-left:16px;position:relative;top:-7px;">Bill To</div>
-        </div>
-        <div style="background:#fff;border:2px solid #e5e7eb;padding:12px;color:#374151;font-size:14px;margin-bottom:16px;">
-         <span style="font-size:14px;font-weight:bold; position:relative;top:-7px;">${invoice.bill_to_address || invoice.billing_address}</span>
-        </div>` : ''}
- 
-        <div style="background:#1f2937;color:#fff;height:36px;display:flex;align-items:center;margin-bottom:8px; ${(invoice.bill_to_address || invoice.billing_address) ? '' : 'margin-top:15px;'}">
-          <div style="font-size:14px;font-weight:bold;margin-left:16px;position:relative;top:-7px;">To</div>
-        </div>
-        <div style="background:#fff;border:2px solid #e5e7eb;padding:12px;margin-bottom:24px;">
-        <div style="position:relative;top:-7px;">
-          <div style="font-weight:600;font-size:16px;color:#374151;">
-            ${job.type === 'contract-based'
-          ? (contractorData?.name || contractorData?.contractor_name || invoice.customer_name || 'Contractor')
-          : (invoice.customer_name || invoice.customer?.name || job.customerName || 'Customer')}
+
+        ${
+          invoice.bill_to_address || invoice.billing_address
+            ? `
+          <div style="
+            background:#1f2937;
+            color:#fff;
+            height:36px;
+            display:flex;
+            align-items:center;
+            margin-bottom:8px;
+            padding:0 16px;
+            font-size:14px;
+            font-weight:700;
+          ">
+            Bill To
           </div>
-          <div style="color:#6b7280;font-size:14px;margin-top:4px;">
-            ${inlineInvoiceData.customerAddress || invoice.customer_address || invoice.customer?.address || job.location || 'Address'}
+          <div style="
+            background:#fff;
+            border:2px solid #e5e7eb;
+            padding:12px 14px;
+            color:#374151;
+            font-size:14px;
+            margin-bottom:16px;
+            font-weight:600;
+          ">
+            ${invoice.bill_to_address || invoice.billing_address}
           </div>
+        `
+            : ""
+        }
+
+        <div style="
+          background:#1f2937;
+          color:#fff;
+          height:36px;
+          display:flex;
+          align-items:center;
+          margin-bottom:8px;
+          padding:0 16px;
+          font-size:14px;
+          font-weight:700;
+          ${invoice.bill_to_address || invoice.billing_address ? "" : "margin-top:15px;"}
+        ">
+          To
+        </div>
+
+        <div style="
+          background:#fff;
+          border:2px solid #e5e7eb;
+          padding:14px;
+          margin-bottom:24px;
+        ">
+          <div style="font-weight:600; font-size:16px; color:#374151;">
+            ${
+              job.type === "contract-based"
+                ? contractorData?.name ||
+                  contractorData?.contractor_name ||
+                  invoice.customer_name ||
+                  "Contractor"
+                : invoice.customer_name ||
+                  invoice.customer?.name ||
+                  job.customerName ||
+                  "Customer"
+            }
+          </div>
+          <div style="color:#6b7280; font-size:14px; margin-top:4px; line-height:1.5;">
+            ${inlineInvoiceData.customerAddress || invoice.customer_address || invoice.customer?.address || job.location || "Address"}
           </div>
         </div>
- 
-        <!-- Project Details -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px;">
+
+        <div style="
+          display:grid;
+          grid-template-columns:1fr 1fr;
+          gap:24px;
+          margin-bottom:32px;
+        ">
           <div>
-            <div style="background:#1f2937;color:#fff;height:36px;display:flex;align-items:center;margin-bottom:8px;">
-              <div style="font-size:14px;font-weight:bold;margin-left:16px;position:relative;top:-7px;">P.O. No.</div>
+            <div style="
+              background:#1f2937;
+              color:#fff;
+              height:36px;
+              display:flex;
+              align-items:center;
+              margin-bottom:8px;
+              padding:0 16px;
+              font-size:14px;
+              font-weight:700;
+            ">
+              P.O. No.
             </div>
-            <div style="background:#fff;border:2px solid #e5e7eb;padding:12px;color:#374151;font-size:14px;"><span style=" position:relative;top:-7px;">${invoice.po_number || 'DFRG-678'}</span></div>
+            <div style="
+              background:#fff;
+              border:2px solid #e5e7eb;
+              padding:12px 14px;
+              color:#374151;
+              font-size:14px;
+            ">
+              ${invoice.po_number || "DFRG-678"}
+            </div>
           </div>
+
           <div>
-            <div style="background:#1f2937;color:#fff;height:36px;display:flex;align-items:center;margin-bottom:8px;">
-              <div style="font-size:14px;font-weight:bold;margin-left:16px;position:relative;top:-7px;">Project</div>
+            <div style="
+              background:#1f2937;
+              color:#fff;
+              height:36px;
+              display:flex;
+              align-items:center;
+              margin-bottom:8px;
+              padding:0 16px;
+              font-size:14px;
+              font-weight:700;
+            ">
+              Project
             </div>
-            <div style="background:#fff;border:2px solid #e5e7eb;padding:12px;color:#374151;font-size:14px;"><span style=" position:relative;top:-7px;">${invoice.estimate_title || invoice.job_title || job.title || 'tech-gb-job'}</span></div>
+            <div style="
+              background:#fff;
+              border:2px solid #e5e7eb;
+              padding:12px 14px;
+              color:#374151;
+              font-size:14px;
+            ">
+              ${invoice.estimate_title || invoice.job_title || job.title || "tech-gb-job"}
+            </div>
           </div>
         </div>
- 
-        <!-- Rep & Due -->
+
         <div style="margin-bottom:24px;">
-          <table style="width:100%;border-collapse:collapse;border:1px solid #d1d5db;">
+          <table style="width:100%; border-collapse:collapse; border:1px solid #d1d5db;">
             <thead>
               <tr style="background:#f3f4f6;">
-                <th style="border:1px solid #d1d5db;padding:8px 12px;text-align:left;font-size:14px;font-weight:600;color:#374151;"><span style=" position:relative;top:-7px;">Rep</span></th>
-                <th style="border:1px solid #d1d5db;padding:8px 12px;text-align:left;font-size:14px;font-weight:600;color:#374151;"><span style=" position:relative;top:-7px;">Due Date</span></th>
+                <th style="
+                  border:1px solid #d1d5db;
+                  padding:10px 12px;
+                  text-align:left;
+                  font-size:14px;
+                  font-weight:600;
+                  color:#374151;
+                ">
+                  Rep
+                </th>
+                <th style="
+                  border:1px solid #d1d5db;
+                  padding:10px 12px;
+                  text-align:left;
+                  font-size:14px;
+                  font-weight:600;
+                  color:#374151;
+                ">
+                  Due Date
+                </th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td style="border:1px solid #d1d5db;padding:8px 12px;font-size:14px;color:#374151;"><span style=" position:relative;top:-7px;">${inlineInvoiceData.rep || 'JDP'}</span></td>
-                <td style="border:1px solid #d1d5db;padding:8px 12px;font-size:14px;color:#374151;">
-                    <span style=" position:relative;top:-7px;">${inlineInvoiceData.dueDate ? new Date(inlineInvoiceData.dueDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : '10/17/2025'}</span>
+                <td style="
+                  border:1px solid #d1d5db;
+                  padding:10px 12px;
+                  font-size:14px;
+                  color:#374151;
+                ">
+                  ${inlineInvoiceData.rep || "JDP"}
+                </td>
+                <td style="
+                  border:1px solid #d1d5db;
+                  padding:10px 12px;
+                  font-size:14px;
+                  color:#374151;
+                ">
+                  ${
+                    inlineInvoiceData.dueDate
+                      ? new Date(inlineInvoiceData.dueDate).toLocaleDateString("en-US", {
+                          month: "2-digit",
+                          day: "2-digit",
+                          year: "numeric",
+                        })
+                      : "10/17/2025"
+                  }
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
- 
-        <!-- Line Items -->
-        <div style="margin-bottom:32px;page-break-inside:avoid;">
-          <table style="width:100%;border-collapse:collapse;border:1px solid #d1d5db;margin-bottom:16px;page-break-inside:avoid;">
+
+        <div style="margin-bottom:32px; page-break-inside:auto;">
+          <table style="
+            width:100%;
+            border-collapse:collapse;
+            table-layout:fixed;
+            border:1px solid #d1d5db;
+            margin-bottom:16px;
+          ">
             <thead>
-              <tr style="background:#1f2937;color:#fff;">
-                <th style="border:1px solid #d1d5db;padding-bottom:15px;padding-left:12px;text-align:left;font-size:14px;font-weight:600;">Qty</th>
-                <th style="border:1px solid #d1d5db;padding-bottom:15px;padding-left:12px;text-align:left;font-size:14px;font-weight:600;">Item</th>
-                <th style="border:1px solid #d1d5db;padding-bottom:15px;padding-left:12px;text-align:left;font-size:14px;font-weight:600;">Description</th>
-                <th style="border:1px solid #d1d5db;padding-bottom:15px;padding-right:12px;text-align:right;font-size:14px;font-weight:600;">Rate</th>
-                <th style="border:1px solid #d1d5db;padding-bottom:15px;padding-right:12px;text-align:right;font-size:14px;font-weight:600;">Total</th>
+              <tr style="background:#1f2937; color:#fff;">
+                <th style="
+                  width:8%;
+                  border:1px solid #d1d5db;
+                  padding:10px 12px;
+                  text-align:left;
+                  font-size:14px;
+                  font-weight:600;
+                ">
+                  Qty
+                </th>
+                <th style="
+                  width:18%;
+                  border:1px solid #d1d5db;
+                  padding:10px 12px;
+                  text-align:left;
+                  font-size:14px;
+                  font-weight:600;
+                ">
+                  Item
+                </th>
+                <th style="
+                  width:46%;
+                  border:1px solid #d1d5db;
+                  padding:10px 12px;
+                  text-align:left;
+                  font-size:14px;
+                  font-weight:600;
+                ">
+                  Description
+                </th>
+                <th style="
+                  width:14%;
+                  border:1px solid #d1d5db;
+                  padding:10px 12px;
+                  text-align:right;
+                  font-size:14px;
+                  font-weight:600;
+                ">
+                  Rate
+                </th>
+                <th style="
+                  width:14%;
+                  border:1px solid #d1d5db;
+                  padding:10px 12px;
+                  text-align:right;
+                  font-size:14px;
+                  font-weight:600;
+                ">
+                  Total
+                </th>
               </tr>
             </thead>
             <tbody>
-              ${invoice.products?.map((p: any) => `
-                <tr style="border-bottom:1px solid #e5e7eb;">
-                  <td style="border:1px solid #d1d5db;padding:12px 16px;font-size:14px;font-weight:500;">${p.stock_quantity || 1}</td>
-                  <td style="border:1px solid #d1d5db;padding:12px 16px;font-weight:600;font-size:14px;">${p.product_name || 'Item'}</td>
-                  <td style="border:1px solid #d1d5db;padding:12px 16px;font-size:13px;color:#6b7280;line-height:1.4;">${p.description || ''}</td>
-                  <td style="border:1px solid #d1d5db;padding:12px 16px;text-align:right;font-size:14px;font-weight:500;">$${(p.estimated_price || 0).toFixed(2)}</td>
-                  <td style="border:1px solid #d1d5db;padding:12px 16px;text-align:right;font-weight:600;font-size:14px;">$${(p.total_cost || 0).toFixed(2)}</td>
-                </tr>
-              `).join('') || ''}
+              ${groupedPrintRows
+                .map((row: any) => {
+                  if (row.type === "synthetic-header") {
+                    return `
+                      <tr style="page-break-inside:avoid;">
+                        <td colspan="5" style="
+                          border:1px solid #d1d5db;
+                          background:#374151;
+                          color:#ffffff;
+                          padding:0px 10px 20px 14px;
+                          font-size:14px;
+                          font-weight:700;
+                          text-align:left;
+                        ">
+                          ${escapeHtml(row.headerName || "Custom Header")}
+                        </td>
+                      </tr>
+                    `;
+                  }
+
+                  return `
+                    <tr style="page-break-inside:avoid;">
+                      <td style="
+                        border:1px solid #d1d5db;
+                        padding:14px 12px;
+                        vertical-align:top;
+                        font-size:14px;
+                        color:#111827;
+                      ">
+                        ${row.qty || 0}
+                      </td>
+                      <td style="
+                        border:1px solid #d1d5db;
+                        padding:14px 12px;
+                        vertical-align:top;
+                        font-size:14px;
+                        font-weight:600;
+                        color:#111827;
+                        word-break:break-word;
+                        white-space:normal;
+                      ">
+                        ${escapeHtml(row.item || "-")}
+                      </td>
+                      <td style="
+                        border:1px solid #d1d5db;
+                        padding:14px 12px;
+                        vertical-align:top;
+                        font-size:13px;
+                        color:#4b5563;
+                        line-height:1.5;
+                        word-break:break-word;
+                        white-space:normal;
+                      ">
+                        ${escapeHtml(row.description || "")}
+                      </td>
+                      <td style="
+                        border:1px solid #d1d5db;
+                        padding:14px 12px;
+                        vertical-align:top;
+                        text-align:right;
+                        font-size:14px;
+                        font-weight:500;
+                        color:#111827;
+                        white-space:nowrap;
+                      ">
+                        $${Number(row.rate || 0).toFixed(2)}
+                      </td>
+                      <td style="
+                        border:1px solid #d1d5db;
+                        padding:14px 12px;
+                        vertical-align:top;
+                        text-align:right;
+                        font-size:14px;
+                        font-weight:700;
+                        color:#111827;
+                        white-space:nowrap;
+                      ">
+                        $${Number(row.total || 0).toFixed(2)}
+                      </td>
+                    </tr>
+                  `;
+                })
+                .join("")}
             </tbody>
           </table>
- 
-          <div style="display:flex;justify-content:end;margin-top:20px;">
+
+          <div style="display:flex; justify-content:flex-end; margin-top:20px;">
             <div style="text-align:right;">
-              <div style="font-weight:bold;font-size:20px;color:#1f2937;">$${(invoice.total_amount || 0).toFixed(2)}</div>
+              <div style="font-weight:700; font-size:20px; color:#1f2937;">
+                $${(invoice.total_amount || 0).toFixed(2)}
+              </div>
             </div>
           </div>
- 
-          <div style="display:flex;justify-content:end;margin-top:16px;">
-            <div style="text-align:right;min-width:200px;">
-              <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-                <span style="font-size:14px;color:#374151;">Payments / Credits:</span>
-                <span style="font-size:14px;color:#374151;">$${(invoice.payment_credits || 0).toFixed(2)}</span>
+
+          <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+            <div style="text-align:right; min-width:220px;">
+              <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span style="font-size:14px; color:#374151;">Payments / Credits:</span>
+                <span style="font-size:14px; color:#374151;">$${(invoice.payment_credits || 0).toFixed(2)}</span>
               </div>
-              <div style="display:flex;justify-content:space-between;background:#f3f4f6;padding:8px 12px;border-radius:4px;">
-                <span style="font-weight:bold;font-size:14px;color:#374151;position:relative;top:-7px;">Balance Due:</span>
-                <span style="font-weight:bold;font-size:14px;color:#374151;position:relative;top:-7px;">$${parseFloat(invoice.balance_due || (invoice.total_amount || 0).toString()).toFixed(2)}</span>
+              <div style="
+                display:flex;
+                justify-content:space-between;
+                background:#f3f4f6;
+                padding:10px 12px;
+                border-radius:4px;
+              ">
+                <span style="font-weight:700; font-size:14px; color:#374151;">
+                  Balance Due:
+                </span>
+                <span style="font-weight:700; font-size:14px; color:#374151;">
+                  $${parseFloat(invoice.balance_due || (invoice.total_amount || 0).toString()).toFixed(2)}
+                </span>
               </div>
             </div>
           </div>
         </div>
- 
-        <!-- Notes -->
-        <div style="border-top:2px solid #e5e7eb;padding-top:20px;margin-bottom:32px;">
-          <div style="background:#f3f4f6;padding:16px;border-radius:6px;text-align:center;border:1px solid #e5e7eb;">
-            <div style="font-size:14px;font-weight:500;white-space:pre-line;color:#374151;">${invoice.notes || 'Final payment to complete project billing'}</div>
+
+        <div style="
+          border-top:2px solid #e5e7eb;
+          padding-top:20px;
+          margin-bottom:32px;
+        ">
+          <div style="
+            background:#f3f4f6;
+            padding:16px;
+            border-radius:6px;
+            text-align:center;
+            border:1px solid #e5e7eb;
+          ">
+            <div style="
+              font-size:14px;
+              font-weight:500;
+              white-space:pre-line;
+              color:#374151;
+              line-height:1.5;
+            ">
+              ${invoice.notes || "Final payment to complete project billing"}
+            </div>
           </div>
         </div>
- 
-        <!-- Acceptance -->
-        <div style="margin-bottom:32px;page-break-inside:avoid;">
-          <div style="font-size:11px;color:#6b7280;margin-bottom:32px;line-height:1.5;">
+
+        <div style="margin-bottom:32px; page-break-inside:avoid;">
+          <div style="
+            font-size:11px;
+            color:#6b7280;
+            margin-bottom:32px;
+            line-height:1.5;
+          ">
             <p style="margin:0;">
-              JDP is not responsible for repair of lamps & landscaping, house owner utilities including cables,
-              sprinkler systems, television or telephone cables, etc. that may be cut or damaged during installation.
-              Price are subject to change prior to receipt of down payment.
+              JDP is not responsible for repair of lamps & landscaping, house owner
+              utilities including cables, sprinkler systems, television or telephone
+              cables, etc. that may be cut or damaged during installation. Price are
+              subject to change prior to receipt of down payment.
             </p>
           </div>
- 
-          <div style="text-align:center;margin-bottom:32px;">
-            <div style="font-size:14px;color:blue;font-weight:500;">EMAIL: jen@jdpelectric.us 952-449-1088</div>
-          </div>
- 
-          <div style="border-top:1px solid #e5e7eb;margin-bottom:24px;"></div>
- 
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-            <div style="display:flex;flex-direction:column;">
-              <div style="font-size:14px;font-weight:500;color:#374151;margin-bottom:4px;">Customer Acceptance</div>
-              <div style="font-size:14px;font-weight:500;color:#374151;">Authorized Signature</div>
-            </div>
-            <div style="font-size:14px;font-weight:500;color:#374151;">Date</div>
-          </div>
- 
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-            <div style="display:flex;flex-direction:column;width:60%;">
-              <div style="border-bottom:1px solid #374151;height:2px;margin-bottom:8px;"></div>
-              <div style="font-size:12px;color:#374151;text-align:center;">Signature</div>
-            </div>
-            <div style="display:flex;flex-direction:column;width:30%;">
-              <div style="border-bottom:1px solid #374151;height:2px;margin-bottom:8px;"></div>
-              <div style="font-size:12px;color:#374151;text-align:center;">Date</div>
+
+          <div style="text-align:center; margin-bottom:32px;">
+            <div style="font-size:14px; color:blue; font-weight:500;">
+              EMAIL: jen@jdpelectric.us 952-449-1088
             </div>
           </div>
- 
-          <div style="background:#e0f2fe;border:1px solid #81d4fa;border-radius:6px;padding:16px;margin-top:20px;">
-            <div style="font-size:12px;color:#374151;line-height:1.4;">
-              By signing above, you agree to the terms and pricing outlined in this estimate. This becomes a binding agreement upon signature.
+
+          <div style="border-top:1px solid #e5e7eb; margin-bottom:24px;"></div>
+
+          <div style="
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            margin-bottom:20px;
+          ">
+            <div style="display:flex; flex-direction:column;">
+              <div style="font-size:14px; font-weight:500; color:#374151; margin-bottom:4px;">
+                Customer Acceptance
+              </div>
+              <div style="font-size:14px; font-weight:500; color:#374151;">
+                Authorized Signature
+              </div>
+            </div>
+            <div style="font-size:14px; font-weight:500; color:#374151;">Date</div>
+          </div>
+
+          <div style="
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            margin-bottom:20px;
+          ">
+            <div style="display:flex; flex-direction:column; width:60%;">
+              <div style="border-bottom:1px solid #374151; height:2px; margin-bottom:8px;"></div>
+              <div style="font-size:12px; color:#374151; text-align:center;">Signature</div>
+            </div>
+            <div style="display:flex; flex-direction:column; width:30%;">
+              <div style="border-bottom:1px solid #374151; height:2px; margin-bottom:8px;"></div>
+              <div style="font-size:12px; color:#374151; text-align:center;">Date</div>
+            </div>
+          </div>
+
+          <div style="
+            background:#e0f2fe;
+            border:1px solid #81d4fa;
+            border-radius:6px;
+            padding:16px;
+            margin-top:20px;
+          ">
+            <div style="font-size:12px; color:#374151; line-height:1.4;">
+              By signing above, you agree to the terms and pricing outlined in this
+              estimate. This becomes a binding agreement upon signature.
             </div>
           </div>
         </div>
       </div>
     `;
+
       tempElement.innerHTML = invoiceHtml;
       document.body.appendChild(tempElement);
 
-      // Header height in CSS px
-      const headerEl = tempElement.querySelector('#print-header') as HTMLElement | null;
-      const headerCssPx = Math.ceil(headerEl?.getBoundingClientRect().height || 0);
+      const printTableRows = Array.from(
+        tempElement.querySelectorAll("tbody tr")
+      ) as HTMLElement[];
 
-      // Render to canvas
       const canvas = await html2canvas(tempElement, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
-        backgroundColor: '#ffffff',
+        backgroundColor: "#ffffff",
         logging: false,
         width: tempElement.scrollWidth,
         height: tempElement.scrollHeight,
         scrollX: 0,
         scrollY: 0,
         windowWidth: tempElement.scrollWidth,
-        windowHeight: tempElement.scrollHeight
+        windowHeight: tempElement.scrollHeight,
       });
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const imgWidth = 210;
+      const pageHeight = 297;
+      const pxToMm = imgWidth / canvas.width;
+
+      const topPaddingMM = 10;
+      const bottomPaddingMM = 14;
+      const usablePageHeight = pageHeight - topPaddingMM - bottomPaddingMM;
+      const pageHeightPx = Math.floor(usablePageHeight / pxToMm);
 
       const scaleX = canvas.width / tempElement.scrollWidth;
       const rootRect = tempElement.getBoundingClientRect();
-      const headRect = headerEl?.getBoundingClientRect();
-      const headerBandCssPx = Math.max(1, Math.ceil(((headRect?.bottom ?? 0) - rootRect.top)));
-      const headerPxScaled = Math.max(1, Math.round(headerBandCssPx * scaleX));
-      log
 
-      // Slice header (use scaled px)
-      let headerImgData: string | null = null;
-      if (headerPxScaled > 0) {
-        const headerCanvas = document.createElement('canvas');
-        headerCanvas.width = canvas.width;
-        headerCanvas.height = headerPxScaled;
-        const hctx = headerCanvas.getContext('2d')!;
-        hctx.drawImage(canvas, 0, 0, canvas.width, headerPxScaled, 0, 0, canvas.width, headerPxScaled);
-        headerImgData = headerCanvas.toDataURL('image/png');
-      }
+      const rowBottomBreakpoints = printTableRows
+        .map((row) => {
+          const rect = row.getBoundingClientRect();
+          return Math.round((rect.bottom - rootRect.top) * scaleX);
+        })
+        .filter((v) => v > 0)
+        .sort((a, b) => a - b);
 
-      const imageData = canvas.toDataURL('image/png');
-
-
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgWidth = 210;
-      const footerSpace = 11;
-      const pageHeight = 295 - footerSpace;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      const pxToMm = imgWidth / canvas.width;
-      const headerHeightMM = headerPxScaled * pxToMm;
-
-
-      const topPaddingMM = 10;
-      const bottomPaddingMM = 0;
-      const usablePageHeight = pageHeight - topPaddingMM - bottomPaddingMM;
-
-
-      let yPosition = 0;
-      const pageHeightPx = (usablePageHeight / pxToMm);
-
-
-      pdf.addImage(imageData, 'PNG', 0, topPaddingMM, imgWidth, imgHeight);
-      yPosition += pageHeightPx;
-
-
-      while (yPosition < canvas.height) {
-        pdf.addPage();
-
-
-        const pageCanvas = document.createElement('canvas');
-        pageCanvas.width = canvas.width;
-        pageCanvas.height = pageHeightPx;
-        const pageCtx = pageCanvas.getContext('2d')!;
-        pageCtx.fillStyle = '#fff';
-        pageCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-        pageCtx.drawImage(
-          canvas,
-          0, yPosition,
-          canvas.width, pageHeightPx,
-          0, 0,
-          canvas.width, pageHeightPx
+      const getSafeSliceEnd = (startY: number, targetEndY: number) => {
+        const possibleBreaks = rowBottomBreakpoints.filter(
+          (point) => point > startY + 40 && point <= targetEndY
         );
 
-        const pageImg = pageCanvas.toDataURL('image/png');
-        pdf.addImage(pageImg, 'PNG', 0, topPaddingMM, imgWidth, (pageHeightPx * pxToMm));
+        if (possibleBreaks.length > 0) {
+          return possibleBreaks[possibleBreaks.length - 1];
+        }
 
-        yPosition += pageHeightPx;
+        return Math.min(targetEndY, canvas.height);
+      };
+
+      let startY = 0;
+      let isFirstPage = true;
+
+      while (startY < canvas.height) {
+        const rawEndY = Math.min(startY + pageHeightPx, canvas.height);
+        const endY =
+          rawEndY >= canvas.height
+            ? canvas.height
+            : getSafeSliceEnd(startY, rawEndY);
+
+        const sliceHeight = endY - startY;
+
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sliceHeight;
+
+        const pageCtx = pageCanvas.getContext("2d")!;
+        pageCtx.fillStyle = "#fff";
+        pageCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+
+        pageCtx.drawImage(
+          canvas,
+          0,
+          startY,
+          canvas.width,
+          sliceHeight,
+          0,
+          0,
+          canvas.width,
+          sliceHeight
+        );
+
+        const pageImg = pageCanvas.toDataURL("image/png");
+
+        if (!isFirstPage) {
+          pdf.addPage();
+        }
+
+        pdf.addImage(
+          pageImg,
+          "PNG",
+          0,
+          topPaddingMM,
+          imgWidth,
+          sliceHeight * pxToMm
+        );
+
+        startY = endY;
+        isFirstPage = false;
       }
 
-      const pdfBlob = pdf.output('blob');
+      const pdfBlob = pdf.output("blob");
       const pdfUrl = URL.createObjectURL(pdfBlob);
-      const printWindow = window.open(pdfUrl, '_blank');
+      const printWindow = window.open(pdfUrl, "_blank");
       if (printWindow) {
         printWindow.onload = () => setTimeout(() => printWindow.print(), 1000);
       }
@@ -3475,157 +4852,162 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
       document.body.removeChild(tempElement);
       setTimeout(() => URL.revokeObjectURL(pdfUrl), 10000);
     } catch (err) {
-      console.error('Print error:', err);
-      toast.error('Failed to print invoice');
+      console.error("Print error:", err);
+      toast.error("Failed to print invoice");
     }
   };
-
-
   const handleDeleteInvoice = async (invoiceId: string) => {
-    setEstimateToDelete({ id: invoiceId })
-    setShowDeleteEstimateDialog(true)
-  }
+    setEstimateToDelete({ id: invoiceId });
+    setShowDeleteEstimateDialog(true);
+  };
 
   // Map UI invoice types to API values
   const mapInvoiceTypeToAPI = (uiType: string): string => {
     const mapping: Record<string, string> = {
-      'Estimate': 'estimate',
-      'Downpayment Invoice': 'down_payment',
-      'Rough Invoice': 'proposal_invoice',
-      'Progressive Invoice': 'progressive_invoice',
-      'Final Invoice': 'final_invoice'
-    }
+      Estimate: "estimate",
+      "Downpayment Invoice": "down_payment",
+      "Rough Invoice": "proposal_invoice",
+      "Progressive Invoice": "progressive_invoice",
+      "Final Invoice": "final_invoice",
+    };
     // Return mapped value if exists, otherwise return the custom value as-is
-    return mapping[uiType] || uiType.toLowerCase().replace(/\s+/g, '_')
-  }
+    return mapping[uiType] || uiType.toLowerCase().replace(/\s+/g, "_");
+  };
 
   // Map API invoice type to UI format
   const mapInvoiceTypeToUI = (apiType: string): string => {
     const mapping: Record<string, string> = {
-      'estimate': 'Estimate',
-      'down_payment': 'Downpayment Invoice',
-      'proposal_invoice': 'Rough Invoice',
-      'progressive_invoice': 'Progressive Invoice',
-      'final_invoice': 'Final Invoice'
-    }
+      estimate: "Estimate",
+      down_payment: "Downpayment Invoice",
+      proposal_invoice: "Rough Invoice",
+      progressive_invoice: "Progressive Invoice",
+      final_invoice: "Final Invoice",
+    };
     // Return mapped value if exists, otherwise convert custom value back to readable format
     if (mapping[apiType]) {
-      return mapping[apiType]
+      return mapping[apiType];
     }
     // Convert custom API value back to readable format
-    return apiType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-  }
+    return apiType.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+  };
 
   // Fetch suppliers with search
-  const fetchSuppliers = async (searchQuery: string = '') => {
+  const fetchSuppliers = async (searchQuery: string = "") => {
     try {
       const response = searchQuery
         ? await apiClient.searchSuppliersByQuery(searchQuery)
-        : await apiClient.getAllSuppliers()
+        : await apiClient.getAllSuppliers();
 
-      const suppliersData = response.data?.suppliers || response.data?.data || []
-      setSuppliersList(suppliersData.map((s: any) => ({
-        id: s.id,
-        name: s.company_name || s.users?.full_name || 'Unknown',
-        fullName: s.users?.full_name || '',
-        companyName: s.company_name || ''
-      })))
+      const suppliersData =
+        response.data?.suppliers || response.data?.data || [];
+      setSuppliersList(
+        suppliersData.map((s: any) => ({
+          id: s.id,
+          name: s.company_name || s.users?.full_name || "Unknown",
+          fullName: s.users?.full_name || "",
+          companyName: s.company_name || "",
+        })),
+      );
     } catch (error) {
-      console.error('Error fetching suppliers:', error)
+      console.error("Error fetching suppliers:", error);
     }
-  }
+  };
 
   // Fetch products with search
-  const fetchProducts = async (searchQuery: string = '') => {
+  const fetchProducts = async (searchQuery: string = "") => {
     try {
       const response = searchQuery
         ? await apiClient.searchProductsByQuery(searchQuery)
-        : await apiClient.getAllProducts()
+        : await apiClient.getAllProducts();
 
-      const productsData = response.data?.products || response.data?.data || []
-      setProducts(productsData.map((p: any) => ({
-        id: p.id,
-        name: p.product_name,
-        description: p.description || '',
-        jdpSKU: p.jdp_sku,
-        jdpPrice: p.jdp_price || p.unit_cost || 0,
-        estimatedPrice: p.estimated_price || 0,
-        supplierId: p.supplier_id || 1
-      })))
+      const productsData = response.data?.products || response.data?.data || [];
+      setProducts(
+        productsData.map((p: any) => ({
+          id: p.id,
+          name: p.product_name,
+          description: p.description || "",
+          jdpSKU: p.jdp_sku,
+          jdpPrice: p.jdp_price || p.unit_cost || 0,
+          estimatedPrice: p.estimated_price || 0,
+          supplierId: p.supplier_id || 1,
+        })),
+      );
     } catch (error) {
-      console.error('Error fetching products:', error)
+      console.error("Error fetching products:", error);
     }
   };
-  console.log(products,"::products");
-  
+  console.log(inlineInvoiceData.lineItems, "::lineItems");
 
   useEffect(() => {
-    fetchProducts()
-    fetchSuppliers()
+    fetchProducts();
+    fetchSuppliers();
 
     // Fetch data based on job type
-    if (job.type === 'contract-based' && job.contractor) {
-      // For contract-based jobs, fetch contractor data 
-      fetchContractorData(job.contractor)
-    } else if (job.type === 'service-based' && job.customer) {
-      // For service-based jobs, fetch customer data 
-      fetchCustomerData(job.customer)
+    if (job.type === "contract-based" && job.contractor) {
+      // For contract-based jobs, fetch contractor data
+      fetchContractorData(job.contractor);
+    } else if (job.type === "service-based" && job.customer) {
+      // For service-based jobs, fetch customer data
+      fetchCustomerData(job.customer);
     } else {
-      console.log('No customer/contractor ID found in job data')
+      console.log("No customer/contractor ID found in job data");
     }
-  }, [job.customer, job.contractor, job.type, job.id])
+  }, [job.customer, job.contractor, job.type, job.id]);
 
   // Debug: Log inlineInvoiceData changes
-  useEffect(() => {
-  }, [inlineInvoiceData.customerAddress])
+  useEffect(() => {}, [inlineInvoiceData.customerAddress]);
 
   // Update customer address when customerData changes
   useEffect(() => {
-    if (customerData?.address && customerData.address !== inlineInvoiceData.customerAddress) {
-      setInlineInvoiceData(prev => ({
+    if (
+      customerData?.address &&
+      customerData.address !== inlineInvoiceData.customerAddress
+    ) {
+      setInlineInvoiceData((prev) => ({
         ...prev,
-        customerAddress: customerData.address
-      }))
+        customerAddress: customerData.address,
+      }));
     }
   }, [customerData?.address]);
-  
 
   const handleSaveInvoiceAsDraft = async () => {
     // Validation
-    const errors: Record<string, string> = {}
+    const errors: Record<string, string> = {};
 
     if (!inlineInvoiceData.project) {
-      errors.project = 'Project field is required'
+      errors.project = "Project field is required";
     }
 
     // Filter out empty line items and check if we have at least one valid item
-    const validLineItems = inlineInvoiceData.lineItems.filter(item =>
-      item.item && item.item.trim() !== ''
-    )
+    const validLineItems = inlineInvoiceData.lineItems.filter(
+      (item) => item.item && item.item.trim() !== "",
+    );
+
+    console.log(errors, "errors");
 
     if (validLineItems.length === 0) {
-      errors.lineItems = 'Please add at least one product item with name'
+      errors.lineItems = "Please add at least one product item with name";
     }
 
     if (Object.keys(errors).length > 0) {
-      setInvoiceValidationErrors(errors)
-      toast.error('Please fix the validation errors')
-      return
+      setInvoiceValidationErrors(errors);
+      toast.error("Please fix the validation errors");
+      return;
     }
 
-    setInvoiceValidationErrors({})
-    setIsLoadingDraft(true)
+    setInvoiceValidationErrors({});
+    setIsLoadingDraft(true);
     try {
-      const subtotal = calculateInvoiceSubtotal()
+      const subtotal = calculateInvoiceSubtotal();
 
       // Only map valid line items to custom products
-      const customProducts = validLineItems.map(item => {
+      const customProducts = validLineItems.map((item) => {
         const productPayload: any = {
           product_name: item.item,
-          description: item.description || '',
+          description: item.description || "",
           jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
           stock_quantity: item.qty,
-          unit: 'unit',
+          unit: "unit",
           job_id: Number(jobId),
           unit_cost: item.rate,
           jdp_price: item.rate,
@@ -3634,245 +5016,264 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
           is_custom: item.isCustomProduct === true,
           section_name: item.headerName || null,
           section_type: item.type ? "room_header" : null,
-          parent_header_key: item.parentHeaderKey || null,
-         parent_header_name: item.parentHeaderName || null,
-        }
+          // parent_header_key: item.parentHeaderKey || null,
+          parent_header_name: item.parentHeaderName || null,
+        };
 
         // Add product ID only for searched/selected products
         if (item.isCustomProduct !== true && item.productId) {
-          productPayload.id = item.productId
+          productPayload.id = item.productId;
         }
 
-        return productPayload
-      })
+        return productPayload;
+      });
+
+      console.log(customProducts,"customProductscustomProducts");
+      
 
       const payload = {
         job_id: Number(jobId),
         estimate_title: inlineInvoiceData.project || job.title,
-        ...(job.type === 'contract-based'
+        ...(job.type === "contract-based"
           ? { contractor_id: Number(job.contractor) || 0 }
-          : { customer_id: Number(job.customer?.id || job.customer) || 0 }
-        ),
-        priority: 'medium' as 'low' | 'medium' | 'high',
-        service_type: job.type === 'contract-based' ? 'contract_based' : 'service_based',
-        email_address: job.type === 'contract-based'
-          ? (contractorData?.email || job.email || 'contractor@example.com')
-          : (customerData?.email || job.customer?.email || job.email || 'customer@example.com'),
+          : { customer_id: Number(job.customer?.id || job.customer) || 0 }),
+        priority: "medium" as "low" | "medium" | "high",
+        service_type:
+          job.type === "contract-based" ? "contract_based" : "service_based",
+        email_address:
+          job.type === "contract-based"
+            ? contractorData?.email || job.email || "contractor@example.com"
+            : customerData?.email ||
+              job.customer?.email ||
+              job.email ||
+              "customer@example.com",
         estimate_date: inlineInvoiceData.date,
-        po_number: inlineInvoiceData.poNumber || '',
-        rep: inlineInvoiceData.rep || '',
-        due_date: inlineInvoiceData.dueDate || '',
+        po_number: inlineInvoiceData.poNumber || "",
+        rep: inlineInvoiceData.rep || "",
+        due_date: inlineInvoiceData.dueDate || "",
         payment_credits: inlineInvoiceData.paymentCredits || 0,
-        balance_due: inlineInvoiceData.balanceDue || '',
-        ...(inlineInvoiceData.billToAddressEnabled && { bill_to_address: inlineInvoiceData.billToAddress || '' }),
-        status: 'draft',
-        invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType),
-        notes: inlineInvoiceData.notes || '',
-        total_amount:subtotal,
-        custom_products: customProducts
-      }
+        balance_due: inlineInvoiceData.balanceDue || "",
+        ...(inlineInvoiceData.billToAddressEnabled && {
+          bill_to_address: inlineInvoiceData.billToAddress || "",
+        }),
+        status: "draft",
+        invoice_type: mapInvoiceTypeToAPI(
+          inlineInvoiceData.invoiceType === "Custom"
+            ? inlineInvoiceData.customInvoiceType
+            : inlineInvoiceData.invoiceType,
+        ),
+        notes: inlineInvoiceData.notes || "",
+        total_amount: subtotal,
+        custom_products: customProducts,
+      };
 
       // Check if we're editing an existing invoice
       if (editingInvoiceId) {
-        await apiClient.updateEstimate(Number(editingInvoiceId), payload as any)
-        toast.success('Invoice updated successfully!')
+        await apiClient.updateEstimate(
+          Number(editingInvoiceId),
+          payload as any,
+        );
+        toast.success("Invoice updated successfully!");
       } else {
-        await apiClient.createEstimate(payload as any)
-        toast.success('Invoice saved as draft!')
+        await apiClient.createEstimate(payload as any);
+        toast.success("Invoice saved as draft!");
       }
 
       // Refresh estimates list
-      await fetchEstimates()
+      await fetchEstimates();
       try {
         const res = await apiClient.getJobDashboard(jobId);
         setDashboardMetrics(res.data.dashboardMetrics);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       }
-      setShowInlineInvoiceForm(false)
-      setEditingInvoiceId(null)
+      setShowInlineInvoiceForm(false);
+      setEditingInvoiceId(null);
 
       // Reset form
       setInlineInvoiceData({
-        date: new Date().toISOString().split('T')[0],
-        estimateNumber: '',
-        customerName: job.customerName || '',
-        customerAddress: job.address || '',
-        billToAddress: job.billToAddress || '',
+        date: new Date().toISOString().split("T")[0],
+        estimateNumber: "",
+        customerName: job.customerName || "",
+        customerAddress: job.address || "",
+        billToAddress: job.billToAddress || "",
         billToAddressEnabled: true,
-        poNumber: '',
-        project: job.title || '',
-        rep: '',
-        dueDate: '',
+        poNumber: "",
+        project: job.title || "",
+        rep: "",
+        dueDate: "",
         paymentCredits: 0,
-        balanceDue: '',
-        lineItems: [{
-          id: Math.random().toString(36).substring(2, 9),
-          productId: null,
-          qty: 1,
-          item: '',
-          description: '',
-          rate: 0,
-          estimatedPrice: 0,
-          total: 0,
-          searchQuery: '',
-          showSearchResults: false,
-          supplierId: 1,
-          isCustomProduct: false,
-          estimate_product_id: null
-        }],
-        notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
-        signatureText: 'ACCEPTED BY________________DATE_____',
-        invoiceType: 'Estimate',
-        customInvoiceType: '',
+        balanceDue: "",
+        lineItems: [],
+        notes: "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
+        signatureText: "ACCEPTED BY________________DATE_____",
+        invoiceType: "Estimate",
+        customInvoiceType: "",
         paymentPercentage: 0,
         estimateTotal: 0,
-        paymentHistory: []
-      })
-      setInvoiceValidationErrors({})
+        paymentHistory: [],
+      });
+      setInvoiceValidationErrors({});
     } catch (error) {
-      console.error('Error saving invoice:', error)
-      toast.error('Failed to save invoice')
+      console.error("Error saving invoice:", error);
+      toast.error("Failed to save invoice");
     } finally {
-      setIsLoadingDraft(false)
+      setIsLoadingDraft(false);
     }
-  }
+  };
   const buildCustomProductsWithSections = () => {
-  let currentSectionName = "";
+    let currentSectionName = "";
 
-  return inlineInvoiceData.lineItems.reduce((acc: any[], lineItem: any) => {
-    if (lineItem.type === "header") {
-      currentSectionName = (lineItem.headerName || "").trim();
+    return inlineInvoiceData.lineItems.reduce((acc: any[], lineItem: any) => {
+      if (lineItem.type === "header") {
+        currentSectionName = (lineItem.headerName || "").trim();
+        return acc;
+      }
+
+      acc.push({
+        ...(lineItem.estimate_product_id
+          ? { id: lineItem.estimate_product_id }
+          : {}),
+        product_name: lineItem.item || "",
+        description: lineItem.description || "",
+        jdp_sku:
+          lineItem.jdp_sku ||
+          `JDP-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        stock_quantity: Number(lineItem.qty || 0),
+        unit: lineItem.unit || "unit",
+        job_id: Number(jobId),
+        unit_cost: Number(lineItem.rate || 0),
+        jdp_price: Number(lineItem.rate || 0),
+        estimated_price: Number(lineItem.estimatedPrice || 0),
+        total_cost: Number(lineItem.total || 0),
+        is_custom: !!lineItem.isCustomProduct,
+
+        // NEW FIELDS FOR BACKEND
+        section_name: currentSectionName || null,
+        section_type: currentSectionName ? "room_header" : null,
+      });
+
       return acc;
-    }
-
-    acc.push({
-      ...(lineItem.estimate_product_id ? { id: lineItem.estimate_product_id } : {}),
-      product_name: lineItem.item || "",
-      description: lineItem.description || "",
-      jdp_sku:
-        lineItem.jdp_sku ||
-        `JDP-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-      stock_quantity: Number(lineItem.qty || 0),
-      unit: lineItem.unit || "unit",
-      job_id: Number(jobId),
-      unit_cost: Number(lineItem.rate || 0),
-      jdp_price: Number(lineItem.rate || 0),
-      estimated_price: Number(lineItem.estimatedPrice || 0),
-      total_cost: Number(lineItem.total || 0),
-      is_custom: !!lineItem.isCustomProduct,
-
-      // NEW FIELDS FOR BACKEND
-      section_name: currentSectionName || null,
-      section_type: currentSectionName ? "room_header" : null,
-    });
-
-    return acc;
-  }, []);
-};
+    }, []);
+  };
 
   const handlePreviewAndSend = async () => {
     // Validation
-    const errors: Record<string, string> = {}
+    const errors: Record<string, string> = {};
 
     if (!inlineInvoiceData.project) {
-      errors.project = 'Project field is required'
+      errors.project = "Project field is required";
     }
 
     // Filter out empty line items and check if we have at least one valid item
-    const validLineItems = inlineInvoiceData.lineItems.filter(item =>
-      item.item && item.item.trim() !== ''
-    )
+    const validLineItems = inlineInvoiceData.lineItems.filter(
+      (item) => item.item && item.item.trim() !== "",
+    );
 
     if (validLineItems.length === 0) {
-      errors.lineItems = 'Please add at least one product item with name'
+      errors.lineItems = "Please add at least one product item with name";
     }
 
     if (Object.keys(errors).length > 0) {
-      setInvoiceValidationErrors(errors)
-      toast.error('Please fix the validation errors')
-      return
+      setInvoiceValidationErrors(errors);
+      toast.error("Please fix the validation errors");
+      return;
     }
 
     // First save as draft
     try {
-      setIsLoadingPreview(true)
+      setIsLoadingPreview(true);
 
-      const subtotal = calculateInvoiceSubtotal()
+      const subtotal = calculateInvoiceSubtotal();
 
       // Only map valid line items to custom products
-      const customProducts = validLineItems.map(item => {
-        console.log(item,"itemitem");
-        
+      const customProducts = validLineItems.map((item) => {
+        console.log(item, "itemitem");
+
         const productPayload: any = {
           product_name: item.item,
-          description: item.description || '',
+          description: item.description || "",
           jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
           stock_quantity: item.qty,
-          unit: 'unit',
+          unit: "unit",
           job_id: Number(jobId),
           unit_cost: item.rate,
           jdp_price: item.rate,
           estimated_price: item.estimatedPrice || 0,
           total_cost: item.total,
           is_custom: item.isCustomProduct === true,
-              // NEW FIELDS FOR BACKEND
+          // NEW FIELDS FOR BACKEND
           section_name: item.headerName || null,
           section_type: item.type ? "room_header" : null,
-          parent_header_key: item.parentHeaderKey || null,
+          // parent_header_key: item.parentHeaderKey || null,
           parent_header_name: item.parentHeaderName || null,
-        }
+        };
 
         // Add product ID only for searched/selected products
         if (item.isCustomProduct !== true && item.productId) {
-          productPayload.id = item.productId
+          productPayload.id = item.productId;
         }
 
-        return productPayload
-      })
+        return productPayload;
+      });
 
       const payload = {
         job_id: Number(jobId),
         estimate_title: inlineInvoiceData.project || job.title,
-        ...(job.type === 'contract-based'
+        ...(job.type === "contract-based"
           ? { contractor_id: Number(job.contractor) || 0 }
-          : { customer_id: Number(job.customer?.id || job.customer) || 0 }
-        ),
-        priority: 'medium' as 'low' | 'medium' | 'high',
-        service_type: job.type === 'contract-based' ? 'contract_based' : 'service_based',
-        email_address: job.type === 'contract-based'
-          ? (contractorData?.email || job.email || 'contractor@example.com')
-          : (customerData?.email || job.customer?.email || job.email || 'customer@example.com'),
+          : { customer_id: Number(job.customer?.id || job.customer) || 0 }),
+        priority: "medium" as "low" | "medium" | "high",
+        service_type:
+          job.type === "contract-based" ? "contract_based" : "service_based",
+        email_address:
+          job.type === "contract-based"
+            ? contractorData?.email || job.email || "contractor@example.com"
+            : customerData?.email ||
+              job.customer?.email ||
+              job.email ||
+              "customer@example.com",
         estimate_date: inlineInvoiceData.date,
-        po_number: inlineInvoiceData.poNumber || '',
-        rep: inlineInvoiceData.rep || '',
-        due_date: inlineInvoiceData.dueDate || '',
+        po_number: inlineInvoiceData.poNumber || "",
+        rep: inlineInvoiceData.rep || "",
+        due_date: inlineInvoiceData.dueDate || "",
         payment_credits: inlineInvoiceData.paymentCredits || 0,
-        balance_due: inlineInvoiceData.balanceDue || '',
-        ...(inlineInvoiceData.billToAddressEnabled && { bill_to_address: inlineInvoiceData.billToAddress || '' }),
-        status: 'draft',
-        invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType),
-        notes: inlineInvoiceData.notes || '',
+        balance_due: inlineInvoiceData.balanceDue || "",
+        ...(inlineInvoiceData.billToAddressEnabled && {
+          bill_to_address: inlineInvoiceData.billToAddress || "",
+        }),
+        status: "draft",
+        invoice_type: mapInvoiceTypeToAPI(
+          inlineInvoiceData.invoiceType === "Custom"
+            ? inlineInvoiceData.customInvoiceType
+            : inlineInvoiceData.invoiceType,
+        ),
+        notes: inlineInvoiceData.notes || "",
         custom_products: customProducts,
-        estimate_source_type: job?.estimatedCost? 'estimate_job' : 'time_material_job',
-        total_amount:subtotal,
-      }
+        estimate_source_type: job?.estimatedCost
+          ? "estimate_job"
+          : "time_material_job",
+        total_amount: subtotal,
+      };
 
       if (editingInvoiceId) {
-        await apiClient.updateEstimate(Number(editingInvoiceId), payload as any)
+        await apiClient.updateEstimate(
+          Number(editingInvoiceId),
+          payload as any,
+        );
       } else {
-        const response = await apiClient.createEstimate(payload as any)
-        setEditingInvoiceId(response.id)
+        const response = await apiClient.createEstimate(payload as any);
+        setEditingInvoiceId(response.id);
       }
 
       // Clear validation errors
-      setInvoiceValidationErrors({})
+      setInvoiceValidationErrors({});
 
       // Show single success message
-      toast.success('Invoice saved successfully!')
+      toast.success("Invoice saved successfully!");
 
       // Refresh estimates to update count
-      await fetchEstimates()
+      await fetchEstimates();
 
       // Refresh dashboard data
       try {
@@ -3883,63 +5284,78 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
       }
 
       // Then open preview dialog
-      setShowPreviewDialog(true)
-
+      setShowPreviewDialog(true);
     } catch (error) {
-      console.error('Error saving invoice:', error)
-      toast.error('Failed to save invoice. Please try again.')
+      console.error("Error saving invoice:", error);
+      toast.error("Failed to save invoice. Please try again.");
     } finally {
-      setIsLoadingPreview(false)
+      setIsLoadingPreview(false);
     }
-  }
+  };
 
-  const handleSendFromPreview = async () => {    
-    setIsLoading(true)
+  const handleSendFromPreview = async () => {
+    setIsLoading(true);
     try {
       // Prepare API payload
-      const subtotal = calculateInvoiceSubtotal()
-      const total = subtotal // You can add tax calculation here if needed
+      const subtotal = calculateInvoiceSubtotal();
+      const total = subtotal; // You can add tax calculation here if needed
 
       const payload = {
-        estimateNumber: inlineInvoiceData.estimateNumber || 'Draft',
-        estimateDate: new Date(inlineInvoiceData.date).toLocaleDateString('en-US', {
-          month: '2-digit',
-          day: '2-digit',
-          year: 'numeric'
-        }),
-        ...(job.type === 'contract-based'
-          ? {
-            customerName: inlineInvoiceData.customerName || 'Contractor',
-            customerEmail: contractorData?.email || job.email || 'contractor@example.com',
-            customerAddress: inlineInvoiceData.customerAddress || ''
-          }
-          : {
-            customerName: inlineInvoiceData.customerName || 'Customer',
-            customerEmail: customerData?.email || job.customer?.email || job.customerEmail || 'customer@example.com',
-            customerAddress: inlineInvoiceData.customerAddress || ''
-          }
+        estimateNumber: inlineInvoiceData.estimateNumber || "Draft",
+        estimateDate: new Date(inlineInvoiceData.date).toLocaleDateString(
+          "en-US",
+          {
+            month: "2-digit",
+            day: "2-digit",
+            year: "numeric",
+          },
         ),
-        billToAddress: inlineInvoiceData.billToAddressEnabled ? inlineInvoiceData.billToAddress || '' : '',
-        poNumber: inlineInvoiceData.poNumber || '',
-        projectName: inlineInvoiceData.project || job.title || '',
-        items: inlineInvoiceData.lineItems.map(item => ({
-          quantity: item.qty.toString(),
-          item: item.item,
-          description: item.description || '',
-          rate: (item.rate || 0).toFixed(2),
-          amount: (item.estimatedPrice || 0).toFixed(2)
+        ...(job.type === "contract-based"
+          ? {
+              customerName: inlineInvoiceData.customerName || "Contractor",
+              customerEmail:
+                contractorData?.email || job.email || "contractor@example.com",
+              customerAddress: inlineInvoiceData.customerAddress || "",
+            }
+          : {
+              customerName: inlineInvoiceData.customerName || "Customer",
+              customerEmail:
+                customerData?.email ||
+                job.customer?.email ||
+                job.customerEmail ||
+                "customer@example.com",
+              customerAddress: inlineInvoiceData.customerAddress || "",
+            }),
+        billToAddress: inlineInvoiceData.billToAddressEnabled
+          ? inlineInvoiceData.billToAddress || ""
+          : "",
+        poNumber: inlineInvoiceData.poNumber || "",
+        projectName: inlineInvoiceData.project || job.title || "",
+        items: (inlineInvoiceData.lineItems || [])
+        .filter((item: any) => item.type === "item")
+        .map((item: any) => ({
+          quantity: String(item.qty || 0),
+          item: item.item || "",
+          description: item.description || "",
+          rate: Number(item.rate || 0).toFixed(2),
+          amount: Number(item.estimatedPrice || 0).toFixed(2),
+          parent_header_name: item.parentHeaderName || item.parent_header_name || null,
         })),
         subtotal: subtotal.toFixed(2),
         total: total.toFixed(2),
-        dueDate: inlineInvoiceData.dueDate || '',
-        rep: inlineInvoiceData.rep || 'JDP',
+        dueDate: inlineInvoiceData.dueDate || "",
+        rep: inlineInvoiceData.rep || "JDP",
         paymentCredits: inlineInvoiceData.paymentCredits || 0,
-        balanceDue: (subtotal - (inlineInvoiceData.paymentCredits || 0)).toFixed(2),
-        notes: inlineInvoiceData.notes ? inlineInvoiceData.notes.split('\n').filter(note => note.trim()) : [],
-        email: 'jen@jdpelectric.us',
-        phone: '952-449-1088',
-        status: 'sent'
-      }
+        balanceDue: (
+          subtotal - (inlineInvoiceData.paymentCredits || 0)
+        ).toFixed(2),
+        notes: inlineInvoiceData.notes
+          ? inlineInvoiceData.notes.split("\n").filter((note) => note.trim())
+          : [],
+        email: "jen@jdpelectric.us",
+        phone: "952-449-1088",
+        status: "sent",
+      };
 
       // Get auth token
       const getAuthToken = (): string | null => {
@@ -3960,85 +5376,78 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
       };
 
       // Call API to send invoice
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
-      const token = getAuthToken()
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+      const token = getAuthToken();
 
       const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      }
+        "Content-Type": "application/json",
+      };
 
       if (token) {
-        headers['Authorization'] = `Bearer ${token}`
+        headers["Authorization"] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`${apiUrl}/invoices/sendInvoiceToCustomer/${editingInvoiceId || estimates[0]?.id}`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload)
-      })
+      const response = await fetch(
+        `${apiUrl}/invoices/sendInvoiceToCustomer/${editingInvoiceId || estimates[0]?.id}`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload),
+        },
+      );
 
       if (!response.ok) {
-        throw new Error('Failed to send invoice')
+        throw new Error("Failed to send invoice");
       }
 
-      toast.success('Invoice sent successfully to customer!')
+      toast.success("Invoice sent successfully to customer!");
 
       // Also save the invoice data to backend
-      const customProducts = inlineInvoiceData.lineItems.map(item => {
-        const productPayload: any = {
-          product_name: item.item,
-          description: item.description || '',
-          jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          stock_quantity: item.qty,
-          unit: 'unit',
-          job_id: Number(jobId),
-          unit_cost: item.rate,
-          jdp_price: item.rate,
-          estimated_price: item.estimatedPrice || 0,
-          total_cost: item.total,
-          is_custom: item.isCustomProduct === true,
-          section_name: item.headerName || null,
-          section_type: item.type ? "room_header" : null,
-          parent_header_key: item.parentHeaderKey || null,
-          parent_header_name: item.parentHeaderName || null,
-        }
-
-        // Add product ID only for searched/selected products
-        if (item.isCustomProduct !== true && item.productId) {
-          productPayload.id = item.productId
-        }
-
-        return productPayload
-      })
-
+    const customProducts = sanitizeCustomProductsForPayload(
+      inlineInvoiceData.lineItems,
+      Number(jobId),
+    );
       const backendPayload = {
         job_id: Number(jobId),
         estimate_title: inlineInvoiceData.project || job.title,
-        ...(job.type === 'contract-based'
+        ...(job.type === "contract-based"
           ? { contractor_id: Number(job.contractor) || 0 }
-          : { customer_id: Number(job.customer?.id || job.customer) || 0 }
-        ),
-        priority: 'medium' as 'low' | 'medium' | 'high',
-        service_type: job.type === 'contract-based' ? 'contract_based' : 'service_based',
-        email_address: job.type === 'contract-based'
-          ? (contractorData?.email || job.email || 'contractor@example.com')
-          : (customerData?.email || job.customer?.email || job.email || 'customer@example.com'),
+          : { customer_id: Number(job.customer?.id || job.customer) || 0 }),
+        priority: "medium" as "low" | "medium" | "high",
+        service_type:
+          job.type === "contract-based" ? "contract_based" : "service_based",
+        email_address:
+          job.type === "contract-based"
+            ? contractorData?.email || job.email || "contractor@example.com"
+            : customerData?.email ||
+              job.customer?.email ||
+              job.email ||
+              "customer@example.com",
         estimate_date: inlineInvoiceData.date,
-        po_number: inlineInvoiceData.poNumber || '',
-        rep: inlineInvoiceData.rep || '',
-        due_date: inlineInvoiceData.dueDate || '',
+        po_number: inlineInvoiceData.poNumber || "",
+        rep: inlineInvoiceData.rep || "",
+        due_date: inlineInvoiceData.dueDate || "",
         payment_credits: inlineInvoiceData.paymentCredits || 0,
-        balance_due: inlineInvoiceData.balanceDue || '',
-        ...(inlineInvoiceData.billToAddressEnabled && { bill_to_address: inlineInvoiceData.billToAddress || '' }),
-        status: 'sent',
-        invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType === 'Custom' ? inlineInvoiceData.customInvoiceType : inlineInvoiceData.invoiceType),
-        notes: inlineInvoiceData.notes || '',
-        custom_products: customProducts
-      }
+        balance_due: inlineInvoiceData.balanceDue || "",
+        ...(inlineInvoiceData.billToAddressEnabled && {
+          bill_to_address: inlineInvoiceData.billToAddress || "",
+        }),
+        status: "sent",
+        invoice_type: mapInvoiceTypeToAPI(
+          inlineInvoiceData.invoiceType === "Custom"
+            ? inlineInvoiceData.customInvoiceType
+            : inlineInvoiceData.invoiceType,
+        ),
+        notes: inlineInvoiceData.notes || "",
+        custom_products: customProducts,
+      };
 
       // Check if we're editing an existing invoice
       if (editingInvoiceId) {
-        await apiClient.updateEstimate(Number(editingInvoiceId), backendPayload as any)
+        await apiClient.updateEstimate(
+          Number(editingInvoiceId),
+          backendPayload as any,
+        );
         // toast.success('Invoice updated and sent successfully!')
       } else {
         // Don't create new estimate when sending - it should already exist from preview step
@@ -4046,68 +5455,54 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
       }
 
       // Refresh estimates list
-      await fetchEstimates()
+      await fetchEstimates();
       try {
         const res = await apiClient.getJobDashboard(jobId);
         setDashboardMetrics(res.data.dashboardMetrics);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       }
-      setShowInlineInvoiceForm(false)
-      setShowPreviewDialog(false)
-      setEditingInvoiceId(null)
+      setShowInlineInvoiceForm(false);
+      setShowPreviewDialog(false);
+      setEditingInvoiceId(null);
 
       // Reset form
       setInlineInvoiceData({
-        date: new Date().toISOString().split('T')[0],
-        estimateNumber: '',
-        customerName: job.customerName || '',
-        customerAddress: job.address || '',
-        billToAddress: job.billToAddress || '',
+        date: new Date().toISOString().split("T")[0],
+        estimateNumber: "",
+        customerName: job.customerName || "",
+        customerAddress: job.address || "",
+        billToAddress: job.billToAddress || "",
         billToAddressEnabled: true,
-        poNumber: '',
-        project: job.title || '',
-        rep: '',
-        dueDate: '',
+        poNumber: "",
+        project: job.title || "",
+        rep: "",
+        dueDate: "",
         paymentCredits: 0,
-        balanceDue: '',
-        lineItems: [{
-          id: Math.random().toString(36).substring(2, 9),
-          productId: null,
-          qty: 1,
-          item: '',
-          description: '',
-          rate: 0,
-          estimatedPrice: 0,
-          total: 0,
-          searchQuery: '',
-          showSearchResults: false,
-          supplierId: 1,
-          isCustomProduct: false,
-          estimate_product_id: null
-        }],
-        notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
-        signatureText: 'ACCEPTED BY________________DATE_____',
-        invoiceType: 'Estimate',
-        customInvoiceType: '',
+        balanceDue: "",
+        lineItems: [],
+        notes: "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
+        signatureText: "ACCEPTED BY________________DATE_____",
+        invoiceType: "Estimate",
+        customInvoiceType: "",
         paymentPercentage: 0,
         estimateTotal: 0,
-        paymentHistory: []
-      })
-      setInvoiceValidationErrors({})
+        paymentHistory: [],
+      });
+      setInvoiceValidationErrors({});
     } catch (error) {
-      console.error('Error sending invoice:', error)
-      toast.error('Failed to send invoice')
+      console.error("Error sending invoice:", error);
+      toast.error("Failed to send invoice");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handlePrintPreview = async () => {
     try {
-      const printElement = document.getElementById('invoice-preview-print');
+      const printElement = document.getElementById("invoice-preview-print");
       if (!printElement) {
-        toast.error('Unable to generate invoice for printing');
+        toast.error("Unable to generate invoice for printing");
         return;
       }
 
@@ -4115,17 +5510,18 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
         scale: 2,
         useCORS: true,
         allowTaint: true,
-        backgroundColor: '#ffffff'
+        backgroundColor: "#ffffff",
       });
-      const imageData = canvas.toDataURL('image/png');
+      const imageData = canvas.toDataURL("image/png");
       const headerEl =
-        printElement.querySelector('#print-header') ||
-        printElement.querySelector('[data-print-header]') ||
-        printElement.querySelector('.print-header') ||
-        document.querySelector('#print-header');
+        printElement.querySelector("#print-header") ||
+        printElement.querySelector("[data-print-header]") ||
+        printElement.querySelector(".print-header") ||
+        document.querySelector("#print-header");
 
       const offsetTopRel = (el: HTMLElement, ancestor: HTMLElement) => {
-        let y = 0, n: any = el;
+        let y = 0,
+          n: any = el;
         while (n && n !== ancestor) {
           y += n.offsetTop || 0;
           n = n.offsetParent;
@@ -4135,9 +5531,9 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
 
       let headerBandCssPx = 0;
       if (headerEl instanceof HTMLElement) {
-        headerBandCssPx = offsetTopRel(headerEl, printElement) + headerEl.offsetHeight;
+        headerBandCssPx =
+          offsetTopRel(headerEl, printElement) + headerEl.offsetHeight;
       } else {
-
         headerBandCssPx = 180;
       }
 
@@ -4146,19 +5542,25 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
 
       let headerImgData: string | null = null;
       if (headerBandPx > 0) {
-        const headerCanvas = document.createElement('canvas');
+        const headerCanvas = document.createElement("canvas");
         headerCanvas.width = canvas.width;
         headerCanvas.height = headerBandPx;
-        const hctx = headerCanvas.getContext('2d')!;
+        const hctx = headerCanvas.getContext("2d")!;
         hctx.drawImage(
           canvas,
-          0, 0, canvas.width, headerBandPx,
-          0, 0, canvas.width, headerBandPx
+          0,
+          0,
+          canvas.width,
+          headerBandPx,
+          0,
+          0,
+          canvas.width,
+          headerBandPx,
         );
-        headerImgData = headerCanvas.toDataURL('image/png');
+        headerImgData = headerCanvas.toDataURL("image/png");
       }
 
-      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdf = new jsPDF("p", "mm", "a4");
       const imgWidth = 210;
       const pageHeight = 295;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
@@ -4169,7 +5571,7 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
 
       let heightLeft = imgHeight;
 
-      pdf.addImage(imageData, 'PNG', 0, 0, imgWidth, imgHeight);
+      pdf.addImage(imageData, "PNG", 0, 0, imgWidth, imgHeight);
       heightLeft -= pageHeight;
 
       while (heightLeft > 0.1) {
@@ -4177,140 +5579,351 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
         pdf.addPage();
 
         if (headerImgData && headerBandMM > 0) {
-
-          pdf.addImage(imageData, 'PNG', 0, position + headerBandMM, imgWidth, imgHeight);
+          pdf.addImage(
+            imageData,
+            "PNG",
+            0,
+            position + headerBandMM,
+            imgWidth,
+            imgHeight,
+          );
 
           pdf.setFillColor(255, 255, 255);
-          pdf.rect(0, 0, imgWidth, headerBandMM, 'F');
+          pdf.rect(0, 0, imgWidth, headerBandMM, "F");
 
-          pdf.addImage(headerImgData, 'PNG', 0, 0, imgWidth, headerBandMM);
+          pdf.addImage(headerImgData, "PNG", 0, 0, imgWidth, headerBandMM);
 
           heightLeft -= pageContentHeightMM;
         } else {
-
-          pdf.addImage(imageData, 'PNG', 0, position, imgWidth, imgHeight);
+          pdf.addImage(imageData, "PNG", 0, position, imgWidth, imgHeight);
           heightLeft -= pageHeight;
         }
       }
 
-
-      const pdfBlob = pdf.output('blob');
+      const pdfBlob = pdf.output("blob");
       const pdfUrl = URL.createObjectURL(pdfBlob);
-      const printWindow = window.open(pdfUrl, '_blank');
+      const printWindow = window.open(pdfUrl, "_blank");
       if (printWindow) {
         printWindow.onload = () => setTimeout(() => printWindow.print(), 800);
       }
       setTimeout(() => URL.revokeObjectURL(pdfUrl), 10000);
     } catch (err) {
-      console.error('Print error:', err);
-      toast.error('Failed to print invoice');
+      console.error("Print error:", err);
+      toast.error("Failed to print invoice");
     }
+  };
+  console.log(inlineInvoiceData.lineItems, "::lineItems");
+
+  const createRowKey = () =>
+    `row_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+  const createHeaderKey = () =>
+    `header_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+  const buildLineItemsFromProducts = (products: any[] = []) => {
+    const grouped: Record<string, any[]> = {};
+    const ungrouped: any[] = [];
+
+    products.forEach((product: any) => {
+      const headerName = product.parent_header_name || null;
+
+      const baseItem = {
+        id: createRowKey(),
+        type: "item",
+        headerKey: null,
+        headerName: "",
+        parentHeaderKey: null,
+        parentHeaderName: headerName,
+        qty: product.stock_quantity || 1,
+        item: product.product_name || "",
+        description: product.description || "",
+        rate: product.unit_cost || product.jdp_price || 0,
+        estimatedPrice:
+          product.estimated_price ||
+          product.unit_cost ||
+          product.jdp_price ||
+          0,
+        total:
+          product.total_cost ??
+          (product.stock_quantity || 1) *
+            (product.estimated_price ||
+              product.unit_cost ||
+              product.jdp_price ||
+              0),
+        searchQuery: "",
+        showSearchResults: false,
+        supplierId: product.supplier_id || 1,
+        isCustomProduct: !!product.is_custom,
+        productId: product.id || null,
+        estimate_product_id: product.estimate_product_id || null,
+      };
+
+      if (!headerName) {
+        ungrouped.push(baseItem);
+      } else {
+        if (!grouped[headerName]) {
+          grouped[headerName] = [];
+        }
+        grouped[headerName].push(baseItem);
+      }
+    });
+
+    const finalLineItems: any[] = [...ungrouped];
+
+    Object.entries(grouped).forEach(([headerName, items]) => {
+      const headerKey = createHeaderKey();
+
+      finalLineItems.push({
+        id: createRowKey(),
+        type: "header",
+        headerName,
+        headerKey,
+        parentHeaderKey: null,
+        parentHeaderName: null,
+        qty: 0,
+        item: "",
+        description: "",
+        rate: 0,
+        estimatedPrice: 0,
+        total: 0,
+        searchQuery: "",
+        showSearchResults: false,
+        supplierId: 1,
+        isCustomProduct: true,
+        productId: null,
+        estimate_product_id: null,
+      });
+
+      items.forEach((item) => {
+        finalLineItems.push({
+          ...item,
+          parentHeaderKey: headerKey,
+          parentHeaderName: headerName,
+        });
+      });
+    });
+
+    return finalLineItems;
   };
 
   const handleEditInvoice = async (invoice: any) => {
     try {
-      setIsLoading(true)
+      setIsLoading(true);
 
-      // Fetch full estimate details from API
-      const response = await apiClient.getEstimateById(invoice.id)
-      const estimateData = response?.data || response
+      const response = await apiClient.getEstimateById(invoice.id);
+      const estimateData = response?.data || response;
 
+      console.log(estimateData.products, "estimateData.products");
 
-      // Map products to line items
-      const lineItems = estimateData.products && estimateData.products.length > 0
-        ? estimateData.products.map((product: any) => ({
-          id: Math.random().toString(36).substring(2, 9),
-          productId: product.id, // Store original product ID for updates
-          qty: product.stock_quantity || 1,
-          item: product.product_name || '',
-          description: product.description || '',
-          rate: product.unit_cost || 0,
-          estimatedPrice: product.estimated_price || product.unit_cost || 0,
-          total: (product.stock_quantity || 1) * (product.estimated_price || product.unit_cost || 0),
-          searchQuery: '',
-          showSearchResults: false,
-          supplierId: product.supplier_id || 1,
-          isCustomProduct: false,
-          estimate_product_id: product.estimate_product_id || null
-        }))
-        : [{
-          id: Math.random().toString(36).substring(2, 9),
-          productId: null,
-          qty: 1,
-          item: '',
-          description: '',
-          rate: 0,
-          estimatedPrice: 0,
-          total: 0,
-          searchQuery: '',
-          showSearchResults: false,
-          supplierId: 1,
-          isCustomProduct: false,
-          estimate_product_id: null
-        }]
-
+      const lineItems =
+        estimateData.products && estimateData.products.length > 0
+          ? buildLineItemsFromProducts(estimateData.products)
+          : [
+              {
+                id: createRowKey(),
+                type: "item",
+                headerKey: null,
+                headerName: "",
+                parentHeaderKey: null,
+                parentHeaderName: null,
+                qty: 1,
+                item: "",
+                description: "",
+                rate: 0,
+                estimatedPrice: 0,
+                total: 0,
+                searchQuery: "",
+                showSearchResults: false,
+                supplierId: 1,
+                isCustomProduct: false,
+                productId: null,
+                estimate_product_id: null,
+              },
+            ];
+      console.log(lineItems, "lineItemslineItems");
       setInlineInvoiceData({
-        date: estimateData.estimate_date || new Date().toISOString().split('T')[0],
-        estimateNumber: estimateData.invoice_number || '',
-        customerName: estimateData.customer?.customer_name || job.customer?.customer_name || job.customerName || '',
-        customerAddress: estimateData.customer?.address || job.customer?.address || job.address || '',
-        billToAddress: estimateData.bill_to_address || job.bill_to_address || '',
-        rep: estimateData.rep || '',
-        dueDate: estimateData.due_date || '',
+        date:
+          estimateData.estimate_date || new Date().toISOString().split("T")[0],
+        estimateNumber: estimateData.invoice_number || "",
+        customerName:
+          estimateData.customer?.customer_name ||
+          job.customer?.customer_name ||
+          job.customerName ||
+          "",
+        customerAddress:
+          estimateData.customer?.address ||
+          job.customer?.address ||
+          job.address ||
+          "",
+        billToAddress:
+          estimateData.bill_to_address || job.bill_to_address || "",
+        rep: estimateData.rep || "",
+        dueDate: estimateData.due_date || "",
         paymentCredits: estimateData.payment_credits || 0,
-        balanceDue: estimateData.balance_due || '',
+        balanceDue: estimateData.balance_due || "",
         billToAddressEnabled: true,
-        poNumber: estimateData.po_number || '',
-        project: estimateData.estimate_title || job.job_title || job.title || '',
-        lineItems: lineItems,
-        notes: estimateData.notes || 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
-        signatureText: 'ACCEPTED BY________________DATE_____',
+        poNumber: estimateData.po_number || "",
+        project:
+          estimateData.estimate_title || job.job_title || job.title || "",
+        lineItems,
+        notes:
+          estimateData.notes ||
+          "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
+        signatureText: "ACCEPTED BY________________DATE_____",
         invoiceType: (() => {
-          const mappedType = mapInvoiceTypeToUI(estimateData.invoice_type) || 'Estimate'
-          // Check if it's a custom type (not in standard mapping)
-          const standardTypes = ['Estimate', 'Downpayment Invoice', 'Rough Invoice', 'Progressive Invoice', 'Final Invoice']
+          const mappedType =
+            mapInvoiceTypeToUI(estimateData.invoice_type) || "Estimate";
+          const standardTypes = [
+            "Estimate",
+            "Downpayment Invoice",
+            "Rough Invoice",
+            "Progressive Invoice",
+            "Final Invoice",
+          ];
           if (!standardTypes.includes(mappedType)) {
-            // It's a custom type, add to custom types list and set as Custom
-            addCustomInvoiceType(mappedType)
-            return 'Custom'
+            addCustomInvoiceType(mappedType);
+            return "Custom";
           }
-          return mappedType
+          return mappedType;
         })(),
         customInvoiceType: (() => {
-          const mappedType = mapInvoiceTypeToUI(estimateData.invoice_type) || 'Estimate'
-          const standardTypes = ['Estimate', 'Downpayment Invoice', 'Rough Invoice', 'Progressive Invoice', 'Final Invoice']
+          const mappedType =
+            mapInvoiceTypeToUI(estimateData.invoice_type) || "Estimate";
+          const standardTypes = [
+            "Estimate",
+            "Downpayment Invoice",
+            "Rough Invoice",
+            "Progressive Invoice",
+            "Final Invoice",
+          ];
           if (!standardTypes.includes(mappedType)) {
-            return mappedType
+            return mappedType;
           }
-          return ''
+          return "";
         })(),
         paymentPercentage: 0,
         estimateTotal: estimateData.total_amount || 0,
-        paymentHistory: []
-      })
+        paymentHistory: [],
+      });
 
-      setEditingInvoiceId(invoice.id)
-      setShowInlineInvoiceForm(true)
-      toast.info('Loading invoice for editing...')
+      setEditingInvoiceId(invoice.id);
+      setShowInlineInvoiceForm(true);
+      toast.info("Invoice loaded for editing");
     } catch (error) {
-      toast.error('Failed to load invoice details')
+      console.error("Edit invoice load error:", error);
+      toast.error("Failed to load invoice details");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
+  // const handleEditInvoice = async (invoice: any) => {
+  //   try {
+  //     setIsLoading(true)
 
+  //     // Fetch full estimate details from API
+  //     const response = await apiClient.getEstimateById(invoice.id)
+  //     const estimateData = response?.data || response
+  //     console.log(estimateData.products,"estimateData.products");
+
+  //     // Map products to line items
+  //     const lineItems = estimateData.products && estimateData.products.length > 0
+  //       ? estimateData.products.map((product: any) => ({
+  //         id: Math.random().toString(36).substring(2, 9),
+  //         productId: product.id, // Store original product ID for updates
+  //         qty: product.stock_quantity || 1,
+  //         item: product.product_name || '',
+  //         description: product.description || '',
+  //         rate: product.unit_cost || 0,
+  //         estimatedPrice: product.estimated_price || product.unit_cost || 0,
+  //         total: (product.stock_quantity || 1) * (product.estimated_price || product.unit_cost || 0),
+  //         searchQuery: '',
+  //         showSearchResults: false,
+  //         supplierId: product.supplier_id || 1,
+  //         isCustomProduct: false,
+  //         estimate_product_id: product.estimate_product_id || null,
+  //         parent_header_name: product.estimate_product_id || null,
+  //       }))
+  //       : [{
+  //         id: Math.random().toString(36).substring(2, 9),
+  //         productId: null,
+  //         qty: 1,
+  //         item: '',
+  //         description: '',
+  //         rate: 0,
+  //         estimatedPrice: 0,
+  //         total: 0,
+  //         searchQuery: '',
+  //         showSearchResults: false,
+  //         supplierId: 1,
+  //         isCustomProduct: false,
+  //         estimate_product_id: null
+  //       }]
+
+  //     setInlineInvoiceData({
+  //       date: estimateData.estimate_date || new Date().toISOString().split('T')[0],
+  //       estimateNumber: estimateData.invoice_number || '',
+  //       customerName: estimateData.customer?.customer_name || job.customer?.customer_name || job.customerName || '',
+  //       customerAddress: estimateData.customer?.address || job.customer?.address || job.address || '',
+  //       billToAddress: estimateData.bill_to_address || job.bill_to_address || '',
+  //       rep: estimateData.rep || '',
+  //       dueDate: estimateData.due_date || '',
+  //       paymentCredits: estimateData.payment_credits || 0,
+  //       balanceDue: estimateData.balance_due || '',
+  //       billToAddressEnabled: true,
+  //       poNumber: estimateData.po_number || '',
+  //       project: estimateData.estimate_title || job.job_title || job.title || '',
+  //       lineItems: lineItems,
+  //       notes: estimateData.notes || 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
+  //       signatureText: 'ACCEPTED BY________________DATE_____',
+  //       invoiceType: (() => {
+  //         const mappedType = mapInvoiceTypeToUI(estimateData.invoice_type) || 'Estimate'
+  //         // Check if it's a custom type (not in standard mapping)
+  //         const standardTypes = ['Estimate', 'Downpayment Invoice', 'Rough Invoice', 'Progressive Invoice', 'Final Invoice']
+  //         if (!standardTypes.includes(mappedType)) {
+  //           // It's a custom type, add to custom types list and set as Custom
+  //           addCustomInvoiceType(mappedType)
+  //           return 'Custom'
+  //         }
+  //         return mappedType
+  //       })(),
+  //       customInvoiceType: (() => {
+  //         const mappedType = mapInvoiceTypeToUI(estimateData.invoice_type) || 'Estimate'
+  //         const standardTypes = ['Estimate', 'Downpayment Invoice', 'Rough Invoice', 'Progressive Invoice', 'Final Invoice']
+  //         if (!standardTypes.includes(mappedType)) {
+  //           return mappedType
+  //         }
+  //         return ''
+  //       })(),
+  //       paymentPercentage: 0,
+  //       estimateTotal: estimateData.total_amount || 0,
+  //       paymentHistory: []
+  //     })
+
+  //     setEditingInvoiceId(invoice.id)
+  //     setShowInlineInvoiceForm(true)
+  //     toast.info('Loading invoice for editing...')
+  //   } catch (error) {
+  //     toast.error('Failed to load invoice details')
+  //   } finally {
+  //     setIsLoading(false)
+  //   }
+  // }
 
   // Change order
-  const handleChangeOrderClick = (job: any, customerId: string, e: React.MouseEvent) => {
+  const handleChangeOrderClick = (
+    job: any,
+    customerId: string,
+    e: React.MouseEvent,
+  ) => {
     e.stopPropagation(); // Prevent job selection
     setChangeOrderJob({
-      ...job,  // Store the entire job object
+      ...job, // Store the entire job object
       customerId: customerId,
-      originalId: job.id // Store original ID for reference
+      originalId: job.id, // Store original ID for reference
     });
     // Set default title as "Change Order - [Original Title]"
-    setChangeOrderTitle(`${''}`);
-    setChangeOrderEstimate(job.estimated_cost || job.estimatedCost || '');
+    setChangeOrderTitle(`${""}`);
+    setChangeOrderEstimate(job.estimated_cost || job.estimatedCost || "");
     setChangeOrderErrors({});
     setShowChangeOrderModal(true);
   };
@@ -4319,7 +5932,7 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
     // Validate
     const errors: Record<string, string> = {};
     if (!changeOrderTitle.trim()) {
-      errors.title = 'Job title is required';
+      errors.title = "Job title is required";
     }
 
     if (Object.keys(errors).length > 0) {
@@ -4335,53 +5948,68 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
       // Prepare payload for NEW JOB (Change Order)
       // Normalize job type to API expected values
       const normalizedJobType =
-        originalJob.job_type === 'service_based' || originalJob.job_type === 'contract_based'
+        originalJob.job_type === "service_based" ||
+        originalJob.job_type === "contract_based"
           ? originalJob.job_type
-          : originalJob.type === 'contract-based'
-            ? 'contract_based'
-            : 'service_based';
+          : originalJob.type === "contract-based"
+            ? "contract_based"
+            : "service_based";
 
       // Copy most fields from original job but with new title
       const payload: any = {
         job_title: changeOrderTitle, // New title
         job_type: normalizedJobType,
-        description: originalJob.description || '',
-        priority: originalJob.priority || 'medium',
-        address: originalJob.address || '',
-        city_zip: originalJob.city_zip || originalJob.cityZip || '',
-        phone: originalJob.phone || '',
-        email: originalJob.email || '',
-        bill_to_address: originalJob.bill_to_address || originalJob.billToAddress || '',
-        bill_to_city_zip: originalJob.bill_to_city_zip || originalJob.billToCityZip || '',
-        bill_to_phone: originalJob.bill_to_phone || originalJob.billToPhone || '',
-        bill_to_email: originalJob.bill_to_email || originalJob.billToEmail || '',
-        same_as_address: originalJob.same_as_address || originalJob.sameAsAddress || false,
-        due_date: originalJob.due_date || originalJob.dueDate || '',
+        description: originalJob.description || "",
+        priority: originalJob.priority || "medium",
+        address: originalJob.address || "",
+        city_zip: originalJob.city_zip || originalJob.cityZip || "",
+        phone: originalJob.phone || "",
+        email: originalJob.email || "",
+        bill_to_address:
+          originalJob.bill_to_address || originalJob.billToAddress || "",
+        bill_to_city_zip:
+          originalJob.bill_to_city_zip || originalJob.billToCityZip || "",
+        bill_to_phone:
+          originalJob.bill_to_phone || originalJob.billToPhone || "",
+        bill_to_email:
+          originalJob.bill_to_email || originalJob.billToEmail || "",
+        same_as_address:
+          originalJob.same_as_address || originalJob.sameAsAddress || false,
+        due_date: originalJob.due_date || originalJob.dueDate || "",
         // estimated_hours: originalJob.estimated_hours || originalJob.estimatedHours || 0,
         estimated_cost: Number(changeOrderEstimate),
 
-        status: 'pending', // New job starts as pending
+        status: "pending", // New job starts as pending
 
         // Copy assigned labor if exists
-        assigned_lead_labor_ids: originalJob.assigned_lead_labor_ids ||
-          (originalJob.assignedLeadLabor ? JSON.stringify(originalJob.assignedLeadLabor) : undefined),
-        assigned_labor_ids: originalJob.assigned_labor_ids ||
-          (originalJob.assignedLabor ? JSON.stringify(originalJob.assignedLabor) : undefined),
-
+        assigned_lead_labor_ids:
+          originalJob.assigned_lead_labor_ids ||
+          (originalJob.assignedLeadLabor
+            ? JSON.stringify(originalJob.assignedLeadLabor)
+            : undefined),
+        assigned_labor_ids:
+          originalJob.assigned_labor_ids ||
+          (originalJob.assignedLabor
+            ? JSON.stringify(originalJob.assignedLabor)
+            : undefined),
       };
 
       // Add customer_id or contractor_id based on job type
-      if (originalJob.job_type === 'service_based' || originalJob.type === 'service_based') {
+      if (
+        originalJob.job_type === "service_based" ||
+        originalJob.type === "service_based"
+      ) {
         payload.customer_id = originalJob.customer_id || originalJob.customer;
       } else {
-        payload.contractor_id = originalJob.contractor_id || originalJob.contractor;
+        payload.contractor_id =
+          originalJob.contractor_id || originalJob.contractor;
       }
 
-      console.log('Creating change order with payload:', payload);
+      console.log("Creating change order with payload:", payload);
 
       // Call API to CREATE NEW JOB (not update)
       const response = await apiClient.createJob(payload); // Remove changeOrderJob.id
-      console.log('Change order creation response:', response);
+      console.log("Change order creation response:", response);
 
       // Get the newly created job from response
       const newJob = response.data || response;
@@ -4396,8 +6024,8 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
           estimated_cost: Number(changeOrderEstimate),
           title: changeOrderTitle,
           isChangeOrder: true,
-          originalJobId: originalJob.id
-        }
+          originalJobId: originalJob.id,
+        },
       ]);
 
       // Ask parent (CustomersPage) to refresh listing so sub-jobs appear
@@ -4405,13 +6033,17 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
         onJobsRefresh();
       }
 
-      toast.success('Change order created successfully!');
+      toast.success("Change order created successfully!");
       setShowChangeOrderModal(false);
       setChangeOrderJob(null);
-      setChangeOrderTitle('');
+      setChangeOrderTitle("");
     } catch (error) {
-      console.error('Error creating change order:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to create change order');
+      console.error("Error creating change order:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to create change order",
+      );
     } finally {
       setIsUpdatingChangeOrder(false);
     }
@@ -5720,32 +7352,6 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
                       }}
                     />
 
-                    {/* Notes Section */}
-                    <div className="mb-6 overflow-x-auto">
-                      <table className="w-full border-collapse">
-                        <tbody>
-                          <tr>
-                            <td
-                              className="border border-gray-300 p-3 bg-white text-sm"
-                              style={{ minHeight: "120px" }}
-                            >
-                              <Textarea
-                                value={inlineInvoiceData.notes}
-                                onChange={(e) =>
-                                  setInlineInvoiceData((prev) => ({
-                                    ...prev,
-                                    notes: e.target.value,
-                                  }))
-                                }
-                                className="w-full min-h-[100px] border-0 p-0 focus-visible:ring-0 resize-none"
-                                placeholder="NOTES&#10;JDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE"
-                              />
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-
                     {/* Footer disclaimer and Total */}
                     <div className="mb-6">
                       <div className="border border-gray-300 p-3 text-xs text-center bg-white">
@@ -5855,25 +7461,7 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
                             dueDate: "",
                             paymentCredits: 0,
                             balanceDue: "",
-                            lineItems: [
-                              {
-                                id: Math.random().toString(36).substring(2, 9),
-                                headerName: "",
-                                type: "",
-                                productId: null,
-                                qty: 1,
-                                item: "",
-                                description: "",
-                                rate: 0,
-                                estimatedPrice: 0,
-                                total: 0,
-                                searchQuery: "",
-                                showSearchResults: false,
-                                supplierId: 1,
-                                isCustomProduct: false,
-                                estimate_product_id: null,
-                              },
-                            ],
+                            lineItems: [],
                             notes:
                               "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
                             signatureText:
@@ -6051,6 +7639,37 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
                             >
                               <FileText className="h-4 w-4 mr-2 text-green-600" />
                               <span>Duplicate</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                const currentStatus = String(
+                                  invoice.status || "",
+                                ).toLowerCase();
+                                if (currentStatus !== "approved") {
+                                  handleApproveInvoice(invoice);
+                                }
+                              }}
+                              className={`cursor-pointer ${
+                                String(invoice.status || "").toLowerCase() ===
+                                "approved"
+                                  ? "opacity-60 cursor-default"
+                                  : ""
+                              }`}
+                              disabled={
+                                isApprovingId === invoice.id ||
+                                String(invoice.status || "").toLowerCase() ===
+                                  "approved"
+                              }
+                            >
+                              <Check className="h-4 w-4 mr-2 text-green-600" />
+                              <span>
+                                {String(invoice.status || "").toLowerCase() ===
+                                "approved"
+                                  ? "Already Approved"
+                                  : isApprovingId === invoice.id
+                                    ? "Approving..."
+                                    : "Approve"}
+                              </span>
                             </DropdownMenuItem>
                             {/* {( */}
                             <DropdownMenuItem
@@ -6862,7 +8481,7 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
       </Dialog>
 
       {/* Add Invoice Modal */}
-      <NewInvoiceDialog
+      {/* <NewInvoiceDialog
         renderInline={true}
         open={showNewInvoiceDialog}
         onOpenChange={setShowNewInvoiceDialog}
@@ -6870,7 +8489,7 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
         jobId={Number(jobId)}
         jobs={jobs}
         onInvoiceSaved={triggerRefresh}
-      />
+      /> */}
       {/* <Dialog open={showAddInvoiceModal} onOpenChange={setShowAddInvoiceModal}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
@@ -8070,6 +9689,9 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
                       <th className="border border-gray-300 px-3 py-2 text-right">
                         Amount
                       </th>
+                      <th className="border border-gray-300 px-3 py-2 text-right">
+                        Total
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -8082,283 +9704,121 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
                         <td className="border border-gray-300 px-3 py-2 text-right font-medium">${(item.total || 0).toFixed(2)}</td>
                       </tr>
                     ))} */}
-                    {inlineInvoiceData.lineItems.map((lineItem, index) => {
-                      console.log(
-                        lineItem.type,
-                        "headerNameheaderNameheaderName",
+                    {(() => {
+                      const lineItems = inlineInvoiceData.lineItems || [];
+
+                      const getHeaderName = (item: any) =>
+                        item.parent_header_name ||
+                        item.parentHeaderName ||
+                        null;
+
+                      const normalizedItems = lineItems
+                        .filter((item: any) => item.type !== "header")
+                        .map((item: any) => ({
+                          ...item,
+                          qty: item.qty ?? item.stock_quantity ?? 0,
+                          item: item.item ?? item.product_name ?? "-",
+                          rate: item.rate ?? item.unit_cost ?? 0,
+                          estimatedPrice:
+                            item.estimatedPrice ?? item.estimated_price ?? 0,
+                          total: item.total ?? item.total_cost ?? 0,
+                          parent_header_name: getHeaderName(item),
+                        }));
+
+                      const directItems = normalizedItems.filter(
+                        (item: any) => !item.parent_header_name,
                       );
 
-                      if (lineItem.type === "header") {
-                        return (
-                          <tr key={lineItem.id} className="bg-blue-50">
-                            <td
-                              colSpan={7}
-                              className="px-3 py-3 border border-gray-300"
-                            >
-                              <div className="flex items-center gap-3 w-full">
-                                <Input
-                                  value={lineItem.headerName || ""}
-                                  onChange={(e) =>
-                                    updateInvoiceLineItem(
-                                      lineItem.id,
-                                      "headerName",
-                                      e.target.value,
-                                    )
-                                  }
-                                  placeholder="Enter section name like Kitchen, Hall, Bathroom"
-                                  className="w-full h-10 font-medium border-blue-200 focus-visible:ring-blue-500"
-                                />
+                      const groupedMap = normalizedItems.reduce(
+                        (acc: Record<string, any[]>, item: any) => {
+                          const headerName = item.parent_header_name;
+                          if (!headerName) return acc;
 
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  className="shrink-0 text-red-500 hover:text-red-700"
-                                  onClick={() =>
-                                    removeInvoiceLineItem(lineItem.id)
-                                  }
-                                >
-                                  Remove
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      } else {
+                          if (!acc[headerName]) {
+                            acc[headerName] = [];
+                          }
+
+                          acc[headerName].push(item);
+                          return acc;
+                        },
+                        {},
+                      );
+
+                      const orderedRows: any[] = [
+                        ...directItems,
+                        ...Object.entries(groupedMap).flatMap(
+                          ([headerName, items]) => [
+                            {
+                              id: `header-${headerName}`,
+                              type: "synthetic-header",
+                              headerName,
+                            },
+                            ...items,
+                          ],
+                        ),
+                      ];
+
+                      return orderedRows.map((lineItem: any, index: number) => {
+                        if (lineItem.type === "synthetic-header") {
+                          return (
+                            <tr key={lineItem.id} className="bg-transparent">
+                              <td
+                                colSpan={6}
+                                className="px-3 py-3 border border-gray-300 bg-white"
+                              >
+                                <div className="flex items-center justify-between w-full rounded-2xl bg-slate-700 px-4 py-4 text-white shadow-sm">
+                                  <div className="flex items-center gap-3">
+                                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-green-400" />
+                                    <span className="text-base font-semibold">
+                                      {lineItem.headerName || "Custom Header"}
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
+
                         return (
                           <tr
-                            key={lineItem.id}
-                            className="hover:bg-gray-50 transition-colors"
+                            key={lineItem.id || index}
+                            className="bg-white transition-colors hover:bg-gray-50"
                           >
-                            <td className="border border-gray-300 p-1">
-                              <Input
-                                type="number"
-                                value={lineItem.qty}
-                                onChange={(e) =>
-                                  updateInvoiceLineItem(
-                                    lineItem.id,
-                                    "qty",
-                                    parseFloat(e.target.value) || 0,
-                                  )
-                                }
-                                className="text-center border-0 p-2"
-                                min="0"
-                              />
+                            <td className="border border-gray-300 px-3 py-2 text-center align-middle">
+                              <div className="flex items-center justify-center gap-2">
+                                <span>{lineItem.qty || 0}</span>
+                              </div>
                             </td>
 
-                            <td className="border border-gray-300 p-1 relative">
-                              {lineItem.isCustomProduct ? (
-                                <Input
-                                  value={lineItem.item}
-                                  onChange={(e) =>
-                                    updateInvoiceLineItem(
-                                      lineItem.id,
-                                      "item",
-                                      e.target.value,
-                                    )
-                                  }
-                                  className="border-0 p-2"
-                                  placeholder="Enter custom item name."
-                                />
-                              ) : (
-                                <div className="relative product-search-container">
-                                  <Input
-                                    value={lineItem.item}
-                                    onChange={(e) => {
-                                      const value = e.target.value;
-                                      updateInvoiceLineItem(
-                                        lineItem.id,
-                                        "item",
-                                        value,
-                                      );
-                                      updateInvoiceLineItem(
-                                        lineItem.id,
-                                        "searchQuery",
-                                        value,
-                                      );
-                                      updateInvoiceLineItem(
-                                        lineItem.id,
-                                        "showSearchResults",
-                                        true,
-                                      );
-
-                                      if (value && value.length > 0) {
-                                        fetchProducts(value);
-                                      }
-                                    }}
-                                    onFocus={() => {
-                                      if (lineItem.item) {
-                                        updateInvoiceLineItem(
-                                          lineItem.id,
-                                          "searchQuery",
-                                          lineItem.item,
-                                        );
-                                        updateInvoiceLineItem(
-                                          lineItem.id,
-                                          "showSearchResults",
-                                          true,
-                                        );
-                                      }
-                                    }}
-                                    className="border-0 p-2 pr-8"
-                                    placeholder="Search or enter product name."
-                                  />
-                                  <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                </div>
-                              )}
-
-                              {!lineItem.isCustomProduct &&
-                                lineItem.showSearchResults &&
-                                lineItem.searchQuery && (
-                                  <div className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1">
-                                    {(() => {
-                                      const filtered = getFilteredProducts(
-                                        lineItem.searchQuery || "",
-                                      );
-
-                                      if (filtered.length === 0) {
-                                        return (
-                                          <div className="p-3 text-sm text-gray-500">
-                                            No products found
-                                          </div>
-                                        );
-                                      }
-
-                                      return filtered.map((product: any) => (
-                                        <div
-                                          key={product.id}
-                                          className="p-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0"
-                                          onClick={() => {
-                                            updateInvoiceLineItem(
-                                              lineItem.id,
-                                              "productId",
-                                              product.id,
-                                            );
-                                            updateInvoiceLineItem(
-                                              lineItem.id,
-                                              "item",
-                                              product.product_name ||
-                                                product.name ||
-                                                "",
-                                            );
-                                            updateInvoiceLineItem(
-                                              lineItem.id,
-                                              "description",
-                                              product.description || "",
-                                            );
-                                            updateInvoiceLineItem(
-                                              lineItem.id,
-                                              "rate",
-                                              Number(
-                                                product.unit_cost ||
-                                                  product.price ||
-                                                  0,
-                                              ),
-                                            );
-                                            updateInvoiceLineItem(
-                                              lineItem.id,
-                                              "estimatedPrice",
-                                              Number(
-                                                product.estimated_price ||
-                                                  product.unit_cost ||
-                                                  product.price ||
-                                                  0,
-                                              ),
-                                            );
-                                            updateInvoiceLineItem(
-                                              lineItem.id,
-                                              "showSearchResults",
-                                              false,
-                                            );
-                                            updateInvoiceLineItem(
-                                              lineItem.id,
-                                              "searchQuery",
-                                              "",
-                                            );
-                                          }}
-                                        >
-                                          <div className="font-medium">
-                                            {product.product_name ||
-                                              product.name}
-                                          </div>
-                                          <div className="text-xs text-gray-500">
-                                            SKU:{" "}
-                                            {product.sku ||
-                                              product.supplier_sku ||
-                                              "N/A"}
-                                          </div>
-                                        </div>
-                                      ));
-                                    })()}
-                                  </div>
-                                )}
+                            <td className="border border-gray-300 px-3 py-2 align-middle">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-sm font-medium text-gray-900">
+                                  {lineItem.item || "-"}
+                                </span>
+                              </div>
                             </td>
 
-                            <td className="border border-gray-300 p-1">
-                              <Textarea
-                                value={lineItem.description}
-                                onChange={(e) =>
-                                  updateInvoiceLineItem(
-                                    lineItem.id,
-                                    "description",
-                                    e.target.value,
-                                  )
-                                }
-                                className="border-0 p-2 min-h-[80px]"
-                                placeholder="Enter product description"
-                              />
+                            <td className="border border-gray-300 px-3 py-2 align-top">
+                              <div className="max-h-[90px] overflow-y-auto pr-1 text-sm leading-6 text-gray-700">
+                                {lineItem.description || "-"}
+                              </div>
                             </td>
 
-                            <td className="border border-gray-300 p-1">
-                              <Input
-                                type="number"
-                                value={lineItem.rate}
-                                onChange={(e) =>
-                                  updateInvoiceLineItem(
-                                    lineItem.id,
-                                    "rate",
-                                    parseFloat(e.target.value) || 0,
-                                  )
-                                }
-                                className="text-right border-0 p-2"
-                                min="0"
-                              />
+                            <td className="border border-gray-300 px-3 py-2 text-right align-middle">
+                              ${Number(lineItem.rate || 0).toFixed(2)}
                             </td>
 
-                            <td className="border border-gray-300 p-1">
-                              <Input
-                                type="number"
-                                value={lineItem.estimatedPrice}
-                                onChange={(e) =>
-                                  updateInvoiceLineItem(
-                                    lineItem.id,
-                                    "estimatedPrice",
-                                    parseFloat(e.target.value) || 0,
-                                  )
-                                }
-                                className="text-right border-0 p-2"
-                                min="0"
-                              />
+                            <td className="border border-gray-300 px-3 py-2 text-right align-middle">
+                              ${Number(lineItem.estimatedPrice || 0).toFixed(2)}
                             </td>
 
-                            <td className="border border-gray-300 px-3 py-2 text-right font-medium">
+                            <td className="border border-gray-300 px-3 py-2 text-right font-medium align-middle">
                               ${(lineItem.total || 0).toFixed(2)}
-                            </td>
-
-                            <td className="border border-gray-300 px-3 py-2 text-center">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  removeInvoiceLineItem(lineItem.id)
-                                }
-                                className="text-red-500 hover:text-red-700"
-                              >
-                                <Trash2 className="h-4 w-4 mx-auto" />
-                              </button>
                             </td>
                           </tr>
                         );
-                      }
-                    })}
+                      });
+                    })()}
                   </tbody>
                 </table>
 
@@ -8683,5 +10143,4 @@ console.log(inlineInvoiceData,"::inlineInvoiceData");
   );
 }
 
-export default JobDetailsPage
-
+export default JobDetailsPage;

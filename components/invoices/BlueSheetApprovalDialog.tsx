@@ -180,10 +180,10 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
           item?.type !== "header" && String(item?.item || "").trim() !== ""
       )
       .map((item: any, index: number) => {
-        const parentHeaderKey =
-          item.parentHeaderKey ??
-          item.parent_header_key ??
-          null;
+        // const parentHeaderKey =
+        //   item.parentHeaderKey ??
+        //   item.parent_header_key ??
+        //   null;
 
         const parentHeaderName =
           item.parentHeaderName ??
@@ -274,7 +274,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
 
           section_name: parentHeaderName || null,
           section_type: parentHeaderName ? "room_header" : null,
-          parent_header_key: parentHeaderKey,
+          // parent_header_key: parentHeaderKey,
           parent_header_name: parentHeaderName,
 
           is_custom:
@@ -521,7 +521,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
           section_name: item.parent_header_name || item.section_name || null,
           section_type:
             item.parent_header_name || item.section_name ? "room_header" : null,
-          parent_header_key: item.parent_header_key || null,
+          // parent_header_key: item.parent_header_key || null,
           parent_header_name: item.parent_header_name || null,
         }
       })
@@ -543,27 +543,26 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
       }
 
       // ── Local state update: API se returned IDs sync karo ──
-      const newMaterials = editedBlueSheet.material_entries.map((item: any, index: number) => {
-        const apiMaterial = updatedMaterials[index]
-        console.log('apiMaterial', apiMaterial)
-        return {
-          ...item,
-          ...(apiMaterial?.id ? { id: apiMaterial.id } : {}),
-          product_id: item.product_id,
-          parent_header_key:
-            apiMaterial?.parent_header_key ?? item.parent_header_key ?? null,
-          parent_header_name:
-            apiMaterial?.parent_header_name ?? item.parent_header_name ?? null,
-          section_name:
-            apiMaterial?.section_name ??
-            item.section_name ??
-            item.parent_header_name ??
-            null, // preserve — API might not return it
-          _isNew: false,
-          job_bluesheet_id:
-            apiMaterial?.job_bluesheet_id || item.job_bluesheet_id,
-        };
-      })
+   const newMaterials = editedBlueSheet.material_entries.map(
+     (item: any, index: number) => {
+       const apiMaterial = updatedMaterials[index];
+       return {
+         ...item,
+         ...(apiMaterial?.id ? { id: apiMaterial.id } : {}),
+         product_id: item.product_id,
+         parent_header_name:
+           apiMaterial?.parent_header_name ?? item.parent_header_name ?? null,
+         section_name:
+           apiMaterial?.section_name ??
+           item.section_name ??
+           item.parent_header_name ??
+           null,
+         _isNew: false,
+         job_bluesheet_id:
+           apiMaterial?.job_bluesheet_id || item.job_bluesheet_id,
+       };
+     },
+   );
 
       const newTotal = newMaterials.reduce(
         (sum: number, item: any) => sum + (item.total_cost || item.total_ordered * item.unit_cost),
@@ -742,7 +741,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
       jdp_sku: '',
       section_name: null,
       section_type: null,
-      parent_header_key: null,
+      // parent_header_key: null,
       parent_header_name: null,
     }
     setEditedBlueSheet({ ...editedBlueSheet, material_entries: [...editedBlueSheet.material_entries, newMaterial] })
@@ -847,15 +846,17 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
   const handleFinalApproval = async () => {
   const finalBlueSheet = editedBlueSheet || blueSheet;
   if (!finalBlueSheet) return;
-
+ console.log(finalBlueSheet.material_entries,"finalBlueSheet.material_entries");
+ return;
+ 
   try {
     setIsApproving(true);
 
     const customProducts = finalBlueSheet.material_entries.map((item: any) => {
-  const parentHeaderKey =
-    item.parent_header_key ??
-    item.parentHeaderKey ??
-    null;
+  // const parentHeaderKey =
+  //   item.parent_header_key ??
+  //   item.parentHeaderKey ??
+  //   null;
 
   const parentHeaderName =
     item.parent_header_name ??
@@ -897,7 +898,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
 
     section_name: sectionName,
     section_type: sectionName ? "room_header" : null,
-    parent_header_key: parentHeaderKey,
+    // parent_header_key: parentHeaderKey,
     parent_header_name: parentHeaderName,
   };
 });
@@ -928,7 +929,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
         // no header mapping for labor summary row
         section_name: null,
         section_type: null,
-        parent_header_key: null,
+        // parent_header_key: null,
         parent_header_name: null,
       });
     }

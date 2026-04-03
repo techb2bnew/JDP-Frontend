@@ -232,64 +232,71 @@ export function InvoicesPage() {
 
 
 
-  const handleViewInvoice = async (invoice: any) => {
-    try {
-      // Fetch detailed estimate data
-      const response = await apiClient.getEstimateById(invoice.id)
-      if (response.success) {
-        console.log('Setting customer data:', {
-          customer_name: response.data?.customer?.customer_name,
-          address: response.data?.customer?.address
-        });
+  // const handleViewInvoice = async (invoice: any) => {
+  //   try {
+  //     // Fetch detailed estimate data
+  //     const response = await apiClient.getEstimateById(invoice.id)
+  //     if (response.success) {
+  //       console.log('Setting customer data:', {
+  //         customer_name: response.data?.customer?.customer_name,
+  //         address: response.data?.customer?.address
+  //       });
 
-        const customerName = response.data?.customer?.customer_name || 'No customer name';
-        const customerAddress = response.data?.customer?.address || 'No address available';
-        const project = response.data?.estimate_title || 'No project name';
+  //       const customerName = response.data?.customer?.customer_name || 'No customer name';
+  //       const customerAddress = response.data?.customer?.address || 'No address available';
+  //       const project = response.data?.estimate_title || 'No project name';
 
 
-        // Set the data with processed values
-        // Extract customer_id or contractor_id from API response
-        const customerId = response.data.customer_id || 
-                           response.data.customer?.id || 
-                           (typeof response.data.customer === 'number' ? response.data.customer : null);
-        const contractorId = response.data.contractor_id || 
-                             response.data.contractor?.id || 
-                             (typeof response.data.contractor === 'number' ? response.data.contractor : null);
-        const isContractBased = response.data.service_type === 'contract_based' || 
-                                response.data.job?.job_type === 'contract_based';
+  //       // Set the data with processed values
+  //       // Extract customer_id or contractor_id from API response
+  //       const customerId = response.data.customer_id || 
+  //                          response.data.customer?.id || 
+  //                          (typeof response.data.customer === 'number' ? response.data.customer : null);
+  //       const contractorId = response.data.contractor_id || 
+  //                            response.data.contractor?.id || 
+  //                            (typeof response.data.contractor === 'number' ? response.data.contractor : null);
+  //       const isContractBased = response.data.service_type === 'contract_based' || 
+  //                               response.data.job?.job_type === 'contract_based';
         
-        const processedData = {
-          ...response.data,
-          customer_id: customerId,
-          contractor_id: contractorId,
-          customer: {
-            ...response.data.customer,
-            id: response.data.customer?.id || response.data.customer_id || (typeof response.data.customer === 'number' ? response.data.customer : null),
-            customer_name: customerName,
-            address: customerAddress
-          },
-          estimate_title: project
-        };
+  //       const processedData = {
+  //         ...response.data,
+  //         customer_id: customerId,
+  //         contractor_id: contractorId,
+  //         customer: {
+  //           ...response.data.customer,
+  //           id: response.data.customer?.id || response.data.customer_id || (typeof response.data.customer === 'number' ? response.data.customer : null),
+  //           customer_name: customerName,
+  //           address: customerAddress
+  //         },
+  //         estimate_title: project
+  //       };
         
-        console.log('Processed invoice data with IDs:', {
-          customer_id: processedData.customer_id,
-          contractor_id: processedData.contractor_id,
-          isContractBased: isContractBased,
-          customer: processedData.customer
-        });
+  //       console.log('Processed invoice data with IDs:', {
+  //         customer_id: processedData.customer_id,
+  //         contractor_id: processedData.contractor_id,
+  //         isContractBased: isContractBased,
+  //         customer: processedData.customer
+  //       });
 
-        setSelectedInvoiceData(processedData)
-        setShowViewInvoiceDialog(true)
-      } else {
-        toast.error('Failed to load invoice details')
-      }
-    } catch (error) {
-      console.error('Error fetching invoice details:', error)
-      toast.error('Failed to load invoice details')
-    }
-  }
+  //       setSelectedInvoiceData(processedData)
+  //       // router.push("/invoices/create");
+  //       router.push(`/invoices/create?mode=view&id=${invoice.id}`);
+  //       // setShowViewInvoiceDialog(true)
+  //     } else {
+  //       toast.error('Failed to load invoice details')
+  //     }
+  //   } catch (error) {
+  //     console.error('Error fetching invoice details:', error)
+  //     toast.error('Failed to load invoice details')
+  //   }
+  // }
 
+const handleViewInvoice = (invoice: any) => {
+  console.log("view clicked invoice:", invoice);
+  console.log("navigating to:", `/invoices/create?mode=view&id=${invoice.id}`);
 
+  router.push(`/invoices/create?mode=view&id=${invoice.id}`);
+};
 
   const handleDownloadInvoice = async (invoice: any) => {
     try {
@@ -1059,6 +1066,8 @@ export function InvoicesPage() {
                         <SelectItem value="all">All Status</SelectItem>
                         <SelectItem value="draft">Draft</SelectItem>
                         <SelectItem value="sent">Sent</SelectItem> 
+                        <SelectItem value="aprroved">Approved</SelectItem> 
+                        <SelectItem value="mark_as_paid">Mark As Paid</SelectItem> 
                       </SelectContent>
                     </Select>
                     <Select value={invoiceTypeFilter} onValueChange={setInvoiceTypeFilter}>
@@ -1151,6 +1160,8 @@ export function InvoicesPage() {
                                   <span
                                     className={`px-2 py-1 text-xs font-medium rounded-full ${
                                       invoice.status === "paid"
+                                        ? "bg-green-100 text-green-800":
+                                        invoice.status === "approved"
                                         ? "bg-green-100 text-green-800"
                                         : invoice.status === "sent"
                                           ? "bg-blue-100 text-blue-800"
@@ -1271,7 +1282,7 @@ export function InvoicesPage() {
 
 
       {/* Dialogs */}
-      <NewInvoiceDialog
+      {/* <NewInvoiceDialog
         open={showNewInvoiceDialog}
         onOpenChange={setShowNewInvoiceDialog}
         onSave={handleSaveInvoice}
@@ -1280,17 +1291,17 @@ export function InvoicesPage() {
           setCurrentPage(1);
           fetchEstimates();
         }}
-      />
+      /> */}
 
       {/* View Invoice Dialog */}
-      <NewInvoiceDialog
+      {/* <NewInvoiceDialog
         open={showViewInvoiceDialog}
         onOpenChange={setShowViewInvoiceDialog}
         onSave={handleSaveInvoice}
         jobs={localJobs}
         isViewMode={true}
         viewInvoiceData={selectedInvoiceData}
-      />
+      /> */}
 
 
       <Dialog open={showInvoiceDetailDialog} onOpenChange={setShowInvoiceDetailDialog}>

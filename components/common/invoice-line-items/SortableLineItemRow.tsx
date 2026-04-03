@@ -66,6 +66,8 @@ const SortableLineItemRow = ({
   } = useSortable({
     id: lineItem.id,
   });
+  console.log(lineItem,"lineItem");
+  
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
