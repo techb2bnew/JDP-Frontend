@@ -311,7 +311,7 @@ export function DashboardOverview() {
           <div>
             <h1 className="text-3xl font-bold mb-2">Welcome back, Admin! 👋</h1>
             <p className="text-blue-100 text-lg">
-              Here's what's happening with your business today. You have{' '}
+              Here&apos;s what&apos;s happening with your business today. You have{' '}
               <span className="font-semibold text-white">3 urgent tasks</span> pending.
             </p>
           </div>

@@ -188,6 +188,76 @@ export const isAuthenticated = (): boolean => {
 }
 
 /**
+ * Check if auth-token cookie exists
+ */
+export const hasAuthTokenCookie = (): boolean => {
+  if (typeof window === 'undefined') return false
+  
+  const getCookie = (name: string) => {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop()?.split(';').shift();
+    return null;
+  };
+  
+  return !!getCookie('auth-token');
+}
+
+/**
+ * Enhanced authentication check that handles cookie/localStorage mismatch
+ */
+export const checkAuthStatus = async (): Promise<{ isAuthenticated: boolean; shouldRedirect: boolean }> => {
+  if (typeof window === 'undefined') {
+    return { isAuthenticated: false, shouldRedirect: true };
+  }
+  
+  const authData = localStorage.getItem('jdp_auth');
+  const hasCookie = hasAuthTokenCookie();
+  
+  console.log('Auth status check:', { 
+    hasLocalStorage: !!authData, 
+    hasCookie,
+    timestamp: new Date().toISOString()
+  });
+  
+  // If no localStorage but has cookie, clear everything
+  if (!authData && hasCookie) {
+    console.log('Mismatch: No localStorage but has cookie - clearing everything');
+    await clearAuthData();
+    return { isAuthenticated: false, shouldRedirect: true };
+  }
+  
+  // If no localStorage and no cookie, clear everything
+  if (!authData && !hasCookie) {
+    console.log('No auth data found - clearing everything');
+    await clearAuthData();
+    return { isAuthenticated: false, shouldRedirect: true };
+  }
+  
+  // If we have localStorage, validate it
+  if (authData) {
+    try {
+      const parsed = JSON.parse(authData);
+      
+      if (parsed.user && parsed.token && parsed.expires && parsed.expires > Date.now()) {
+        console.log('✅ Valid authentication found');
+        return { isAuthenticated: true, shouldRedirect: false };
+      } else {
+        console.log('❌ Invalid or expired authentication data');
+        await clearAuthData();
+        return { isAuthenticated: false, shouldRedirect: true };
+      }
+    } catch (error) {
+      console.error('Error parsing auth data:', error);
+      await clearAuthData();
+      return { isAuthenticated: false, shouldRedirect: true };
+    }
+  }
+  
+  return { isAuthenticated: false, shouldRedirect: true };
+}
+
+/**
  * Get authentication token
  */
 export const getAuthToken = (): string | null => {

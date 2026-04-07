@@ -5,6 +5,7 @@ import { AuthStep } from '../AuthFlow'
 import { toast } from 'sonner'
 // import img4541 from "figma:asset/a3e40afe539df138ee43712dc0bf65b14d1b7224.png"
 import { EyeOff } from 'lucide-react'
+import Image from 'next/image'
 
 interface NewPasswordScreenProps {
   email: string
@@ -17,7 +18,7 @@ export function NewPasswordScreen({ email, onStepChange, onAuthSuccess }: NewPas
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [showPasswordHelp, setShowPasswordHelp] = useState(false)
-  const [errors, setErrors] = useState<{confirm?: string}>({})
+  const [errors, setErrors] = useState<{ confirm?: string }>({})
 
   const validatePassword = (password: string) => {
     const minLength = password.length >= 8
@@ -25,7 +26,7 @@ export function NewPasswordScreen({ email, onStepChange, onAuthSuccess }: NewPas
     const hasLower = /[a-z]/.test(password)
     const hasNumber = /\d/.test(password)
     const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password)
-    
+
     return {
       minLength,
       hasUpper,
@@ -38,19 +39,19 @@ export function NewPasswordScreen({ email, onStepChange, onAuthSuccess }: NewPas
 
   const handleSave = async () => {
     const validation = validatePassword(newPassword)
-    
+
     if (!validation.isValid) {
       setShowPasswordHelp(true)
       return
     }
-    
+
     if (newPassword !== confirmPassword) {
       setErrors({ confirm: 'Password mismatch' })
       return
     }
-    
+
     setIsLoading(true)
-    
+
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
       const response = await fetch(`${apiBaseUrl}/auth/forgot-password/reset`, {
@@ -93,21 +94,25 @@ export function NewPasswordScreen({ email, onStepChange, onAuthSuccess }: NewPas
       <div className="absolute left-[-10px] top-[-318px] w-[561px] h-[561px]">
         <div className="w-full h-full rounded-full bg-[#00A1FF] opacity-10" />
       </div>
-      
+
       {/* Dark left section */}
       <div className="absolute bg-[#111c2d] h-full w-[50%] left-0 top-0" />
-      
+
       {/* White right section */}
       <div className="absolute bg-white h-full w-[50%] right-0 top-0" />
-      
+
       {/* Left content */}
       <div className="absolute left-[72px] top-1/2 transform -translate-y-1/2">
         <div className="mb-8">
-         <img 
-            src="/assets/logos/logo-jdp.png" 
-            alt="JDP Logo" 
+          <Image
+            src="/assets/logos/logo-jdp.png"
+            alt="JDP Logo"
             className="w-[168px] h-[63px] object-contain opacity-99"
+            width={168}
+            height={63}
+
           />
+
         </div>
         <div className="text-white">
           <h1 className="text-[32px] font-extrabold mb-4">Welcome to JDP</h1>
@@ -119,7 +124,7 @@ export function NewPasswordScreen({ email, onStepChange, onAuthSuccess }: NewPas
           </p>
         </div>
       </div>
-      
+
       {/* Right content */}
       <div className="absolute right-[50px] top-1/2 transform -translate-y-1/2 w-[600px]">
         <div className="mb-8">
@@ -129,7 +134,7 @@ export function NewPasswordScreen({ email, onStepChange, onAuthSuccess }: NewPas
             choose something unique, strong, and hard for others to guess.
           </p>
         </div>
-        
+
         <div className="space-y-6">
           {/* New Password Field */}
           <div>
@@ -148,7 +153,7 @@ export function NewPasswordScreen({ email, onStepChange, onAuthSuccess }: NewPas
               <EyeOff className="absolute right-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             </div>
           </div>
-          
+
           {/* Confirm Password Field */}
           <div>
             <label className="text-[18px] font-medium text-gray-900 block mb-2">
@@ -160,9 +165,8 @@ export function NewPasswordScreen({ email, onStepChange, onAuthSuccess }: NewPas
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="********"
-                className={`h-[50px] rounded-full border pl-4 pr-12 ${
-                  errors.confirm ? 'border-[#e02424] bg-[#fff3f3]' : 'border-[#00a1ff]'
-                }`}
+                className={`h-[50px] rounded-full border pl-4 pr-12 ${errors.confirm ? 'border-[#e02424] bg-[#fff3f3]' : 'border-[#00a1ff]'
+                  }`}
               />
               <EyeOff className="absolute right-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             </div>
@@ -170,7 +174,7 @@ export function NewPasswordScreen({ email, onStepChange, onAuthSuccess }: NewPas
               <p className="text-[#e02424] text-[14px] mt-1">{errors.confirm}</p>
             )}
           </div>
-          
+
           {/* Password Requirements */}
           {showPasswordHelp && (
             <div className="bg-[#f8fcff] border border-[#00a1ff] border-opacity-30 rounded-lg p-4 shadow-sm">
@@ -189,7 +193,7 @@ export function NewPasswordScreen({ email, onStepChange, onAuthSuccess }: NewPas
               </div>
             </div>
           )}
-          
+
           {/* Save Button */}
           <Button
             onClick={handleSave}
@@ -198,7 +202,7 @@ export function NewPasswordScreen({ email, onStepChange, onAuthSuccess }: NewPas
           >
             {isLoading ? 'Saving...' : 'Save'}
           </Button>
-          
+
           {/* Back Button */}
           <Button
             onClick={() => onStepChange('forgot-password')}

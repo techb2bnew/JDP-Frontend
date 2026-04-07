@@ -18,11 +18,13 @@ import {
   ChevronRight,
   LogOut,
   Settings2,
-  Bell
+  Bell,
+  Clock
 } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { LogoutConfirmationDialog } from "../LogoutConfirmationDialog"
 import { usePermissions } from "../../contexts/PermissionContext"
+import Image from "next/image"
 interface SidebarProps {
   currentPath: string
   onLogout: () => void
@@ -81,6 +83,15 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       requiredActions: ["view", "create", "edit", "delete"]
     },
     {
+      id: "timesheets",
+      name: "Time sheets",
+      icon: Clock,
+      href: "/timesheets",
+      description: "Review and approve employee timesheets",
+      module: "invoices",
+      requiredActions: ["view", "create", "edit", "delete"]
+    },
+    {
       id: "customers",
       name: "Customers",
       icon: Users,
@@ -133,16 +144,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       description: "Manage and view system alerts and messages",
       module: "notification",
       requiredActions: ["view", "create", "edit", "delete"]
-    },
-    {
-      id: "configuration",
-      name: "Configuration",
-      icon: Settings,
-      href: "/configuration",
-      description: "Configure system-wide settings for pricing and rates",
-      module: "settings",
-      requiredActions: ["view", "create", "edit", "delete"]
-    },
+    }, 
     {
       id: "role",
       name: "Role & Permission",
@@ -151,7 +153,16 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       description: "Role & Permission",
       module: "role_permission",
       requiredActions: ["view", "create", "edit", "delete"]
-    }
+    },
+    {
+      id: "configuration",
+      name: "Configuration",
+      icon: Settings,
+      href: "/configuration",
+      description: "Configure system-wide settings for pricing and rates",
+      module: "configuration",
+      requiredActions: ["view", "create", "edit", "delete"]
+    },
   ]
 
   // Filter navigation items based on permissions
@@ -203,7 +214,15 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
         <div className="p-5 border-b border-sidebar-border bg-gradient-to-r from-sidebar to-sidebar-accent/20">
           <div className="flex items-center justify-center space-x-3">
             <div className="text-center">
-              <img src='/assets/logos/logo-jdp.png' alt="logo" className='w-[140px] ' />
+              <Image
+                src='/assets/logos/logo-jdp.png'
+                alt="logo"
+                width={168}
+                height={63}
+                className='w-[140px] '
+
+              />
+
               <p className="font-semibold text-md pt-3">JDP Electrical Services</p>
             </div>
           </div>

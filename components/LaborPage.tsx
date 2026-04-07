@@ -26,6 +26,7 @@ import {
   Shield,
   MapPin
 } from 'lucide-react'
+import { apiClient } from '@/utils/api'
 
 interface Labor {
   id: string
@@ -124,6 +125,8 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
   const canDeleteLabour = isAdmin || hasPermission('labour', 'delete')
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
   const [totalLabor, setTotalLabor] = useState(0)
+  const [filteredLabors, setFilteredLabors] = useState<any[]>([]);
+
 
 
   const [formData, setFormData] = useState<LaborFormData>({
@@ -186,21 +189,21 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
     }
   }
 
-  const filteredLaborers = laborers.filter(labor => {
-    const matchesSearch = labor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         labor.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         labor.phone.includes(searchTerm) ||
-                         labor.laborId.includes(searchTerm) ||
-                         labor.trade.toLowerCase().includes(searchTerm.toLowerCase())
+  // const filteredLaborers = laborers.filter(labor => {
+  //   const matchesSearch = labor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //                        labor.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //                        labor.phone.includes(searchTerm) ||
+  //                        labor.laborId.includes(searchTerm) ||
+  //                        labor.trade.toLowerCase().includes(searchTerm.toLowerCase())
     
-    const matchesTrade = filterTrade === 'all' || labor.trade === filterTrade
-    const matchesAvailability = filterAvailability === 'all' || labor.availability === filterAvailability
+  //   const matchesTrade = filterTrade === 'all' || labor.trade === filterTrade
+  //   const matchesAvailability = filterAvailability === 'all' || labor.availability === filterAvailability
     
-    return matchesSearch && matchesTrade && matchesAvailability
-  })
+  //   return matchesSearch && matchesTrade && matchesAvailability
+  // })
 
  
-    const paginatedLaborers = filteredLaborers
+    const paginatedLaborers = filteredLabors
   const totalPages = Math.ceil(totalLabor / itemsPerPage)
 
   const handleCreate = async () => {
@@ -648,6 +651,8 @@ const fetchLeadLabourData = async () => {
   }
 };
 
+
+
 const fetchLaborData = async (page: number = 1, limit: number = 10) => {
   setIsLoadingLabor(true);
   try {
@@ -687,6 +692,7 @@ const fetchLaborData = async (page: number = 1, limit: number = 10) => {
         }));
 
         setLaborers(mappedData);
+        setFilteredLabors(mappedData);
         setTotalLabor(responseData.data.pagination.totalItems || mappedData.length);
         
         // Extract unique trades from API response
@@ -707,6 +713,93 @@ const fetchLaborData = async (page: number = 1, limit: number = 10) => {
     setIsLoadingLabor(false);
   }
 };
+
+const fetchBySearchLabor = async () => {
+  if (!searchTerm.trim()) return;
+
+  setIsLoadingLabor(true);
+
+  try {
+    const response = await apiClient.searchLaborByQuery(searchTerm.trim(), 1, 10);
+    const laborData = response.data;
+    const laborList = laborData?.labor || [];
+
+    const transformedData = laborList.map((labor: any) => ({
+      id: labor.id,
+      userId: labor.user_id,
+      laborCode: labor.labor_code || 'N/A',
+      name: labor.users?.full_name || 'N/A',
+      email: labor.users?.email || 'N/A',
+      phone: labor.users?.phone || 'N/A',
+      role: labor.users?.role || 'N/A',
+      status: labor.users?.status || 'N/A',
+      dob: labor.dob || 'N/A',
+      address: labor.address || 'N/A',
+      notes: labor.notes || '',
+      dateOfJoining: labor.date_of_joining || 'N/A',
+      trade: labor.trade || 'N/A',
+      experience: labor.experience || 'N/A',
+      hourlyRate: labor.hourly_rate || 0,
+      supervisorId: labor.supervisor_id || null,
+      availability: labor.availability || 'N/A',
+      certifications: labor.certifications || [],
+      skills: labor.skills || [],
+      createdAt: labor.created_at || '',
+      photoUrl: labor.users?.photo_url || null,
+      jobId: labor.job_id || null,
+      totalCost: labor.total_cost || 0
+    }));
+
+    setFilteredLabors(transformedData);
+    setTotalLabor(laborData.pagination.total || transformedData.length);
+  } catch (error) {
+    console.error('Labor search error:', error);
+    setFilteredLabors([]);
+  } finally {
+    setIsLoadingLabor(false);
+  }
+};
+
+
+useEffect(() => {
+  const debounceTimeout = setTimeout(() => {
+    if (!searchTerm.trim()) {
+      fetchLaborData(currentPage, itemsPerPage); 
+    } else {
+      fetchBySearchLabor();
+    }
+  }, 500);
+
+  return () => clearTimeout(debounceTimeout);
+}, [searchTerm, currentPage, itemsPerPage]);
+
+useEffect(() => {
+  const fetchLaborByStatus = async () => {
+    if (!filterAvailability || filterAvailability === 'all') {
+      setLaborers([]);
+      setTotalLabor(0);
+      return;
+    }
+
+    setIsLoadingLabor(true);
+    try {
+      const res = await apiClient.searchLaborByStatus(filterAvailability, 1, 10); 
+      const laborList = res.data?.labors || []; 
+      setLaborers(laborList);
+      setTotalLabor(laborList.length);
+    } catch (err) {
+      console.error('Labor filter error:', err);
+      setLaborers([]);
+      setTotalLabor(0);
+    } finally {
+      setIsLoadingLabor(false);
+    }
+  };
+
+  fetchLaborByStatus();
+}, [filterAvailability]);
+
+
 
 const fetchLaborById = async (id: string) => {
   try {
@@ -1064,7 +1157,7 @@ const fetchLaborById = async (id: string) => {
             <Upload className="h-4 w-4" />
             Import
           </Button>
-          <Button variant="outline" className="gap-2" onClick={() => downloadCSV(filteredLaborers, `labor-export-${new Date().toISOString().split('T')[0]}.csv`)}>
+          <Button variant="outline" className="gap-2" onClick={() => downloadCSV(filteredLabors, `labor-export-${new Date().toISOString().split('T')[0]}.csv`)}>
             <Download className="h-4 w-4" />
             Export
           </Button>
@@ -1183,7 +1276,7 @@ const fetchLaborById = async (id: string) => {
                 />
               </div>
               
-              <Select value={filterTrade} onValueChange={setFilterTrade}>
+              {/* <Select value={filterTrade} onValueChange={setFilterTrade}>
                 <SelectTrigger className="w-56">
                   <SelectValue placeholder="Filter by Trade" />
                 </SelectTrigger>
@@ -1193,7 +1286,7 @@ const fetchLaborById = async (id: string) => {
                     <SelectItem key={trade} value={trade}>{trade}</SelectItem>
                   ))}
                 </SelectContent>
-              </Select>
+              </Select> */}
 
               <Select value={filterAvailability} onValueChange={setFilterAvailability}>
                 <SelectTrigger className="w-48">
@@ -1210,7 +1303,7 @@ const fetchLaborById = async (id: string) => {
             </div>
             
             <div className="flex items-center gap-2 text-sm text-gray-600">
-              <span>Total: {filteredLaborers.length}</span>
+              <span>Total: {filteredLabors.length}</span>
             </div>
           </div>
         </CardContent>

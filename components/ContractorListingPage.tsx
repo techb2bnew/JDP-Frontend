@@ -1,6 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { JobDetailsPage } from './JobDetailsPage'
+import { apiClient } from '../utils/api'
+import { ContractorDetailsPage } from './ContractorDetailsPage'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
@@ -53,20 +57,68 @@ import {
   Plus
 } from 'lucide-react'
 
+interface Job {
+  id: number
+  job_title: string
+  job_type: string
+  customer_id: number | null
+  contractor_id: number
+  description: string
+  priority: string
+  address: string
+  city_zip: string
+  phone: string | null
+  email: string | null
+  bill_to_address: string | null
+  bill_to_city_zip: string | null
+  bill_to_phone: string | null
+  bill_to_email: string | null
+  same_as_address: boolean
+  due_date: string
+  estimated_hours: number
+  estimated_cost: number
+  assigned_lead_labor_ids: string | null
+  assigned_labor_ids: string | null
+  assigned_material_ids: string | null
+  status: string
+  created_by: number
+  system_ip: string | null
+  created_at: string
+  updated_at: string
+  created_from: string
+  total_work_time: string
+  work_activity: number
+  start_timer: string | null
+  end_timer: string | null
+  pause_timer: any[]
+  labor_timesheets: any[]
+  customer: any
+  isMainJob: boolean
+  isSubJob: boolean
+  parentJobId: number | null
+  parentAddress: string | null
+  subJobs: Job[]
+  progress: number
+  totalSubJobs: number
+  totalJobs: number
+  completedSubJobs: number
+  completedJobs: number
+  totalEstimatedCost: number
+  totalEstimatedHours: number
+}
+
 interface Contractor {
-  id: string
-  name: string
+  id: number
+  contractor_name: string
+  company_name: string
   email: string
   phone: string
-  address: string
-  status: 'active' | 'inactive'
-  totalJobs: number
-  completedJobs: number
-  ongoingJobs: number
-  pendingJobs: number
-  totalRevenue: number
-  rating: number
-  joinDate: string
+  status: string
+  created_at: string
+  jobs: Job[]
+  total_jobs: number
+  active_jobs: number
+  completed_jobs: number
 }
 
 interface OrderItem {
@@ -138,75 +190,11 @@ interface SubJob {
   invoices: SubJobInvoice[]
 }
 
-interface Job {
-  id: string
-  title: string
-  contractorId: string
-  status: 'complete' | 'ongoing' | 'pending'
-  customer: string
-  location: string
-  startDate: string
-  dueDate: string
-  estimatedCost: number
-  actualCost?: number
-  estimatedHours: number
-  actualHours?: number
-  progress: number
-  priority: 'high' | 'medium' | 'low'
-  invoiceStatus: 'paid' | 'partial-paid' | 'pending' | 'overdue'
-  approvalStatus: 'approved' | 'pending' | 'rejected'
-  subJobs?: SubJob[]
-}
 
-const contractorsData: Contractor[] = [
-  {
-    id: 'CONT-001',
-    name: 'John Carter',
-    email: 'john@gmail.com',
-    phone: '+1 415‑555‑0132',
-    address: '1160 N Willow Dr Near Res.',
-    status: 'active',
-    totalJobs: 15,
-    completedJobs: 12,
-    ongoingJobs: 2,
-    pendingJobs: 1,
-    totalRevenue: 45000,
-    rating: 4.8,
-    joinDate: '2024-01-15'
-  },
-  {
-    id: 'CONT-002',
-    name: 'Sarah Johnson',
-    email: 'sarah@contracting.com',
-    phone: '+1 415‑555‑0133',
-    address: '2805 Maplewood Cir E palladino',
-    status: 'active',
-    totalJobs: 8,
-    completedJobs: 7,
-    ongoingJobs: 1,
-    pendingJobs: 0,
-    totalRevenue: 32000,
-    rating: 4.6,
-    joinDate: '2024-03-20'
-  },
-  {
-    id: 'CONT-003',
-    name: 'Mike Wilson',
-    email: 'mike@electrical.com',
-    phone: '+1 415‑555‑0134',
-    address: '6149 CR 13 Batzer Res.',
-    status: 'active',
-    totalJobs: 22,
-    completedJobs: 18,
-    ongoingJobs: 3,
-    pendingJobs: 1,
-    totalRevenue: 68000,
-    rating: 4.9,
-    joinDate: '2023-11-10'
-  }
-]
+// Sample data removed - using API data instead
 
-const jobsData: Job[] = [
+// Sample jobs data removed - using API data instead
+const jobsData: any[] = [
   {
     id: 'PH209_US_JDP',
     title: '1160 N Willow Dr Near Res.',
@@ -796,8 +784,8 @@ const InvoiceTemplate = ({ subJob, job, contractor }: { subJob: SubJob, job: Job
         <div>
           <h3 className="font-semibold mb-2">Bill To:</h3>
           <div className="text-sm">
-            <p className="font-medium">{job.customer}</p>
-            <p>{job.location}</p>
+            <p className="font-medium">{job.customer?.customer_name || job.customer?.company_name || 'N/A'}</p>
+            <p>{job.address}</p>
           </div>
         </div>
         <div>
@@ -805,7 +793,7 @@ const InvoiceTemplate = ({ subJob, job, contractor }: { subJob: SubJob, job: Job
           <div className="text-sm">
             <p><span className="font-medium">Job ID:</span> {job.id}</p>
             <p><span className="font-medium">Sub-Job:</span> {subJob.title}</p>
-            <p><span className="font-medium">Contractor:</span> {contractor.name}</p>
+            <p><span className="font-medium">Contractor:</span> {contractor.contractor_name}</p>
             <p><span className="font-medium">Completion Date:</span> {subJob.completedDate ? formatDate(subJob.completedDate) : 'In Progress'}</p>
           </div>
         </div>
@@ -906,9 +894,12 @@ const InvoiceTemplate = ({ subJob, job, contractor }: { subJob: SubJob, job: Job
 }
 
 export function ContractorListingPage() {
+  const router = useRouter()
   const [selectedContractor, setSelectedContractor] = useState<string | null>(null)
   const [selectedJob, setSelectedJob] = useState<string | null>(null)
   const [selectedSubJob, setSelectedSubJob] = useState<string | null>(null)
+  const [showContractorDetails, setShowContractorDetails] = useState(false)
+  const [enhancedJobData, setEnhancedJobData] = useState<any>(null)
   const [expandedContractors, setExpandedContractors] = useState<Set<string>>(new Set(['CONT-001']))
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set(['PH210_US_JDP']))
   const [expandedSubJobs, setExpandedSubJobs] = useState<Set<string>>(new Set(['SUB-004']))
@@ -957,12 +948,12 @@ export function ContractorListingPage() {
     try {
       setIsLoadingContractors(true)
       
-      const response = await globalApiCall(`${apiBaseUrl}/contractor/getContractors?page=${currentPage}&limit=${itemsPerPage}`, {
+      const response = await globalApiCall(`${apiBaseUrl}/contractor/getContractors?include_jobs=true&page=${currentPage}&limit=${itemsPerPage}`, {
         method: 'GET'
       })
 
       const responseData = await response.json()
-      console.log('Contractors API Response:', responseData)
+      console.log('Contractors with Jobs API Response:', responseData)
 
       if (responseData.success && responseData.data) {
         setContractors(responseData.data.contractors || [])
@@ -1062,10 +1053,87 @@ export function ContractorListingPage() {
   }
 
   // Handle view contractor
-  const handleViewContractor = (contractorId: string) => {
-    fetchContractorById(contractorId)
-    setIsViewMode(true)
-    setIsEditMode(false)
+  const handleViewContractor = async (contractorId: string) => {
+    try {
+      setIsLoadingContractors(true)
+      const response = await globalApiCall(`${apiBaseUrl}/contractor/getContractorById/${contractorId}`, {
+        method: 'GET'
+      })
+      const responseData = await response.json()
+      
+      if (responseData.success) {
+        const contractorData = responseData.data
+        
+        // Fetch job details for each sub-job like JobManagementPage does
+        const jobsWithDetails = await Promise.all(
+          contractorData.subJobs.map(async (subJob: any) => {
+            try {
+              const jobDetailsResponse = await globalApiCall(`${apiBaseUrl}/job/getJobById/${subJob.id}`, {
+                method: 'GET'
+              })
+              const jobDetailsData = await jobDetailsResponse.json()
+              const jobData = jobDetailsData.success ? jobDetailsData.data : subJob
+              
+              // Parse labor IDs and fetch labor details
+              let assignedLaborDetails = []
+              
+              if (jobData.assigned_labor_ids) {
+                try {
+                  const laborIds = JSON.parse(jobData.assigned_labor_ids)
+                  const laborDetails = await Promise.all(
+                    laborIds.map(async (laborId: number) => {
+                      try {
+                        const laborResponse = await globalApiCall(`${apiBaseUrl}/labor/getLaborById/${laborId}`, {
+                          method: 'GET'
+                        })
+                        const laborData = await laborResponse.json()
+                        return laborData.success ? laborData.data : null
+                      } catch (error) {
+                        console.error('Error fetching labor details for ID:', laborId, error)
+                        return null
+                      }
+                    })
+                  )
+                  assignedLaborDetails = laborDetails.filter(labor => labor !== null)
+                } catch (error) {
+                  console.error('Error parsing labor IDs:', error)
+                }
+              }
+              
+              return {
+                ...jobData,
+                assignedLaborDetails
+              }
+            } catch (error) {
+              console.error('Error fetching job details for subJob:', subJob.id, error)
+              return subJob
+            }
+          })
+        )
+        
+        // Update contractor data with fetched job details
+        const updatedContractorData = {
+          ...contractorData,
+          subJobs: jobsWithDetails
+        }
+        
+        setSelectedContractor(updatedContractorData)
+        setShowContractorDetails(true)
+      } else {
+        toast.error('Failed to fetch contractor details')
+      }
+    } catch (error) {
+      console.error('Error fetching contractor details:', error)
+      toast.error('Failed to fetch contractor details')
+    } finally {
+      setIsLoadingContractors(false)
+    }
+  }
+
+  const handleBackFromContractorDetails = () => {
+    setShowContractorDetails(false)
+    setSelectedContractor(null)
+    setEnhancedJobData(null)
   }
 
   // Handle switch from view to edit mode
@@ -1307,21 +1375,65 @@ export function ContractorListingPage() {
     setSelectedContractor(contractorId)
     setSelectedJob(null)
     setSelectedSubJob(null)
+    setShowContractorDetails(true)
     if (!expandedContractors.has(contractorId)) {
       toggleContractor(contractorId)
     }
   }
 
-  const selectJob = (jobId: string, contractorId: string) => {
+  const selectJob = async (jobId: string, contractorId: string) => {
     setSelectedContractor(contractorId)
     setSelectedJob(jobId)
     setSelectedSubJob(null)
+    
+    // Clear previous enhanced job data
+    setEnhancedJobData(null)
+    
+    // Fetch enhanced job data for the main job
+    try {
+      console.log('=== FETCHING MAIN JOB DETAILS ===')
+      console.log('Fetching job details for main job:', jobId)
+      const jobDetails = await apiClient.getJobById(jobId)
+      console.log('Main job details from API:', jobDetails)
+      console.log('Main job assignedLaborDetails:', jobDetails.assignedLaborDetails)
+      console.log('Main job assignedLeadLaborDetails:', jobDetails.assignedLeadLaborDetails)
+      
+      // Store the enhanced job data for use in JobDetailsPage
+      setEnhancedJobData(jobDetails)
+      console.log('Enhanced main job data set:', jobDetails)
+    } catch (error) {
+      console.error('Error fetching main job details:', error)
+    }
   }
 
-  const selectSubJob = (subJobId: string, jobId: string, contractorId: string) => {
+  const selectSubJob = async (subJobId: string, jobId: string, contractorId: string) => {
+    console.log('=== SELECT SUB JOB CALLED ===')
+    console.log('subJobId:', subJobId)
+    console.log('jobId:', jobId)
+    console.log('contractorId:', contractorId)
+    
     setSelectedContractor(contractorId)
     setSelectedJob(jobId)
     setSelectedSubJob(subJobId)
+    
+    // Clear previous enhanced job data
+    setEnhancedJobData(null)
+    
+    // Fetch the latest job details from API exactly like JobManagementPage does
+    try {
+      console.log('=== FETCHING JOB DETAILS ===')
+      console.log('Fetching job details for sub-job:', subJobId)
+      const jobDetails = await apiClient.getJobById(subJobId)
+      console.log('Job details from API:', jobDetails)
+      console.log('Job details assignedLaborDetails:', jobDetails.assignedLaborDetails)
+      console.log('Job details assignedLeadLaborDetails:', jobDetails.assignedLeadLaborDetails)
+      
+      // Store the enhanced job data for use in JobDetailsPage
+      setEnhancedJobData(jobDetails)
+      console.log('Enhanced job data set:', jobDetails)
+    } catch (error) {
+      console.error('Error fetching job details:', error)
+    }
   }
 
   const handleGenerateInvoice = (subJob: SubJob) => {
@@ -1670,8 +1782,8 @@ export function ContractorListingPage() {
           <div class="bill-to">
             <div class="section-title">Bill To:</div>
             <div class="section-content">
-              <div>${job.customer}</div>
-              <div>${job.location}</div>
+              <div>${job.customer?.customer_name || job.customer?.company_name || 'N/A'}</div>
+              <div>${job.address}</div>
             </div>
           </div>
           <div class="job-details">
@@ -1679,7 +1791,7 @@ export function ContractorListingPage() {
             <div class="section-content">
               <div>Job ID: ${job.id}</div>
               <div>Sub-Job: ${subJob.title}</div>
-              <div>Contractor: ${contractor.name}</div>
+              <div>Contractor: ${contractor.contractor_name}</div>
               <div>Completion: ${subJob.completedDate ? formatDate(subJob.completedDate) : 'In Progress'}</div>
             </div>
           </div>
@@ -1828,7 +1940,7 @@ export function ContractorListingPage() {
       pdf.text('Bill To:', 20, yPosition)
       yPosition += 8
       pdf.setFontSize(10)
-      pdf.text(selectedJobData.customer, 20, yPosition)
+      pdf.text(selectedJobData.customer?.customer_name || selectedJobData.customer?.company_name || 'N/A', 20, yPosition)
       yPosition += 5
       pdf.text(selectedJobData.location, 20, yPosition)
       
@@ -1977,7 +2089,7 @@ export function ContractorListingPage() {
       
       // Generate filename
       const invoiceNumber = invoiceSubJob.invoices[0]?.invoiceNumber || `INV-${invoiceSubJob.id}`
-      const filename = `${invoiceNumber}_${selectedJobData.customer.replace(/\s+/g, '_')}.pdf`
+      const filename = `${invoiceNumber}_${(selectedJobData.customer?.customer_name || selectedJobData.customer?.company_name || 'Customer').replace(/\s+/g, '_')}.pdf`
       
       // Download the PDF
       pdf.save(filename)
@@ -2084,15 +2196,16 @@ export function ContractorListingPage() {
     }
   }
 
-  const selectedContractorData = selectedContractor ? contractorsData.find(c => c.id === selectedContractor) : null
-  const selectedJobData = selectedJob ? jobsData.find(j => j.id === selectedJob) : null
-
+  const selectedContractorData = selectedContractor ? contractors.find(c => c.id.toString() === selectedContractor) : null
+  const selectedJobData = selectedJob ? selectedContractorData?.jobs.find((j: Job) => j.id.toString() === selectedJob) : null
+  console.log(selectedJobData, 'selectedJobData')
+  console.log(selectedContractorData, 'selectedContractorData')
   const SubJobDetails = ({ subJob }: { subJob: SubJob }) => {
-    const isExpanded = expandedSubJobs.has(subJob.id)
+    const isExpanded = expandedSubJobs.has(subJob.id.toString())
     
     return (
       <Card className="mt-4 border-l-4 border-l-primary bg-gradient-to-r from-primary/5 to-transparent">
-        <Collapsible open={isExpanded} onOpenChange={() => toggleSubJob(subJob.id)}>
+        <Collapsible open={isExpanded} onOpenChange={() => toggleSubJob(subJob.id.toString())}>
           <CollapsibleTrigger asChild>
             <CardHeader className="cursor-pointer hover:bg-primary/5 transition-colors">
               <div className="flex items-center justify-between">
@@ -2113,7 +2226,7 @@ export function ContractorListingPage() {
                 </div>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                   <span>{subJob.progress}% Complete</span>
-                  <span>{subJob.actualHours || 0}h / {subJob.estimatedHours}h</span>
+                  <span>0h / {subJob.estimatedHours}h</span>
                 </div>
               </div>
               <div className="flex items-center gap-4 mt-2">
@@ -2145,7 +2258,7 @@ export function ContractorListingPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {subJob.orders.length > 0 ? (
+                  {subJob.orders && subJob.orders.length > 0 ? (
                     <div className="overflow-hidden">
                       <Table>
                         <TableHeader>
@@ -2224,7 +2337,7 @@ export function ContractorListingPage() {
                   <CardContent className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Actual Hours:</span>
-                      <span className="font-medium">{subJob.actualHours || 0}h</span>
+                      <span className="font-medium">0h</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Actual Cost:</span>
@@ -2278,7 +2391,7 @@ export function ContractorListingPage() {
                     <div>
                       <span className="text-sm text-muted-foreground">Staff Assigned:</span>
                       <div className="flex flex-wrap gap-1 mt-1">
-                        {subJob.staffAssigned.map((staff, index) => (
+                        {subJob.staffAssigned && subJob.staffAssigned.map((staff, index) => (
                           <Badge key={index} variant="outline" className="text-xs">
                             {staff}
                           </Badge>
@@ -2335,7 +2448,7 @@ export function ContractorListingPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {subJob.transactions.length > 0 ? (
+                  {subJob.transactions && subJob.transactions.length > 0 ? (
                     <div className="overflow-hidden">
                       <Table>
                         <TableHeader>
@@ -2379,7 +2492,7 @@ export function ContractorListingPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {subJob.timesheets.length > 0 ? (
+                  {subJob.timesheets && subJob.timesheets.length > 0 ? (
                     <div className="overflow-hidden">
                       <Table>
                         <TableHeader>
@@ -2454,7 +2567,7 @@ export function ContractorListingPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {subJob.invoices.length > 0 ? (
+                  {subJob.invoices && subJob.invoices.length > 0 ? (
                     <div className="space-y-3">
                       {subJob.invoices.map((invoice) => (
                         <div key={invoice.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -2510,6 +2623,7 @@ export function ContractorListingPage() {
     )
   }
 
+
   return (
     <div className="h-full flex">
       {/* Left Sidebar - Contractor Listings */}
@@ -2539,16 +2653,16 @@ export function ContractorListingPage() {
         {/* Contractor Listings */}
         <ScrollArea className="flex-1 bg-white">
           <div className="p-2">
-            {contractorsData.map((contractor) => {
-              const contractorJobs = jobsData.filter(job => job.contractorId === contractor.id)
-              const isExpanded = expandedContractors.has(contractor.id)
-              const isSelected = selectedContractor === contractor.id && !selectedJob
+            {contractors.map((contractor) => {
+              const contractorJobs = contractor.jobs || []
+              const isExpanded = expandedContractors.has(contractor.id.toString())
+              const isSelected = selectedContractor === contractor.id.toString() && !selectedJob
 
               return (
                 <div key={contractor.id} className="mb-2">
                   <Collapsible
                     open={isExpanded}
-                    onOpenChange={() => toggleContractor(contractor.id)}
+                    onOpenChange={() => toggleContractor(contractor.id.toString())}
                   >
                     <CollapsibleTrigger asChild>
                       <Button
@@ -2556,7 +2670,7 @@ export function ContractorListingPage() {
                         className={`w-full justify-start p-3 text-left h-auto hover:bg-primary/5 ${
                           isSelected ? 'bg-primary/10 shadow-sm border border-primary/20' : ''
                         }`}
-                        onClick={() => selectContractor(contractor.id)}
+                        onClick={() => selectContractor(contractor.id.toString())}
                       >
                         <div className="flex items-center justify-between w-full">
                           <div className="flex items-center gap-3">
@@ -2569,8 +2683,8 @@ export function ContractorListingPage() {
                               <User className="h-4 w-4 text-primary" />
                             </div>
                             <div>
-                              <div className="font-medium text-gray-900">{contractor.name}</div>
-                              <div className="text-xs text-gray-500">{contractor.totalJobs} jobs</div>
+                              <div className="font-medium text-gray-900">{contractor.contractor_name}</div>
+                              <div className="text-xs text-gray-500">{contractor.total_jobs} jobs</div>
                             </div>
                           </div>
                         </div>
@@ -2578,10 +2692,10 @@ export function ContractorListingPage() {
                     </CollapsibleTrigger>
 
                     <CollapsibleContent className="ml-6 mt-1">
-                      {contractorJobs.map((job) => {
+                      {contractorJobs.map((job: Job) => {
                         const hasSubJobs = job.subJobs && job.subJobs.length > 0
-                        const isJobExpanded = expandedJobs.has(job.id)
-                        const isJobSelected = selectedJob === job.id && !selectedSubJob
+                        const isJobExpanded = expandedJobs.has(job.id.toString())
+                        const isJobSelected = selectedJob === job.id.toString() && !selectedSubJob
 
                         return (
                           <div key={job.id} className="mb-1">
@@ -2590,7 +2704,7 @@ export function ContractorListingPage() {
                               <div className="flex-1">
                                 <Collapsible
                                   open={isJobExpanded}
-                                  onOpenChange={() => toggleJob(job.id)}
+                                  onOpenChange={() => toggleJob(job.id.toString())}
                                 >
                                   <CollapsibleTrigger asChild>
                                     <Button
@@ -2598,7 +2712,7 @@ export function ContractorListingPage() {
                                       className={`w-full justify-start p-2 text-left h-auto text-sm hover:bg-primary/5 ${
                                         isJobSelected ? 'bg-primary/10 shadow-sm border border-primary/20' : ''
                                       }`}
-                                      onClick={() => selectJob(job.id, contractor.id)}
+                                      onClick={() => selectJob(job.id.toString(), contractor.id.toString())}
                                     >
                                       <div className="flex items-center justify-between w-full">
                                         <div className="flex items-center gap-2">
@@ -2612,7 +2726,7 @@ export function ContractorListingPage() {
                                           {getStatusIcon(job.status)}
                                           <div className="flex-1 min-w-0">
                                             <div className="text-xs font-medium text-gray-800 truncate">
-                                              {job.title}
+                                              {job.job_title}
                                             </div>
                                             <div className="text-xs text-gray-500">
                                               {job.status} • {job.progress}%
@@ -2626,7 +2740,7 @@ export function ContractorListingPage() {
                                   {hasSubJobs && (
                                     <CollapsibleContent className="ml-4 mt-1">
                                       {job.subJobs?.map((subJob) => {
-                                        const isSubJobSelected = selectedSubJob === subJob.id
+                                        const isSubJobSelected = selectedSubJob === subJob.id.toString()
 
                                         return (
                                           <div key={subJob.id} className="flex items-start mb-1">
@@ -2636,16 +2750,16 @@ export function ContractorListingPage() {
                                               className={`flex-1 justify-start p-1.5 text-left h-auto text-xs hover:bg-primary/5 ${
                                                 isSubJobSelected ? 'bg-primary/10 shadow-sm border border-primary/20' : ''
                                               }`}
-                                              onClick={() => selectSubJob(subJob.id, job.id, contractor.id)}
+                                              onClick={() => selectSubJob(subJob.id.toString(), job.id.toString(), contractor.id.toString())}
                                             >
                                               <div className="flex items-center gap-2 w-full">
                                                 {getStatusIcon(subJob.status)}
                                                 <div className="flex-1 min-w-0">
                                                   <div className="text-xs text-gray-700 truncate">
-                                                    {subJob.title}
+                                                    {subJob.job_title}
                                                   </div>
                                                   <div className="text-xs text-gray-500">
-                                                    {subJob.progress}% • {subJob.actualHours || 0}h
+                                                    {subJob.progress}% • 0h
                                                   </div>
                                                 </div>
                                               </div>
@@ -2684,172 +2798,18 @@ export function ContractorListingPage() {
           </div>
         </div>
 
-        {/* Contractor Listing Table */}
+        {/* Contractor Details */}
         <div className="p-6 space-y-6">
-          {/* Header */}
-          <div className="flex items-center justify-between">
+          {showContractorDetails && selectedContractor ? (
             <div>
-              <h2 className="text-2xl font-medium text-gray-900">Contractors</h2>
-              <p className="text-sm text-gray-600 mt-1">Manage your contractors and their information</p>
+              <ContractorDetailsPage 
+                contractorId={selectedContractor} 
+                onBack={handleBackFromContractorDetails}
+              />
             </div>
-          </div>
-
-          {/* Filters and Search */}
-          
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    placeholder="Search contractors..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant="outline"
-                    onClick={() => handleSort('contractor_name')}
-                    className="gap-2"
-                  >
-                    <ArrowUpAZ className="h-4 w-4" />
-                    A-Z
-                  </Button>
-                </div>
-              </div>  
-
-          {/* Contractors Table */}
-          <Card>
-            <CardContent className="p-0">
-              {isLoadingContractors ? (
-                <div className="flex items-center justify-center h-64">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                    <p className="text-muted-foreground">Loading contractors...</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Contractor Name</TableHead>
-                        <TableHead>Company</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>Address</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {displayContractors.length > 0 ? (
-                        displayContractors.map((contractor) => (
-                          <TableRow key={contractor.id}>
-                            <TableCell className="font-medium">
-                              {contractor.contractor_name}
-                            </TableCell>
-                            <TableCell>{contractor.company_name || '-'}</TableCell>
-                            <TableCell>{contractor.email}</TableCell>
-                            <TableCell>{contractor.phone}</TableCell>
-                            <TableCell className="max-w-xs truncate">
-                              {contractor.address || '-'}
-                            </TableCell>
-                            <TableCell>
-                              <Badge 
-                                className={
-                                  contractor.status === 'active' 
-                                    ? 'bg-green-100 text-green-800 border-green-200' 
-                                    : 'bg-red-100 text-red-800 border-red-200'
-                                }
-                              >
-                                {contractor.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex gap-2">
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  onClick={() => handleViewContractor(contractor.id)}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  onClick={() => handleEditContractor(contractor.id)}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  onClick={() => handleDeleteContractor(contractor)}
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center py-8">
-                            <div className="text-center">
-                              <User className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                              <h3 className="text-lg font-medium text-gray-900 mb-2">No contractors found</h3>
-                              <p className="text-gray-500">Get started by creating your first contractor.</p>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Pagination Controls */}
-          {totalContractors > itemsPerPage && (
-            <div className="flex items-center justify-between px-4 py-3 border-t">
-              <div className="text-sm text-muted-foreground">
-                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalContractors)} of {totalContractors} contractors
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1 || isLoadingContractors}
-                >
-                  Previous
-                </Button>
-                <span className="text-sm">
-                  Page {currentPage} of {Math.ceil(totalContractors / itemsPerPage)}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage >= Math.ceil(totalContractors / itemsPerPage) || isLoadingContractors}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
+          ) : (
+            <>
+            </>
           )}
         </div>
 
@@ -2865,7 +2825,7 @@ export function ContractorListingPage() {
                   Job Details • {selectedContractorData.name}
                 </p>
               </div>
-              <div className="flex gap-3">
+              {/* <div className="flex gap-3">
                 <Button variant="outline" className="gap-2">
                   <Download className="h-4 w-4" />
                   Export Report
@@ -2874,7 +2834,7 @@ export function ContractorListingPage() {
                   <Send className="h-4 w-4" />
                   Generate Invoice
                 </Button>
-              </div>
+              </div> */}
             </div>
 
             {/* Job Overview */}
@@ -2892,37 +2852,38 @@ export function ContractorListingPage() {
                     {getStatusBadge(selectedJobData.status)}
                   </div>
                   <div>
+                    <p className="text-sm text-gray-600 mb-1">Estimated Cost</p>
+                    <p className="font-medium text-primary">{formatCurrency(selectedJobData.estimated_cost)}</p>
+                  </div>
+                  {/* <div>
                     <p className="text-sm text-gray-600 mb-1">Progress</p>
                     <div className="flex items-center gap-2">
                       <Progress value={selectedJobData.progress} className="flex-1" />
                       <span className="text-sm font-medium text-primary">{selectedJobData.progress}%</span>
                     </div>
-                  </div>
+                  </div> */}
                 </div>
                 <div className="space-y-4">
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Customer</p>
-                    <p className="font-medium">{selectedJobData.customer}</p>
+                    <p className="text-sm text-gray-600 mb-1">Job Title</p>
+                    <p className="font-medium">{selectedJobData.job_title || 'N/A'}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Location</p>
-                    <p className="font-medium">{selectedJobData.location}</p>
+                    <p className="text-sm text-gray-600 mb-1">Address</p>
+                    <p className="font-medium">{selectedJobData.address}</p>
                   </div>
                 </div>
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Start Date</p>
-                    <p className="font-medium">{formatDate(selectedJobData.startDate)}</p>
+                    <p className="font-medium">{formatDate(selectedJobData.created_at)}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Due Date</p>
-                    <p className="font-medium">{formatDate(selectedJobData.dueDate)}</p>
-                  </div>
+               
                 </div>
                 <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Estimated Cost</p>
-                    <p className="font-medium text-primary">{formatCurrency(selectedJobData.estimatedCost)}</p>
+                <div>
+                    <p className="text-sm text-gray-600 mb-1">Due Date</p>
+                    <p className="font-medium">{formatDate(selectedJobData.due_date)}</p>
                   </div>
                   {selectedJobData.actualCost && (
                     <div>
@@ -2934,21 +2895,200 @@ export function ContractorListingPage() {
               </CardContent>
             </Card>
 
-            {/* Sub-Jobs Details */}
-            {selectedJobData.subJobs && selectedJobData.subJobs.length > 0 && (
+            {/* Job Details - Show main job or sub-job based on selection */}
+            {selectedJobData && (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-xl font-medium text-gray-900">Sub-Jobs Details</h3>
+                  <h3 className="text-xl font-medium text-gray-900">
+                    {selectedSubJob ? 'Sub-Job Details' : 'Job Details'}
+                  </h3>
                   <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-                    {selectedJobData.subJobs.length} Sub-Jobs
+                    {selectedJobData.subJobs?.length || 0} Sub-Jobs
                   </Badge>
                 </div>
                 
-                {selectedJobData.subJobs.map((subJob) => (
-                  <SubJobDetails key={subJob.id} subJob={subJob} />
-                ))}
+                {/* Show sub-job details if sub-job is selected */}
+                {selectedSubJob ? (
+                  selectedJobData.subJobs.map((subJob: Job) => {
+                    if (subJob.id.toString() !== selectedSubJob) return null
+                    
+                    // Use enhanced job data if available (from API call), otherwise use subJob data
+                    const jobData = enhancedJobData && enhancedJobData.id.toString() === subJob.id.toString() ? enhancedJobData : subJob
+                    
+                    console.log('=== DEBUGGING SUB-JOB DATA ===')
+                    console.log('subJob.id:', subJob.id, 'type:', typeof subJob.id)
+                    console.log('enhancedJobData:', enhancedJobData)
+                    console.log('enhancedJobData.id:', enhancedJobData?.id, 'type:', typeof enhancedJobData?.id)
+                    console.log('IDs match:', enhancedJobData && enhancedJobData.id.toString() === subJob.id.toString())
+                    console.log('Using job data:', jobData)
+                    console.log('Enhanced job data available:', !!enhancedJobData)
+                    console.log('Job data assignedLaborDetails:', jobData.assignedLaborDetails)
+                    console.log('Job data assignedLeadLaborDetails:', jobData.assignedLeadLaborDetails)
+                    
+                    // Ensure the subJob has the customer data properly structured
+                    const jobWithCustomerData = {
+                      ...jobData,
+                      // CRITICAL: Ensure ID matches what we pass to JobDetailsPage
+                      id: subJob.id.toString(),
+                      // Map customer data to the format JobDetailsPage expects
+                      customer: subJob.customer?.id?.toString() || subJob.customer_id?.toString(),
+                      customerName: subJob.customer?.customer_name || subJob.customer?.company_name,
+                      customerEmail: subJob.customer?.email,
+                      contractor: subJob.contractor_id?.toString(),
+                      // Map other fields that JobDetailsPage might expect
+                      title: subJob.job_title,
+                      type: subJob.job_type === 'contract_based' ? 'contract-based' : 'service-based',
+                      location: subJob.address,
+                      address: subJob.address,
+                      cityZip: subJob.city_zip,
+                      estimatedCost: subJob.estimated_cost,
+                      estimatedHours: subJob.estimated_hours,
+                      startDate: subJob.created_at,
+                      dueDate: subJob.due_date,
+                      priority: subJob.priority,
+                      status: subJob.status,
+                      progress: subJob.progress || 0,
+                      // Include labor timesheet data
+                      labor_timesheets: subJob.labor_timesheets || [],
+                      assigned_labor_ids: subJob.assigned_labor_ids,
+                      assigned_lead_labor_ids: subJob.assigned_lead_labor_ids,
+                      // Include assigned labor details - use enhanced data if available
+                      assignedLaborDetails: jobData.assignedLaborDetails || [],
+                      assignedLeadLaborDetails: jobData.assignedLeadLaborDetails || []
+                    }
+                  
+                    const allJobs = [jobWithCustomerData]
+                    console.log('All jobs:', allJobs)
+                    
+                    // Create a proper setJobs function that updates the contractor data
+                    const handleSetJobs = (updatedJobs: any[]) => {
+                      if (updatedJobs.length > 0) {
+                        const updatedJob = updatedJobs[0]
+                        // Update the contractor's jobs array with the updated job data
+                        setContractors(prevContractors => 
+                          prevContractors.map(contractor => {
+                            if (contractor.id.toString() === selectedContractor) {
+                              return {
+                                ...contractor,
+                                jobs: contractor.jobs.map((job: Job) => {
+                                  if (job.id.toString() === selectedJob) {
+                                    return {
+                                      ...job,
+                                      subJobs: job.subJobs?.map((subJobItem: Job) => 
+                                        subJobItem.id.toString() === updatedJob.id 
+                                          ? { ...subJobItem, ...updatedJob }
+                                          : subJobItem
+                                      ) || []
+                                    }
+                                  }
+                                  return job
+                                })
+                              }
+                            }
+                            return contractor
+                          })
+                        )
+                      }
+                    }
+                    
+                    return (
+                      <JobDetailsPage 
+                        key={subJob.id} 
+                        jobId={subJob.id.toString()} 
+                        onBack={() => setSelectedSubJob(null)}
+                        jobs={allJobs} 
+                        setJobs={handleSetJobs}
+                      />
+                    )
+                  })
+                ) : (
+                  /* Show main job details if no sub-job is selected */
+                  (() => {
+                    // Use enhanced job data if available (from API call), otherwise use selectedJobData
+                    const jobData = enhancedJobData && enhancedJobData.id.toString() === selectedJobData.id.toString() ? enhancedJobData : selectedJobData
+                    
+                    console.log('=== DEBUGGING MAIN JOB DATA ===')
+                    console.log('selectedJobData.id:', selectedJobData.id, 'type:', typeof selectedJobData.id)
+                    console.log('enhancedJobData:', enhancedJobData)
+                    console.log('enhancedJobData.id:', enhancedJobData?.id, 'type:', typeof enhancedJobData?.id)
+                    console.log('IDs match:', enhancedJobData && enhancedJobData.id.toString() === selectedJobData.id.toString())
+                    console.log('Using job data:', jobData)
+                    console.log('Enhanced job data available:', !!enhancedJobData)
+                    console.log('Job data assignedLaborDetails:', jobData.assignedLaborDetails)
+                    console.log('Job data assignedLeadLaborDetails:', jobData.assignedLeadLaborDetails)
+                    
+                    // Ensure the job has the customer data properly structured
+                    const jobWithCustomerData = {
+                      ...jobData,
+                      // CRITICAL: Ensure ID matches what we pass to JobDetailsPage
+                      id: selectedJobData.id.toString(),
+                      // Map customer data to the format JobDetailsPage expects
+                      customer: selectedJobData.customer?.id?.toString() || selectedJobData.customer_id?.toString(),
+                      customerName: selectedJobData.customer?.customer_name || selectedJobData.customer?.company_name,
+                      customerEmail: selectedJobData.customer?.email,
+                      contractor: selectedJobData.contractor_id?.toString(),
+                      // Map other fields that JobDetailsPage might expect
+                      title: selectedJobData.job_title,
+                      type: selectedJobData.job_type === 'contract_based' ? 'contract-based' : 'service-based',
+                      location: selectedJobData.address,
+                      address: selectedJobData.address,
+                      cityZip: selectedJobData.city_zip,
+                      estimatedCost: selectedJobData.estimated_cost,
+                      estimatedHours: selectedJobData.estimated_hours,
+                      startDate: selectedJobData.created_at,
+                      dueDate: selectedJobData.due_date,
+                      priority: selectedJobData.priority,
+                      status: selectedJobData.status,
+                      progress: selectedJobData.progress || 0,
+                      // Include labor timesheet data
+                      labor_timesheets: selectedJobData.labor_timesheets || [],
+                      assigned_labor_ids: selectedJobData.assigned_labor_ids,
+                      assigned_lead_labor_ids: selectedJobData.assigned_lead_labor_ids,
+                      // Include assigned labor details - use enhanced data if available
+                      assignedLaborDetails: jobData.assignedLaborDetails || [],
+                      assignedLeadLaborDetails: jobData.assignedLeadLaborDetails || []
+                    }
+                  
+                    const allJobs = [jobWithCustomerData]
+                    console.log('All jobs:', allJobs)
+                    
+                    // Create a proper setJobs function that updates the contractor data
+                    const handleSetJobs = (updatedJobs: any[]) => {
+                      if (updatedJobs.length > 0) {
+                        const updatedJob = updatedJobs[0]
+                        // Update the contractor's jobs array with the updated job data
+                        setContractors(prevContractors => 
+                          prevContractors.map(contractor => {
+                            if (contractor.id.toString() === selectedContractor) {
+                              return {
+                                ...contractor,
+                                jobs: contractor.jobs.map((job: Job) => 
+                                  job.id.toString() === selectedJob 
+                                    ? { ...job, ...updatedJob }
+                                    : job
+                                )
+                              }
+                            }
+                            return contractor
+                          })
+                        )
+                      }
+                    }
+                    
+                    return (
+                      <JobDetailsPage 
+                        key={selectedJobData.id} 
+                        jobId={selectedJobData.id.toString()} 
+                        onBack={() => setSelectedJob(null)}
+                        jobs={allJobs} 
+                        setJobs={handleSetJobs}
+                      />
+                    )
+                  })()
+                )}
               </div>
             )}
+
           </div>
         ) : (
           <div className="flex items-center justify-center h-full">

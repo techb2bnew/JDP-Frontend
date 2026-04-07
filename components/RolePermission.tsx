@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from './ui/button'
 import {
   Edit,
@@ -60,24 +60,19 @@ export default function RolePermission() {
   // State to track permissions for new roles
   const [newRolePermissions, setNewRolePermissions] = useState<Permission[]>([]);
 
-  // Fetch roles from API when component mounts
-  useEffect(() => {
-    fetchRoles();
-  }, []);
-
-  const fetchRoles = async () => {
+  const fetchRoles = useCallback(async () => {
     setIsLoadingRoles(true);
     try {
-      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const token = localStorage.getItem('jdp_auth')
+        ? JSON.parse(localStorage.getItem('jdp_auth')!).token
+        : null;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-
 
       const response = await fetch(`${apiBaseUrl}/permissions/roles-with-permissions`, {
         method: 'GET',
         headers
       });
-
 
       if (response.ok) {
         const responseData = await response.json();
@@ -105,7 +100,12 @@ export default function RolePermission() {
     } finally {
       setIsLoadingRoles(false);
     }
-  };
+  }, [apiBaseUrl]);
+
+  // Fetch roles from API when component mounts
+  useEffect(() => {
+    fetchRoles();
+  }, [fetchRoles]);
 
   // Pagination logic
   const paginatedRoles = roles.slice(
@@ -117,16 +117,16 @@ export default function RolePermission() {
 
   const fetchRoleById = async (roleId: string) => {
     try {
-      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const token = localStorage.getItem('jdp_auth')
+        ? JSON.parse(localStorage.getItem('jdp_auth')!).token
+        : null;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-
 
       const response = await fetch(`${apiBaseUrl}/permissions/roles/${roleId}`, {
         method: 'GET',
         headers
       });
-
 
       if (response.ok) {
         const responseData = await response.json();
@@ -139,11 +139,11 @@ export default function RolePermission() {
           const transformedPermissions: Permission[] = [];
 
           // Create all possible permissions first (all unchecked)
-          modules.forEach(module => {
-            getActionsForModule(module).forEach(action => {
+          modules.forEach(modName => {
+            getActionsForModule(modName).forEach(act => {
               transformedPermissions.push({
-                module,
-                action,
+                module: modName,
+                action: act,
                 allowed: false // Default to false
               });
             });
@@ -152,13 +152,13 @@ export default function RolePermission() {
           // Now update permissions based on API response
           apiPermissions.forEach((apiPerm: any) => {
             // Extract module and action from the permission object
-            const module = apiPerm.permission?.module;
-            const action = apiPerm.permission?.action;
+            const modName = apiPerm.permission?.module;
+            const act = apiPerm.permission?.action;
 
-            if (module && action) {
+            if (modName && act) {
               // Find and update the corresponding permission
               const existingPermission = transformedPermissions.find(p =>
-                p.module === module && p.action === action
+                p.module === modName && p.action === act
               );
               if (existingPermission) {
                 existingPermission.allowed = apiPerm.allowed;
@@ -167,7 +167,7 @@ export default function RolePermission() {
           });
 
           // Transform API response to match component's expected format
-          const transformedRole = {
+          const transformedRole: Role = {
             id: apiRole.id.toString(),
             roleName: apiRole.role_name || '',
             roleType: apiRole.role_type || '',
@@ -176,9 +176,6 @@ export default function RolePermission() {
             createdAt: apiRole.created_at ? apiRole.created_at.split('T')[0] : '',
             updatedAt: apiRole.updated_at ? apiRole.updated_at.split('T')[0] : ''
           };
-
-          console.log('Transformed role:', transformedRole);
-          console.log('Transformed permissions:', transformedPermissions);
 
           setEditingRole(transformedRole);
           setFormData({
@@ -213,13 +210,14 @@ export default function RolePermission() {
     'notification',
     'inventory_price',
     'bluesheet',
-    'role_permission'
+    'role_permission',
+    'configuration'
   ];
 
   const actions = ['view', 'create', 'edit', 'delete'];
 
   // Special actions for specific modules
-  const specialActions: { [key: string]: string[] } = {
+  const specialActionsMap: { [key: string]: string[] } = {
     'dashboard': ['view'],
     'jobs': ['view', 'create', 'edit', 'delete', 'assign'],
     'products': ['view', 'create', 'edit', 'delete', 'upload'],
@@ -231,15 +229,15 @@ export default function RolePermission() {
     'role_permission': ['view', 'create', 'edit', 'delete']
   };
 
-  const getActionsForModule = (module: string): string[] => {
-    return specialActions[module] || actions;
+  const getActionsForModule = (modName: string): string[] => {
+    return specialActionsMap[modName] || actions;
   };
 
-  const getPermissionValue = (module: string, action: string, permissions: Permission[]): boolean => {
-    if (!permissions || permissions.length === 0) return false;
-    const permission = permissions.find(p => p.module === module && p.action === action);
+  const getPermissionValue = (modName: string, act: string, perms: Permission[]): boolean => {
+    if (!perms || perms.length === 0) return false;
+    const permission = perms.find(p => p.module === modName && p.action === act);
     return permission ? permission.allowed : false;
-  };
+    };
 
   const handleAddRole = () => {
     setShowAddForm(true);
@@ -248,9 +246,9 @@ export default function RolePermission() {
 
     // Initialize permissions for new role
     const initialPermissions: Permission[] = [];
-    modules.forEach(module => {
-      getActionsForModule(module).forEach(action => {
-        initialPermissions.push({ module, action, allowed: false });
+    modules.forEach(modName => {
+      getActionsForModule(modName).forEach(act => {
+        initialPermissions.push({ module: modName, action: act, allowed: false });
       });
     });
     setNewRolePermissions(initialPermissions);
@@ -278,7 +276,9 @@ export default function RolePermission() {
     if (!roleToDelete) return;
 
     try {
-      const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+      const token = localStorage.getItem('jdp_auth')
+        ? JSON.parse(localStorage.getItem('jdp_auth')!).token
+        : null;
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -303,7 +303,7 @@ export default function RolePermission() {
     }
   };
 
-  const handlePermissionChange = (module: string, action: string, allowed: boolean) => {
+  const handlePermissionChange = (modName: string, act: string, allowed: boolean) => {
     if (editingRole) {
       // Update existing role permissions
       setRoles(prevRoles => {
@@ -311,20 +311,20 @@ export default function RolePermission() {
           if (role.id === editingRole.id) {
             // Check if permission already exists
             const existingPermission = role.permissions.find(p =>
-              p.module === module && p.action === action
+              p.module === modName && p.action === act
             );
 
-            let updatedPermissions;
+            let updatedPermissions: Permission[];
             if (existingPermission) {
               // Update existing permission
               updatedPermissions = role.permissions.map(p =>
-                p.module === module && p.action === action
+                p.module === modName && p.action === act
                   ? { ...p, allowed }
                   : p
               );
             } else {
               // Add new permission
-              updatedPermissions = [...role.permissions, { module, action, allowed }];
+              updatedPermissions = [...role.permissions, { module: modName, action: act, allowed }];
             }
 
             return { ...role, permissions: updatedPermissions };
@@ -338,18 +338,18 @@ export default function RolePermission() {
         if (!prev) return prev;
 
         const existingPermission = prev.permissions.find(p =>
-          p.module === module && p.action === action
+          p.module === modName && p.action === act
         );
 
-        let updatedPermissions;
+        let updatedPermissions: Permission[];
         if (existingPermission) {
           updatedPermissions = prev.permissions.map(p =>
-            p.module === module && p.action === action
+            p.module === modName && p.action === act
               ? { ...p, allowed }
               : p
           );
         } else {
-          updatedPermissions = [...prev.permissions, { module, action, allowed }];
+          updatedPermissions = [...prev.permissions, { module: modName, action: act, allowed }];
         }
 
         return { ...prev, permissions: updatedPermissions };
@@ -357,22 +357,22 @@ export default function RolePermission() {
     } else {
       // Update new role permissions
       setNewRolePermissions(prev => {
-        const existing = prev.find(p => p.module === module && p.action === action);
+        const existing = prev.find(p => p.module === modName && p.action === act);
         if (existing) {
           return prev.map(p =>
-            p.module === module && p.action === action
+            p.module === modName && p.action === act
               ? { ...p, allowed }
               : p
           );
         } else {
-          return [...prev, { module, action, allowed }];
+          return [...prev, { module: modName, action: act, allowed }];
         }
       });
     }
   };
 
   // Handle selecting all checkboxes for a specific action
-  const handleSelectAll = (action: string, checked: boolean) => {
+  const handleSelectAll = (act: string, checked: boolean) => {
     if (editingRole) {
       // Update existing role permissions
       setRoles(prevRoles => {
@@ -382,18 +382,18 @@ export default function RolePermission() {
 
             // Update existing permissions for this action
             updatedPermissions = updatedPermissions.map(p =>
-              p.action === action ? { ...p, allowed: checked } : p
+              p.action === act ? { ...p, allowed: checked } : p
             );
 
             // Add missing permissions for this action if they don't exist
-            modules.forEach(module => {
-              const moduleActions = getActionsForModule(module);
-              if (moduleActions.includes(action)) {
+            modules.forEach(modName => {
+              const moduleActs = getActionsForModule(modName);
+              if (moduleActs.includes(act)) {
                 const existingPermission = updatedPermissions.find(p =>
-                  p.module === module && p.action === action
+                  p.module === modName && p.action === act
                 );
                 if (!existingPermission) {
-                  updatedPermissions.push({ module, action, allowed: checked });
+                  updatedPermissions.push({ module: modName, action: act, allowed: checked });
                 }
               }
             });
@@ -411,18 +411,18 @@ export default function RolePermission() {
 
         // Update existing permissions for this action
         updatedPermissions = updatedPermissions.map(p =>
-          p.action === action ? { ...p, allowed: checked } : p
+          p.action === act ? { ...p, allowed: checked } : p
         );
 
         // Add missing permissions for this action if they don't exist
-        modules.forEach(module => {
-          const moduleActions = getActionsForModule(module);
-          if (moduleActions.includes(action)) {
+        modules.forEach(modName => {
+          const moduleActs = getActionsForModule(modName);
+          if (moduleActs.includes(act)) {
             const existingPermission = updatedPermissions.find(p =>
-              p.module === module && p.action === action
+              p.module === modName && p.action === act
             );
             if (!existingPermission) {
-              updatedPermissions.push({ module, action, allowed: checked });
+              updatedPermissions.push({ module: modName, action: act, allowed: checked });
             }
           }
         });
@@ -436,18 +436,18 @@ export default function RolePermission() {
 
         // Update existing permissions for this action
         updated = updated.map(p =>
-          p.action === action ? { ...p, allowed: checked } : p
+          p.action === act ? { ...p, allowed: checked } : p
         );
 
         // Add missing permissions for this action if they don't exist
-        modules.forEach(module => {
-          const moduleActions = getActionsForModule(module);
-          if (moduleActions.includes(action)) {
+        modules.forEach(modName => {
+          const moduleActs = getActionsForModule(modName);
+          if (moduleActs.includes(act)) {
             const existingPermission = updated.find(p =>
-              p.module === module && p.action === action
+              p.module === modName && p.action === act
             );
             if (!existingPermission) {
-              updated.push({ module, action, allowed: checked });
+              updated.push({ module: modName, action: act, allowed: checked });
             }
           }
         });
@@ -473,18 +473,18 @@ export default function RolePermission() {
             });
 
             // Add missing special action permissions if they don't exist
-            modules.forEach(module => {
-              const moduleActions = getActionsForModule(module);
-              const specialActions = moduleActions.filter(action =>
-                !['view', 'create', 'edit', 'delete'].includes(action)
+            modules.forEach(modName => {
+              const moduleActs = getActionsForModule(modName);
+              const specialActs = moduleActs.filter(a =>
+                !['view', 'create', 'edit', 'delete'].includes(a)
               );
 
-              specialActions.forEach(action => {
+              specialActs.forEach(a => {
                 const existingPermission = updatedPermissions.find(p =>
-                  p.module === module && p.action === action
+                  p.module === modName && p.action === a
                 );
                 if (!existingPermission) {
-                  updatedPermissions.push({ module, action, allowed: checked });
+                  updatedPermissions.push({ module: modName, action: a, allowed: checked });
                 }
               });
             });
@@ -507,18 +507,18 @@ export default function RolePermission() {
         });
 
         // Add missing special action permissions if they don't exist
-        modules.forEach(module => {
-          const moduleActions = getActionsForModule(module);
-          const specialActions = moduleActions.filter(action =>
-            !['view', 'create', 'edit', 'delete'].includes(action)
+        modules.forEach(modName => {
+          const moduleActs = getActionsForModule(modName);
+          const specialActs = moduleActs.filter(a =>
+            !['view', 'create', 'edit', 'delete'].includes(a)
           );
 
-          specialActions.forEach(action => {
+          specialActs.forEach(a => {
             const existingPermission = updatedPermissions.find(p =>
-              p.module === module && p.action === action
+              p.module === modName && p.action === a
             );
             if (!existingPermission) {
-              updatedPermissions.push({ module, action, allowed: checked });
+              updatedPermissions.push({ module: modName, action: a, allowed: checked });
             }
           });
         });
@@ -537,18 +537,18 @@ export default function RolePermission() {
         });
 
         // Add missing special action permissions if they don't exist
-        modules.forEach(module => {
-          const moduleActions = getActionsForModule(module);
-          const specialActions = moduleActions.filter(action =>
-            !['view', 'create', 'edit', 'delete'].includes(action)
+        modules.forEach(modName => {
+          const moduleActs = getActionsForModule(modName);
+          const specialActs = moduleActs.filter(a =>
+            !['view', 'create', 'edit', 'delete'].includes(a)
           );
 
-          specialActions.forEach(action => {
+          specialActs.forEach(a => {
             const existingPermission = updated.find(p =>
-              p.module === module && p.action === action
+              p.module === modName && p.action === a
             );
             if (!existingPermission) {
-              updated.push({ module, action, allowed: checked });
+              updated.push({ module: modName, action: a, allowed: checked });
             }
           });
         });
@@ -582,17 +582,19 @@ export default function RolePermission() {
       setErrors(newErrors);
       return;
     }
-    const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
+    const token = localStorage.getItem('jdp_auth')
+      ? JSON.parse(localStorage.getItem('jdp_auth')!).token
+      : null;
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const permissions: Permission[] = [];
-    modules.forEach(module => {
-      getActionsForModule(module).forEach(action => {
+    const compiledPermissions: Permission[] = [];
+    modules.forEach(modName => {
+      getActionsForModule(modName).forEach(act => {
         const allowed = editingRole
-          ? getPermissionValue(module, action, editingRole.permissions)
-          : getPermissionValue(module, action, newRolePermissions);
-        permissions.push({ module, action, allowed });
+          ? getPermissionValue(modName, act, editingRole.permissions)
+          : getPermissionValue(modName, act, newRolePermissions);
+        compiledPermissions.push({ module: modName, action: act, allowed });
       });
     });
 
@@ -600,9 +602,9 @@ export default function RolePermission() {
       roleName: formData.roleName,
       roleType: formData.roleType,
       description: formData.description,
-      permissions: permissions.map((permission, index) => ({
+      permissions: compiledPermissions.map((perm, index) => ({
         id: index + 1, // Add unique ID for each permission
-        ...permission
+        ...perm
       }))
     };
 
@@ -613,13 +615,12 @@ export default function RolePermission() {
         const updateData = {
           roleId: parseInt(editingRole.id),
           roleName: formData.roleName,
-          permissions: permissions.map(permission => ({
-            module: permission.module,
-            action: permission.action,
-            allowed: permission.allowed
+          permissions: compiledPermissions.map(perm => ({
+            module: perm.module,
+            action: perm.action,
+            allowed: perm.allowed
           }))
         };
-
 
         // Show a more detailed loading message
         const loadingToastId = toast.loading('Updating role permissions... This may take a moment.');
@@ -642,7 +643,7 @@ export default function RolePermission() {
             const currentUser = JSON.parse(localStorage.getItem('jdp_auth') || '{}').user;
             if (currentUser && currentUser.role === formData.roleName) {
               // Update current user's permissions in localStorage
-              const updatedPermissions = permissions
+              const updatedPermissions = compiledPermissions
                 .filter(p => p.allowed)
                 .map(p => ({
                   id: Math.random(), // Generate temporary ID
@@ -978,23 +979,23 @@ export default function RolePermission() {
                       </tr>
                     </thead>
                     <tbody>
-                      {modules.map((module) => {
-                        const moduleActions = getActionsForModule(module);
-                        const hasSpecialActions = moduleActions.length > 4;
-                        const isDashboard = module === 'dashboard';
+                      {modules.map((modName) => {
+                        const moduleActs = getActionsForModule(modName);
+                        const hasSpecialActions = moduleActs.length > 4;
+                        const isDashboard = modName === 'dashboard';
 
                         return (
-                          <tr key={module} className="hover:bg-gray-50">
+                          <tr key={modName} className="hover:bg-gray-50">
                             <td className="px-4 py-3 text-sm font-medium text-gray-900 border border-gray-300 capitalize">
-                              {module.replace('_', ' ')}
+                              {modName.replace('_', ' ')}
                             </td>
 
                             {/* View Checkbox - Always show */}
                             <td className="px-4 py-3 text-center border border-gray-300">
                               <input
                                 type="checkbox"
-                                checked={editingRole ? getPermissionValue(module, 'view', editingRole.permissions) : getPermissionValue(module, 'view', newRolePermissions)}
-                                onChange={(e) => handlePermissionChange(module, 'view', e.target.checked)}
+                                checked={editingRole ? getPermissionValue(modName, 'view', editingRole.permissions) : getPermissionValue(modName, 'view', newRolePermissions)}
+                                onChange={(e) => handlePermissionChange(modName, 'view', e.target.checked)}
                                 className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                               />
                             </td>
@@ -1004,8 +1005,8 @@ export default function RolePermission() {
                               {!isDashboard ? (
                                 <input
                                   type="checkbox"
-                                  checked={editingRole ? getPermissionValue(module, 'create', editingRole.permissions) : getPermissionValue(module, 'create', newRolePermissions)}
-                                  onChange={(e) => handlePermissionChange(module, 'create', e.target.checked)}
+                                  checked={editingRole ? getPermissionValue(modName, 'create', editingRole.permissions) : getPermissionValue(modName, 'create', newRolePermissions)}
+                                  onChange={(e) => handlePermissionChange(modName, 'create', e.target.checked)}
                                   className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                                 />
                               ) : (
@@ -1018,8 +1019,8 @@ export default function RolePermission() {
                               {!isDashboard ? (
                                 <input
                                   type="checkbox"
-                                  checked={editingRole ? getPermissionValue(module, 'edit', editingRole.permissions) : getPermissionValue(module, 'edit', newRolePermissions)}
-                                  onChange={(e) => handlePermissionChange(module, 'edit', e.target.checked)}
+                                  checked={editingRole ? getPermissionValue(modName, 'edit', editingRole.permissions) : getPermissionValue(modName, 'edit', newRolePermissions)}
+                                  onChange={(e) => handlePermissionChange(modName, 'edit', e.target.checked)}
                                   className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                                 />
                               ) : (
@@ -1032,8 +1033,8 @@ export default function RolePermission() {
                               {!isDashboard ? (
                                 <input
                                   type="checkbox"
-                                  checked={editingRole ? getPermissionValue(module, 'delete', editingRole.permissions) : getPermissionValue(module, 'delete', newRolePermissions)}
-                                  onChange={(e) => handlePermissionChange(module, 'delete', e.target.checked)}
+                                  checked={editingRole ? getPermissionValue(modName, 'delete', editingRole.permissions) : getPermissionValue(modName, 'delete', newRolePermissions)}
+                                  onChange={(e) => handlePermissionChange(modName, 'delete', e.target.checked)}
                                   className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                                 />
                               ) : (
@@ -1045,17 +1046,19 @@ export default function RolePermission() {
                             <td className="px-4 py-3 text-center border border-gray-300">
                               {!isDashboard && hasSpecialActions ? (
                                 <div className="space-y-2">
-                                  {moduleActions.filter(action => !['view', 'create', 'edit', 'delete'].includes(action)).map((action) => (
-                                    <div key={action} className="flex items-center justify-center">
-                                      <input
-                                        type="checkbox"
-                                        checked={editingRole ? getPermissionValue(module, action, editingRole.permissions) : getPermissionValue(module, action, newRolePermissions)}
-                                        onChange={(e) => handlePermissionChange(module, action, e.target.checked)}
-                                        className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                                      />
-                                      <span className="text-xs ml-1 capitalize">{action}</span>
-                                    </div>
-                                  ))}
+                                  {moduleActs
+                                    .filter(a => !['view', 'create', 'edit', 'delete'].includes(a))
+                                    .map((a) => (
+                                      <div key={a} className="flex items-center justify-center">
+                                        <input
+                                          type="checkbox"
+                                          checked={editingRole ? getPermissionValue(modName, a, editingRole.permissions) : getPermissionValue(modName, a, newRolePermissions)}
+                                          onChange={(e) => handlePermissionChange(modName, a, e.target.checked)}
+                                          className="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                                        />
+                                        <span className="text-xs ml-1 capitalize">{a}</span>
+                                      </div>
+                                    ))}
                                 </div>
                               ) : (
                                 <span className="text-gray-400">-</span>
@@ -1110,7 +1113,7 @@ export default function RolePermission() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure you want to delete this role?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the role "{roleToDelete?.roleName}" from your system.
+              This action cannot be undone. This will permanently delete the role &quot;{roleToDelete?.roleName}&quot; from your system.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1123,4 +1126,4 @@ export default function RolePermission() {
       </AlertDialog>
     </div>
   );
-};
+}

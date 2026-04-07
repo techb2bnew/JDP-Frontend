@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useState } from 'react'
 
 interface ImageWithFallbackProps extends React.ImgHTMLAttributes<HTMLImageElement> {
@@ -27,12 +28,16 @@ export function ImageWithFallback({
   }
 
   return (
-    <img
+     <Image
       {...props}
       src={imgSrc}
       alt={alt}
       className={className}
       onError={handleError}
-    />
+      width={1000}
+      height={500}
+    
+              />
+  
   )
 }

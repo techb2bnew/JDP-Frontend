@@ -25,6 +25,7 @@ import { StaffManagementPage } from './components/StaffManagementPage'
 import { StaffProfilePage } from './components/profiles/StaffProfilePage'
 import { LeadLabourProfilePage } from './components/profiles/LeadLabourProfilePage'
 import { LabourProfilePage } from './components/profiles/LabourProfilePage'
+import { TimesheetsPage } from './components/TimesheetsPage'
 import { ActionButtonsDemo } from './components/ActionButtonsDemo'
 import { useAppDispatch } from './redux/hooks'
 import { logout } from './redux/slices/authSlice'
@@ -88,6 +89,8 @@ function AppContent() {
         return <JobManagementPage />;
       case "live-tracking":
         return <LiveTrackingPage />;
+      case "timesheets":
+        return <TimesheetsPage />;
       case "staff-management":
         return (
           <StaffManagementPage

@@ -23,12 +23,15 @@ export interface Product {
   jdpSku?: string
   jdp_price?: number
   markup_amount?: number
+  markup_percentage?: number
   createdDate: string
   lastUpdated: string
   minStockLevel?: number
   maxStockLevel?: number
   supplier?: string
   weight?: number
+  estimated_price:number
+  unit_cost:number
   dimensions?: {
     length: number
     width: number

@@ -8,6 +8,7 @@ import { useAppDispatch } from '../../redux/hooks'
 import { loginSuccess } from '../../redux/slices/authSlice'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff } from 'lucide-react'
+import Image from 'next/image'
 
 interface LoginScreenProps {
   onStepChange: (step: AuthStep, email?: string) => void
@@ -31,26 +32,26 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {}
-    
+
     if (!email.trim()) {
       newErrors.email = 'Email is required'
     } else if (!/\S+@\S+\.\S+/.test(email)) {
       newErrors.email = 'Please enter valid email'
     }
-    
+
     if (!password.trim()) {
       newErrors.password = 'Password is required'
     }
-    
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
-   const handleSignIn = async (): Promise<void> => {
+  const handleSignIn = async (): Promise<void> => {
     if (!validateForm()) return
-    
+
     setIsLoading(true)
-    
+
     try {
       // Call external API directly
       const response = await fetch(`${apiBaseUrl}/auth/login`, {
@@ -64,7 +65,7 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
       if (response.ok) {
         const data = await response.json()
         console.log('Login API response:', data)
-        
+
         if (data.success && data.data?.token) {
           // Store authentication data in localStorage
           const authData = {
@@ -75,25 +76,25 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
             token: data.data.token,
             expires: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
           }
-          
+
           localStorage.setItem('jdp_auth', JSON.stringify(authData))
-          
+
           // Set HTTP-only cookie for authentication
           document.cookie = `auth-token=${data.data.token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
           document.cookie = `jdp_auth=${JSON.stringify(authData)}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
-          
+
           // Dispatch custom event to notify PermissionContext to refresh
           window.dispatchEvent(new CustomEvent('userLoggedIn'));
-          
+
           // Dispatch login success action
           dispatch(loginSuccess({
             user: authData.user,
             token: data.data.token
           }))
-          
+
           toast.success('Logged in successfully')
           onAuthSuccess(true)
-          
+
           // Redirect based on user role
           // console.log('=== LOGIN DEBUG ===');
           // console.log('Full API response:', data);
@@ -102,7 +103,7 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
           // console.log('Role comparison:', data.data.user.role === 'Super Admin');
           // console.log('Role type:', typeof data.data.user.role);
           // console.log('Role length:', data.data.user.role.length); 
-          
+
           if (data.data.user.role === 'Super Admin') {
             console.log('✅ Redirecting Super Admin to /superDashboard');
             router.push('/superDashboard')
@@ -126,11 +127,14 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
   }
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    setEmail(e.target.value)
-    if (errors.email) {
-      setErrors(prev => ({ ...prev, email: undefined }))
-    }
+  const lowercaseEmail = e.target.value.toLowerCase();
+  setEmail(lowercaseEmail);
+  
+  if (errors.email) {
+    setErrors(prev => ({ ...prev, email: undefined }));
   }
+};
+
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     setPassword(e.target.value)
@@ -153,21 +157,25 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
       <div className="absolute left-[-10px] top-[-318px] w-[561px] h-[561px]">
         <div className="w-full h-full rounded-full bg-[#00A1FF] opacity-10" />
       </div>
-      
+
       {/* Dark left section */}
       <div className="absolute bg-[#111c2d] h-full w-[50%] left-0 top-0" />
-      
+
       {/* White right section */}
       <div className="absolute bg-white h-full w-[50%] right-0 top-0" />
-      
+
       {/* Left content */}
       <div className="absolute left-[72px] top-1/2 transform -translate-y-1/2">
         <div className="mb-8">
-          <img 
-            src="/assets/logos/logo-jdp.png" 
-            alt="JDP Logo" 
+          <Image
+            src="/assets/logos/logo-jdp.png"
+            alt="JDP Logo"
             className="w-[168px] h-[63px] object-contain opacity-99"
+            width={168}
+            height={63}
+
           />
+
         </div>
         <div className="text-white">
           <h1 className="text-[32px] font-extrabold mb-4">Welcome to JDP</h1>
@@ -179,7 +187,7 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
           </p>
         </div>
       </div>
-      
+
       {/* Right content */}
       <div className="absolute right-[150px] top-1/2 transform -translate-y-1/2 w-[507px]">
         <div className="mb-8">
@@ -189,7 +197,7 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
             your registered email address and secure password now.
           </p>
         </div>
-        
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Email Field */}
           <div>
@@ -222,20 +230,19 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
                 value={email}
                 onChange={handleEmailChange}
                 placeholder="Enter your email/ phone number"
-                className={`pl-12 h-[50px] rounded-full border ${
-                  errors.email 
-                    ? 'border-[#e02424] bg-[#fff3f3] text-[#e02424]' 
-                    : email 
-                    ? 'border-[#00a1ff] bg-white' 
-                    : 'border-[rgba(17,24,39,0.2)]'
-                }`}
+                className={`pl-12 h-[50px] rounded-full border ${errors.email
+                    ? 'border-[#e02424] bg-[#fff3f3] text-[#e02424]'
+                    : email
+                      ? 'border-[#00a1ff] bg-white'
+                      : 'border-[rgba(17,24,39,0.2)]'
+                  }`}
               />
             </div>
             {errors.email && (
               <p className="text-[#e02424] text-[14px] mt-1">{errors.email}</p>
             )}
           </div>
-          
+
           {/* Password Field */}
           <div>
             <label className="text-[18px] font-medium text-gray-900 block mb-2">
@@ -267,13 +274,12 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
                 value={password}
                 onChange={handlePasswordChange}
                 placeholder="Enter your password"
-                className={`pl-12 pr-12 h-[50px] rounded-full border ${
-                  errors.password 
-                    ? 'border-[#e02424] bg-[#fff3f3] text-[#e02424]' 
-                    : password 
-                    ? 'border-[#00a1ff] bg-white' 
-                    : 'border-[rgba(17,24,39,0.2)]'
-                }`}
+                className={`pl-12 pr-12 h-[50px] rounded-full border ${errors.password
+                    ? 'border-[#e02424] bg-[#fff3f3] text-[#e02424]'
+                    : password
+                      ? 'border-[#00a1ff] bg-white'
+                      : 'border-[rgba(17,24,39,0.2)]'
+                  }`}
               />
               <button
                 type="button"
@@ -291,7 +297,7 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
               <p className="text-[#e02424] text-[14px] mt-1">{errors.password}</p>
             )}
           </div>
-          
+
           {/* Remember & Forgot */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -306,7 +312,7 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
               Forgot Password?
             </button>
           </div>
-          
+
           {/* Sign In Button */}
           <Button
             type="submit"
@@ -315,7 +321,7 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
           >
             {isLoading ? 'Signing in...' : 'Sign in'}
           </Button>
-          
+
           {/* Create Account Link */}
           {/* <div className="text-center">
             <p className="text-[14px] text-gray-900">

@@ -57,7 +57,7 @@ export const invoicesData: Invoice[] = [
     invoiceNumber: 'INV-2025-001',
     customerId: 'CUST-001',
     customerName: 'ABC Corporation',
-    jobId: 'PH209_US_JDP',
+    jobId: 2,
     jobTitle: '1160 N Willow Dr Near Res.',
     type: 'final',
     issueDate: '2025-01-23',
@@ -69,7 +69,8 @@ export const invoicesData: Invoice[] = [
         description: 'Main Electrical Panel 200A',
         quantity: 1,
         unitPrice: 450,
-        total: 450
+        total_cost:23 ,
+        productId:2
       },
       {
         id: 'ITEM-002',
@@ -77,7 +78,8 @@ export const invoicesData: Invoice[] = [
         description: 'Circuit Breakers 20A (10 Pack)',
         quantity: 1,
         unitPrice: 180,
-        total: 180
+        total_cost:23 ,
+        productId:2
       }
     ],
     labor: [
@@ -86,7 +88,7 @@ export const invoicesData: Invoice[] = [
         laborName: 'David Wilson',
         hours: 12,
         hourlyRate: 35,
-        total: 420,
+        total_cost: 420,
         description: 'Panel installation and testing'
       },
       {
@@ -94,7 +96,7 @@ export const invoicesData: Invoice[] = [
         laborName: 'Tom Anderson',
         hours: 10,
         hourlyRate: 32,
-        total: 320,
+        total_cost: 320,
         description: 'Wiring assistance and cleanup'
       }
     ],
@@ -116,7 +118,7 @@ export const invoicesData: Invoice[] = [
     invoiceNumber: 'INV-2025-002',
     customerId: 'CUST-002',
     customerName: 'XYZ Company',
-    jobId: 'PH210_US_JDP',
+    jobId: 3,
     jobTitle: '11613 W Shores RD NW Jursa Res.',
     type: 'progressive',
     issueDate: '2025-01-25',
@@ -128,7 +130,8 @@ export const invoicesData: Invoice[] = [
         description: 'Advanced Main Unit 5000W',
         quantity: 1,
         unitPrice: 2200,
-        total: 2200
+        total_cost: 2200,
+        productId:34
       }
     ],
     labor: [
@@ -137,7 +140,7 @@ export const invoicesData: Invoice[] = [
         laborName: 'Alex Turner',
         hours: 8,
         hourlyRate: 38,
-        total: 304,
+        total_cost: 304,
         description: 'Initial installation setup'
       }
     ],
@@ -158,9 +161,9 @@ export const invoicesData: Invoice[] = [
     invoiceNumber: 'INV-2025-003',
     customerId: 'CUST-003',
     customerName: 'DEF Industries',
-    jobId: 'PH211_US_JDP',
+    jobId: 4,
     jobTitle: '4211 Aiden Dr Frakes Res.',
-    type: 'proposed',
+    type: 'proposal_invoice',
     issueDate: '2025-01-20',
     dueDate: '2025-02-05',
     items: [
@@ -170,7 +173,8 @@ export const invoicesData: Invoice[] = [
         description: 'Project Estimation - Complete Installation',
         quantity: 1,
         unitPrice: 5000,
-        total: 5000
+        total_cost: 5000,
+        productId:45
       }
     ],
     labor: [],

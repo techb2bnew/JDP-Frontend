@@ -106,7 +106,7 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
   };
 
   const hasAnyPermission = (module: string, actions: string[]): boolean => {
-    console.log("modulemodulemodule",module,actions);
+    // console.log("modulemodulemodule",module,actions);
     
     return actions.some(action => hasPermission(module, action));
   };

@@ -4,6 +4,7 @@ import { AuthStep } from '../AuthFlow'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { apiClient } from '../../utils/api'
+import Image from 'next/image'
 // import img4541 from "figma:asset/a3e40afe539df138ee43712dc0bf65b14d1b7224.png"
 
 interface OTPScreenProps {
@@ -22,11 +23,11 @@ export function OTPScreen({ email, role, onStepChange, onAuthSuccess, isForgotPa
 
   const handleOtpChange = (index: number, value: string) => {
     if (value.length > 1) return
-    
+
     const newOtp = [...otp]
     newOtp[index] = value
     setOtp(newOtp)
-    
+
     // Auto-focus next input
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus()
@@ -42,9 +43,9 @@ export function OTPScreen({ email, role, onStepChange, onAuthSuccess, isForgotPa
   const handleSubmit = async () => {
     const otpString = otp.join('')
     if (otpString.length !== 6) return
-    
+
     setIsLoading(true)
-    
+
     try {
       if (isForgotPassword) {
         // Forgot password flow - verify OTP
@@ -76,18 +77,18 @@ export function OTPScreen({ email, role, onStepChange, onAuthSuccess, isForgotPa
           role || 'Staff', // Default to Staff if no role provided
           otpString
         )
-        
+
         toast.success(data.message || 'Registration successful!')
-        
+
         // For signup flow, mark as new user
         onAuthSuccess(true)
-        
+
         // Redirect to login page after successful registration
         setTimeout(() => {
           router.push('/login')
         }, 1500)
       }
-      
+
     } catch (error) {
       console.error('OTP verification error:', error)
       toast.error(error instanceof Error ? error.message : 'OTP verification failed. Please try again.')
@@ -131,20 +132,23 @@ export function OTPScreen({ email, role, onStepChange, onAuthSuccess, isForgotPa
       <div className="absolute left-[-10px] top-[-318px] w-[561px] h-[561px]">
         <div className="w-full h-full rounded-full bg-[#00A1FF] opacity-10" />
       </div>
-      
+
       {/* Dark left section */}
       <div className="absolute bg-[#111c2d] h-full w-[50%] left-0 top-0" />
-      
+
       {/* White right section */}
       <div className="absolute bg-white h-full w-[50%] right-0 top-0" />
-      
+
       {/* Left content */}
       <div className="absolute left-[72px] top-1/2 transform -translate-y-1/2">
         <div className="mb-8">
-          <img 
-            src="/assets/logos/logo-jdp.png" 
-            alt="JDP Logo" 
+          <Image
+            src="/assets/logos/logo-jdp.png"
+            alt="JDP Logo"
             className="w-[168px] h-[63px] object-contain opacity-99"
+            width={168}
+            height={63}
+
           />
         </div>
         <div className="text-white">
@@ -157,7 +161,7 @@ export function OTPScreen({ email, role, onStepChange, onAuthSuccess, isForgotPa
           </p>
         </div>
       </div>
-      
+
       {/* Right content */}
       <div className="absolute right-[150px] top-1/2 transform -translate-y-1/2 w-[507px]">
         <div className="mb-8">
@@ -172,7 +176,7 @@ export function OTPScreen({ email, role, onStepChange, onAuthSuccess, isForgotPa
             </p>
           )}
         </div>
-        
+
         <div className="space-y-6">
           {/* OTP Input Fields */}
           <div className="flex gap-4 justify-center">
@@ -186,14 +190,13 @@ export function OTPScreen({ email, role, onStepChange, onAuthSuccess, isForgotPa
                 value={digit}
                 onChange={(e) => handleOtpChange(index, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(index, e)}
-                className={`w-16 h-[60px] text-center text-[32px] font-medium border rounded-[10px] ${
-                  digit ? 'border-gray-900' : 'border-[rgba(17,24,39,0.2)]'
-                } focus:outline-none focus:border-[#00a1ff]`}
+                className={`w-16 h-[60px] text-center text-[32px] font-medium border rounded-[10px] ${digit ? 'border-gray-900' : 'border-[rgba(17,24,39,0.2)]'
+                  } focus:outline-none focus:border-[#00a1ff]`}
                 maxLength={1}
               />
             ))}
           </div>
-          
+
           {/* Resend Link */}
           <div className="text-center">
             <p className="text-[14px] text-gray-900">
@@ -207,7 +210,7 @@ export function OTPScreen({ email, role, onStepChange, onAuthSuccess, isForgotPa
               </button>
             </p>
           </div>
-          
+
           {/* Submit Button */}
           <Button
             onClick={handleSubmit}
@@ -216,7 +219,7 @@ export function OTPScreen({ email, role, onStepChange, onAuthSuccess, isForgotPa
           >
             {isLoading ? 'Verifying...' : 'Submit'}
           </Button>
-          
+
           {/* Back Button */}
           <Button
             onClick={() => onStepChange('forgot-password')}

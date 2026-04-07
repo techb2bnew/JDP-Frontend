@@ -2,7 +2,7 @@ name: Deploy Application
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "preet" ]
 
 jobs:
   deploy:
@@ -21,7 +21,6 @@ jobs:
 
       - name: Install dependencies (bypass postinstall)
         run: |
-          # Environment variable use karke postinstall script disable karo
           npm ci --ignore-scripts
           npm install --save-dev @types/node
           echo "Dependencies installed without postinstall scripts"
@@ -37,7 +36,6 @@ jobs:
 
       - name: Prepare deployment files
         run: |
-          # Clean up unnecessary files before deployment
           rm -rf .git .next/cache node_modules
           echo "Deployment files ready"
 
@@ -48,9 +46,8 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY_LIVE }}
           script: |
-            # Correct path use karo
-            sudo chown -R ${{ secrets.SERVER_USER }}:${{ secrets.SERVER_USER }} /home/ec2-user/JDP-FRONTEND/
-            sudo chmod -R 755 /home/ec2-user/JDP-FRONTEND/
+            sudo chown -R ${{ secrets.SERVER_USER }}:${{ secrets.SERVER_USER }} /home/ec2-user/jdp-stagging/
+            sudo chmod -R 755 /home/ec2-user/jdp-stagging/
 
       - name: Deploy via Rsync 
         uses: easingthemes/ssh-deploy@main
@@ -58,22 +55,30 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY_LIVE }}
           REMOTE_HOST: ${{ secrets.SERVER_IP }}
           REMOTE_USER: ${{ secrets.SERVER_USER }}
-          TARGET: /home/ec2-user/JDP-FRONTEND/
+          TARGET: /home/ec2-user/jdp-stagging/
           ARGS: "-rlgoDzvc --chmod=Du=rwx,Dg=rx,Do=rx,Fu=rw,Fg=r,Fo=r --no-perms --no-owner --no-group --exclude=.next/cache --exclude=node_modules --exclude=.git --exclude=src"
 
       - name: Skip server dependencies (already built on GitHub Actions)
         run: |
           echo "Skipping server dependencies installation - already built on GitHub Actions"
-          echo "Built files will be deployed directly"
 
-      - name: Restart application
+      - name: Restart application (safe reload)
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY_LIVE }}
           script: |
-            cd /home/ec2-user/JDP-FRONTEND/
-            # PM2 se restart karo
-            pm2 reload jdp-frontend || pm2 start "npm run start" --name jdp-frontend
+            cd /home/ec2-user/jdp-stagging/
+
+            # Check if PM2 process exists
+            if pm2 list | grep -q "jdp-stagging"; then
+              echo "Process already exists — restarting..."
+              pm2 restart jdp-stagging
+            else
+              echo "Starting new PM2 process..."
+              PORT=3001 pm2 start "npx next start" --name jdp-stagging --cwd /home/ec2-user/jdp-stagging/
+            fi
+
             pm2 save
+            pm2 status

@@ -96,21 +96,23 @@ const positions = ['Electrical Engineer', 'Senior Technician', 'Technician', 'Pr
 interface StaffPageProps {
   onViewDetails?: (id: string) => void
 }
+type FilterStatus = 'all' | 'active' | 'inactive';
 
 export function StaffPage({ onViewDetails }: StaffPageProps) {
   const { hasPermission, isLoading: permissionsLoading, permissions } = usePermissions()
-  const [staff, setStaff] = useState<Staff[]>(initialStaffData)
+  const [staff, setStaff] = useState<Staff[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [isStaffDialogOpen, setIsStaffDialogOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null)
   const [filterDepartment, setFilterDepartment] = useState<string>('all')
-  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null)
   const [showDetails, setShowDetails] = useState(false)
   const itemsPerPage = 10
   const [totalStaff, setTotalStaff] = useState(0) 
+  const [filteredStaff, setFilteredStaff] = useState<any[]>([]);
 
   // Check if user is admin (has no specific permissions but should see all actions)
   const isAdmin = !permissionsLoading && permissions.length === 0
@@ -338,6 +340,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
         }));
         
         setStaff(transformedStaff);
+        setFilteredStaff(transformedStaff);
         setTotalStaff(responseData.data.pagination.totalItems || transformedStaff.length);
         
         // Extract unique departments and positions from the staff data
@@ -405,17 +408,17 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
     }
   }
 
-  const filteredStaff = staff.filter(member => {
-    const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         member.phone.includes(searchTerm) ||
-                         member.id.includes(searchTerm)
+  // const filteredStaff = staff.filter(member => {
+  //   const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //                        member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //                        member.phone.includes(searchTerm) ||
+  //                        member.id.includes(searchTerm)
     
-    const matchesDepartment = filterDepartment === 'all' || member.department === filterDepartment
-    const matchesStatus = filterStatus === 'all' || member.status === filterStatus
+  //   const matchesDepartment = filterDepartment === 'all' || member.department === filterDepartment
+  //   const matchesStatus = filterStatus === 'all' || member.status === filterStatus
     
-    return matchesSearch && matchesDepartment && matchesStatus
-  })
+  //   return matchesSearch && matchesDepartment && matchesStatus
+  // })
 
   
   const paginatedStaff = filteredStaff
@@ -759,6 +762,108 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
   document.body.removeChild(link);
 };
 
+
+
+const fetchBySearchStaff = async () => {
+  if (!searchTerm.trim()) return;
+
+  setIsLoadingStaff(true);
+
+  try {
+    const response = await apiClient.searchStaffByQuery(searchTerm.trim(), 1, 10);
+    const staffData = response.data;
+    const staffList = staffData?.staff || [];
+
+    const transformedStaff = staffList.map((staff: any) => ({
+      id: staff.id,
+      userId: staff.user_id,
+      name: staff.users?.full_name || 'N/A',
+      email: staff.users?.email || 'N/A',
+      phone: staff.users?.phone || 'N/A',
+      role: staff.users?.role || 'N/A',
+      status: staff.users?.status || 'N/A',
+      position: staff.position || 'N/A',
+      department: staff.department || 'N/A',
+      dateOfJoining: staff.date_of_joining || 'N/A',
+      dob: staff.dob || 'N/A',
+      address: staff.address || 'N/A',
+    }));
+
+    setFilteredStaff(transformedStaff); 
+    setTotalStaff(transformedStaff.length); 
+  } catch (error) {
+    console.error('Staff search error:', error);
+    setFilteredStaff([]);
+  } finally {
+    setIsLoadingStaff(false);
+  }
+};
+useEffect(() => {
+  const debounceTimeout = setTimeout(() => {
+    if (!searchTerm.trim()) {
+      fetchStaffData(currentPage, itemsPerPage);
+    } else {
+      fetchBySearchStaff();
+    }
+  }, 500);
+
+  return () => clearTimeout(debounceTimeout);
+}, [searchTerm, filterStatus,currentPage, itemsPerPage]);
+
+useEffect(() => {
+  const fetchStaffByStatus = async () => {
+    setIsLoadingStaff(true);
+
+    try {
+      let res
+      if (!filterStatus || filterStatus === 'all') {
+        res = fetchStaffData(currentPage, itemsPerPage); 
+      } else {
+        res = await apiClient.searchStaffByStatus(filterStatus, 1, 10);
+      }
+
+      const staffList = res.data?.staff || [];
+      console.log(staffList,"stff")
+
+      const transformedStaff = staffList.map((staff: any) => ({
+        id: staff.id,
+        userId: staff.user_id,
+        name: staff.users?.full_name || 'N/A',
+        email: staff.users?.email || 'N/A',
+        phone: staff.users?.phone || 'N/A',
+        role: staff.users?.role || 'N/A',
+        status: staff.users?.status || 'N/A',
+        position: staff.position || 'N/A',
+        department: staff.department || 'N/A',
+        dateOfJoining: staff.date_of_joining || 'N/A',
+        dob: staff.dob || 'N/A',
+        address: staff.address || 'N/A',
+      }));
+      console.log(transformedStaff,"tarnss")
+
+      setStaff(transformedStaff);
+      setTotalStaff(transformedStaff.length);
+
+    } catch (err) {
+      console.error('Staff filter error:', err);
+      setStaff([]);
+      setTotalStaff(0);
+    } finally {
+      setIsLoadingStaff(false);
+    }
+  };
+
+  fetchStaffByStatus();
+}, [filterStatus]);
+
+
+
+
+
+
+
+
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -800,7 +905,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
                 />
               </div>
               
-              <Select value={filterDepartment} onValueChange={setFilterDepartment}>
+              {/* <Select value={filterDepartment} onValueChange={setFilterDepartment}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="Filter by Department" />
                 </SelectTrigger>
@@ -810,9 +915,9 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
                     <SelectItem key={dept} value={dept}>{dept}</SelectItem>
                   ))}
                 </SelectContent>
-              </Select>
+              </Select> */}
 
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <Select value={filterStatus} onValueChange={(value: FilterStatus) =>setFilterStatus(value)}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="Filter by Status" />
                 </SelectTrigger>
@@ -913,7 +1018,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       </Card>
 
       {/* Pagination */}
-      {totalPages > 1 && (
+      {totalPages > 0 && (
         <div className="flex items-center justify-center gap-2">
           <Button
             variant="outline"
