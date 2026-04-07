@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { CSS } from "@dnd-kit/utilities";
 import { useSortable } from "@dnd-kit/sortable";
 import { GripVertical, Plus, Search, Trash2 } from "lucide-react";
@@ -15,6 +15,7 @@ type ProductType = {
   jdpPrice?: number;
   estimatedPrice?: number;
   rate?: number;
+  supplierId?: number | string;
 };
 
 type LineItemType = {
@@ -44,6 +45,7 @@ interface SortableLineItemRowProps {
   onSelectProduct: (rowId: string, product: ProductType) => void;
   onAddCustomFromSearch?: (rowId: string, value: string) => void;
   getFilteredProducts: (query: string) => ProductType[];
+  isJobDetail?:boolean
 }
 
 const SortableLineItemRow = ({
@@ -55,6 +57,7 @@ const SortableLineItemRow = ({
   onSelectProduct,
   onAddCustomFromSearch,
   getFilteredProducts,
+  isJobDetail=false
 }: SortableLineItemRowProps) => {
   const {
     setNodeRef,
@@ -66,8 +69,25 @@ const SortableLineItemRow = ({
   } = useSortable({
     id: lineItem.id,
   });
-  console.log(lineItem,"lineItem");
-  
+
+  const containerRef = useRef<HTMLTableCellElement | null>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!lineItem.showSearchResults) return;
+      if (!containerRef.current) return;
+
+      const target = event.target as Node;
+      if (!containerRef.current.contains(target)) {
+        onUpdateRow(lineItem.id, "showSearchResults", false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, [lineItem.id, lineItem.showSearchResults, onUpdateRow]);
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -77,7 +97,11 @@ const SortableLineItemRow = ({
     opacity: isDragging ? 0.12 : 1,
   };
 
-  const filteredProducts = getFilteredProducts(lineItem.searchQuery || "");
+  const filteredProducts = useMemo(
+    () => getFilteredProducts(lineItem.searchQuery || ""),
+    [getFilteredProducts, lineItem.searchQuery],
+  );
+
   return (
     <tr
       ref={setNodeRef}
@@ -88,7 +112,6 @@ const SortableLineItemRow = ({
           : "hover:bg-gray-50 transition-colors"
       }`}
     >
-    {/* <tr ref={setNodeRef} style={style} className="overflow-visible"> */}
       <td className="border border-gray-300 p-1 align-top h-[92px] max-h-[92]">
         <div className="flex items-center gap-2 h-[100%]">
           <button
@@ -112,7 +135,10 @@ const SortableLineItemRow = ({
         </div>
       </td>
 
-      <td className="border border-gray-300 p-1 relative h-[92px] overflow-visible  max-h-[92]">
+      <td
+        ref={containerRef}
+        className="w-[400px] border border-gray-300 p-1 relative h-[92px] overflow-visible max-h-[92]"
+      >
         {lineItem.isCustomProduct ? (
           <Input
             value={lineItem.item}
@@ -130,51 +156,97 @@ const SortableLineItemRow = ({
                 onSearchChange(lineItem.id, value);
               }}
               onFocus={() => {
+                onUpdateRow(lineItem.id, "showSearchResults", true);
                 if (lineItem.item) {
                   onSearchFocus?.(lineItem.id, lineItem.item);
                 }
               }}
-              className="border-0 p-2 pr-8"
-              placeholder="Search or enter product name"
+              className="border-0 p-2 pr-10 h-11 text-[14px]"
+              placeholder="Search by name, SKU, description, supplier..."
             />
-            <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           </div>
         )}
 
         {!lineItem.isCustomProduct &&
           lineItem.showSearchResults &&
           lineItem.searchQuery && (
-            <div className=" z-[999999] absolute left-0 top-full mt-1 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto">
+            <div
+              className={`
+                absolute left-0 top-full mt-2
+                z-[999999]
+                ${isJobDetail ? "w-[320px]" : ""}
+                rounded-xl border border-slate-200 bg-white
+                shadow-2xl max-h-[320px] overflow-y-auto p-2
+                opacity-1000000
+              `}
+              style={{
+                opacity: 999999,
+                transform: "translateZ(0)",
+                willChange: "transform",
+              }}
+            >
               {filteredProducts.length > 0 ? (
-                filteredProducts.map((product) => (
-                  <div
-                    key={product.id}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      onSelectProduct(lineItem.id, product);
-                    }}
-                    className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100 transition-colors"
-                  >
-                    <div className="font-medium text-sm mb-1">
-                      {product.name}
-                    </div>
+                <div className="space-y-2">
+                  {filteredProducts.map((product) => (
+                    <div
+                      key={product.id}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        onSelectProduct(lineItem.id, product);
+                      }}
+                      className="rounded-lg border border-slate-100 px-4 py-3 hover:bg-slate-50 cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-[14px] text-slate-900 mb-1">
+                            {product.name}
+                          </div>
 
-                    <div className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
-                      {product.description}
-                    </div>
+                          {product.description && (
+                            <div className="text-[12px] text-slate-500 leading-5 line-clamp-2">
+                              {product.description}
+                            </div>
+                          )}
 
-                    <div className="text-xs text-primary mt-2">
-                      {product.jdpSKU} • $
-                      {(product.jdpPrice || product.rate || 0).toFixed(2)}
-                      {!!product.estimatedPrice &&
-                        product.estimatedPrice > 0 &&
-                        ` • Est: $${product.estimatedPrice.toFixed(2)}`}
+                          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px]">
+                            {product.jdpSKU && (
+                              <span className="text-slate-600">
+                                <span className="font-medium text-slate-700">
+                                  SKU:
+                                </span>{" "}
+                                {product.jdpSKU}
+                              </span>
+                            )}
+
+                            <span className="text-slate-600">
+                              <span className="font-medium text-slate-700">
+                                Rate:
+                              </span>{" "}
+                              $
+                              {(product.jdpPrice || product.rate || 0).toFixed(
+                                2,
+                              )}
+                            </span>
+
+                            {!!product.estimatedPrice &&
+                              product.estimatedPrice > 0 && (
+                                <span className="text-slate-600">
+                                  <span className="font-medium text-slate-700">
+                                    Est:
+                                  </span>{" "}
+                                  ${product.estimatedPrice.toFixed(2)}
+                                </span>
+                              )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               ) : (
                 <div className="p-3">
-                  <div className="text-sm text-muted-foreground mb-2">
+                  <div className="text-sm text-muted-foreground mb-3">
                     No products found
                   </div>
 
@@ -188,9 +260,9 @@ const SortableLineItemRow = ({
                         lineItem.searchQuery || "",
                       );
                     }}
-                    className="w-full"
+                    className="w-full h-10"
                   >
-                    <Plus className="h-3 w-3 mr-1" />
+                    <Plus className="h-4 w-4 mr-2" />
                     Add "{lineItem.searchQuery}"
                   </Button>
                 </div>
@@ -199,15 +271,7 @@ const SortableLineItemRow = ({
           )}
       </td>
 
-      <td className="border border-gray-300 p-1  max-h-[92]">
-        {/* <Textarea
-          value={lineItem.description}
-          onChange={(e) =>
-            onUpdateRow(lineItem.id, "description", e.target.value)
-          }
-          className="border-0 p-2 min-h-[80px] h-[80px]  max-h-[80]"
-          placeholder="Enter product description"
-        /> */}
+      <td className="border border-gray-300 p-1 max-h-[92]">
         <Textarea
           value={lineItem.description}
           onChange={(e) =>
@@ -218,19 +282,19 @@ const SortableLineItemRow = ({
         />
       </td>
 
-      <td className="border border-gray-300 p-1 h-[92px]  max-h-[92]">
+      <td className="border border-gray-300 p-1 h-[92px] max-h-[92]">
         <Input
           type="number"
           value={lineItem.rate}
           onChange={(e) =>
             onUpdateRow(lineItem.id, "rate", parseFloat(e.target.value) || 0)
           }
-          className="text-right border-0 p-2  max-h-[92]"
+          className="text-right border-0 p-2 max-h-[92]"
           min="0"
         />
       </td>
 
-      <td className="border border-gray-300 p-1  max-h-[92]">
+      <td className="border border-gray-300 p-1 max-h-[92]">
         <Input
           type="number"
           value={lineItem.estimatedPrice}

@@ -846,8 +846,6 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
   const handleFinalApproval = async () => {
   const finalBlueSheet = editedBlueSheet || blueSheet;
   if (!finalBlueSheet) return;
- console.log(finalBlueSheet.material_entries,"finalBlueSheet.material_entries");
- return;
  
   try {
     setIsApproving(true);

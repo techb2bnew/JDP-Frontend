@@ -4,7 +4,7 @@ export const createRowId = () =>
 export const createHeaderKey = () =>
   `header_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-export const createHeaderRow = (selectedSupplierId: number, headerName = "Custom Header") => ({
+export const createHeaderRow = (selectedSupplierId: number, headerName = "") => ({
   id: createRowId(),
   type: "header",
   headerName,

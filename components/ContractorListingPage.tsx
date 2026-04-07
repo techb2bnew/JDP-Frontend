@@ -2799,6 +2799,8 @@ export function ContractorListingPage() {
         </div>
 
         {/* Contractor Listings */}
+          <div className="min-w-0 flex-1">
+          <div className="h-[calc(100vh-240px)] min-h-0">
            <CommonEntityListing
               data={filteredContractors}
               emptyText="No contractors found"
@@ -2858,6 +2860,8 @@ export function ContractorListingPage() {
                 </div>
               }
             />
+            </div>
+            </div>
 
 
       </div>

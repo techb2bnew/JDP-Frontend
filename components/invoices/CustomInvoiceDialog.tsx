@@ -574,36 +574,100 @@ console.log(totalAmount,"amounttt");
     });
   };
 
-  const selectProduct = (itemId: string, product: any) => {
-    hasUserTouchedLineItemsRef.current = true
-    setInlineInvoiceData(prev => ({
-      ...prev,
-      lineItems: prev.lineItems.map(item => {
-        if (item.id === itemId) {
-          const rate = product.jdpPrice || 0
-          const estimatedPrice = product.estimatedPrice || 0
-          // Use estimated price if available, otherwise use rate
-          const priceToUse = estimatedPrice > 0 ? estimatedPrice : rate
+  // const selectProduct = (itemId: string, product: any) => {
+  //   hasUserTouchedLineItemsRef.current = true
+  //   setInlineInvoiceData(prev => ({
+  //     ...prev,
+  //     lineItems: prev.lineItems.map(item => {
+  //       if (item.id === itemId) {
+  //         const rate = product.jdpPrice || 0
+  //         const estimatedPrice = product.estimatedPrice || 0
+  //         // Use estimated price if available, otherwise use rate
+  //         const priceToUse = estimatedPrice > 0 ? estimatedPrice : rate
 
-          return {
-            ...item,
-            item: product.name,
-            // Selected from search -> not custom and keep product reference
-            productId: product.id,
-            description: product.description || '',
-            rate: rate,
-            estimatedPrice: estimatedPrice,
-            total: (item.qty || 1) * priceToUse,
-            showSearchResults: false,
-            searchQuery: '',
-            supplierId: product.supplierId || selectedSupplierId || 1,
-            isCustomProduct: false,
-          }
-        }
-        return item
-      })
-    }))
+  //         return {
+  //           ...item,
+  //           item: product.name,
+  //           // Selected from search -> not custom and keep product reference
+  //           productId: product.id,
+  //           description: product.description || '',
+  //           rate: rate,
+  //           estimatedPrice: estimatedPrice,
+  //           total: (item.qty || 1) * priceToUse,
+  //           showSearchResults: false,
+  //           searchQuery: '',
+  //           supplierId: product.supplierId || selectedSupplierId || 1,
+  //           isCustomProduct: false,
+  //         }
+  //       }
+  //       return item
+  //     })
+  //   }))
+  // }
+
+  const selectProduct = (itemId: string, product: any) => {
+  hasUserTouchedLineItemsRef.current = true;
+
+  const currentItem = inlineInvoiceData.lineItems.find(
+    (item: any) => item.id === itemId,
+  );
+
+  if (!currentItem) return;
+
+  const currentHeaderKey = currentItem.parentHeaderKey || null;
+
+  // duplicate check only inside same header group and by jdpSKU
+  const isDuplicateInSameGroup = inlineInvoiceData.lineItems.some(
+      (item: any) => {
+        if (item.id === itemId) return false;
+        if (item.type === "header") return false;
+
+        return (
+          item.parentHeaderKey === currentHeaderKey &&
+          item.productId === product.id
+        );
+      },
+    );
+
+  if (isDuplicateInSameGroup) {
+    toast(
+      "This product is already added in this section. You can increase its quantity instead.",
+      {
+        duration: 3000,
+      },
+    );
+    return;
   }
+
+  setInlineInvoiceData((prev) => ({
+    ...prev,
+    lineItems: prev.lineItems.map((item: any) => {
+      if (item.id === itemId) {
+        const rate = Number(product.jdpPrice || 0);
+        const estimatedPrice = Number(
+          product.estimatedPrice || product.jdpPrice || 0,
+        );
+        const priceToUse = estimatedPrice > 0 ? estimatedPrice : rate;
+
+        return {
+          ...item,
+          item: product.name || "",
+          productId: product.id,
+          estimate_product_id: product.id,
+          description: product.description || "",
+          rate,
+          estimatedPrice,
+          total: (item.qty || 1) * priceToUse,
+          showSearchResults: false,
+          searchQuery: "",
+          supplierId: product.supplierId || selectedSupplierId || 1,
+          isCustomProduct: false,
+        };
+      }
+      return item;
+    }),
+  }));
+};
 
   const addCustomProduct = (itemId: string, productName: string) => {
     hasUserTouchedLineItemsRef.current = true

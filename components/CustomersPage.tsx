@@ -1345,65 +1345,69 @@ export function CustomersPage() {
 
         {/* Customer Listings */}
         <div className="min-w-0 flex-1">
-        <CommonEntityListing
-          data={paginatedCustomers}
-          isLoading={isLoadingCustomers}
-          emptyText="No customers found"
-          expandedParents={expandedCustomers}
-          expandedJobs={expandedJobs}
-          selectedParent={selectedCustomer}
-          selectedJob={selectedJob}
-          selectedSubJob={selectedSubJob}
-          onToggleParent={toggleCustomer}
-          onToggleJob={toggleJob}
-          onSelectParent={selectCustomer}
-          onSelectJob={(jobId, customerId) => selectJob(jobId, customerId)}
-          onSelectSubJob={(subJobId, jobId, customerId) =>
-            selectSubJob(subJobId, jobId, customerId)
-          }
-          onEditParent={(customer) => handleEditCustomer(customer)}
-          onDeleteParent={(customer) => handleDeleteCustomerClick(customer)}
-          hasEditPermission={hasPermission("customers", "edit")}
-          hasDeletePermission={hasPermission("customers", "delete")}
-          getParentName={(customer) => customer.customer_name || customer.name || ""}
-          getParentJobCount={(customer) =>
-            customer.total_jobs || customer.jobs?.length || 0
-          }
-          itemsPerPage={itemsPerPage}
-          getStatusIcon={getStatusIcon}
-          totalItems={totalCustomers}
-          footer={
-            <div className="mx-auto text-center">
-              <div className="mb-3 text-sm text-slate-600">
-                Showing {customersWithJobs.length} of {totalCustomers} Customer • Page{" "}
-                {currentPage} of {totalPages}
-              </div>
+          <div className="h-[calc(100vh-240px)] min-h-0">
+            <CommonEntityListing
+              data={paginatedCustomers}
+              isLoading={isLoadingCustomers}
+              emptyText="No customers found"
+              expandedParents={expandedCustomers}
+              expandedJobs={expandedJobs}
+              selectedParent={selectedCustomer}
+              selectedJob={selectedJob}
+              selectedSubJob={selectedSubJob}
+              onToggleParent={toggleCustomer}
+              onToggleJob={toggleJob}
+              onSelectParent={selectCustomer}
+              onSelectJob={(jobId, customerId) => selectJob(jobId, customerId)}
+              onSelectSubJob={(subJobId, jobId, customerId) =>
+                selectSubJob(subJobId, jobId, customerId)
+              }
+              onEditParent={(customer) => handleEditCustomer(customer)}
+              onDeleteParent={(customer) => handleDeleteCustomerClick(customer)}
+              hasEditPermission={hasPermission("customers", "edit")}
+              hasDeletePermission={hasPermission("customers", "delete")}
+              getParentName={(customer) =>
+                customer.customer_name || customer.name || ""
+              }
+              getParentJobCount={(customer) =>
+                customer.total_jobs || customer.jobs?.length || 0
+              }
+              itemsPerPage={itemsPerPage}
+              getStatusIcon={getStatusIcon}
+              totalItems={totalCustomers}
+              footer={
+                <div className="mx-auto text-center">
+                  <div className="mb-3 text-sm text-slate-600">
+                    Showing {customersWithJobs.length} of {totalCustomers}{" "}
+                    Customer • Page {currentPage} of {totalPages}
+                  </div>
 
-              <div className="flex items-center justify-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handlePreviousPage}
-                  disabled={currentPage === 1}
-                  className="h-9 w-9 rounded-full border-sky-100 bg-white p-0 text-sky-600 shadow-sm hover:bg-sky-50"
-                >
-                  <ChevronDown className="h-4 w-4 rotate-90" />
-                </Button>
+                  <div className="flex items-center justify-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePreviousPage}
+                      disabled={currentPage === 1}
+                      className="h-9 w-9 rounded-full border-sky-100 bg-white p-0 text-sky-600 shadow-sm hover:bg-sky-50"
+                    >
+                      <ChevronDown className="h-4 w-4 rotate-90" />
+                    </Button>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleNextPage}
-                  disabled={currentPage === totalPages}
-                  className="h-9 w-9 rounded-full border-sky-100 bg-white p-0 text-sky-600 shadow-sm hover:bg-sky-50"
-                >
-                  <ChevronDown className="h-4 w-4 -rotate-90" />
-                </Button>
-              </div>
-            </div>
-                }
-              />
-         </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleNextPage}
+                      disabled={currentPage === totalPages}
+                      className="h-9 w-9 rounded-full border-sky-100 bg-white p-0 text-sky-600 shadow-sm hover:bg-sky-50"
+                    >
+                      <ChevronDown className="h-4 w-4 -rotate-90" />
+                    </Button>
+                  </div>
+                </div>
+              }
+            />
+          </div>
+        </div>
       </div>
 
       {/* Right Content - Job Details */}
@@ -1709,18 +1713,19 @@ export function CustomersPage() {
                 <p className="text-lg text-gray-600">Customer Details</p>
               </div>
               <div className="flex items-center gap-2">
-              <Link href={'/jobs?create=true'}
-              className="flex items-center w-[120px] p-2 justify-center border rounded gap-2"
-            >
-              <Briefcase className="h-4 w-4" />
-              Add Jobs
-            </Link>
-              <Badge
-                variant="default"
-                className="p-2 bg-green-100 text-green-800 border-green-200"
-              >
-                Active
-              </Badge>
+                <Link
+                  href={"/jobs?create=true"}
+                  className="flex items-center w-[120px] p-2 justify-center border rounded gap-2"
+                >
+                  <Briefcase className="h-4 w-4" />
+                  Add Jobs
+                </Link>
+                <Badge
+                  variant="default"
+                  className="p-2 bg-green-100 text-green-800 border-green-200"
+                >
+                  Active
+                </Badge>
               </div>
             </div>
 
@@ -1864,86 +1869,87 @@ export function CustomersPage() {
                 </div>
               );
             })()}
-           {/* Jobs Table */}
-          <Card className="mt-8">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Briefcase className="h-5 w-5 text-primary" />
-                Jobs
-              </CardTitle>
-            </CardHeader>
+            {/* Jobs Table */}
+            <Card className="mt-8">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Briefcase className="h-5 w-5 text-primary" />
+                  Jobs
+                </CardTitle>
+              </CardHeader>
 
-            <CardContent>
-              {selectedCustomerData.jobs && selectedCustomerData.jobs.length > 0 ? (
-                <div className="overflow-x-auto rounded-lg border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Job Title</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Address</TableHead>
-                        <TableHead>Due Date</TableHead>
-                        <TableHead>Est. Cost</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-
-                    <TableBody>
-                      {selectedCustomerData.jobs.map((job: any) => (
-                        <TableRow key={job.id}>
-                          <TableCell className="font-medium">
-                            {job.job_title || "N/A"}
-                          </TableCell>
-
-                          <TableCell className="capitalize">
-                            {(job.job_type || "N/A").replace("_", " ")}
-                          </TableCell>
-
-                          <TableCell className="max-w-[240px] truncate">
-                            {job.address || "N/A"}
-                          </TableCell>
-
-                          <TableCell>
-                            {job.due_date ? formatDate(job.due_date) : "N/A"}
-                          </TableCell>
-
-                          <TableCell>
-                            {formatCurrency(job.estimated_cost || 0)}
-                          </TableCell>
-                           <TableCell>{getStatusBadge(job.status)}</TableCell>
-
-                          <TableCell className="text-right">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                selectJob(
-                                  job.id.toString(),
-                                  selectedCustomerData.id.toString(),
-                                )
-                              }
-                            >
-                              <Eye className="h-4 w-4 mr-1" />
-                              View
-                            </Button>
-                          </TableCell>
+              <CardContent>
+                {selectedCustomerData.jobs &&
+                selectedCustomerData.jobs.length > 0 ? (
+                  <div className="overflow-x-auto rounded-lg border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Job Title</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Address</TableHead>
+                          <TableHead>Due Date</TableHead>
+                          <TableHead>Est. Cost</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Action</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                <div className="rounded-lg border border-dashed p-8 text-center">
-                  <Briefcase className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500 font-medium">No jobs found</p>
-                  <p className="text-sm text-gray-400 mt-1">
-                    This customer does not have any jobs yet.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                      </TableHeader>
+
+                      <TableBody>
+                        {selectedCustomerData.jobs.map((job: any) => (
+                          <TableRow key={job.id}>
+                            <TableCell className="font-medium">
+                              {job.job_title || "N/A"}
+                            </TableCell>
+
+                            <TableCell className="capitalize">
+                              {(job.job_type || "N/A").replace("_", " ")}
+                            </TableCell>
+
+                            <TableCell className="max-w-[240px] truncate">
+                              {job.address || "N/A"}
+                            </TableCell>
+
+                            <TableCell>
+                              {job.due_date ? formatDate(job.due_date) : "N/A"}
+                            </TableCell>
+
+                            <TableCell>
+                              {formatCurrency(job.estimated_cost || 0)}
+                            </TableCell>
+                            <TableCell>{getStatusBadge(job.status)}</TableCell>
+
+                            <TableCell className="text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  selectJob(
+                                    job.id.toString(),
+                                    selectedCustomerData.id.toString(),
+                                  )
+                                }
+                              >
+                                <Eye className="h-4 w-4 mr-1" />
+                                View
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed p-8 text-center">
+                    <Briefcase className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500 font-medium">No jobs found</p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      This customer does not have any jobs yet.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         ) : (
           <div className="p-6">

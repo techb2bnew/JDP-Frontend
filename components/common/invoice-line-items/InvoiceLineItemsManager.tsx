@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import GroupedLineItemsTable from "./GroupedLineItemsTable";
 import { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
+import { toast } from "sonner";
 
 export type ProductType = {
   id: string | number;
@@ -33,6 +34,7 @@ export type LineItemType = {
   isCustomProduct?: boolean;
   productId?: string | number | null;
   estimate_product_id?: string | number | null;
+   jdpSKU?: string | null;
 };
 
 export type HeaderGroupType = {
@@ -47,6 +49,7 @@ interface InvoiceLineItemsManagerProps {
   fetchProducts: (query: string) => void;
   getFilteredProducts: (query: string) => ProductType[];
   onSelectProductData?: (rowId: string, product: ProductType) => void;
+  isJobDetail?:boolean
 }
 
 const createRowId = () =>
@@ -57,7 +60,7 @@ const createHeaderKey = () =>
 
 const createHeaderRow = (
   selectedSupplierId: number,
-  headerName = "Custom Header",
+  headerName = "",
 ): LineItemType => ({
   id: createRowId(),
   type: "header",
@@ -108,6 +111,7 @@ const createItemRow = ({
   isCustomProduct,
   productId: null,
   estimate_product_id: null,
+  jdpSKU: null,
 });
 
 const getHeaderGroups = (lineItems: LineItemType[] = []): HeaderGroupType[] => {
@@ -242,7 +246,6 @@ const resolveParentAfterDrop = (rows: LineItemType[], targetIndex: number) => {
   };
 };
 
-
 const handleItemDropReparent = (
   rows: LineItemType[],
   movedItemId: string,
@@ -253,8 +256,6 @@ const handleItemDropReparent = (
   if (movedIndex === -1) return rows;
 
   const [movedItem] = updatedRows.splice(movedIndex, 1);
-
-  // downward and upward both cases me same index use karo
   updatedRows.splice(newIndex, 0, movedItem);
 
   const parentMeta = resolveParentAfterDrop(updatedRows, newIndex);
@@ -267,6 +268,7 @@ const handleItemDropReparent = (
 
   return updatedRows;
 };
+
 const InvoiceLineItemsManager = ({
   lineItems,
   setLineItems,
@@ -274,9 +276,26 @@ const InvoiceLineItemsManager = ({
   fetchProducts,
   getFilteredProducts,
   onSelectProductData,
+  isJobDetail=false
 }: InvoiceLineItemsManagerProps) => {
   const [activeDraggedItem, setActiveDraggedItem] =
     useState<LineItemType | null>(null);
+  const [duplicateSectionHeaderKey, setDuplicateSectionHeaderKey] = useState<
+    string | null
+  >(null);
+
+  const highlightDuplicateSection = (headerKey: string | null) => {
+    if (!headerKey || headerKey === "standalone_header_key") return;
+
+    setDuplicateSectionHeaderKey(headerKey);
+
+    window.setTimeout(() => {
+      setDuplicateSectionHeaderKey((prev) =>
+        prev === headerKey ? null : prev,
+      );
+    }, 2500);
+  };
+
   const handleDragStart = (event: DragStartEvent) => {
     const activeId = String(event.active.id);
 
@@ -288,6 +307,7 @@ const InvoiceLineItemsManager = ({
 
     setActiveDraggedItem(null);
   };
+
   const groupedItems = useMemo(
     () => getHeaderGroups(lineItems || []),
     [lineItems],
@@ -315,7 +335,7 @@ const InvoiceLineItemsManager = ({
       const newItem = createItemRow({
         selectedSupplierId,
         parentHeaderKey: headerRow.headerKey as string,
-        parentHeaderName: headerRow.headerName || "Custom Header",
+        parentHeaderName: headerRow.headerName || "",
         isCustomProduct: false,
       });
 
@@ -348,7 +368,7 @@ const InvoiceLineItemsManager = ({
       const newItem = createItemRow({
         selectedSupplierId,
         parentHeaderKey: headerRow.headerKey as string,
-        parentHeaderName: headerRow.headerName || "Custom Header",
+        parentHeaderName: headerRow.headerName || "",
         isCustomProduct: true,
       });
 
@@ -476,7 +496,126 @@ const InvoiceLineItemsManager = ({
     );
   };
 
+  // const handleSelectProduct = (rowId: string, product: ProductType) => {
+  //   const targetRow = lineItems.find((row) => row.id === rowId);
+  //   console.log(lineItems,"lineItemslineItems");
+    
+
+  //   if (!targetRow) return;
+
+  //   const targetHeaderKey = targetRow.parentHeaderKey || null;
+
+  //   const duplicateItemInSameSection = lineItems.find((row) => {
+  //     if (row.id === rowId) return false;
+  //     if (row.type !== "item") return false;
+  //     if ((row.parentHeaderKey || null) !== targetHeaderKey) return false;
+
+  //     const currentProductId = row.productId ?? row.estimate_product_id ?? null;
+  //     const selectedProductId = product.id ?? null;
+
+  //     if (
+  //       currentProductId !== null &&
+  //       selectedProductId !== null &&
+  //       String(currentProductId) === String(selectedProductId)
+  //     ) {
+  //       return true;
+  //     }
+
+  //     return (
+  //       String(row.item || "").trim().toLowerCase() ===
+  //       String(product.name || "").trim().toLowerCase()
+  //     );
+  //   });
+
+  //   if (duplicateItemInSameSection) {
+  //     highlightDuplicateSection(targetHeaderKey);
+
+  //     toast.error(
+  //       "This product is already added in this section. You can increase its quantity instead.",
+  //     );
+  //     return;
+  //   }
+  //   console.log(product,"productproduct");
+
+  //   if (onSelectProductData) {
+  //     onSelectProductData(rowId, product);
+  //     return;
+  //   };
+
+    
+
+  //   setLineItems((prev) =>
+  //     prev.map((row) => {
+  //       if (row.id !== rowId) return row;
+
+  //       const rate = Number(product.jdpPrice || product.rate || 0);
+  //       const estimatedPrice = Number(product.estimatedPrice || 0);
+  //       const qty = Number(row.qty || 0);
+  //       const total = qty * (estimatedPrice > 0 ? estimatedPrice : rate);
+
+  //       return {
+  //         ...row,
+  //         productId: product.id,
+  //         estimate_product_id: product.id,
+  //         item: product.name || "",
+  //         description: product.description || "",
+  //         rate,
+  //         estimatedPrice,
+  //         total,
+  //         searchQuery: product.name || "",
+  //         showSearchResults: false,
+  //         isCustomProduct: false,
+  //       };
+  //     }),
+  //   );
+  // };
+
+
   const handleSelectProduct = (rowId: string, product: ProductType) => {
+    const targetRow = lineItems.find((row) => row.id === rowId);
+
+    if (!targetRow) return;
+
+    const targetHeaderKey = targetRow.parentHeaderKey || null;
+
+    const duplicateItemInSameSection = lineItems.find((row) => {
+      if (row.id === rowId) return false;
+      if (row.type !== "item") return false;
+      if ((row.parentHeaderKey || null) !== targetHeaderKey) return false;
+
+      const currentProductId = row.productId ?? row.estimate_product_id ?? null;
+      const selectedProductId = product.id ?? null;
+
+      if (
+        currentProductId !== null &&
+        selectedProductId !== null &&
+        String(currentProductId) === String(selectedProductId)
+      ) {
+        return true;
+      }
+
+      return (
+        String(row.item || "")
+          .trim()
+          .toLowerCase() ===
+        String(product.name || "")
+          .trim()
+          .toLowerCase()
+      );
+    });
+
+    if (duplicateItemInSameSection) {
+      highlightDuplicateSection(targetHeaderKey);
+
+      toast(
+        "This product is already added in this section. You can increase its quantity instead.",
+        {
+          duration: 3000,
+        },
+      );
+      return;
+    }
+
     if (onSelectProductData) {
       onSelectProductData(rowId, product);
       return;
@@ -495,6 +634,7 @@ const InvoiceLineItemsManager = ({
           ...row,
           productId: product.id,
           estimate_product_id: product.id,
+          jdpSKU: product.jdpSKU || null,
           item: product.name || "",
           description: product.description || "",
           rate,
@@ -507,74 +647,6 @@ const InvoiceLineItemsManager = ({
       }),
     );
   };
-
-  // const handleDragEnd = (event: DragEndEvent) => {
-  //   const { active, over } = event;
-  //   if (!over || active.id === over.id) return;
-
-  //   const activeId = String(active.id);
-  //   const overId = String(over.id);
-
-  //   const activeGroup = groupedItems.find(
-  //     (group) => group.header.headerKey === activeId
-  //   );
-
-  //   // header group reorder
-  //   if (activeGroup?.header.type === "header") {
-  //     const normalizedOverId = overId.startsWith("empty-drop-")
-  //       ? overId.replace("empty-drop-", "")
-  //       : overId;
-
-  //     setLineItems((prev) =>
-  //       reorderHeaderGroups({
-  //         lineItems: prev,
-  //         activeHeaderKey: activeId,
-  //         overHeaderKey: normalizedOverId,
-  //       })
-  //     );
-  //     return;
-  //   }
-
-  //   const activeRow = lineItems.find((row) => row.id === activeId);
-  //   if (!activeRow || activeRow.type !== "item") return;
-
-  //   let overRowIndex = lineItems.findIndex((row) => row.id === overId);
-
-  //   // dropped on empty drop zone
-  //   if (overRowIndex === -1 && overId.startsWith("empty-drop-")) {
-  //     const targetHeaderKey = overId.replace("empty-drop-", "");
-  //     const headerIndex = lineItems.findIndex(
-  //       (row) => row.type === "header" && row.headerKey === targetHeaderKey
-  //     );
-
-  //     if (headerIndex !== -1) {
-  //       overRowIndex = headerIndex + 1;
-  //     }
-  //   }
-
-  //   // dropped directly over header
-  //   if (overRowIndex === -1) {
-  //     const overGroup = groupedItems.find(
-  //       (group) => group.header.headerKey === overId
-  //     );
-
-  //     if (overGroup) {
-  //       const headerIndex = lineItems.findIndex(
-  //         (row) =>
-  //           row.type === "header" &&
-  //           row.headerKey === overGroup.header.headerKey
-  //       );
-
-  //       if (headerIndex !== -1) {
-  //         overRowIndex = headerIndex + 1;
-  //       }
-  //     }
-  //   }
-
-  //   if (overRowIndex === -1) return;
-
-  //   setLineItems((prev) => handleItemDropReparent(prev, activeId, overRowIndex));
-  // };
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveDraggedItem(null);
 
@@ -692,16 +764,14 @@ const InvoiceLineItemsManager = ({
     ]);
   };
 
-  console.log(lineItems, "lineItemsss");
-
   const handleAddHeaderWithFirstItem = () => {
     setLineItems((prev) => {
-      const headerRow = createHeaderRow(selectedSupplierId, "Custom Header");
+      const headerRow = createHeaderRow(selectedSupplierId, "");
 
       const firstItem = createItemRow({
         selectedSupplierId,
         parentHeaderKey: headerRow.headerKey as string,
-        parentHeaderName: headerRow.headerName || "Custom Header",
+        parentHeaderName: headerRow.headerName || "",
         isCustomProduct: false,
       });
 
@@ -729,6 +799,8 @@ const InvoiceLineItemsManager = ({
       onAddCustomFromSearch={handleAddCustomFromSearch}
       getFilteredProducts={getFilteredProducts}
       subtotal={calculateSubtotal()}
+      duplicateSectionHeaderKey={duplicateSectionHeaderKey}
+      isJobDetail={isJobDetail}
     />
   );
 };

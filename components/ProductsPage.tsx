@@ -162,19 +162,37 @@ const [formMode, setFormMode] = useState<ProductAction>('add') // 'add' | 'edit'
   console.log(formData,"formData");
   
   // Auto-generate JDP SKU when supplier SKU changes
- useEffect(() => {
-  if (formData.supplierSku) {
-    let generatedJdpSku = '';
+//  useEffect(() => {
+//   if (formData.supplierSku) {
+//     let generatedJdpSku = '';
 
-    if (formData.supplierSku.includes('-')) {
-      generatedJdpSku = `JDP-${formData.supplierSku.split('-').slice(1).join('-')}`;
-    } else {
-      generatedJdpSku = `JDP-${formData.supplierSku}`;
-    }
+//     if (formData.supplierSku.includes('-')) {
+//       generatedJdpSku = `JDP-${formData.supplierSku.split('-').slice(1).join('-')}`;
+//     } else {
+//       generatedJdpSku = `JDP-${formData.supplierSku}`;
+//     }
 
-    setFormData(prev => ({ ...prev, jdpSku: generatedJdpSku }));
-  }
-}, [formData.supplierSku]);
+//     setFormData(prev => ({ ...prev, jdpSku: generatedJdpSku }));
+//   }
+// }, [formData.supplierSku]);
+    useEffect(() => {
+      // Edit/view mode me API ki jdpSku value overwrite nahi karni
+      if (formMode !== 'add') return;
+      if (!formData.supplierSku) return;
+
+      let generatedJdpSku = '';
+
+      if (formData.supplierSku.includes('-')) {
+        generatedJdpSku = `JDP-${formData.supplierSku.split('-').slice(1).join('-')}`;
+      } else {
+        generatedJdpSku = `JDP-${formData.supplierSku}`;
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        jdpSku: generatedJdpSku
+      }));
+    }, [formData.supplierSku, formMode]);
 
 
   // Calculate pricing when cost or markup changes
@@ -691,6 +709,22 @@ const handleAction = (action: ProductAction, product?: Product) => {
   resetForm();
 };
 
+useEffect(() => {
+  const handleProductsSidebarClick = () => {
+    handleCloseForm();
+    setShowDeleteAlert(false);
+    setShowImportDialog(false);
+    setShowProductModal(false);
+    setViewProductData(null);
+  };
+
+  window.addEventListener("products:close-form", handleProductsSidebarClick);
+
+  return () => {
+    window.removeEventListener("products:close-form", handleProductsSidebarClick);
+  };
+}, []);
+
  const handleExport = async () => {
   // Check if any product is selected
   if (selectedProducts.length === 0) {
@@ -1074,6 +1108,8 @@ const handleAction = (action: ProductAction, product?: Product) => {
 
       if (responseData.success && responseData.data) {
         const apiProduct = responseData.data;
+        console.log( apiProduct.jdp_sku,"apiProduct");
+        
         
         // Transform API response to match form data format
         const productData: ProductFormData = {
@@ -1968,9 +2004,13 @@ const handleAction = (action: ProductAction, product?: Product) => {
         <Input
           id="jdpSku"
           value={formData.jdpSku}
-          readOnly
+          onChange={(e) => {
+            setFormData(prev => ({ ...prev, jdpSku: e.target.value }));
+            clearValidationError('jdpSku');
+          }}
+          // readOnly
           placeholder="JDP-XXX-XXX-B81 (auto-gen)"
-          className="mt-1 bg-gray-100"
+          className="mt-1 "
         />
       </div>
     </div>

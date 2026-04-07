@@ -400,6 +400,7 @@ export function JobDetailsPage({
             product_name: String(item.product_name || item.item || "").trim(),
             description: item.description || "",
             jdp_sku:
+              item.jdpSKU ||
               item.jdp_sku ||
               `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             stock_quantity: Number(item.stock_quantity || item.qty || 1),
@@ -407,7 +408,9 @@ export function JobDetailsPage({
             job_id: Number(jobId),
             unit_cost: Number(item.unit_cost || item.rate || 0),
             jdp_price: Number(item.jdp_price || item.rate || 0),
-            estimated_price: Number(item.estimated_price || item.estimatedPrice || 0),
+            estimated_price: Number(
+              item.estimated_price || item.estimatedPrice || 0,
+            ),
             total_cost: Number(item.total_cost || item.total || 0),
             is_custom: item.is_custom === true || item.isCustomProduct === true,
             section_name: null,
@@ -1676,10 +1679,6 @@ export function JobDetailsPage({
       // Replace with your actual API call
       const response = await apiClient.searchProductsByQuery(query);
       setProductSearchResults(response.data.products || []);
-      console.log(
-        productSearchResults,
-        "productSearchResultsproductSearchResultsproductSearchResults ",
-      );
     } catch (error) {
       console.error("Error searching products:", error);
       toast.error("Failed to search products");
@@ -1813,6 +1812,20 @@ export function JobDetailsPage({
     setProductSearchQuery("");
     setMaterialErrors({});
   };
+
+  const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
+  const invalidHeaders = lineItems.filter(
+    (item: any) =>
+      item?.type === "header" && !String(item?.headerName || "").trim(),
+  );
+
+  if (invalidHeaders.length > 0) {
+    toast.error("Please fill in all header group names before submitting");
+    return false;
+  }
+
+  return true;
+};
 
   const removeSelectedProduct = (productId: number): void => {
     setSelectedProducts(selectedProducts.filter((p) => p.id !== productId));
@@ -3032,56 +3045,56 @@ export function JobDetailsPage({
     return products; // ✅ API se aaye results directly use karo
   };
 
-  const selectProduct = (itemId: string, product: any) => {
-    // Check if product already exists in line items (by product ID, not name)
-    const currentItem = inlineInvoiceData.lineItems.find(
-      (item: any) => item.id === itemId,
-    );
-    const currentHeaderKey = currentItem.parentHeaderKey || null;
+  // const selectProduct = (itemId: string, product: any) => {
+  //   // Check if product already exists in line items (by product ID, not name)
+  //   const currentItem = inlineInvoiceData.lineItems.find(
+  //     (item: any) => item.id === itemId,
+  //   );
+  //   const currentHeaderKey = currentItem.parentHeaderKey || null;
 
-    // Check duplicate only inside same header group
-    const isDuplicateInSameGroup = inlineInvoiceData.lineItems.some(
-      (item: any) => {
-        if (item.id === itemId) return false;
-        if (item.type === "header") return false;
+  //   // Check duplicate only inside same header group
+  //   const isDuplicateInSameGroup = inlineInvoiceData.lineItems.some(
+  //     (item: any) => {
+  //       if (item.id === itemId) return false;
+  //       if (item.type === "header") return false;
 
-        return (
-          item.parentHeaderKey === currentHeaderKey &&
-          item.productId === product.id
-        );
-      },
-    );
+  //       return (
+  //         item.parentHeaderKey === currentHeaderKey &&
+  //         item.productId === product.id
+  //       );
+  //     },
+  //   );
 
-    if (isDuplicateInSameGroup) {
-      toast.error("This product is already added in this section");
-      return;
-    }
+  //   if (isDuplicateInSameGroup) {
+  //     toast.error("This product is already added in this section");
+  //     return;
+  //   }
 
-    setInlineInvoiceData((prev) => ({
-      ...prev,
-      lineItems: prev.lineItems.map((item) => {
-        if (item.id === itemId) {
-          return {
-            ...item,
-            productId: product.id,
-            item: product.name,
-            description: product.description || "",
-            rate: product.jdpPrice || 0,
-            estimatedPrice: product.estimatedPrice || product.jdpPrice || 0,
-            total:
-              (item.qty || 1) *
-              (product.estimatedPrice || product.jdpPrice || 0),
-            showSearchResults: false,
-            searchQuery: "",
-            supplierId: product.supplierId || selectedSupplierId || 1,
-            // Searched/selected product => not custom
-            isCustomProduct: false,
-          };
-        }
-        return item;
-      }),
-    }));
-  };
+  //   setInlineInvoiceData((prev) => ({
+  //     ...prev,
+  //     lineItems: prev.lineItems.map((item) => {
+  //       if (item.id === itemId) {
+  //         return {
+  //           ...item,
+  //           productId: product.id,
+  //           item: product.name,
+  //           description: product.description || "",
+  //           rate: product.jdpPrice || 0,
+  //           estimatedPrice: product.estimatedPrice || product.jdpPrice || 0,
+  //           total:
+  //             (item.qty || 1) *
+  //             (product.estimatedPrice || product.jdpPrice || 0),
+  //           showSearchResults: false,
+  //           searchQuery: "",
+  //           supplierId: product.supplierId || selectedSupplierId || 1,
+  //           // Searched/selected product => not custom
+  //           isCustomProduct: false,
+  //         };
+  //       }
+  //       return item;
+  //     }),
+  //   }));
+  // };
 
   // const addCustomProduct = (itemId: string, productName: string) => {
   //   // Check if custom product already exists in line items (by name for custom products)
@@ -3129,6 +3142,68 @@ export function JobDetailsPage({
   //   }
   // }
 
+  const selectProduct = (itemId: string, product: any) => {
+  const currentItem = inlineInvoiceData.lineItems.find(
+    (item: any) => item.id === itemId,
+  );
+
+  if (!currentItem) return;
+
+  const currentHeaderKey = currentItem.parentHeaderKey || null;
+  const selectedSku = String(product.jdpSKU || "").trim().toLowerCase();
+
+  // duplicate check only inside same header group and by jdpSKU
+  const isDuplicateInSameGroup = inlineInvoiceData.lineItems.some(
+    (item: any) => {
+      if (item.id === itemId) return false;
+      if (item.type === "header") return false;
+
+      return (
+        item.parentHeaderKey === currentHeaderKey &&
+        item.productId === product.id
+      );
+    },
+  );
+
+  if (isDuplicateInSameGroup) {
+    toast(
+      "This product is already added in this section. You can increase its quantity instead.",
+      {
+        duration: 3000,
+      },
+    );
+    return;
+  }
+
+  setInlineInvoiceData((prev) => ({
+    ...prev,
+    lineItems: prev.lineItems.map((item: any) => {
+      if (item.id === itemId) {
+        const rate = Number(product.jdpPrice || 0);
+        const estimatedPrice = Number(
+          product.estimatedPrice || product.jdpPrice || 0,
+        );
+        const qty = Number(item.qty || 1);
+
+        return {
+          ...item,
+          productId: product.id,
+          estimate_product_id: product.id,
+          item: product.name || "",
+          description: product.description || "",
+          rate,
+          estimatedPrice,
+          total: qty * estimatedPrice,
+          showSearchResults: false,
+          searchQuery: "",
+          supplierId: product.supplierId || selectedSupplierId || 1,
+          isCustomProduct: false,
+        };
+      }
+      return item;
+    }),
+  }));
+};
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       month: "short",
@@ -3163,7 +3238,7 @@ export function JobDetailsPage({
       const response = await apiClient.getEstimateById(invoice.id);
       const invoiceData = response?.data || response;
 
-      console.log(invoiceData.products, "invoiceData.products");
+      console.log(invoiceData.products, "::invoiceData.products");
 
       // Populate the inline invoice form with the fetched invoice data
       setInlineInvoiceData({
@@ -3797,7 +3872,7 @@ const escapeHtml = (value: any) =>
 //                             font-weight:700;
 //                             text-align:left;
 //                           ">
-//                             ${escapeHtml(row.headerName || "Custom Header")}
+//                             ${escapeHtml(row.headerName || "")}
 //                           </td>
 //                         </tr>
 //                       `;
@@ -4537,7 +4612,7 @@ const handlePrintInvoice = async (invoice: any) => {
                           font-weight:700;
                           text-align:left;
                         ">
-                          ${escapeHtml(row.headerName || "Custom Header")}
+                          ${escapeHtml(row.headerName || "")}
                         </td>
                       </tr>
                     `;
@@ -4994,6 +5069,9 @@ const handlePrintInvoice = async (invoice: any) => {
       toast.error("Please fix the validation errors");
       return;
     }
+    if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
+      return;
+    }
 
     setInvoiceValidationErrors({});
     setIsLoadingDraft(true);
@@ -5180,6 +5258,10 @@ const handlePrintInvoice = async (invoice: any) => {
       return;
     }
 
+     if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
+       return;
+     }
+
     // First save as draft
     try {
       setIsLoadingPreview(true);
@@ -5332,7 +5414,7 @@ const handlePrintInvoice = async (invoice: any) => {
         poNumber: inlineInvoiceData.poNumber || "",
         projectName: inlineInvoiceData.project || job.title || "",
         items: (inlineInvoiceData.lineItems || [])
-        .filter((item: any) => item.type === "item")
+        .filter((item: any) => item.type !== "header")
         .map((item: any) => ({
           quantity: String(item.qty || 0),
           item: item.item || "",
@@ -7343,6 +7425,7 @@ const handlePrintInvoice = async (invoice: any) => {
                               : updater,
                         }))
                       }
+                      isJobDetail={true}
                       selectedSupplierId={selectedSupplierId}
                       fetchProducts={fetchProducts}
                       getFilteredProducts={getFilteredProducts}
@@ -9764,15 +9847,12 @@ const handlePrintInvoice = async (invoice: any) => {
                             <tr key={lineItem.id} className="bg-transparent">
                               <td
                                 colSpan={6}
-                                className="px-3 py-3 border border-gray-300 bg-white"
+                                className="px-0 py-0 border border-gray-300 bg-white"
                               >
-                                <div className="flex items-center justify-between w-full rounded-2xl bg-slate-700 px-4 py-4 text-white shadow-sm">
-                                  <div className="flex items-center gap-3">
-                                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-green-400" />
-                                    <span className="text-base font-semibold">
-                                      {lineItem.headerName || "Custom Header"}
-                                    </span>
-                                  </div>
+                                <div className="w-full bg-gray-800 px-3 py-2 text-white">
+                                  <span className="text-[15px] font-semibold tracking-wide">
+                                    {lineItem.headerName || ""}
+                                  </span>
                                 </div>
                               </td>
                             </tr>

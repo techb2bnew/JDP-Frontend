@@ -51,6 +51,8 @@ interface SortableHeaderGroupProps {
   onSelectProduct: (rowId: string, product: ProductType) => void;
   onAddCustomFromSearch?: (rowId: string, value: string) => void;
   getFilteredProducts: (query: string) => ProductType[];
+  isDuplicateSection?: boolean;
+  isJobDetail?: boolean;
 }
 
 const SortableHeaderGroup = ({
@@ -64,6 +66,8 @@ const SortableHeaderGroup = ({
   onSelectProduct,
   onAddCustomFromSearch,
   getFilteredProducts,
+  isDuplicateSection = false,
+  isJobDetail = false,
 }: SortableHeaderGroupProps) => {
   const isVirtualStandaloneHeader =
     group.header.headerKey === "standalone_header_key";
@@ -80,7 +84,7 @@ const SortableHeaderGroup = ({
     disabled: isVirtualStandaloneHeader,
   });
 
-  const { setNodeRef: setDropRef, isOver } = useDroppable({
+  const { setNodeRef: setDropRef } = useDroppable({
     id: `empty-drop-${group.header.headerKey}`,
     disabled: isVirtualStandaloneHeader || group.items.length > 0,
   });
@@ -92,15 +96,26 @@ const SortableHeaderGroup = ({
   };
 
   return (
-    <tbody ref={setNodeRef} style={style}>
+    <tbody
+      ref={setNodeRef}
+      style={style}
+      // className={isDuplicateSection ? "animate-pulse" : ""}
+    >
       {!isVirtualStandaloneHeader && (
         <tr>
-          <td colSpan={7} className="border border-gray-300 bg-slate-100 p-3">
+          <td
+            colSpan={7}
+            className={`border-x border-b border-slate-300 p-0 transition-all duration-300 ${
+              isDuplicateSection ? "bg-amber-50/30" : "bg-transparent"
+            }`}
+          >
             <div
-              className={`flex items-center justify-between gap-3 rounded-xl px-4 py-2.5 text-white shadow-sm transition ${
-                isDragging
-                  ? "bg-slate-500 ring-2 ring-slate-300"
-                  : "bg-gradient-to-r from-slate-700 to-slate-600"
+              className={`relative flex items-center justify-between gap-3 px-4 py-3 text-white transition-all duration-300 ${
+                isDuplicateSection
+                  ? "bg-[#334155] ring-1 ring-amber-200/80"
+                  : isDragging
+                    ? "bg-[#334155]"
+                    : "bg-gray-800"
               }`}
             >
               <div className="flex items-center gap-3 min-w-0">
@@ -108,31 +123,49 @@ const SortableHeaderGroup = ({
                   type="button"
                   {...attributes}
                   {...listeners}
-                  className="cursor-grab active:cursor-grabbing opacity-80 hover:opacity-100 transition"
+                  className="cursor-grab active:cursor-grabbing opacity-80 hover:opacity-100 transition shrink-0"
                 >
                   <GripVertical className="h-4 w-4" />
                 </button>
 
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="h-2 w-2 rounded-full bg-green-400 shrink-0" />
-                  <Input
-                    value={group.header.headerName || ""}
-                    onChange={(e) =>
-                      onUpdateRow(group.header.id, "headerName", e.target.value)
-                    }
-                    className="h-8 max-w-[220px] rounded-md border border-transparent bg-transparent px-2 py-1 text-sm font-medium text-white shadow-none transition-all placeholder:text-white/60 hover:bg-white/5 focus-visible:border-white/30 focus-visible:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/20"
-                    placeholder="Section name"
-                  />
-                </div>
+                <Input
+                  value={group.header.headerName || ""}
+                  onChange={(e) =>
+                    onUpdateRow(group.header.id, "headerName", e.target.value)
+                  }
+                  className="
+                  h-9 w-[240px]
+                  bg-transparent px-2
+                  text-[20px] font-medium text-white
+                  border border-transparent rounded-md
+                  shadow-none outline-none
+                  transition-all duration-200
+                  placeholder:text-white/50
+                  focus-visible:border-white/15
+                  focus-visible:bg-white/5
+                  focus-visible:ring-0
+                  focus-visible:ring-transparent
+                  focus-visible:ring-offset-0
+                  focus:outline-none
+                  !ring-0 !ring-transparent !ring-offset-0
+                "
+                  placeholder="Type your header name"
+                />
               </div>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
+                {isDuplicateSection && (
+                  <span className="rounded-full border border-amber-200/30 bg-amber-100/10 px-3 py-1 text-[11px] font-medium text-amber-50">
+                    Item already exists in this section
+                  </span>
+                )}
+
                 <button
                   type="button"
                   onClick={() =>
                     onAddLineItemUnderHeader(group.header.headerKey as string)
                   }
-                  className="flex items-center gap-1 rounded-md bg-white/10 hover:bg-white/20 px-2 py-1 text-xs transition"
+                  className="flex items-center gap-1 rounded-md bg-white/10 hover:bg-white/20 px-3 py-1.5 text-xs transition"
                 >
                   <Plus className="h-3 w-3" />
                   Add Line Item
@@ -145,7 +178,7 @@ const SortableHeaderGroup = ({
                       group.header.headerKey as string,
                     )
                   }
-                  className="flex items-center gap-1 rounded-md bg-white/10 hover:bg-white/20 px-2 py-1 text-xs transition"
+                  className="flex items-center gap-1 rounded-md bg-white/10 hover:bg-white/20 px-3 py-1.5 text-xs transition"
                 >
                   <Plus className="h-3 w-3" />
                   Add Custom
@@ -154,7 +187,7 @@ const SortableHeaderGroup = ({
                 <button
                   type="button"
                   onClick={() => onRemoveRow(group.header.id)}
-                  className="flex items-center gap-1 rounded-md bg-red-500/20 hover:bg-red-500/30 px-2 py-1 text-xs text-red-200 transition"
+                  className="flex items-center gap-1 rounded-md bg-red-500/20 hover:bg-red-500/30 px-3 py-1.5 text-xs text-red-200 transition"
                 >
                   Remove
                 </button>
@@ -167,6 +200,7 @@ const SortableHeaderGroup = ({
       {group.items.length === 0 && !isVirtualStandaloneHeader && (
         <tr>
           <td
+            ref={setDropRef}
             colSpan={7}
             className="border border-dashed border-slate-300 bg-slate-50 h-[84px] min-h-[84px] px-4 text-center text-sm text-slate-500"
           >
@@ -186,6 +220,7 @@ const SortableHeaderGroup = ({
           onSelectProduct={onSelectProduct}
           onAddCustomFromSearch={onAddCustomFromSearch}
           getFilteredProducts={getFilteredProducts}
+          isJobDetail={isJobDetail}
         />
       ))}
     </tbody>

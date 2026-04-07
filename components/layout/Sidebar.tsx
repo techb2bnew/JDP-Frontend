@@ -345,24 +345,84 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
             const Icon = item.icon
 
             return (
-              <Link key={item.id} href={item.href} prefetch={true}>
-                <Button
-                  variant={active ? "default" : "ghost"}
-                  size="sm"
-                  className={cn(
-                    "w-full sidebar-item h-10",
-                    isCollapsed ? "justify-center p-0" : "justify-start text-left",
-                    active
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  )}
-                  title={isCollapsed ? item.name : item.description}
-                >
-                  <Icon className={cn("h-4 w-4", !isCollapsed && "mr-3")} />
-                  {!isCollapsed && <span className="font-medium">{item.name}</span>}
-                </Button>
-              </Link>
-            )
+              // <Link key={item.id} href={item.href} prefetch={true}>
+              //   <Button
+              //     variant={active ? "default" : "ghost"}
+              //     size="sm"
+              //     className={cn(
+              //       "w-full sidebar-item h-10",
+              //       isCollapsed ? "justify-center p-0" : "justify-start text-left",
+              //       active
+              //         ? "bg-primary text-primary-foreground shadow-sm"
+              //         : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              //     )}
+              //     title={isCollapsed ? item.name : item.description}
+              //   >
+              //     <Icon className={cn("h-4 w-4", !isCollapsed && "mr-3")} />
+              //     {!isCollapsed && <span className="font-medium">{item.name}</span>}
+              //   </Button>
+              // </Link>
+              <>
+                {item.id === "products" ? (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      if (currentPath === item.href) {
+                        window.dispatchEvent(
+                          new CustomEvent("products:close-form"),
+                        );
+                      } else {
+                        router.push(item.href);
+                      }
+                    }}
+                    className="w-full"
+                    title={isCollapsed ? item.name : item.description}
+                  >
+                    <Button
+                      variant={active ? "default" : "ghost"}
+                      size="sm"
+                      className={cn(
+                        "w-full sidebar-item h-10",
+                        isCollapsed
+                          ? "justify-center p-0"
+                          : "justify-start text-left",
+                        active
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                      )}
+                    >
+                      <Icon className={cn("h-4 w-4", !isCollapsed && "mr-3")} />
+                      {!isCollapsed && (
+                        <span className="font-medium">{item.name}</span>
+                      )}
+                    </Button>
+                  </button>
+                ) : (
+                  <Link key={item.id} href={item.href} prefetch={true}>
+                    <Button
+                      variant={active ? "default" : "ghost"}
+                      size="sm"
+                      className={cn(
+                        "w-full sidebar-item h-10",
+                        isCollapsed
+                          ? "justify-center p-0"
+                          : "justify-start text-left",
+                        active
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                      )}
+                      title={isCollapsed ? item.name : item.description}
+                    >
+                      <Icon className={cn("h-4 w-4", !isCollapsed && "mr-3")} />
+                      {!isCollapsed && (
+                        <span className="font-medium">{item.name}</span>
+                      )}
+                    </Button>
+                  </Link>
+                )}
+              </>
+            );
           })}
 
           {/* Profiles Section */}

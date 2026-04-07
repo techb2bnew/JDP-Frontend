@@ -678,57 +678,121 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
     return products; // ✅ API se aaye results directly use karo
   };
 
+  // const selectProduct = (itemId: string, product: any) => {
+  //   // Check if product already exists in line items (by product ID, not name)
+  //   const currentItem = inlineInvoiceData.lineItems.find(
+  //     (item: any) => item.id === itemId,
+  //   );
+  //   const currentHeaderKey = currentItem.parentHeaderKey || null;
+
+  //   // Check duplicate only inside same header group
+  //   const isDuplicateInSameGroup = inlineInvoiceData.lineItems.some(
+  //     (item: any) => {
+  //       if (item.id === itemId) return false;
+  //       if (item.type === "header") return false;
+
+  //       return (
+  //         item.parentHeaderKey === currentHeaderKey &&
+  //         item.productId === product.id
+  //       );
+  //     },
+  //   );
+
+  //   if (isDuplicateInSameGroup) {
+  //     toast.error("This product is already added in this section");
+  //     return;
+  //   }
+
+  //   setInlineInvoiceData((prev) => ({
+  //     ...prev,
+  //     lineItems: prev.lineItems.map((item) => {
+  //       if (item.id === itemId) {
+  //         return {
+  //           ...item,
+  //           productId: product.id,
+  //           item: product.name,
+  //           description: product.description || "",
+  //           rate: product.jdpPrice || 0,
+  //           estimatedPrice: product.estimatedPrice || product.jdpPrice || 0,
+  //           total:
+  //             (item.qty || 1) *
+  //             (product.estimatedPrice || product.jdpPrice || 0),
+  //           showSearchResults: false,
+  //           searchQuery: "",
+  //           supplierId: product.supplierId || selectedSupplierId || 1,
+  //           // Searched/selected product => not custom
+  //           isCustomProduct: false,
+  //         };
+  //       }
+  //       return item;
+  //     }),
+  //   }));
+  // };
+
   const selectProduct = (itemId: string, product: any) => {
-    // Check if product already exists in line items (by product ID, not name)
-    const currentItem = inlineInvoiceData.lineItems.find(
-      (item: any) => item.id === itemId,
-    );
-    const currentHeaderKey = currentItem.parentHeaderKey || null;
+  const currentItem = inlineInvoiceData.lineItems.find(
+    (item: any) => item.id === itemId,
+  );
 
-    // Check duplicate only inside same header group
-    const isDuplicateInSameGroup = inlineInvoiceData.lineItems.some(
-      (item: any) => {
-        if (item.id === itemId) return false;
-        if (item.type === "header") return false;
+  if (!currentItem) return;
 
-        return (
-          item.parentHeaderKey === currentHeaderKey &&
-          item.productId === product.id
-        );
+  const currentHeaderKey = currentItem.parentHeaderKey || null;
+  const selectedSku = String(product.jdpSKU || "").trim().toLowerCase();
+
+  // Check duplicate only inside same header group and by jdpSKU
+  const isDuplicateInSameGroup = inlineInvoiceData.lineItems.some(
+    (item: any) => {
+      if (item.id === itemId) return false;
+      if (item.type === "header") return false;
+      if ((item.parentHeaderKey || null) !== currentHeaderKey) return false;
+
+      const existingSku = String(item.jdpSKU || "").trim().toLowerCase();
+
+      return !!selectedSku && !!existingSku && existingSku === selectedSku;
+    },
+  );
+
+  if (isDuplicateInSameGroup) {
+    toast(
+      "This product is already added in this section. You can increase its quantity instead.",
+      {
+        duration: 3000,
       },
     );
+    return;
+  }
 
-    if (isDuplicateInSameGroup) {
-      toast.error("This product is already added in this section");
-      return;
-    }
+  setInlineInvoiceData((prev) => ({
+    ...prev,
+    lineItems: prev.lineItems.map((item: any) => {
+      if (item.id === itemId) {
+        const rate = Number(product.jdpPrice || 0);
+        const estimatedPrice = Number(
+          product.estimatedPrice || product.jdpPrice || 0,
+        );
+        const priceToUse = estimatedPrice > 0 ? estimatedPrice : rate;
 
-    setInlineInvoiceData((prev) => ({
-      ...prev,
-      lineItems: prev.lineItems.map((item) => {
-        if (item.id === itemId) {
-          return {
-            ...item,
-            productId: product.id,
-            item: product.name,
-            description: product.description || "",
-            rate: product.jdpPrice || 0,
-            estimatedPrice: product.estimatedPrice || product.jdpPrice || 0,
-            total:
-              (item.qty || 1) *
-              (product.estimatedPrice || product.jdpPrice || 0),
-            showSearchResults: false,
-            searchQuery: "",
-            supplierId: product.supplierId || selectedSupplierId || 1,
-            // Searched/selected product => not custom
-            isCustomProduct: false,
-          };
-        }
-        return item;
-      }),
-    }));
-  };
-
+        return {
+          ...item,
+          productId: product.id,
+          estimate_product_id: product.id,
+          jdpSKU: product.jdpSKU || null,
+          item: product.name || "",
+          description: product.description || "",
+          rate,
+          estimatedPrice,
+          total: (item.qty || 1) * priceToUse,
+          showSearchResults: false,
+          searchQuery: "",
+          supplierId: product.supplierId || selectedSupplierId || 1,
+          // Searched/selected product => not custom
+          isCustomProduct: false,
+        };
+      }
+      return item;
+    }),
+  }));
+};
   const mapInvoiceTypeToAPI = (uiType: string): string => {
     const mapping: Record<string, string> = {
       Estimate: "estimate",
@@ -793,6 +857,19 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
   };
 
   console.log(productsList, "productss");
+    const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
+      const invalidHeaders = lineItems.filter(
+        (item: any) =>
+          item?.type === "header" && !String(item?.headerName || "").trim(),
+      );
+
+      if (invalidHeaders.length > 0) {
+        toast.error("Please fill in all header group names before submitting");
+        return false;
+      }
+
+      return true;
+    };
 
   const fetchJobsList = async (searchQuery: string = "") => {
     try {
@@ -896,6 +973,9 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
       toast.error("Please fix the validation errors");
+      return;
+    }
+    if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
       return;
     }
 
@@ -1081,12 +1161,6 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
       errors.jobId = "Please select a job first";
     }
 
-    console.log(
-      inlineInvoiceData.lineItems.length === 0,
-      inlineInvoiceData.lineItems[0],
-      "inlineInvoiceData.lineItems",
-    );
-
     if (!inlineInvoiceData.project) {
       errors.project = "Project field is required";
     }
@@ -1103,6 +1177,9 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
       toast.error("Please fix the validation errors");
       return;
     }
+    if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
+        return;
+      }
 
     setValidationErrors({});
     setSendingInvoice(true);
@@ -2137,18 +2214,15 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
                       return orderedRows.map((lineItem: any, index: number) => {
                         if (lineItem.type === "synthetic-header") {
                           return (
-                            <tr key={lineItem.id} className="bg-transparent">
+                             <tr key={lineItem.id} className="bg-transparent">
                               <td
                                 colSpan={6}
-                                className="px-3 py-3 border border-gray-300 bg-white"
+                                className="px-0 py-0 border border-gray-300 bg-white"
                               >
-                                <div className="flex items-center justify-between w-full rounded-2xl bg-slate-700 px-4 py-4 text-white shadow-sm">
-                                  <div className="flex items-center gap-3">
-                                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-green-400" />
-                                    <span className="text-base font-semibold">
-                                      {lineItem.headerName || "Custom Header"}
-                                    </span>
-                                  </div>
+                                <div className="w-full bg-gray-700 px-3 py-2 text-white">
+                                  <span className="text-[15px] font-semibold tracking-wide">
+                                    {lineItem.headerName || ""}
+                                  </span>
                                 </div>
                               </td>
                             </tr>

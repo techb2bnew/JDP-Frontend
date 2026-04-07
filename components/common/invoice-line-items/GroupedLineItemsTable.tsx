@@ -42,6 +42,7 @@ type LineItemType = {
   isCustomProduct?: boolean;
   productId?: string | number | null;
   estimate_product_id?: string | number | null;
+  
 };
 
 type HeaderGroupType = {
@@ -73,6 +74,9 @@ interface GroupedLineItemsTableProps {
   handleAddStandaloneLineItem: () => void;
   handleAddStandaloneCustomItem: () => void;
   handleAddHeaderWithFirstItem: () => void;
+
+  duplicateSectionHeaderKey?: string | null;
+  isJobDetail?:boolean
 }
 
 const GroupedLineItemsTable = ({
@@ -97,6 +101,8 @@ const GroupedLineItemsTable = ({
   activeDraggedItem,
   getFilteredProducts,
   subtotal,
+  duplicateSectionHeaderKey,
+  isJobDetail=false
 }: GroupedLineItemsTableProps) => {
   return (
     <div className="space-y-4">
@@ -141,10 +147,11 @@ const GroupedLineItemsTable = ({
               </div>
             ) : null}
           </DragOverlay>
+
           <div className="overflow-y-visible">
-            <table className=" table-fixed w-full border-collapse">
+            <table className="table-fixed w-full border-collapse">
               <thead>
-                <tr>
+                <tr className="bg-gray-800 text-white">
                   <th className="border border-gray-300 px-3 py-2 text-left w-[90px]">
                     Qty
                   </th>
@@ -182,8 +189,14 @@ const GroupedLineItemsTable = ({
                   onSelectProduct={onSelectProduct}
                   onAddCustomFromSearch={onAddCustomFromSearch}
                   getFilteredProducts={getFilteredProducts}
+                  isDuplicateSection={
+                    !!duplicateSectionHeaderKey &&
+                    group.header.headerKey === duplicateSectionHeaderKey
+                  }
+                  isJobDetail={isJobDetail}
                 />
               ))}
+
               <tfoot>
                 <tr>
                   <td
