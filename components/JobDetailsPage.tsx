@@ -553,6 +553,8 @@ export function JobDetailsPage({
   const [pendingReviewSheets, setPendingReviewSheets] = useState<any[] | null>(
     null,
   );
+  const [invalidHeaderKeys, setInvalidHeaderKeys] = useState<string[]>([]);
+  
 
   const extractDocumentFileName = (fileUrl: string | null): string => {
     if (!fileUrl) return "Document";
@@ -1813,17 +1815,26 @@ export function JobDetailsPage({
     setMaterialErrors({});
   };
 
-  const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
+const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
   const invalidHeaders = lineItems.filter(
     (item: any) =>
-      item?.type === "header" && !String(item?.headerName || "").trim(),
+      item?.type === "header" &&
+      item?.headerKey !== "standalone_header_key" &&
+      !String(item?.headerName || "").trim(),
   );
 
   if (invalidHeaders.length > 0) {
+    const invalidKeys = invalidHeaders
+      .map((item: any) => item.headerKey)
+      .filter(Boolean);
+
+    setInvalidHeaderKeys(invalidKeys);
+
     toast.error("Please fill in all header group names before submitting");
     return false;
   }
 
+  setInvalidHeaderKeys([]);
   return true;
 };
 
@@ -7416,6 +7427,8 @@ const handlePrintInvoice = async (invoice: any) => {
                     {/* Line Items Table */}
                     <InvoiceLineItemsManager
                       lineItems={inlineInvoiceData.lineItems}
+                      invalidHeaderKeys={invalidHeaderKeys}
+                      setInvalidHeaderKeys={setInvalidHeaderKeys}
                       setLineItems={(updater) =>
                         setInlineInvoiceData((prev) => ({
                           ...prev,
@@ -9619,473 +9632,453 @@ const handlePrintInvoice = async (invoice: any) => {
 
       {/* Invoice Preview Modal */}
       <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
-        <DialogContent className="min-w-[80%] max-h-[90vh] overflow-y-auto p-0">
-          <div className="bg-gray-100 p-6">
-            {/* Print-ready Invoice Design */}
-            <div id="invoice-preview-print" className="bg-white p-8 shadow-lg">
-              {/* Header */}
-              <div className="flex justify-between items-start mb-8">
-                <div>
-                  {/* <Logo /> */}
-                  <Image
-                    src="/assets/logos/logo-jdp.png"
-                    alt="logo"
-                    width={168}
-                    height={63}
-                    className="w-[140px] "
-                  />
-                  <p className="text-sm text-gray-600 mt-2">952-449-1088</p>
-                  {/* Invoice Number Display */}
-                </div>
-                <div className="text-right">
-                  <div className="text-center flex justify-center items-center">
-                    <div className="text-lg font-bold bg-gray-800 text-white p-[14px] w-[200px]">
-                      Date
-                    </div>
-                    <div className="text-sm border border-gray-800 p-[17px] w-[200px]">
-                      {new Date(inlineInvoiceData.date).toLocaleDateString(
-                        "en-US",
-                        { month: "2-digit", day: "2-digit", year: "numeric" },
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-center mb-2 flex justify-center items-center">
-                    <div className="text-lg font-bold bg-gray-800 text-white p-[14px] w-[200px]">
-                      {(inlineInvoiceData.invoiceType === "Custom"
-                        ? inlineInvoiceData.customInvoiceType
-                        : inlineInvoiceData.invoiceType) || "ESTIMATE"}{" "}
-                      #
-                    </div>
-                    <div className="text-sm border border-gray-800 p-[17px] w-[200px]">
-                      {InvoioiceNumber}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              {inlineInvoiceData.billToAddressEnabled && (
-                <>
-                  <div className="bg-gray-800 text-white p-3 mb-4">
-                    <div className="text-sm font-bold ">Bill TO</div>
-                  </div>
-                  {inlineInvoiceData.billToAddress && (
-                    <div className="text-gray-600 mt-2 font-medium border border-gray-800 p-3">
-                      {" "}
-                      {inlineInvoiceData.billToAddress}
-                    </div>
-                  )}
-                </>
-              )}
-              {/* To Section */}
-              <div className="bg-gray-800 text-white p-3 mb-4 mt-4">
-                <div className="text-sm font-bold">TO</div>
-              </div>
-              <div className="mb-6 border border-gray-800 p-3">
-                <div className="font-semibold">
-                  {job.type === "contract-based"
-                    ? contractorData?.name ||
-                      contractorData?.contractor_name ||
-                      "Contractor"
-                    : customerData?.customer_name ||
-                      customerData?.company_name ||
-                      inlineInvoiceData.customerName ||
-                      "Customer"}
-                </div>
-                <div className="text-gray-600">
-                  {job.type === "contract-based"
-                    ? contractorData?.address ||
-                      inlineInvoiceData.customerAddress ||
-                      ""
-                    : customerData?.address ||
-                      inlineInvoiceData.customerAddress ||
-                      ""}
-                </div>
-              </div>
+  <DialogContent className="min-w-[80%] max-h-[90vh] overflow-y-auto p-0">
+    <div className="bg-gray-100 p-3 md:p-4">
+      {/* Print-ready Invoice Design */}
+      <div
+        id="invoice-preview-print"
+        className="bg-white p-4 md:p-5 shadow-lg"
+      >
+        {/* Header */}
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <Image
+              src="/assets/logos/logo-jdp.png"
+              alt="logo"
+              width={168}
+              height={63}
+              className="w-[120px]"
+            />
+            <p className="text-xs text-gray-600 mt-1">952-449-1088</p>
+          </div>
 
-              {/* Project Details */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div>
-                  <div className="text-sm font-semibold border border-gray-800 p-3">
-                    P.O. No.
-                  </div>
-                  <div className="text-gray-600 border border-gray-800 p-3">
-                    {inlineInvoiceData.poNumber}
-                  </div>
-                </div>
-                <div>
-                  <div className="bg-gray-800 text-white text-sm font-semibold border border-gray-800 p-3">
-                    Project
-                  </div>
-                  <div className="text-gray-600 border border-gray-800 p-3">
-                    {inlineInvoiceData.project}
-                  </div>
-                </div>
+          <div className="text-right space-y-1">
+            <div className="text-center flex justify-center items-center">
+              <div className="text-sm font-bold bg-gray-800 text-white px-4 py-2 w-[160px]">
+                Date
               </div>
-
-              {/* Rep and Due Date */}
-              <div className="mb-4">
-                <table className="w-full border-collapse border border-gray-300">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
-                        Rep
-                      </th>
-                      <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
-                        Due Date
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="border border-gray-300 px-3 py-2">
-                        {inlineInvoiceData.rep || "JDP"}
-                      </td>
-                      <td className="border border-gray-300 px-3 py-2">
-                        {inlineInvoiceData.dueDate ||
-                          new Date().toLocaleDateString("en-US", {
-                            month: "2-digit",
-                            day: "2-digit",
-                            year: "numeric",
-                          })}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div className="text-sm border border-gray-800 px-4 py-2 w-[160px]">
+                {new Date(inlineInvoiceData.date).toLocaleDateString("en-US", {
+                  month: "2-digit",
+                  day: "2-digit",
+                  year: "numeric",
+                })}
               </div>
+            </div>
 
-              {/* Line Items Table */}
-              <div className="mb-6">
-                <table className="w-full border-collapse border border-gray-300">
-                  <thead>
-                    <tr className="bg-gray-800 text-white">
-                      <th className="border border-gray-300 px-3 py-2 text-left">
-                        Qty
-                      </th>
-                      <th className="border border-gray-300 px-3 py-2 text-left">
-                        Item
-                      </th>
-                      <th className="border border-gray-300 px-3 py-2 text-left">
-                        Description
-                      </th>
-                      <th className="border border-gray-300 px-3 py-2 text-right">
-                        Rate
-                      </th>
-                      <th className="border border-gray-300 px-3 py-2 text-right">
-                        Amount
-                      </th>
-                      <th className="border border-gray-300 px-3 py-2 text-right">
-                        Total
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {/* {inlineInvoiceData.lineItems.map((item, index) => (
-                      <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="border border-gray-300 px-3 py-2">{item.qty}</td>
-                        <td className="border border-gray-300 px-3 py-2 font-medium">{item.item}</td>
-                        <td className="border border-gray-300 px-3 py-2 text-sm text-gray-600">{item.description}</td>
-                        <td className="border border-gray-300 px-3 py-2 text-right">${((item.estimatedPrice && item.estimatedPrice > 0) ? item.estimatedPrice : (item.rate || 0)).toFixed(2)}</td>
-                        <td className="border border-gray-300 px-3 py-2 text-right font-medium">${(item.total || 0).toFixed(2)}</td>
+            <div className="text-center flex justify-center items-center">
+              <div className="text-sm font-bold bg-gray-800 text-white px-4 py-2 w-[160px]">
+                {(inlineInvoiceData.invoiceType === "Custom"
+                  ? inlineInvoiceData.customInvoiceType
+                  : inlineInvoiceData.invoiceType) || "ESTIMATE"}{" "}
+                #
+              </div>
+              <div className="text-sm border border-gray-800 px-4 py-2 w-[160px]">
+                {InvoioiceNumber}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {inlineInvoiceData.billToAddressEnabled && (
+          <>
+            <div className="bg-gray-800 text-white px-3 py-2 mb-2">
+              <div className="text-xs font-bold">Bill TO</div>
+            </div>
+            {inlineInvoiceData.billToAddress && (
+              <div className="text-gray-600 mt-1 font-medium border border-gray-800 px-3 py-2 text-sm mb-3">
+                {inlineInvoiceData.billToAddress}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* To Section */}
+        <div className="bg-gray-800 text-white px-3 py-2 mb-2 mt-2">
+          <div className="text-xs font-bold">TO</div>
+        </div>
+        <div className="mb-4 border border-gray-800 px-3 py-2">
+          <div className="font-semibold text-sm">
+            {job.type === "contract-based"
+              ? contractorData?.name ||
+                contractorData?.contractor_name ||
+                "Contractor"
+              : customerData?.customer_name ||
+                customerData?.company_name ||
+                inlineInvoiceData.customerName ||
+                "Customer"}
+          </div>
+          <div className="text-gray-600 text-sm leading-5">
+            {job.type === "contract-based"
+              ? contractorData?.address || inlineInvoiceData.customerAddress || ""
+              : customerData?.address || inlineInvoiceData.customerAddress || ""}
+          </div>
+        </div>
+
+        {/* Project Details */}
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <div className="text-sm font-semibold border border-gray-800 px-3 py-2">
+              P.O. No.
+            </div>
+            <div className="text-gray-600 border border-gray-800 px-3 py-2 text-sm min-h-[40px]">
+              {inlineInvoiceData.poNumber}
+            </div>
+          </div>
+          <div>
+            <div className="bg-gray-800 text-white text-sm font-semibold border border-gray-800 px-3 py-2">
+              Project
+            </div>
+            <div className="text-gray-600 border border-gray-800 px-3 py-2 text-sm min-h-[40px]">
+              {inlineInvoiceData.project}
+            </div>
+          </div>
+        </div>
+
+        {/* Rep and Due Date */}
+        <div className="mb-3">
+          <table className="w-full border-collapse border border-gray-300">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-sm">
+                  Rep
+                </th>
+                <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-sm">
+                  Due Date
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="border border-gray-300 px-3 py-2 text-sm">
+                  {inlineInvoiceData.rep || "JDP"}
+                </td>
+                <td className="border border-gray-300 px-3 py-2 text-sm">
+                  {inlineInvoiceData.dueDate ||
+                    new Date().toLocaleDateString("en-US", {
+                      month: "2-digit",
+                      day: "2-digit",
+                      year: "numeric",
+                    })}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Line Items Table */}
+        <div className="mb-4">
+          <table className="w-full border-collapse border border-gray-300">
+            <thead>
+              <tr className="bg-gray-800 text-white">
+                <th className="border border-gray-300 px-3 py-2 text-left text-sm">
+                  Qty
+                </th>
+                <th className="border border-gray-300 px-3 py-2 text-left text-sm">
+                  Item
+                </th>
+                <th className="border border-gray-300 px-3 py-2 text-left text-sm">
+                  Description
+                </th>
+                <th className="border border-gray-300 px-3 py-2 text-right text-sm">
+                  Rate
+                </th>
+                <th className="border border-gray-300 px-3 py-2 text-right text-sm">
+                  Amount
+                </th>
+                <th className="border border-gray-300 px-3 py-2 text-right text-sm">
+                  Total
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {(() => {
+                const lineItems = inlineInvoiceData.lineItems || [];
+
+                const getHeaderName = (item: any) =>
+                  item.parent_header_name || item.parentHeaderName || null;
+
+                const normalizedItems = lineItems
+                  .filter((item: any) => item.type !== "header")
+                  .map((item: any) => ({
+                    ...item,
+                    qty: item.qty ?? item.stock_quantity ?? 0,
+                    item: item.item ?? item.product_name ?? "-",
+                    rate: item.rate ?? item.unit_cost ?? 0,
+                    estimatedPrice:
+                      item.estimatedPrice ?? item.estimated_price ?? 0,
+                    total: item.total ?? item.total_cost ?? 0,
+                    parent_header_name: getHeaderName(item),
+                  }));
+
+                const directItems = normalizedItems.filter(
+                  (item: any) => !item.parent_header_name,
+                );
+
+                const groupedMap = normalizedItems.reduce(
+                  (acc: Record<string, any[]>, item: any) => {
+                    const headerName = item.parent_header_name;
+                    if (!headerName) return acc;
+
+                    if (!acc[headerName]) {
+                      acc[headerName] = [];
+                    }
+
+                    acc[headerName].push(item);
+                    return acc;
+                  },
+                  {},
+                );
+
+                const orderedRows: any[] = [
+                  ...directItems,
+                  ...Object.entries(groupedMap).flatMap(([headerName, items]) => [
+                    {
+                      id: `header-${headerName}`,
+                      type: "synthetic-header",
+                      headerName,
+                    },
+                    ...items,
+                  ]),
+                ];
+
+                return orderedRows.map((lineItem: any, index: number) => {
+                  if (lineItem.type === "synthetic-header") {
+                    return (
+                      <tr key={lineItem.id} className="bg-transparent">
+                        <td
+                          colSpan={6}
+                          className="px-0 py-0 border border-gray-300 bg-white"
+                        >
+                          <div className="w-full bg-gray-800 px-3 py-2 text-white">
+                            <span className="text-sm font-semibold tracking-wide">
+                              {lineItem.headerName || ""}
+                            </span>
+                          </div>
+                        </td>
                       </tr>
-                    ))} */}
-                    {(() => {
-                      const lineItems = inlineInvoiceData.lineItems || [];
+                    );
+                  }
 
-                      const getHeaderName = (item: any) =>
-                        item.parent_header_name ||
-                        item.parentHeaderName ||
-                        null;
+                  return (
+                    <tr
+                      key={lineItem.id || index}
+                      className="bg-white transition-colors hover:bg-gray-50"
+                    >
+                      <td className="border border-gray-300 px-3 py-2 text-center align-middle text-sm">
+                        <div className="flex items-center justify-center gap-2">
+                          <span>{lineItem.qty || 0}</span>
+                        </div>
+                      </td>
 
-                      const normalizedItems = lineItems
-                        .filter((item: any) => item.type !== "header")
-                        .map((item: any) => ({
-                          ...item,
-                          qty: item.qty ?? item.stock_quantity ?? 0,
-                          item: item.item ?? item.product_name ?? "-",
-                          rate: item.rate ?? item.unit_cost ?? 0,
-                          estimatedPrice:
-                            item.estimatedPrice ?? item.estimated_price ?? 0,
-                          total: item.total ?? item.total_cost ?? 0,
-                          parent_header_name: getHeaderName(item),
-                        }));
+                      <td className="border border-gray-300 px-3 py-2 align-middle">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium text-gray-900">
+                            {lineItem.item || "-"}
+                          </span>
+                        </div>
+                      </td>
 
-                      const directItems = normalizedItems.filter(
-                        (item: any) => !item.parent_header_name,
-                      );
+                      <td className="border border-gray-300 px-3 py-2 align-top">
+                        <div className="max-h-[72px] overflow-y-auto pr-1 text-sm leading-5 text-gray-700">
+                          {lineItem.description || "-"}
+                        </div>
+                      </td>
 
-                      const groupedMap = normalizedItems.reduce(
-                        (acc: Record<string, any[]>, item: any) => {
-                          const headerName = item.parent_header_name;
-                          if (!headerName) return acc;
+                      <td className="border border-gray-300 px-3 py-2 text-right align-middle text-sm">
+                        ${Number(lineItem.rate || 0).toFixed(2)}
+                      </td>
 
-                          if (!acc[headerName]) {
-                            acc[headerName] = [];
-                          }
+                      <td className="border border-gray-300 px-3 py-2 text-right align-middle text-sm">
+                        ${Number(lineItem.estimatedPrice || 0).toFixed(2)}
+                      </td>
 
-                          acc[headerName].push(item);
-                          return acc;
-                        },
-                        {},
-                      );
+                      <td className="border border-gray-300 px-3 py-2 text-right font-medium align-middle text-sm">
+                        ${(lineItem.total || 0).toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                });
+              })()}
+            </tbody>
+          </table>
 
-                      const orderedRows: any[] = [
-                        ...directItems,
-                        ...Object.entries(groupedMap).flatMap(
-                          ([headerName, items]) => [
-                            {
-                              id: `header-${headerName}`,
-                              type: "synthetic-header",
-                              headerName,
-                            },
-                            ...items,
-                          ],
-                        ),
-                      ];
-
-                      return orderedRows.map((lineItem: any, index: number) => {
-                        if (lineItem.type === "synthetic-header") {
-                          return (
-                            <tr key={lineItem.id} className="bg-transparent">
-                              <td
-                                colSpan={6}
-                                className="px-0 py-0 border border-gray-300 bg-white"
-                              >
-                                <div className="w-full bg-gray-800 px-3 py-2 text-white">
-                                  <span className="text-[15px] font-semibold tracking-wide">
-                                    {lineItem.headerName || ""}
-                                  </span>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        }
-
-                        return (
-                          <tr
-                            key={lineItem.id || index}
-                            className="bg-white transition-colors hover:bg-gray-50"
-                          >
-                            <td className="border border-gray-300 px-3 py-2 text-center align-middle">
-                              <div className="flex items-center justify-center gap-2">
-                                <span>{lineItem.qty || 0}</span>
-                              </div>
-                            </td>
-
-                            <td className="border border-gray-300 px-3 py-2 align-middle">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-sm font-medium text-gray-900">
-                                  {lineItem.item || "-"}
-                                </span>
-                              </div>
-                            </td>
-
-                            <td className="border border-gray-300 px-3 py-2 align-top">
-                              <div className="max-h-[90px] overflow-y-auto pr-1 text-sm leading-6 text-gray-700">
-                                {lineItem.description || "-"}
-                              </div>
-                            </td>
-
-                            <td className="border border-gray-300 px-3 py-2 text-right align-middle">
-                              ${Number(lineItem.rate || 0).toFixed(2)}
-                            </td>
-
-                            <td className="border border-gray-300 px-3 py-2 text-right align-middle">
-                              ${Number(lineItem.estimatedPrice || 0).toFixed(2)}
-                            </td>
-
-                            <td className="border border-gray-300 px-3 py-2 text-right font-medium align-middle">
-                              ${(lineItem.total || 0).toFixed(2)}
-                            </td>
-                          </tr>
-                        );
-                      });
-                    })()}
-                  </tbody>
-                </table>
-
-                {/* Subtotal */}
-                <div className="flex justify-end mt-4">
-                  <div className="text-right">
-                    <div className="font-bold text-lg">
-                      ${calculateInvoiceSubtotal().toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Payments/Credits and Balance Due */}
-                <div className="flex justify-end mt-4">
-                  <div className="text-right w-64">
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm text-gray-600">
-                        Payments / Credits:
-                      </span>
-                      <span className="text-sm text-gray-600">
-                        ${(inlineInvoiceData.paymentCredits || 0).toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between bg-gray-100 p-2 rounded">
-                      <span className="font-bold text-sm">Balance Due:</span>
-                      <span className="font-bold text-sm">
-                        $
-                        {(
-                          calculateInvoiceSubtotal() -
-                          (inlineInvoiceData.paymentCredits || 0)
-                        ).toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Notes Section */}
-              <div className="border-t pt-4 mb-6">
-                <div className="bg-gray-100 p-3 rounded text-center">
-                  <div className="text-sm font-medium whitespace-pre-line">
-                    {inlineInvoiceData.notes ||
-                      "Final payment to complete project billing"}
-                  </div>
-                </div>
-              </div>
-
-              {/* Disclaimer */}
-              <div className="text-xs text-gray-600 mb-6">
-                <p className="mb-2">
-                  JDP is not responsible for repair of lamps & landscaping,
-                  house owner utilities including cables, sprinkler systems,
-                  television or telephone cables, etc. that may be cut or
-                  damaged during installation. Price are subject to change prior
-                  to receipt of down payment.
-                </p>
-              </div>
-
-              {/* Total and Contact */}
-              <div className="text-center mb-6">
-                {/* <div className="text-2xl font-bold mb-4">Total ${calculateInvoiceSubtotal().toFixed(2)}</div> */}
-                <div className="text-sm text-blue-600">
-                  EMAIL: jen@jdpelectric.us 952-449-1088
-                </div>
-              </div>
-              <div className="secnacher">
-                {/* Customer Acceptance Section */}
-                <div className="mt-8">
-                  {/* Top separator line */}
-                  <div className="border-t border-gray-300 mb-6"></div>
-
-                  {/* Customer Acceptance Header */}
-                  <div className="flex justify-between items-center mb-5">
-                    <div className="flex flex-col">
-                      <div className="text-sm font-medium text-gray-700 mb-1">
-                        Customer Acceptance
-                      </div>
-                      <div className="text-sm font-medium text-gray-700">
-                        Authorized Signature
-                      </div>
-                    </div>
-                    <div className="text-sm font-medium text-gray-700">
-                      Date
-                    </div>
-                  </div>
-
-                  {/* Signature Fields */}
-                  <div className="flex justify-between items-center mb-5">
-                    <div className="flex flex-col w-3/5">
-                      <div className="border-b border-gray-800 h-0.5 mb-2"></div>
-                      <div className="text-xs text-gray-700 text-center">
-                        Signature
-                      </div>
-                    </div>
-                    <div className="flex flex-col w-1/3">
-                      <div className="border-b border-gray-800 h-0.5 mb-2"></div>
-                      <div className="text-xs text-gray-700 text-center">
-                        Date
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Disclaimer Box */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mt-5">
-                    <div className="text-xs text-gray-700 leading-relaxed">
-                      By signing above, you agree to the terms and pricing
-                      outlined in this estimate. This becomes a binding
-                      agreement upon signature.
-                    </div>
-                  </div>
-                </div>
+          {/* Subtotal */}
+          <div className="flex justify-end mt-3">
+            <div className="text-right">
+              <div className="font-bold text-base">
+                ${calculateInvoiceSubtotal().toFixed(2)}
               </div>
             </div>
           </div>
 
-          {/* Modal Footer Buttons */}
-          <div className="flex justify-center gap-4 p-6 bg-gray-50 border-t">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowPreviewDialog(false);
-                // Reset form when closing preview
-                if (!editingInvoiceId) {
-                  setShowInlineInvoiceForm(false);
-                  setEditingInvoiceId(null);
-                  setInvoiceValidationErrors({});
-
-                  setInlineInvoiceData({
-                    date: new Date().toISOString().split("T")[0],
-                    estimateNumber: "",
-                    customerName: job.customerName || "",
-                    customerAddress: job.address || "",
-                    billToAddress: job.billToAddress || "",
-                    billToAddressEnabled: true,
-                    poNumber: "",
-                    project: job.title || "",
-                    rep: "",
-                    dueDate: "",
-                    paymentCredits: 0,
-                    balanceDue: "",
-                    lineItems: [
-                      {
-                        id: Math.random().toString(36).substring(2, 9),
-                        productId: null,
-                        headerName: "",
-                        type: "",
-                        qty: 1,
-                        item: "",
-                        description: "",
-                        rate: 0,
-                        estimatedPrice: 0,
-                        total: 0,
-                        searchQuery: "",
-                        showSearchResults: false,
-                        supplierId: 1,
-                        isCustomProduct: false,
-                        estimate_product_id: null,
-                      },
-                    ],
-                    notes:
-                      "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
-                    signatureText: "ACCEPTED BY________________DATE_____",
-                    invoiceType: "Estimate",
-                    customInvoiceType: "",
-                    paymentPercentage: 0,
-                    estimateTotal: 0,
-                    paymentHistory: [] as any[],
-                  });
-                }
-              }}
-              className="flex items-center gap-2"
-            >
-              <X className="h-4 w-4" />
-              Close
-            </Button>
-
-            <Button
-              onClick={handleSendFromPreview}
-              disabled={isLoading}
-              className="bg-gray-800 hover:bg-gray-900 text-white flex items-center gap-2"
-            >
-              <Send className="h-4 w-4" />
-              {isLoading ? "Sending..." : "Send Invoice"}
-            </Button>
+          {/* Payments/Credits and Balance Due */}
+          <div className="flex justify-end mt-3">
+            <div className="text-right w-60">
+              <div className="flex justify-between mb-1.5">
+                <span className="text-sm text-gray-600">
+                  Payments / Credits:
+                </span>
+                <span className="text-sm text-gray-600">
+                  ${(inlineInvoiceData.paymentCredits || 0).toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between bg-gray-100 px-3 py-2 rounded">
+                <span className="font-bold text-sm">Balance Due:</span>
+                <span className="font-bold text-sm">
+                  $
+                  {(
+                    calculateInvoiceSubtotal() -
+                    (inlineInvoiceData.paymentCredits || 0)
+                  ).toFixed(2)}
+                </span>
+              </div>
+            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+
+        {/* Notes Section */}
+        <div className="border-t pt-3 mb-4">
+          <div className="bg-gray-100 px-3 py-2 rounded text-center">
+            <div className="text-sm font-medium whitespace-pre-line leading-5">
+              {inlineInvoiceData.notes ||
+                "Final payment to complete project billing"}
+            </div>
+          </div>
+        </div>
+
+        {/* Disclaimer */}
+        <div className="text-xs text-gray-600 mb-4 leading-5">
+          <p>
+            JDP is not responsible for repair of lamps & landscaping, house
+            owner utilities including cables, sprinkler systems, television or
+            telephone cables, etc. that may be cut or damaged during
+            installation. Price are subject to change prior to receipt of down
+            payment.
+          </p>
+        </div>
+
+        {/* Total and Contact */}
+        <div className="text-center mb-4">
+          <div className="text-sm text-blue-600">
+            EMAIL: jen@jdpelectric.us 952-449-1088
+          </div>
+        </div>
+
+        <div className="secnacher">
+          {/* Customer Acceptance Section */}
+          <div className="mt-5">
+            <div className="border-t border-gray-300 mb-4"></div>
+
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex flex-col">
+                <div className="text-sm font-medium text-gray-700">
+                  Customer Acceptance
+                </div>
+                <div className="text-sm font-medium text-gray-700">
+                  Authorized Signature
+                </div>
+              </div>
+              <div className="text-sm font-medium text-gray-700">Date</div>
+            </div>
+
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex flex-col w-3/5">
+                <div className="border-b border-gray-800 h-0.5 mb-1.5"></div>
+                <div className="text-xs text-gray-700 text-center">
+                  Signature
+                </div>
+              </div>
+              <div className="flex flex-col w-1/3">
+                <div className="border-b border-gray-800 h-0.5 mb-1.5"></div>
+                <div className="text-xs text-gray-700 text-center">Date</div>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-md px-3 py-2.5 mt-3">
+              <div className="text-xs text-gray-700 leading-5">
+                By signing above, you agree to the terms and pricing outlined
+                in this estimate. This becomes a binding agreement upon
+                signature.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Modal Footer Buttons */}
+    <div className="sticky bottom-0 z-20 flex justify-center gap-3 border-t bg-gray-50 p-4">
+      <Button
+        variant="outline"
+        onClick={() => {
+          setShowPreviewDialog(false);
+          if (!editingInvoiceId) {
+            setShowInlineInvoiceForm(false);
+            setEditingInvoiceId(null);
+            setInvoiceValidationErrors({});
+
+            setInlineInvoiceData({
+              date: new Date().toISOString().split("T")[0],
+              estimateNumber: "",
+              customerName: job.customerName || "",
+              customerAddress: job.address || "",
+              billToAddress: job.billToAddress || "",
+              billToAddressEnabled: true,
+              poNumber: "",
+              project: job.title || "",
+              rep: "",
+              dueDate: "",
+              paymentCredits: 0,
+              balanceDue: "",
+              lineItems: [
+                {
+                  id: Math.random().toString(36).substring(2, 9),
+                  productId: null,
+                  headerName: "",
+                  type: "",
+                  qty: 1,
+                  item: "",
+                  description: "",
+                  rate: 0,
+                  estimatedPrice: 0,
+                  total: 0,
+                  searchQuery: "",
+                  showSearchResults: false,
+                  supplierId: 1,
+                  isCustomProduct: false,
+                  estimate_product_id: null,
+                },
+              ],
+              notes:
+                "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
+              signatureText: "ACCEPTED BY________________DATE_____",
+              invoiceType: "Estimate",
+              customInvoiceType: "",
+              paymentPercentage: 0,
+              estimateTotal: 0,
+              paymentHistory: [] as any[],
+            });
+          }
+        }}
+        className="flex items-center gap-2"
+      >
+        <X className="h-4 w-4" />
+        Close
+      </Button>
+
+      <Button
+        onClick={handleSendFromPreview}
+        disabled={isLoading}
+        className="bg-gray-800 hover:bg-gray-900 text-white flex items-center gap-2"
+      >
+        <Send className="h-4 w-4" />
+        {isLoading ? "Sending..." : "Send Invoice"}
+      </Button>
+    </div>
+  </DialogContent>
+</Dialog>
 
       {/* Bluesheet approval dialog (opens from Bluesheets Data card) */}
       <BlueSheetApprovalDialog

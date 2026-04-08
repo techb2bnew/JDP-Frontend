@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import GroupedLineItemsTable from "./GroupedLineItemsTable";
 import { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { toast } from "sonner";
@@ -50,6 +50,8 @@ interface InvoiceLineItemsManagerProps {
   getFilteredProducts: (query: string) => ProductType[];
   onSelectProductData?: (rowId: string, product: ProductType) => void;
   isJobDetail?:boolean
+  invalidHeaderKeys?:string
+  setInvalidHeaderKeys?: () => void;
 }
 
 const createRowId = () =>
@@ -276,25 +278,57 @@ const InvoiceLineItemsManager = ({
   fetchProducts,
   getFilteredProducts,
   onSelectProductData,
-  isJobDetail=false
+  isJobDetail=false,
+  invalidHeaderKeys,
+  setInvalidHeaderKeys
+
 }: InvoiceLineItemsManagerProps) => {
   const [activeDraggedItem, setActiveDraggedItem] =
     useState<LineItemType | null>(null);
-  const [duplicateSectionHeaderKey, setDuplicateSectionHeaderKey] = useState<
-    string | null
-  >(null);
+const [duplicateItemRowId, setDuplicateItemRowId] = useState<string | null>(null);
 
-  const highlightDuplicateSection = (headerKey: string | null) => {
-    if (!headerKey || headerKey === "standalone_header_key") return;
+const highlightInvalidHeaders = (headerKeys: string[] = []) => {
+  setInvalidHeaderKeys(headerKeys);
+};
 
-    setDuplicateSectionHeaderKey(headerKey);
+const clearInvalidHeaderHighlight = () => {
+  setInvalidHeaderKeys([]);
+};
 
-    window.setTimeout(() => {
-      setDuplicateSectionHeaderKey((prev) =>
-        prev === headerKey ? null : prev,
-      );
-    }, 2500);
-  };
+const highlightDuplicateItem = (rowId: string | null) => {
+  if (!rowId) return;
+  setDuplicateItemRowId(rowId);
+};
+
+const duplicateRowRef = useRef<HTMLElement | null>(null);
+const dropdownPortalRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!duplicateItemRowId) return;
+
+    const handleDocumentMouseDown = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+
+      const clickedInsideHighlightedRow =
+        duplicateRowRef.current?.contains(target) ?? false;
+
+      const clickedInsideDropdown =
+        dropdownPortalRef.current?.contains(target) ?? false;
+
+      if (clickedInsideHighlightedRow || clickedInsideDropdown) {
+        return;
+      }
+
+      setDuplicateItemRowId(null);
+    };
+
+    document.addEventListener("mousedown", handleDocumentMouseDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handleDocumentMouseDown);
+    };
+  }, [duplicateItemRowId]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const activeId = String(event.active.id);
@@ -387,48 +421,109 @@ const InvoiceLineItemsManager = ({
     });
   };
 
+  // const handleUpdateLineItem = (rowId: string, field: string, value: any) => {
+  //   // if (field === "headerName") {
+  //   //   setInvalidHeaderKeys((prev) =>
+  //   //     prev.filter((key) => key !== row.headerKey),
+  //   //   );
+  //   // }
+  //   setLineItems((prev) => {
+  //     const updatedRows = prev.map((row) => {
+  //       if (row.id !== rowId) return row;
+
+  //       const updated = { ...row, [field]: value };
+
+  //       if (
+  //         updated.type === "item" &&
+  //         ["qty", "rate", "estimatedPrice"].includes(field)
+  //       ) {
+  //         const qty = Number(updated.qty) || 0;
+  //         const priceToUse =
+  //           Number(updated.estimatedPrice) > 0
+  //             ? Number(updated.estimatedPrice)
+  //             : Number(updated.rate) || 0;
+
+  //         updated.total = qty * priceToUse;
+  //       }
+
+  //       return updated;
+  //     });
+
+  //     const changedHeader = updatedRows.find(
+  //       (row) => row.id === rowId && row.type === "header",
+  //     );
+
+  //     if (changedHeader && field === "headerName") {
+  //       updatedRows.forEach((row) => {
+  //         if (
+  //           row.type === "item" &&
+  //           row.parentHeaderKey === changedHeader.headerKey
+  //         ) {
+  //           row.parentHeaderName = value || null;
+  //         }
+  //       });
+  //     }
+
+  //     return updatedRows;
+  //   });
+  // };
+
+
   const handleUpdateLineItem = (rowId: string, field: string, value: any) => {
-    setLineItems((prev) => {
-      const updatedRows = prev.map((row) => {
-        if (row.id !== rowId) return row;
+  setLineItems((prev) => {
+    const updatedRows = prev.map((row) => {
+      if (row.id !== rowId) return row;
 
-        const updated = { ...row, [field]: value };
+      const updated = { ...row, [field]: value };
 
-        if (
-          updated.type === "item" &&
-          ["qty", "rate", "estimatedPrice"].includes(field)
-        ) {
-          const qty = Number(updated.qty) || 0;
-          const priceToUse =
-            Number(updated.estimatedPrice) > 0
-              ? Number(updated.estimatedPrice)
-              : Number(updated.rate) || 0;
+      if (
+        updated.type === "item" &&
+        ["qty", "rate", "estimatedPrice"].includes(field)
+      ) {
+        const qty = Number(updated.qty) || 0;
+        const priceToUse =
+          Number(updated.estimatedPrice) > 0
+            ? Number(updated.estimatedPrice)
+            : Number(updated.rate) || 0;
 
-          updated.total = qty * priceToUse;
-        }
-
-        return updated;
-      });
-
-      const changedHeader = updatedRows.find(
-        (row) => row.id === rowId && row.type === "header",
-      );
-
-      if (changedHeader && field === "headerName") {
-        updatedRows.forEach((row) => {
-          if (
-            row.type === "item" &&
-            row.parentHeaderKey === changedHeader.headerKey
-          ) {
-            row.parentHeaderName = value || null;
-          }
-        });
+        updated.total = qty * priceToUse;
       }
 
-      return updatedRows;
+      return updated;
     });
-  };
 
+    const changedHeader = updatedRows.find(
+      (row) => row.id === rowId && row.type === "header",
+    );
+
+    if (changedHeader && field === "headerName") {
+      updatedRows.forEach((row) => {
+        if (
+          row.type === "item" &&
+          row.parentHeaderKey === changedHeader.headerKey
+        ) {
+          row.parentHeaderName = value || null;
+        }
+      });
+
+      const trimmedValue = String(value || "").trim();
+
+      setInvalidHeaderKeys((prev) => {
+        const withoutCurrent = prev.filter(
+          (key) => key !== changedHeader.headerKey,
+        );
+
+        if (!trimmedValue && changedHeader.headerKey) {
+          return [...withoutCurrent, changedHeader.headerKey];
+        }
+
+        return withoutCurrent;
+      });
+    }
+
+    return updatedRows;
+  });
+};
   const handleRemoveLineItem = (rowId: string) => {
     setLineItems((prev) => {
       const target = prev.find((row) => row.id === rowId);
@@ -605,7 +700,7 @@ const InvoiceLineItemsManager = ({
     });
 
     if (duplicateItemInSameSection) {
-      highlightDuplicateSection(targetHeaderKey);
+      highlightDuplicateItem(duplicateItemInSameSection.id);
 
       toast(
         "This product is already added in this section. You can increase its quantity instead.",
@@ -799,8 +894,11 @@ const InvoiceLineItemsManager = ({
       onAddCustomFromSearch={handleAddCustomFromSearch}
       getFilteredProducts={getFilteredProducts}
       subtotal={calculateSubtotal()}
-      duplicateSectionHeaderKey={duplicateSectionHeaderKey}
+      duplicateItemRowId={duplicateItemRowId}
       isJobDetail={isJobDetail}
+       duplicateRowRef={duplicateRowRef}
+       dropdownPortalRef={dropdownPortalRef}
+       invalidHeaderKeys={invalidHeaderKeys}
     />
   );
 };

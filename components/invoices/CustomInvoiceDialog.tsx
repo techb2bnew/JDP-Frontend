@@ -34,6 +34,9 @@ interface CustomInvoiceDialogProps {
   // Optional callback when preview+send completes successfully
   onDone?: () => void
   onLineItemsSync?: (lineItems: any[]) => void
+  invalidHeaderKeys?:string[]
+  setInvalidHeaderKeys?: () => void;
+  validateHeaderGroupsBeforeSubmit? :()=>void
 }
 
 
@@ -116,7 +119,10 @@ export const CustomInvoiceDialog = ({
   onInvoiceSaved,
   registerPreviewAndSend,
   onDone,
-  onLineItemsSync
+  onLineItemsSync,
+  invalidHeaderKeys,
+  setInvalidHeaderKeys,
+  validateHeaderGroupsBeforeSubmit
 }: CustomInvoiceDialogProps) => {
   // Derive viewInvoiceData and job list from blueSheet (custom invoice from bluesheet)
   const viewInvoiceData = useMemo(() => {
@@ -260,7 +266,8 @@ export const CustomInvoiceDialog = ({
   const [jobsList, setJobsList] = useState<any[]>([])
   const [selectedJob, setSelectedJob] = useState<any>(null)
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-  const [totalProductAmount, settotalProductAmount] = useState(0)
+  const [totalProductAmount, settotalProductAmount] = useState(0);
+  
 
   // Refs to ensure we always read the latest typed values from the inputs
   const dueDateRef = useRef<HTMLInputElement | null>(null)
@@ -270,7 +277,8 @@ export const CustomInvoiceDialog = ({
   // If user edits/adds/removes line items, don't let viewInvoiceData effect overwrite them
   const hasUserTouchedLineItemsRef = useRef(false)
   // Always keep latest line items (avoid stale state at send-time)
-  const lineItemsRef = useRef<any[]>([])
+  const lineItemsRef = useRef<any[]>([]);
+  
 
   const currentJob = selectedJob || jobs?.find((j: any) => j.id === jobId)
 
@@ -312,11 +320,9 @@ export const CustomInvoiceDialog = ({
     paymentPercentage: 0,
     estimateTotal: 0,
     paymentHistory: [] as any[]
-  }) 
+  });
 
- useEffect(() => {
-  console.log('inlineInvoiceData:11111111111', inlineInvoiceData)
- }, [inlineInvoiceData])
+
 
   useEffect(() => {
     lineItemsRef.current = inlineInvoiceData.lineItems
@@ -890,6 +896,11 @@ console.log(totalAmount,"amounttt");
       return;
     }
 
+    
+    if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
+      return;
+    }
+
     setValidationErrors({});
     setSendingInvoice(true);
 
@@ -1377,715 +1388,602 @@ console.log(totalAmount,"amounttt");
 
   return (
     <div key={viewInvoiceData?.id || "new-invoice"} className="w-full">
-      {/* <DialogHeader>
-          <DialogTitle>Create New Invoice</DialogTitle>
-          <DialogDescription>
-            Create a comprehensive invoice for your project
-          </DialogDescription>
-        </DialogHeader> */}
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.4 }}
+    className="mb-4"
+  >
+    <Card className="bg-white shadow-lg border-2 border-primary/20 overflow-hidden">
+      {/* Invoice Type Selector */}
+      <div className="p-4 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Label className="text-primary font-semibold text-sm">
+            Invoice Type:
+          </Label>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="mb-6"
-      >
-        <Card className="bg-white shadow-lg border-2 border-primary/20">
-          {/* Invoice Type Selector */}
-          <div className="p-6 border-b border-gray-200 bg-gray-50">
-            <div className="flex items-center gap-4">
-              <Label className="text-primary font-semibold">
-                Invoice Type:
-              </Label>
-              <div className="relative w-[250px]">
-                <Select
-                  value={inlineInvoiceData.invoiceType}
-                  onValueChange={(value) =>
+          <div className="relative w-[220px]">
+            <Select
+              value={inlineInvoiceData.invoiceType}
+              onValueChange={(value) =>
+                setInlineInvoiceData((prev) => ({
+                  ...prev,
+                  invoiceType: value,
+                }))
+              }
+            >
+              <SelectTrigger className="h-9 border-primary/30 focus:border-primary">
+                <SelectValue placeholder="Select invoice type..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Estimate">Estimate</SelectItem>
+                <SelectItem value="Downpayment Invoice">
+                  Downpayment Invoice
+                </SelectItem>
+                <SelectItem value="Rough Invoice">Rough Invoice</SelectItem>
+                <SelectItem value="Progressive Invoice">
+                  Progressive Invoice
+                </SelectItem>
+                <SelectItem value="Final Invoice">Final Invoice</SelectItem>
+                <SelectItem value="Custom">+ Add Custom</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {inlineInvoiceData.invoiceType === "Custom" && (
+            <div className="relative w-[260px]">
+              <Input
+                value={inlineInvoiceData.customInvoiceType}
+                onChange={(e) =>
+                  setInlineInvoiceData((prev) => ({
+                    ...prev,
+                    customInvoiceType: e.target.value,
+                  }))
+                }
+                placeholder="Enter custom invoice type name..."
+                className="h-9 border-primary/30 focus:border-primary"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="max-h-[calc(90vh-132px)] overflow-y-auto">
+        <div className="p-5">
+          {/* Header */}
+          <div className="flex justify-between items-end gap-4 mb-5">
+            <div className="flex-shrink-0">
+              <Image
+                src="/assets/logos/logo-jdp.png"
+                alt="logo"
+                width={168}
+                height={63}
+                className="w-[120px]"
+              />
+            </div>
+
+            <div className="text-right">
+              <h1 className="text-xl font-bold mb-2">
+                {inlineInvoiceData.invoiceType === "Custom"
+                  ? inlineInvoiceData.customInvoiceType
+                  : inlineInvoiceData.invoiceType}
+              </h1>
+
+              <div className="grid grid-cols-2">
+                <Label className="text-right bg-gray-600 text-white px-3 py-2 text-xs font-semibold">
+                  Date
+                </Label>
+                <Input
+                  value={inlineInvoiceData.date}
+                  onChange={(e) =>
                     setInlineInvoiceData((prev) => ({
                       ...prev,
-                      invoiceType: value,
+                      date: e.target.value,
                     }))
                   }
-                >
-                  <SelectTrigger className="border-primary/30 focus:border-primary">
-                    <SelectValue placeholder="Select invoice type..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Estimate">Estimate</SelectItem>
-                    <SelectItem value="Downpayment Invoice">
-                      Downpayment Invoice
-                    </SelectItem>
-                    <SelectItem value="Rough Invoice">Rough Invoice</SelectItem>
-                    <SelectItem value="Progressive Invoice">
-                      Progressive Invoice
-                    </SelectItem>
-                    <SelectItem value="Final Invoice">Final Invoice</SelectItem>
-                    <SelectItem value="Custom">+ Add Custom</SelectItem>
-                  </SelectContent>
-                </Select>
+                  className="h-9 px-3 py-2 text-sm rounded-none"
+                  readOnly={isViewMode}
+                />
               </div>
-              {inlineInvoiceData.invoiceType === "Custom" && (
-                <div className="relative w-[300px]">
-                  <Input
-                    value={inlineInvoiceData.customInvoiceType}
-                    onChange={(e) =>
-                      setInlineInvoiceData((prev) => ({
-                        ...prev,
-                        customInvoiceType: e.target.value,
-                      }))
-                    }
-                    placeholder="Enter custom invoice type name..."
-                    className="border-primary/30 focus:border-primary"
-                  />
+
+              {isViewMode && (
+                <div className="grid grid-cols-2">
+                  <Label className="text-right bg-gray-600 text-white px-3 py-2 text-xs font-semibold">
+                    {inlineInvoiceData.invoiceType === "Estimate"
+                      ? "Estimate #"
+                      : "Invoice #"}
+                  </Label>
+                  <div>
+                    <Input
+                      value={
+                        inlineInvoiceData.estimateNumber ||
+                        viewInvoiceData?.invoice_number ||
+                        ""
+                      }
+                      className="h-9 px-3 py-2 text-sm rounded-none"
+                      disabled={true}
+                    />
+                  </div>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="p-8">
-            {/* Header */}
-            <div className="flex justify-between items-end mb-8">
-              <div className="flex-shrink-0">
-                <Image
-                  src="/assets/logos/logo-jdp.png"
-                  alt="logo"
-                  width={168}
-                  height={63}
-                  className="w-[140px] "
-                />
-              </div>
+          {/* Job Selection - auto-selected from blueSheet, disabled */}
+          <div className="mb-4">
+            <Label className="block bg-gray-600 text-white px-3 py-2 text-xs font-semibold">
+              Job
+            </Label>
+            <div className="border border-gray-300 p-3">
+              <Select
+                value={String(blueSheet?.job_id || "job")}
+                onValueChange={() => {}}
+                disabled={true}
+              >
+                <SelectTrigger className="h-9 border-primary/30 focus:border-primary bg-gray-50 cursor-not-allowed opacity-90">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={String(blueSheet?.job_id || "job")}>
+                    {blueSheet
+                      ? `#${blueSheet.job_id} - ${blueSheet.job?.job_title || "Job"}`
+                      : "Job"}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
 
-              <div className="text-right">
-                <h1 className="text-2xl font-bold mb-4">
-                  {inlineInvoiceData.invoiceType === "Custom"
-                    ? inlineInvoiceData.customInvoiceType
-                    : inlineInvoiceData.invoiceType}
-                </h1>
-                <div className="grid grid-cols-2">
-                  <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">
-                    Date
-                  </Label>
-                  <Input
-                    value={inlineInvoiceData.date}
-                    onChange={(e) =>
-                      setInlineInvoiceData((prev) => ({
-                        ...prev,
-                        date: e.target.value,
-                      }))
-                    }
-                    className="px-3 py-2 text-sm"
-                    readOnly={isViewMode}
-                  />
-                </div>
-                {/* Show Estimate Number only in view mode */}
-                {isViewMode && (
-                  <div className="grid grid-cols-2">
-                    <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">
-                      {inlineInvoiceData.invoiceType === "Estimate"
-                        ? "Estimate #"
-                        : "Invoice #"}
-                    </Label>
-                    <div>
-                      <Input
-                        value={
-                          inlineInvoiceData.estimateNumber ||
-                          viewInvoiceData?.invoice_number ||
-                          ""
-                        }
-                        className="px-3 py-2 text-sm"
-                        disabled={true}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
+              {validationErrors.jobId && (
+                <p className="text-red-500 text-xs mt-1">
+                  {validationErrors.jobId}
+                </p>
+              )}
             </div>
+          </div>
 
-            {/* Job Selection - auto-selected from blueSheet, disabled */}
-            <div className="mb-6">
-              <Label className="block bg-gray-600 text-white px-3 py-2 mb-0 text-sm font-semibold">
-                Job
-              </Label>
-              <div className="border border-gray-300 p-4">
-                <Select
-                  value={String(blueSheet?.job_id || "job")}
-                  onValueChange={() => {}}
-                  disabled={true}
+          {/* Bill To Section */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between bg-gray-600 text-white px-3 py-2">
+              <div className="flex items-center">
+                <svg
+                  className="w-4 h-4 mr-2"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
                 >
-                  <SelectTrigger className="border-primary/30 focus:border-primary bg-gray-50 cursor-not-allowed opacity-90">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={String(blueSheet?.job_id || "job")}>
-                      {blueSheet
-                        ? `#${blueSheet.job_id} - ${blueSheet.job?.job_title || "Job"}`
-                        : "Job"}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                {validationErrors.jobId && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {validationErrors.jobId}
-                  </p>
-                )}
+                  <path
+                    fillRule="evenodd"
+                    d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-6a1 1 0 00-1-1H9a1 1 0 00-1 1v6a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <Label className="text-xs font-semibold">
+                  Bill To (Billing Address)
+                </Label>
+              </div>
+
+              <div className="flex items-center">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setInlineInvoiceData((prev) => ({
+                      ...prev,
+                      billToAddressEnabled: !prev.billToAddressEnabled,
+                    }))
+                  }
+                  className={`mr-1 px-3 py-1 rounded text-xs font-medium transition-colors ${
+                    inlineInvoiceData.billToAddressEnabled
+                      ? "bg-red-100 text-red-700 hover:bg-red-200"
+                      : "bg-green-100 text-green-700 hover:bg-green-200"
+                  }`}
+                >
+                  {inlineInvoiceData.billToAddressEnabled ? (
+                    <>
+                      <svg
+                        className="w-3 h-3 inline mr-1"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Disable
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className="w-3 h-3 inline mr-1"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Enable
+                    </>
+                  )}
+                </button>
               </div>
             </div>
 
-            {/* Bill To Section */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between bg-gray-600 text-white px-3 py-2 mb-0">
+            {inlineInvoiceData.billToAddressEnabled && (
+              <Textarea
+                value={inlineInvoiceData.billToAddress || ""}
+                onChange={(e) =>
+                  setInlineInvoiceData({
+                    ...inlineInvoiceData,
+                    billToAddress: e.target.value,
+                  })
+                }
+                className="mt-0 border-0 rounded-none min-h-[76px]"
+                placeholder="Enter billing address (defaults to customer/supplier address, can be edited)"
+                rows={3}
+                readOnly={isViewMode}
+              />
+            )}
+
+            {!inlineInvoiceData.billToAddressEnabled && (
+              <div className="bg-gray-50 px-3 py-2 text-xs text-gray-600">
                 <div className="flex items-center">
                   <svg
-                    className="w-4 h-4 mr-2"
+                    className="w-4 h-4 mr-2 text-yellow-500"
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
                     <path
                       fillRule="evenodd"
-                      d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-6a1 1 0 00-1-1H9a1 1 0 00-1 1v6a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z"
+                      d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
                       clipRule="evenodd"
                     />
                   </svg>
-                  <Label className="text-sm font-semibold">
-                    Bill To (Billing Address)
-                  </Label>
-                </div>
-                <div className="flex items-center">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setInlineInvoiceData((prev) => ({
-                        ...prev,
-                        billToAddressEnabled: !prev.billToAddressEnabled,
-                      }))
-                    }
-                    className={`mr-2 px-3 py-1 rounded text-xs font-medium transition-colors ${
-                      inlineInvoiceData.billToAddressEnabled
-                        ? "bg-red-100 text-red-700 hover:bg-red-200"
-                        : "bg-green-100 text-green-700 hover:bg-green-200"
-                    }`}
-                  >
-                    {inlineInvoiceData.billToAddressEnabled ? (
-                      <>
-                        <svg
-                          className="w-3 h-3 inline mr-1"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                        Disable
-                      </>
-                    ) : (
-                      <>
-                        <svg
-                          className="w-3 h-3 inline mr-1"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                        Enable
-                      </>
-                    )}
-                  </button>
+                  This address defaults to the customer/supplier address but can
+                  be changed if billing address differs from job location
                 </div>
               </div>
-              {inlineInvoiceData.billToAddressEnabled && (
-                <Textarea
-                  value={inlineInvoiceData.billToAddress || ""}
-                  onChange={(e) =>
-                    setInlineInvoiceData({
-                      ...inlineInvoiceData,
-                      billToAddress: e.target.value,
-                    })
-                  }
-                  className="mt-0 border-0 rounded-none"
-                  placeholder="Enter billing address (defaults to customer/supplier address, can be edited)"
-                  rows={3}
-                  readOnly={isViewMode}
-                />
-              )}
-              {!inlineInvoiceData.billToAddressEnabled && (
-                <div className="bg-gray-50 p-3 text-sm text-gray-600">
-                  <div className="flex items-center">
-                    <svg
-                      className="w-4 h-4 mr-2 text-yellow-500"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    This address defaults to the customer/supplier address but
-                    can be changed if billing address differs from job location
-                  </div>
-                </div>
-              )}
-            </div>
+            )}
+          </div>
 
-            {/* Customer Information */}
-            <div className="mb-6">
-              <Label className="block bg-gray-600 text-white px-3 py-2 mb-0 text-sm font-semibold">
-                Customer Name / Address
+          {/* Customer Information */}
+          <div className="mb-4">
+            <Label className="block bg-gray-600 text-white px-3 py-2 text-xs font-semibold">
+              Customer Name / Address
+            </Label>
+            <div className="border border-gray-300 p-3 min-h-[92px]">
+              {(() => {
+                const jobType =
+                  selectedJob?.type ||
+                  selectedJob?.job_type ||
+                  selectedJob?.jobType;
+                const isContractBased =
+                  jobType === "contract_based" ||
+                  jobType === "contract-based" ||
+                  viewInvoiceData?.service_type === "contract_based" ||
+                  viewInvoiceData?.job?.job_type === "contract_based" ||
+                  viewInvoiceData?.contractor_id != null;
+
+                const contractorName =
+                  selectedJob?.contractorName ||
+                  selectedJob?.contractor?.contractor_name ||
+                  selectedJob?.contractor?.contractorName ||
+                  selectedJob?.contractor?.name ||
+                  selectedJob?.contractor?.full_name ||
+                  viewInvoiceData?.contractor?.contractor_name ||
+                  viewInvoiceData?.contractor?.company_name ||
+                  "";
+
+                const contractorAddress =
+                  selectedJob?.contractorAddress ||
+                  selectedJob?.contractor?.address ||
+                  viewInvoiceData?.contractor?.address ||
+                  "";
+
+                const customerName =
+                  inlineInvoiceData.customerName ||
+                  viewInvoiceData?.customer?.customer_name ||
+                  "";
+                const customerAddress =
+                  inlineInvoiceData.customerAddress ||
+                  viewInvoiceData?.customer?.address ||
+                  "";
+
+                const displayName = isContractBased
+                  ? contractorName || customerName
+                  : customerName;
+                const displayAddress = isContractBased
+                  ? contractorAddress || customerAddress
+                  : customerAddress;
+
+                return (
+                  <>
+                    <Input
+                      value={displayName}
+                      onChange={(e) =>
+                        setInlineInvoiceData((prev) => ({
+                          ...prev,
+                          customerName: e.target.value,
+                        }))
+                      }
+                      className="mb-1 h-8 border-0 p-0 focus-visible:ring-0"
+                      placeholder={
+                        isContractBased ? "Contractor Name" : "Customer Name"
+                      }
+                      readOnly
+                    />
+                    <Textarea
+                      value={displayAddress}
+                      onChange={(e) =>
+                        setInlineInvoiceData((prev) => ({
+                          ...prev,
+                          customerAddress: e.target.value,
+                        }))
+                      }
+                      className="border-0 p-0 resize-none focus-visible:ring-0 min-h-[64px]"
+                      rows={3}
+                      placeholder={
+                        isContractBased
+                          ? "Contractor Address"
+                          : "Customer Address"
+                      }
+                      readOnly
+                    />
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* PO and Project */}
+          <div className="mb-4">
+            <div className="grid grid-cols-3 gap-0">
+              <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-xs font-semibold">
+                P.O. No.
               </Label>
-              <div className="border border-gray-300 p-4 min-h-[120px]">
-                {(() => {
-                  const jobType =
-                    selectedJob?.type ||
-                    selectedJob?.job_type ||
-                    selectedJob?.jobType;
-                  const isContractBased =
-                    jobType === "contract_based" ||
-                    jobType === "contract-based" ||
-                    viewInvoiceData?.service_type === "contract_based" ||
-                    viewInvoiceData?.job?.job_type === "contract_based" ||
-                    viewInvoiceData?.contractor_id != null;
-
-                  const contractorName =
-                    selectedJob?.contractorName ||
-                    selectedJob?.contractor?.contractor_name ||
-                    selectedJob?.contractor?.contractorName ||
-                    selectedJob?.contractor?.name ||
-                    selectedJob?.contractor?.full_name ||
-                    viewInvoiceData?.contractor?.contractor_name ||
-                    viewInvoiceData?.contractor?.company_name ||
-                    "";
-
-                  const contractorAddress =
-                    selectedJob?.contractorAddress ||
-                    selectedJob?.contractor?.address ||
-                    viewInvoiceData?.contractor?.address ||
-                    "";
-
-                  const customerName =
-                    inlineInvoiceData.customerName ||
-                    viewInvoiceData?.customer?.customer_name ||
-                    "";
-                  const customerAddress =
-                    inlineInvoiceData.customerAddress ||
-                    viewInvoiceData?.customer?.address ||
-                    "";
-
-                  const displayName = isContractBased
-                    ? contractorName || customerName
-                    : customerName;
-                  const displayAddress = isContractBased
-                    ? contractorAddress || customerAddress
-                    : customerAddress;
-
-                  return (
-                    <>
-                      <Input
-                        value={displayName}
-                        onChange={(e) =>
-                          setInlineInvoiceData((prev) => ({
-                            ...prev,
-                            customerName: e.target.value,
-                          }))
-                        }
-                        className="mb-2 border-0 p-0 focus-visible:ring-0"
-                        placeholder={
-                          isContractBased ? "Contractor Name" : "Customer Name"
-                        }
-                        readOnly
-                      />
-                      <Textarea
-                        value={displayAddress}
-                        onChange={(e) =>
-                          setInlineInvoiceData((prev) => ({
-                            ...prev,
-                            customerAddress: e.target.value,
-                          }))
-                        }
-                        className="border-0 p-0 resize-none focus-visible:ring-0"
-                        rows={3}
-                        placeholder={
-                          isContractBased
-                            ? "Contractor Address"
-                            : "Customer Address"
-                        }
-                        readOnly
-                      />
-                    </>
-                  );
-                })()}
-              </div>
+              <Label className="bg-gray-600 text-white px-3 py-2 text-center text-xs font-semibold">
+                Project
+              </Label>
+              <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-xs font-semibold">
+                Rep
+              </Label>
             </div>
 
-            {/* PO and Project */}
-            <div className="mb-6">
-              <div className="grid grid-cols-3 gap-0">
-                <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">
-                  P.O. No.
-                </Label>
-                <Label className="bg-gray-600 text-white px-3 py-2 text-center text-sm font-semibold">
-                  Project
-                </Label>
-                <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">
-                  Rep
-                </Label>
-              </div>
-              <div className="grid grid-cols-3 gap-0">
-                <div>
-                  <Input
-                    value={inlineInvoiceData.poNumber}
-                    onChange={(e) =>
-                      setInlineInvoiceData((prev) => ({
-                        ...prev,
-                        poNumber: e.target.value,
-                      }))
-                    }
-                    className="px-3 py-2 text-sm rounded-none border-t-0"
-                    placeholder="PO Number"
-                    readOnly={isViewMode}
-                  />
-                </div>
-                <div>
-                  <Input
-                    value={
-                      inlineInvoiceData.project ||
-                      blueSheet?.job?.job_title ||
-                      ""
-                    }
-                    onChange={(e) =>
-                      setInlineInvoiceData((prev) => ({
-                        ...prev,
-                        project: e.target.value,
-                      }))
-                    }
-                    className={`px-3 py-2 text-sm rounded-none border-t-0 ${validationErrors.project ? "border-red-500" : ""}`}
-                    placeholder="Project"
-                    readOnly={isViewMode}
-                  />
-                  {validationErrors.project && (
-                    <p className="text-xs text-red-500 mt-1">
-                      {validationErrors.project}
-                    </p>
-                  )}
-                </div>
+            <div className="grid grid-cols-3 gap-0">
+              <div>
                 <Input
-                  ref={repRef}
-                  value={inlineInvoiceData.rep}
+                  value={inlineInvoiceData.poNumber}
                   onChange={(e) =>
                     setInlineInvoiceData((prev) => ({
                       ...prev,
-                      rep: e.target.value,
+                      poNumber: e.target.value,
                     }))
                   }
-                  className="px-3 py-2 text-sm rounded-none border-t-0"
-                  placeholder="Rep"
+                  className="h-9 px-3 py-2 text-sm rounded-none border-t-0"
+                  placeholder="PO Number"
                   readOnly={isViewMode}
                 />
               </div>
-            </div>
 
-            <div className="mb-6">
-              <div className="grid grid-cols-3 gap-0">
-                <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">
-                  Due Date
-                </Label>
-                <Label className="bg-gray-600 text-white px-3 py-2 text-center text-sm font-semibold">
-                  Payment / Credits
-                </Label>
-                <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">
-                  Balance Due
-                </Label>
-              </div>
-              <div className="grid grid-cols-3 gap-0">
-                <div>
-                  <Input
-                    type="date"
-                    ref={dueDateRef}
-                    value={inlineInvoiceData.dueDate}
-                    onChange={(e) =>
-                      setInlineInvoiceData((prev) => ({
-                        ...prev,
-                        dueDate: e.target.value,
-                      }))
-                    }
-                    className="px-3 py-2 text-sm rounded-none border-t-0"
-                    readOnly={isViewMode}
-                  />
-                </div>
+              <div>
                 <Input
-                  ref={paymentCreditsRef}
-                  value={inlineInvoiceData.paymentCredits}
+                  value={
+                    inlineInvoiceData.project || blueSheet?.job?.job_title || ""
+                  }
                   onChange={(e) =>
                     setInlineInvoiceData((prev) => ({
                       ...prev,
-                      paymentCredits: parseFloat(e.target.value) || 0,
+                      project: e.target.value,
                     }))
                   }
-                  className="px-3 py-2 text-sm rounded-none border-t-0"
-                  placeholder="Payment / Credits"
+                  className={`h-9 px-3 py-2 text-sm rounded-none border-t-0 ${validationErrors.project ? "border-red-500" : ""}`}
+                  placeholder="Project"
                   readOnly={isViewMode}
                 />
+                {validationErrors.project && (
+                  <p className="text-xs text-red-500 mt-1">
+                    {validationErrors.project}
+                  </p>
+                )}
+              </div>
+
+              <Input
+                ref={repRef}
+                value={inlineInvoiceData.rep}
+                onChange={(e) =>
+                  setInlineInvoiceData((prev) => ({
+                    ...prev,
+                    rep: e.target.value,
+                  }))
+                }
+                className="h-9 px-3 py-2 text-sm rounded-none border-t-0"
+                placeholder="Rep"
+                readOnly={isViewMode}
+              />
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <div className="grid grid-cols-3 gap-0">
+              <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-xs font-semibold">
+                Due Date
+              </Label>
+              <Label className="bg-gray-600 text-white px-3 py-2 text-center text-xs font-semibold">
+                Payment / Credits
+              </Label>
+              <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-xs font-semibold">
+                Balance Due
+              </Label>
+            </div>
+
+            <div className="grid grid-cols-3 gap-0">
+              <div>
                 <Input
-                  ref={balanceDueRef}
-                  value={inlineInvoiceData.balanceDue}
+                  type="date"
+                  ref={dueDateRef}
+                  value={inlineInvoiceData.dueDate}
                   onChange={(e) =>
                     setInlineInvoiceData((prev) => ({
                       ...prev,
-                      balanceDue: e.target.value,
+                      dueDate: e.target.value,
                     }))
                   }
-                  className="px-3 py-2 text-sm rounded-none border-t-0"
-                  placeholder="Balance Due"
+                  className="h-9 px-3 py-2 text-sm rounded-none border-t-0"
                   readOnly={isViewMode}
                 />
               </div>
-            </div>
 
-            {/* Line Items Table */}
-            {/* <InvoiceLineItemsManager
-              lineItems={inlineInvoiceData.lineItems}
-              setLineItems={setManagedLineItems}
-              selectedSupplierId={selectedSupplierId}
-              fetchProducts={fetchProducts}
-              getFilteredProducts={getFilteredProducts}
-            /> */}
+              <Input
+                ref={paymentCreditsRef}
+                value={inlineInvoiceData.paymentCredits}
+                onChange={(e) =>
+                  setInlineInvoiceData((prev) => ({
+                    ...prev,
+                    paymentCredits: parseFloat(e.target.value) || 0,
+                  }))
+                }
+                className="h-9 px-3 py-2 text-sm rounded-none border-t-0"
+                placeholder="Payment / Credits"
+                readOnly={isViewMode}
+              />
+
+              <Input
+                ref={balanceDueRef}
+                value={inlineInvoiceData.balanceDue}
+                onChange={(e) =>
+                  setInlineInvoiceData((prev) => ({
+                    ...prev,
+                    balanceDue: e.target.value,
+                  }))
+                }
+                className="h-9 px-3 py-2 text-sm rounded-none border-t-0"
+                placeholder="Balance Due"
+                readOnly={isViewMode}
+              />
+            </div>
+          </div>
+
+          {/* Line Items */}
+          <div className="mb-4">
             <InvoiceLineItemsManager
               lineItems={inlineInvoiceData.lineItems}
-              // setLineItems={(updater) =>
-              //   setInlineInvoiceData((prev) => ({
-              //     ...prev,
-              //     lineItems:
-              //       typeof updater === "function"
-              //         ? updater(prev.lineItems)
-              //         : updater,
-              //   }))
-              // }
+              invalidHeaderKeys={invalidHeaderKeys}
+              setInvalidHeaderKeys={setInvalidHeaderKeys}
               setLineItems={setManagedLineItems}
               selectedSupplierId={selectedSupplierId}
               fetchProducts={fetchProducts}
               getFilteredProducts={getFilteredProducts}
               onSelectProductData={(rowId, product) => {
-                // optional: agar existing autofill logic already hai
                 selectProduct(rowId, product);
               }}
             />
+          </div>
 
-            {/* Notes Section */}
-            <div className="mb-6 overflow-x-auto">
-              <table className="w-full border-collapse">
-                <tbody>
-                  <tr>
-                    <td
-                      className="border border-gray-300 p-3 bg-white text-sm"
-                      style={{ minHeight: "120px" }}
-                    >
-                      <Textarea
-                        value={inlineInvoiceData.notes}
-                        onChange={(e) => {
-                          setInlineInvoiceData((prev) => ({
-                            ...prev,
-                            notes: e.target.value,
-                          }));
-                        }}
-                        className="w-full min-h-[100px] border-0 p-0 focus-visible:ring-0 resize-none"
-                        placeholder="NOTES&#10;JDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE"
-                        readOnly={isViewMode}
-                      />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+          {/* Notes Section */}
+          <div className="mb-4 overflow-x-auto">
+            <table className="w-full border-collapse">
+              <tbody>
+                <tr>
+                  <td
+                    className="border border-gray-300 p-3 bg-white text-sm"
+                    style={{ minHeight: "96px" }}
+                  >
+                    <Textarea
+                      value={inlineInvoiceData.notes}
+                      onChange={(e) => {
+                        setInlineInvoiceData((prev) => ({
+                          ...prev,
+                          notes: e.target.value,
+                        }));
+                      }}
+                      className="w-full min-h-[84px] border-0 p-0 focus-visible:ring-0 resize-none"
+                      placeholder="NOTES&#10;JDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE"
+                      readOnly={isViewMode}
+                    />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer disclaimer and Total */}
+          <div className="mb-4">
+            <div className="border border-gray-300 px-3 py-2.5 text-xs text-center bg-white leading-5">
+              <p>
+                JDP is not responsible for repair of lamps & landscaping, house
+                owner utilities including cables, sprinkler systems, television
+                or telephone cables, etc. that may be cut or damaged during
+                installation. Price are subject to change prior to receipt of
+                down payment.
+              </p>
             </div>
 
-            {/* Footer disclaimer and Total */}
-            <div className="mb-6">
-              <div className="border border-gray-300 p-3 text-xs text-center bg-white">
-                <p>
-                  JDP is not responsible for repair of lamps & landscaping,
-                  house owner utilities including cables, sprinkler systems,
-                  television or telephone cables, etc. that may be cut or
-                  damaged during installation. Price are subject to change prior
-                  to receipt of down payment.
-                </p>
-              </div>
-              <div className="flex justify-end mt-4">
-                {/* <div className="text-right">
-                    <div className="flex items-center gap-4">
-                      <span className="text-xl font-bold">Total</span>
-                      <span className="text-2xl font-bold">
-                        ${calculateInvoiceSubtotal().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  </div> */}
-              </div>
-              <div className="text-center text-sm text-blue-500 font-bold">
-                <p>
-                  1432 Oakpointe Drive Waconia, MN 55387 paul@jdpelectric.us
-                </p>
-              </div>
+            <div className="text-center text-sm text-blue-500 font-bold mt-3">
+              <p>
+                1432 Oakpointe Drive Waconia, MN 55387 paul@jdpelectric.us
+              </p>
             </div>
-            <div className="secnacher">
-              {/* Customer Acceptance Section */}
-              <div className="mt-8">
-                {/* Top separator line */}
-                <div className="border-t border-gray-300 mb-6"></div>
+          </div>
 
-                {/* Customer Acceptance Header */}
-                <div className="flex justify-between items-center mb-5">
-                  <div className="flex flex-col">
-                    <div className="text-sm font-medium text-gray-700 mb-1">
-                      Customer Acceptance
-                    </div>
-                    <div className="text-sm font-medium text-gray-700">
-                      Authorized Signature
-                    </div>
-                  </div>
-                  <div className="text-sm font-medium text-gray-700">Date</div>
-                </div>
+          <div className="secnacher">
+            <div className="mt-5">
+              <div className="border-t border-gray-300 mb-4"></div>
 
-                {/* Signature Fields */}
-                <div className="flex justify-between items-center mb-5">
-                  <div className="flex flex-col w-3/5">
-                    <div className="border-b border-gray-800 h-0.5 mb-2"></div>
-                    <div className="text-xs text-gray-700 text-center">
-                      Signature
-                    </div>
+              <div className="flex justify-between items-center mb-3">
+                <div className="flex flex-col">
+                  <div className="text-sm font-medium text-gray-700">
+                    Customer Acceptance
                   </div>
-                  <div className="flex flex-col w-1/3">
-                    <div className="border-b border-gray-800 h-0.5 mb-2"></div>
-                    <div className="text-xs text-gray-700 text-center">
-                      Date
-                    </div>
+                  <div className="text-sm font-medium text-gray-700">
+                    Authorized Signature
                   </div>
                 </div>
+                <div className="text-sm font-medium text-gray-700">Date</div>
+              </div>
 
-                {/* Disclaimer Box */}
-                <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mt-5">
-                  <div className="text-xs text-gray-700 leading-relaxed">
-                    By signing above, you agree to the terms and pricing
-                    outlined in this estimate. This becomes a binding agreement
-                    upon signature.
+              <div className="flex justify-between items-center mb-3">
+                <div className="flex flex-col w-3/5">
+                  <div className="border-b border-gray-800 h-0.5 mb-1.5"></div>
+                  <div className="text-xs text-gray-700 text-center">
+                    Signature
                   </div>
+                </div>
+                <div className="flex flex-col w-1/3">
+                  <div className="border-b border-gray-800 h-0.5 mb-1.5"></div>
+                  <div className="text-xs text-gray-700 text-center">Date</div>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-md px-3 py-2.5 mt-3">
+                <div className="text-xs text-gray-700 leading-5">
+                  By signing above, you agree to the terms and pricing outlined
+                  in this estimate. This becomes a binding agreement upon
+                  signature.
                 </div>
               </div>
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* Action Buttons */}
-          {!isViewMode && (
-            <div className="border-t bg-gray-50 px-8 py-6">
-              <div className="flex items-center justify-between">
-                {/* <Button
-                    variant="outline"
-                    onClick={() => {
-                      onOpenChange(false)
-                      setValidationErrors({})
-                    }}
-                    className="border-gray-300"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Cancel
-                  </Button> */}
-                <div className="flex gap-3">
-                  {/* <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                      <Button
-                        onClick={handleSaveInvoiceAsDraft}
-                        variant="outline"
-                        size="lg"
-                        className="border-primary text-primary hover:bg-primary/5"
-                        disabled={savingDraft || sendingInvoice}
-                      >
-                        <FileText className="h-5 w-5 mr-2" />
-                        {savingDraft ? 'Saving...' : 'Save as Draft'}
-                      </Button>
-                    </motion.div> */}
-
-                  <motion.div
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    {/* Send button moved to BlueSheetApprovalDialog */}
-                  </motion.div>
-                </div>
-              </div>
+      {/* Action Buttons */}
+      {!isViewMode && (
+        <div className="sticky bottom-0 z-20 border-t bg-gray-50 px-5 py-3">
+          <div className="flex items-center justify-end">
+            <div className="flex gap-3">
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                {/* Send button moved to BlueSheetApprovalDialog */}
+              </motion.div>
             </div>
-          )}
-        </Card>
-      </motion.div>
-      {/* <div className="mb-6">
-                          <div className="grid grid-cols-2 gap-0">
-                            <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">P.O. No.</Label>
-                           </div>
-                          <div className="grid grid-cols-2 gap-0">
-                            <div>
-                              <Input
-                                value={inlineInvoiceData.poNumber}
-                                onChange={(e) => {
-                                  setInlineInvoiceData(prev => ({ ...prev, poNumber: e.target.value }))
-                                  setValidationErrors(prev => ({ ...prev, poNumber: '' }))
-                                }}
-                                className={`px-3 py-2 text-sm rounded-none border-t-0 ${validationErrors.poNumber ? 'border-red-500' : ''}`}
-                                placeholder="PO Number"
-                              />
-                              {validationErrors.poNumber && (
-                                <p className="text-red-500 text-xs mt-1 px-2">{validationErrors.poNumber}</p>
-                              )}
-                            </div>
-                            <div>
-                              <Input
-                                value={inlineInvoiceData.project}
-                                onChange={(e) => {
-                                  setInlineInvoiceData(prev => ({ ...prev, project: e.target.value }))
-                                  setValidationErrors(prev => ({ ...prev, project: '' }))
-                                }}
-                                className={`px-3 py-2 text-sm rounded-none border-t-0 ${validationErrors.project ? 'border-red-500' : ''}`}
-                                readOnly
-                              />
-                              {validationErrors.project && (
-                                <p className="text-red-500 text-xs mt-1 px-2">{validationErrors.project}</p>
-                              )}
-                            </div>
-                          </div>
-                        </div> */}
-      {/* Estimate Selection - Only show for payment invoices */}
-      {/* {inlineInvoiceData.invoiceType !== 'Estimate' && (
-                        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                          <Label className="text-primary font-semibold mb-2 block">Select Estimate</Label>
-                          <Select 
-                            value={selectedEstimateId || ''} 
-                            onValueChange={(value) => handleEstimateSelection(value)}
-                          >
-                            <SelectTrigger className="border-primary/30 focus:border-primary bg-white">
-                              <SelectValue placeholder="Select an estimate to link..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {getAvailableEstimates().map((estimate: any) => (
-                                <SelectItem key={estimate.id} value={estimate.id}>
-                                  {estimate.invoice_number} - {estimate.estimate_title} (${(estimate.total_amount || 0).toLocaleString()})
-                                </SelectItem>
-                              ))}
-                              {getAvailableEstimates().length === 0 && (
-                                <SelectItem value="none" disabled>No estimates available</SelectItem>
-                              )}
-                            </SelectContent>
-                          </Select>
-                          {selectedEstimateId && (
-                            <p className="text-sm text-muted-foreground mt-2">
-                              Estimate Total: ${inlineInvoiceData.estimateTotal?.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                              {inlineInvoiceData.paymentHistory && inlineInvoiceData.paymentHistory.length > 0 && (
-                                <> â€¢ Previous Payments: ${inlineInvoiceData.paymentHistory.reduce((sum, p) => sum + p.amount, 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</>
-                              )}
-                            </p>
-                          )}
-                        </div>
-                      )} */}
+          </div>
+        </div>
+      )}
+    </Card>
+  </motion.div>
     </div>
   );
 }

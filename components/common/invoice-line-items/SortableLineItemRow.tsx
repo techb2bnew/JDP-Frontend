@@ -45,7 +45,10 @@ interface SortableLineItemRowProps {
   onSelectProduct: (rowId: string, product: ProductType) => void;
   onAddCustomFromSearch?: (rowId: string, value: string) => void;
   getFilteredProducts: (query: string) => ProductType[];
-  isJobDetail?:boolean
+  isJobDetail?:boolean;
+  duplicateRowRef?: React.MutableRefObject<HTMLElement | null>;
+  dropdownPortalRef?: React.MutableRefObject<HTMLElement | null>;
+  isDuplicateItem?: boolean;
 }
 
 const SortableLineItemRow = ({
@@ -57,7 +60,11 @@ const SortableLineItemRow = ({
   onSelectProduct,
   onAddCustomFromSearch,
   getFilteredProducts,
-  isJobDetail=false
+  isJobDetail=false,
+  duplicateRowRef,
+  dropdownPortalRef,
+  isDuplicateItem=false
+  
 }: SortableLineItemRowProps) => {
   const {
     setNodeRef,
@@ -89,30 +96,62 @@ const SortableLineItemRow = ({
     };
   }, [lineItem.id, lineItem.showSearchResults, onUpdateRow]);
 
-  const style: React.CSSProperties = {
+ 
+  // const style: React.CSSProperties = {
+  //   transform: CSS.Transform.toString(transform),
+  //   transition: isDragging ? "none" : transition,
+  //   position: "relative",
+  //   zIndex: isDragging ? 1 : "auto",
+  //   opacity: isDragging ? 0.12 : 1,
+  //   boxShadow:isDuplicateItem ? "#3b82f680 0px 5px 15px" : ""
+
+    const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition: isDragging ? "none" : transition,
     position: "relative",
-    zIndex: isDragging ? 1 : "auto",
+    zIndex: isDragging ? 50 : isDuplicateItem ? 10 : 0.5,
     opacity: isDragging ? 0.12 : 1,
+    boxShadow: isDuplicateItem ? "#3b82f680 0px 5px 15px" : "",
   };
+  // };
 
   const filteredProducts = useMemo(
     () => getFilteredProducts(lineItem.searchQuery || ""),
     [getFilteredProducts, lineItem.searchQuery],
   );
+  const duplicateCellClass = isDuplicateItem
+  ? "border-sky-300 bg-sky-50/60"
+  : "border-gray-300";
 
   return (
+    // <tr
+    //   ref={setNodeRef}
+    //   style={style}
+    //   className={`overflow-visible ${
+    //     isDragging
+    //       ? "bg-white shadow-lg opacity-95"
+    //       : "hover:bg-gray-50 transition-colors"
+    //   }`}
+    // >
     <tr
-      ref={setNodeRef}
       style={style}
-      className={`overflow-visible ${
+      ref={(node) => {
+        setNodeRef(node);
+        if (isDuplicateItem && duplicateRowRef) {
+          duplicateRowRef.current = node;
+        }
+      }}
+      className={`relative overflow-visible transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
         isDragging
-          ? "bg-white shadow-lg opacity-95"
-          : "hover:bg-gray-50 transition-colors"
+          ? "bg-white opacity-95"
+          : isDuplicateItem
+            ? "bg-sky-50/80 ring-2 ring-sky-400 scale-[1.003] will-change-transform"
+            : "hover:bg-gray-50"
       }`}
     >
-      <td className="border border-gray-300 p-1 align-top h-[92px] max-h-[92]">
+      <td
+        className={`border border-gray-300 px-2 py-2 align-top h-[92px] max-h-[92] ${duplicateCellClass}`}
+      >
         <div className="flex items-center gap-2 h-[100%]">
           <button
             type="button"
@@ -137,7 +176,14 @@ const SortableLineItemRow = ({
 
       <td
         ref={containerRef}
-        className="w-[400px] border border-gray-300 p-1 relative h-[92px] overflow-visible max-h-[92]"
+        // className={`w-[400px] border border-gray-300 p-1 relative h-[92px] overflow-visible max-h-[92] ${
+        //   lineItem.showSearchResults ? "z-[9999]" : "z-[1]"
+        // } ${duplicateCellClass}`}
+        className={`${
+          isJobDetail ? "w-[520px]" : "w-[400px]"
+        } border border-gray-300 px-2 py-2 relative h-[92px] overflow-visible max-h-[92] ${
+          lineItem.showSearchResults ? "z-[9999]" : "z-[1]"
+        } ${duplicateCellClass}`}
       >
         {lineItem.isCustomProduct ? (
           <Input
@@ -172,16 +218,27 @@ const SortableLineItemRow = ({
           lineItem.showSearchResults &&
           lineItem.searchQuery && (
             <div
-              className={`
+              ref={(node) => {
+                if (lineItem.showSearchResults && dropdownPortalRef) {
+                  dropdownPortalRef.current = node;
+                }
+              }}
+              //   className={`
+              //   absolute left-0 top-full mt-2
+              //   z-[999999]
+              //   ${isJobDetail ? "w-[320px]" : ""}
+              //   rounded-xl border border-slate-200 bg-white
+              //   shadow-2xl max-h-[320px] overflow-y-auto p-2
+              // `}
+                  className={`
                 absolute left-0 top-full mt-2
                 z-[999999]
-                ${isJobDetail ? "w-[320px]" : ""}
+                ${isJobDetail ? "w-full min-w-[320px]" : ""}
                 rounded-xl border border-slate-200 bg-white
                 shadow-2xl max-h-[320px] overflow-y-auto p-2
-                opacity-1000000
               `}
               style={{
-                opacity: 999999,
+                opacity: 1,
                 transform: "translateZ(0)",
                 willChange: "transform",
               }}
@@ -193,6 +250,7 @@ const SortableLineItemRow = ({
                       key={product.id}
                       onMouseDown={(e) => {
                         e.preventDefault();
+                        e.stopPropagation();
                         onSelectProduct(lineItem.id, product);
                       }}
                       className="rounded-lg border border-slate-100 px-4 py-3 hover:bg-slate-50 cursor-pointer transition-colors"
@@ -271,7 +329,9 @@ const SortableLineItemRow = ({
           )}
       </td>
 
-      <td className="border border-gray-300 p-1 max-h-[92]">
+      <td
+        className={`border border-gray-300 px-2 py-2 max-h-[92] ${duplicateCellClass}`}
+      >
         <Textarea
           value={lineItem.description}
           onChange={(e) =>
@@ -282,7 +342,9 @@ const SortableLineItemRow = ({
         />
       </td>
 
-      <td className="border border-gray-300 p-1 h-[92px] max-h-[92]">
+      <td
+        className={`border border-gray-300 px-2 py-2 h-[92px] max-h-[92] ${duplicateCellClass}`}
+      >
         <Input
           type="number"
           value={lineItem.rate}
@@ -294,7 +356,9 @@ const SortableLineItemRow = ({
         />
       </td>
 
-      <td className="border border-gray-300 p-1 max-h-[92]">
+      <td
+        className={`border border-gray-300 px-2 py-2 max-h-[92] ${duplicateCellClass}`}
+      >
         <Input
           type="number"
           value={lineItem.estimatedPrice}
@@ -310,11 +374,15 @@ const SortableLineItemRow = ({
         />
       </td>
 
-      <td className="border border-gray-300 px-3 py-2 text-right font-medium">
+      <td
+        className={`border border-gray-300 px-3 py-2 text-right font-medium ${duplicateCellClass}`}
+      >
         ${(lineItem.total || 0).toFixed(2)}
       </td>
 
-      <td className="border border-gray-300 px-3 py-2 text-center h-[92px]">
+      <td
+        className={`border border-gray-300 px-3 py-2 text-center h-[92px] ${duplicateCellClass}`}
+      >
         <button
           type="button"
           onClick={() => onRemoveRow(lineItem.id)}

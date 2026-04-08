@@ -198,6 +198,7 @@ export const NewInvoiceDialog = ({
   const [estimateCost, setEstimateCost] = useState(null);
 
   const currentJob = selectedJob || jobs?.find((j: any) => j.id === jobId);
+  const [invalidHeaderKeys, setInvalidHeaderKeys] = useState<string[]>([]);
 
   // Inline Invoice Data State
   const [inlineInvoiceData, setInlineInvoiceData] = useState({
@@ -408,41 +409,38 @@ export const NewInvoiceDialog = ({
     })),
     "dialog-line-items",
   );
-console.log(inlineInvoiceData,"inlineInvoiceData.lineItems");
+  console.log(inlineInvoiceData, "inlineInvoiceData.lineItems");
 
-const itemsTotal =
-  (inlineInvoiceData.lineItems || [])
+  const itemsTotal = (inlineInvoiceData.lineItems || [])
     .filter((item: any) => item.type !== "header")
     .reduce((sum: number, item: any) => {
       return sum + Number(item.total || 0);
     }, 0);
 
-const laborTotal =
-  newInvoice.labor?.reduce((sum, l) => sum + l.total_cost, 0) || 0;
+  const laborTotal =
+    newInvoice.labor?.reduce((sum, l) => sum + l.total_cost, 0) || 0;
 
-const additionalTotal =
-  newInvoice.additionalCosts?.reduce((sum, c) => sum + c.amount, 0) || 0;
+  const additionalTotal =
+    newInvoice.additionalCosts?.reduce((sum, c) => sum + c.amount, 0) || 0;
 
-const calculateInvoiceSubtotal = () => {
-  return (
-    (inlineInvoiceData.lineItems || [])
-      .filter((item: any) => item.type !== "header")
-      .reduce((sum: number, item: any) => {
-        return sum + Number(item.total || 0);
-      }, 0) +
-    laborTotal +
-    additionalTotal
-  );
-};
+  const calculateInvoiceSubtotal = () => {
+    return (
+      (inlineInvoiceData.lineItems || [])
+        .filter((item: any) => item.type !== "header")
+        .reduce((sum: number, item: any) => {
+          return sum + Number(item.total || 0);
+        }, 0) +
+      laborTotal +
+      additionalTotal
+    );
+  };
 
-const subtotal = calculateInvoiceSubtotal();
+  const subtotal = calculateInvoiceSubtotal();
 
-const taxRate = Number(
-  inlineInvoiceData.taxRate ?? newInvoice.taxRate ?? 0
-);
+  const taxRate = Number(inlineInvoiceData.taxRate ?? newInvoice.taxRate ?? 0);
 
-const taxAmount = Number((subtotal * taxRate).toFixed(2));
-const totalAmount = Number((subtotal + taxAmount).toFixed(2));
+  const taxAmount = Number((subtotal * taxRate).toFixed(2));
+  const totalAmount = Number((subtotal + taxAmount).toFixed(2));
 
   // Invoice Helper Functions
   // const calculateInvoiceSubtotal = () => {
@@ -730,69 +728,73 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
   // };
 
   const selectProduct = (itemId: string, product: any) => {
-  const currentItem = inlineInvoiceData.lineItems.find(
-    (item: any) => item.id === itemId,
-  );
+    const currentItem = inlineInvoiceData.lineItems.find(
+      (item: any) => item.id === itemId,
+    );
 
-  if (!currentItem) return;
+    if (!currentItem) return;
 
-  const currentHeaderKey = currentItem.parentHeaderKey || null;
-  const selectedSku = String(product.jdpSKU || "").trim().toLowerCase();
+    const currentHeaderKey = currentItem.parentHeaderKey || null;
+    const selectedSku = String(product.jdpSKU || "")
+      .trim()
+      .toLowerCase();
 
-  // Check duplicate only inside same header group and by jdpSKU
-  const isDuplicateInSameGroup = inlineInvoiceData.lineItems.some(
-    (item: any) => {
-      if (item.id === itemId) return false;
-      if (item.type === "header") return false;
-      if ((item.parentHeaderKey || null) !== currentHeaderKey) return false;
+    // Check duplicate only inside same header group and by jdpSKU
+    const isDuplicateInSameGroup = inlineInvoiceData.lineItems.some(
+      (item: any) => {
+        if (item.id === itemId) return false;
+        if (item.type === "header") return false;
+        if ((item.parentHeaderKey || null) !== currentHeaderKey) return false;
 
-      const existingSku = String(item.jdpSKU || "").trim().toLowerCase();
+        const existingSku = String(item.jdpSKU || "")
+          .trim()
+          .toLowerCase();
 
-      return !!selectedSku && !!existingSku && existingSku === selectedSku;
-    },
-  );
-
-  if (isDuplicateInSameGroup) {
-    toast(
-      "This product is already added in this section. You can increase its quantity instead.",
-      {
-        duration: 3000,
+        return !!selectedSku && !!existingSku && existingSku === selectedSku;
       },
     );
-    return;
-  }
 
-  setInlineInvoiceData((prev) => ({
-    ...prev,
-    lineItems: prev.lineItems.map((item: any) => {
-      if (item.id === itemId) {
-        const rate = Number(product.jdpPrice || 0);
-        const estimatedPrice = Number(
-          product.estimatedPrice || product.jdpPrice || 0,
-        );
-        const priceToUse = estimatedPrice > 0 ? estimatedPrice : rate;
+    if (isDuplicateInSameGroup) {
+      toast(
+        "This product is already added in this section. You can increase its quantity instead.",
+        {
+          duration: 3000,
+        },
+      );
+      return;
+    }
 
-        return {
-          ...item,
-          productId: product.id,
-          estimate_product_id: product.id,
-          jdpSKU: product.jdpSKU || null,
-          item: product.name || "",
-          description: product.description || "",
-          rate,
-          estimatedPrice,
-          total: (item.qty || 1) * priceToUse,
-          showSearchResults: false,
-          searchQuery: "",
-          supplierId: product.supplierId || selectedSupplierId || 1,
-          // Searched/selected product => not custom
-          isCustomProduct: false,
-        };
-      }
-      return item;
-    }),
-  }));
-};
+    setInlineInvoiceData((prev) => ({
+      ...prev,
+      lineItems: prev.lineItems.map((item: any) => {
+        if (item.id === itemId) {
+          const rate = Number(product.jdpPrice || 0);
+          const estimatedPrice = Number(
+            product.estimatedPrice || product.jdpPrice || 0,
+          );
+          const priceToUse = estimatedPrice > 0 ? estimatedPrice : rate;
+
+          return {
+            ...item,
+            productId: product.id,
+            estimate_product_id: product.id,
+            jdpSKU: product.jdpSKU || null,
+            item: product.name || "",
+            description: product.description || "",
+            rate,
+            estimatedPrice,
+            total: (item.qty || 1) * priceToUse,
+            showSearchResults: false,
+            searchQuery: "",
+            supplierId: product.supplierId || selectedSupplierId || 1,
+            // Searched/selected product => not custom
+            isCustomProduct: false,
+          };
+        }
+        return item;
+      }),
+    }));
+  };
   const mapInvoiceTypeToAPI = (uiType: string): string => {
     const mapping: Record<string, string> = {
       Estimate: "estimate",
@@ -857,19 +859,28 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
   };
 
   console.log(productsList, "productss");
-    const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
-      const invalidHeaders = lineItems.filter(
-        (item: any) =>
-          item?.type === "header" && !String(item?.headerName || "").trim(),
-      );
+  const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
+    const invalidHeaders = lineItems.filter(
+      (item: any) =>
+        item?.type === "header" &&
+        item?.headerKey !== "standalone_header_key" &&
+        !String(item?.headerName || "").trim(),
+    );
 
-      if (invalidHeaders.length > 0) {
-        toast.error("Please fill in all header group names before submitting");
-        return false;
-      }
+    if (invalidHeaders.length > 0) {
+      const invalidKeys = invalidHeaders
+        .map((item: any) => item.headerKey)
+        .filter(Boolean);
 
-      return true;
-    };
+      setInvalidHeaderKeys(invalidKeys);
+
+      toast.error("Please fill in all header group names before submitting");
+      return false;
+    }
+
+    setInvalidHeaderKeys([]);
+    return true;
+  };
 
   const fetchJobsList = async (searchQuery: string = "") => {
     try {
@@ -967,8 +978,7 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
     if (invoiceItemRows.length === 0) {
       errors.lineItems = "Please add at least one product item";
     }
-    console.log(errors,"errors");
-    
+    console.log(errors, "errors");
 
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
@@ -1178,8 +1188,8 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
       return;
     }
     if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
-        return;
-      }
+      return;
+    }
 
     setValidationErrors({});
     setSendingInvoice(true);
@@ -1709,12 +1719,15 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
   console.log(jobsList, "jobsListjobsListjobsList");
   if (renderInline) {
     return (
-      <Card className="bg-white shadow-lg border-2 border-primary/20">
+      <Card className="bg-white shadow-lg border-2 border-primary/20 overflow-hidden">
         {/* Invoice Type Selector */}
-        <div className="p-6 border-b border-gray-200 bg-gray-50">
-          <div className="flex items-center gap-4">
-            <Label className="text-primary font-semibold">Invoice Type:</Label>
-            <div className="relative w-[250px]">
+        <div className="p-4 border-b border-gray-200 bg-gray-50">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Label className="text-primary font-semibold text-sm">
+              Invoice Type:
+            </Label>
+
+            <div className="relative w-[220px]">
               <Select
                 value={inlineInvoiceData.invoiceType}
                 onValueChange={(value) =>
@@ -1724,7 +1737,7 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
                   }))
                 }
               >
-                <SelectTrigger className="border-primary/30 focus:border-primary">
+                <SelectTrigger className="h-9 border-primary/30 focus:border-primary">
                   <SelectValue placeholder="Select invoice type..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -1741,8 +1754,9 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
                 </SelectContent>
               </Select>
             </div>
+
             {inlineInvoiceData.invoiceType === "Custom" && (
-              <div className="relative w-[300px]">
+              <div className="relative w-[260px]">
                 <Input
                   value={inlineInvoiceData.customInvoiceType}
                   onChange={(e) =>
@@ -1752,677 +1766,693 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
                     }))
                   }
                   placeholder="Enter custom invoice type name..."
-                  className="border-primary/30 focus:border-primary"
+                  className="h-9 border-primary/30 focus:border-primary"
                 />
               </div>
             )}
           </div>
         </div>
 
-        <div className="p-8">
-          {/* Header */}
-          <div className="flex justify-between items-end mb-8">
-            <div className="flex-shrink-0">
-              <Image
-                src="/assets/logos/logo-jdp.png"
-                alt="logo"
-                width={168}
-                height={63}
-                className="w-[140px] "
-              />
-            </div>
-
-            <div className="text-right">
-              <h1 className="text-2xl font-bold mb-4">
-                {inlineInvoiceData.invoiceType === "Custom"
-                  ? inlineInvoiceData.customInvoiceType
-                  : inlineInvoiceData.invoiceType}
-              </h1>
-              <div className="grid grid-cols-2">
-                <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">
-                  Date
-                </Label>
-                <Input
-                  value={inlineInvoiceData.date}
-                  onChange={(e) =>
-                    setInlineInvoiceData((prev) => ({
-                      ...prev,
-                      date: e.target.value,
-                    }))
-                  }
-                  className="px-3 py-2 text-sm"
-                  readOnly={isViewMode}
+        <div className="">
+          <div className="p-5">
+            {/* Header */}
+            <div className="flex justify-between items-end mb-5 gap-4">
+              <div className="flex-shrink-0">
+                <Image
+                  src="/assets/logos/logo-jdp.png"
+                  alt="logo"
+                  width={168}
+                  height={63}
+                  className="w-[120px]"
                 />
               </div>
-              {/* Show Estimate Number only in view mode */}
-              {isViewMode && (
+
+              <div className="text-right">
+                <h1 className="text-xl font-bold mb-2">
+                  {inlineInvoiceData.invoiceType === "Custom"
+                    ? inlineInvoiceData.customInvoiceType
+                    : inlineInvoiceData.invoiceType}
+                </h1>
+
                 <div className="grid grid-cols-2">
-                  <Label className="text-right bg-gray-600 text-white px-3 py-2 text-sm font-semibold">
-                    {inlineInvoiceData.invoiceType === "Estimate"
-                      ? "Estimate #"
-                      : "Invoice #"}
+                  <Label className="text-right bg-gray-600 text-white px-3 py-2 text-xs font-semibold">
+                    Date
                   </Label>
-                  <div>
-                    <Input
-                      value={
-                        inlineInvoiceData.estimateNumber ||
-                        viewInvoiceData?.invoice_number ||
-                        ""
-                      }
-                      className="px-3 py-2 text-sm"
-                      disabled={true}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Job Selection */}
-          <div className="mb-6">
-            <Label className="block bg-gray-600 text-white px-3 py-2 mb-0 text-sm font-semibold">
-              Select Job
-            </Label>
-            <div className="border border-gray-300 p-4">
-              <Select
-                value={inlineInvoiceData.jobId?.toString() || ""}
-                onValueChange={(value) => {
-                  if (!isViewMode) {
-                    handleJobSelection(value);
-                    setValidationErrors((prev) => ({ ...prev, jobId: "" }));
-                  }
-                }}
-                disabled={isViewMode}
-              >
-                <SelectTrigger
-                  className={`border-primary/30 focus:border-primary bg-white ${validationErrors.jobId ? "border-red-500" : ""} ${isViewMode ? "opacity-50" : ""}`}
-                >
-                  <SelectValue placeholder="Select a job..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {jobsList.length > 0 ? (
-                    jobsList.map((job: any) => (
-                      <SelectItem key={job.id} value={job.id.toString()}>
-                        #{job.id} - {job.title}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="none" disabled>
-                      No jobs available
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-              {validationErrors.jobId && (
-                <p className="text-red-500 text-xs mt-1">
-                  {validationErrors.jobId}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Bill To Section */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between bg-gray-600 text-white px-3 py-2 mb-0">
-              <div className="flex items-center">
-                <svg
-                  className="w-4 h-4 mr-2"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-6a1 1 0 00-1-1H9a1 1 0 00-1 1v6a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z"
-                    clipRule="evenodd"
+                  <Input
+                    value={inlineInvoiceData.date}
+                    onChange={(e) =>
+                      setInlineInvoiceData((prev) => ({
+                        ...prev,
+                        date: e.target.value,
+                      }))
+                    }
+                    className="h-9 px-3 py-2 text-sm rounded-none"
+                    readOnly={isViewMode}
                   />
-                </svg>
-                <Label className="text-sm font-semibold">
-                  Bill To (Billing Address)
-                </Label>
-              </div>
-              <div className="flex items-center">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setInlineInvoiceData((prev) => ({
-                      ...prev,
-                      billToAddressEnabled: !prev.billToAddressEnabled,
-                    }))
-                  }
-                  className={`mr-2 px-3 py-1 rounded text-xs font-medium transition-colors ${
-                    inlineInvoiceData.billToAddressEnabled
-                      ? "bg-red-100 text-red-700 hover:bg-red-200"
-                      : "bg-green-100 text-green-700 hover:bg-green-200"
-                  }`}
-                >
-                  {inlineInvoiceData.billToAddressEnabled ? (
-                    <>
-                      <svg
-                        className="w-3 h-3 inline mr-1"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      Disable
-                    </>
-                  ) : (
-                    <>
-                      <svg
-                        className="w-3 h-3 inline mr-1"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      Enable
-                    </>
-                  )}
-                </button>
+                </div>
+
+                {isViewMode && (
+                  <div className="grid grid-cols-2">
+                    <Label className="text-right bg-gray-600 text-white px-3 py-2 text-xs font-semibold">
+                      {inlineInvoiceData.invoiceType === "Estimate"
+                        ? "Estimate #"
+                        : "Invoice #"}
+                    </Label>
+                    <div>
+                      <Input
+                        value={
+                          inlineInvoiceData.estimateNumber ||
+                          viewInvoiceData?.invoice_number ||
+                          ""
+                        }
+                        className="h-9 px-3 py-2 text-sm rounded-none"
+                        disabled
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-            {inlineInvoiceData.billToAddressEnabled && (
-              <Textarea
-                value={inlineInvoiceData.billToAddress || ""}
-                onChange={(e) =>
-                  setInlineInvoiceData({
-                    ...inlineInvoiceData,
-                    billToAddress: e.target.value,
-                  })
-                }
-                className="mt-0 border-0 rounded-none"
-                placeholder="Enter billing address (defaults to customer/supplier address, can be edited)"
-                rows={3}
-                readOnly={isViewMode}
-              />
-            )}
-            {!inlineInvoiceData.billToAddressEnabled && (
-              <div className="bg-gray-50 p-3 text-sm text-gray-600">
+
+            {/* Job Selection */}
+            <div className="mb-4">
+              <Label className="block bg-gray-600 text-white px-3 py-2 text-xs font-semibold">
+                Select Job
+              </Label>
+              <div className="border border-gray-300 p-3">
+                <Select
+                  value={inlineInvoiceData.jobId?.toString() || ""}
+                  onValueChange={(value) => {
+                    if (!isViewMode) {
+                      handleJobSelection(value);
+                      setValidationErrors((prev) => ({ ...prev, jobId: "" }));
+                    }
+                  }}
+                  disabled={isViewMode}
+                >
+                  <SelectTrigger
+                    className={`h-9 border-primary/30 focus:border-primary bg-white ${validationErrors.jobId ? "border-red-500" : ""} ${isViewMode ? "opacity-50" : ""}`}
+                  >
+                    <SelectValue placeholder="Select a job..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {jobsList.length > 0 ? (
+                      jobsList.map((job: any) => (
+                        <SelectItem key={job.id} value={job.id.toString()}>
+                          #{job.id} - {job.title}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="none" disabled>
+                        No jobs available
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+
+                {validationErrors.jobId && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {validationErrors.jobId}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Bill To Section */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between bg-gray-600 text-white px-3 py-2">
                 <div className="flex items-center">
                   <svg
-                    className="w-4 h-4 mr-2 text-yellow-500"
+                    className="w-4 h-4 mr-2"
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
                     <path
                       fillRule="evenodd"
-                      d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                      d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-6a1 1 0 00-1-1H9a1 1 0 00-1 1v6a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z"
                       clipRule="evenodd"
                     />
                   </svg>
-                  This address defaults to the customer/supplier address but can
-                  be changed if billing address differs from job location
+                  <Label className="text-xs font-semibold">
+                    Bill To (Billing Address)
+                  </Label>
                 </div>
-              </div>
-            )}
-          </div>
 
-          {/* Customer Information */}
-          <div className="mb-6">
-            <Label className="block bg-gray-600 text-white px-3 py-2 mb-0 text-sm font-semibold">
-              Customer Name / Address
-            </Label>
-            <div className="border border-gray-300 p-4 min-h-[120px]">
-              <Input
-                value={
-                  selectedJob?.type === "contract-based"
-                    ? selectedJob?.contractorName ||
-                      selectedJob?.contractor?.name ||
-                      inlineInvoiceData.customerName
-                    : inlineInvoiceData.customerName
-                }
-                onChange={(e) =>
-                  setInlineInvoiceData((prev) => ({
-                    ...prev,
-                    customerName: e.target.value,
-                  }))
-                }
-                className="mb-2 border-0 p-0 focus-visible:ring-0"
-                placeholder={
-                  selectedJob?.type === "contract-based"
-                    ? "Contractor Name"
-                    : "Customer Name"
-                }
-                readOnly
-              />
-              <Textarea
-                value={
-                  selectedJob?.type === "contract-based"
-                    ? selectedJob?.contractorAddress ||
-                      selectedJob?.contractor?.address ||
-                      inlineInvoiceData.customerAddress
-                    : inlineInvoiceData.customerAddress
-                }
-                onChange={(e) =>
-                  setInlineInvoiceData((prev) => ({
-                    ...prev,
-                    customerAddress: e.target.value,
-                  }))
-                }
-                className="border-0 p-0 resize-none focus-visible:ring-0"
-                rows={3}
-                placeholder={
-                  selectedJob?.type === "contract-based"
-                    ? "Contractor Address"
-                    : "Customer Address"
-                }
-                readOnly
-              />
-            </div>
-          </div>
-
-          {/* PO and Project */}
-          <div className="mb-6">
-            <div className="grid grid-cols-3 gap-0">
-              <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">
-                P.O. No.
-              </Label>
-              <Label className="bg-gray-600 text-white px-3 py-2 text-center text-sm font-semibold">
-                Project
-              </Label>
-              <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">
-                Rep
-              </Label>
-            </div>
-            <div className="grid grid-cols-3 gap-0">
-              <div>
-                <Input
-                  value={inlineInvoiceData.poNumber}
-                  onChange={(e) =>
-                    setInlineInvoiceData((prev) => ({
-                      ...prev,
-                      poNumber: e.target.value,
-                    }))
-                  }
-                  className="px-3 py-2 text-sm rounded-none border-t-0"
-                  placeholder="PO Number"
-                  readOnly={isViewMode}
-                />
-              </div>
-              <Input
-                value={inlineInvoiceData.project || ""}
-                onChange={(e) =>
-                  setInlineInvoiceData((prev) => ({
-                    ...prev,
-                    project: e.target.value,
-                  }))
-                }
-                className="px-3 py-2 text-sm rounded-none border-t-0"
-                placeholder="Project"
-                readOnly={isViewMode}
-              />
-              <Input
-                value={inlineInvoiceData.rep}
-                onChange={(e) =>
-                  setInlineInvoiceData((prev) => ({
-                    ...prev,
-                    rep: e.target.value,
-                  }))
-                }
-                className="px-3 py-2 text-sm rounded-none border-t-0"
-                placeholder="Rep"
-                readOnly={isViewMode}
-              />
-            </div>
-          </div>
-
-          <div className="mb-6">
-            <div className="grid grid-cols-3 gap-0">
-              <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">
-                Due Date
-              </Label>
-              <Label className="bg-gray-600 text-white px-3 py-2 text-center text-sm font-semibold">
-                Payment / Credits
-              </Label>
-              <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-sm font-semibold">
-                Balance Due
-              </Label>
-            </div>
-            <div className="grid grid-cols-3 gap-0">
-              <div>
-                <Input
-                  type="date"
-                  value={inlineInvoiceData.dueDate}
-                  onChange={(e) =>
-                    setInlineInvoiceData((prev) => ({
-                      ...prev,
-                      dueDate: e.target.value,
-                    }))
-                  }
-                  className="px-3 py-2 text-sm rounded-none border-t-0"
-                  readOnly={isViewMode}
-                />
-              </div>
-              <Input
-                value={inlineInvoiceData.paymentCredits}
-                onChange={(e) =>
-                  setInlineInvoiceData((prev) => ({
-                    ...prev,
-                    paymentCredits: parseFloat(e.target.value) || 0,
-                  }))
-                }
-                className="px-3 py-2 text-sm rounded-none border-t-0"
-                placeholder="Payment / Credits"
-                readOnly={isViewMode}
-              />
-              <Input
-                value={inlineInvoiceData.balanceDue}
-                onChange={(e) =>
-                  setInlineInvoiceData((prev) => ({
-                    ...prev,
-                    balanceDue: e.target.value,
-                  }))
-                }
-                className="px-3 py-2 text-sm rounded-none border-t-0"
-                placeholder="Balance Due"
-                readOnly={isViewMode}
-              />
-            </div>
-          </div>
-
-          {/* Line Items Table */}
-          <div className="mb-6 overflow-x-auto mt-4">
-            {/* Line Items Table */}
-            {isViewMode ? (
-              <div className="overflow-x-auto mt-4">
-                <table className="w-full border-collapse border border-gray-300">
-                  <thead>
-                    <tr className="bg-gray-700 text-white">
-                      <th className="border border-gray-300 px-3 py-3 text-left text-sm font-semibold w-[100px]">
-                        Qty
-                      </th>
-                      <th className="border border-gray-300 px-3 py-3 text-left text-sm font-semibold">
-                        Item
-                      </th>
-                      <th className="border border-gray-300 px-3 py-3 text-left text-sm font-semibold">
-                        Description
-                      </th>
-                      <th className="border border-gray-300 px-3 py-3 text-right text-sm font-semibold w-[140px]">
-                        Rate
-                      </th>
-                      <th className="border border-gray-300 px-3 py-3 text-right text-sm font-semibold w-[160px]">
-                        Estimated Price
-                      </th>
-                      <th className="border border-gray-300 px-3 py-3 text-right text-sm font-semibold w-[140px]">
-                        Total
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(() => {
-                      const lineItems = inlineInvoiceData.lineItems || [];
-
-                      const getHeaderName = (item: any) =>
-                        item.parent_header_name ||
-                        item.parentHeaderName ||
-                        null;
-
-                      const normalizedItems = lineItems
-                        .filter((item: any) => item.type !== "header")
-                        .map((item: any) => ({
-                          ...item,
-                          qty: item.qty ?? item.stock_quantity ?? 0,
-                          item: item.item ?? item.product_name ?? "-",
-                          rate: item.rate ?? item.unit_cost ?? 0,
-                          estimatedPrice:
-                            item.estimatedPrice ?? item.estimated_price ?? 0,
-                          total: item.total ?? item.total_cost ?? 0,
-                          parent_header_name: getHeaderName(item),
-                        }));
-
-                      const directItems = normalizedItems.filter(
-                        (item: any) => !item.parent_header_name,
-                      );
-
-                      const groupedMap = normalizedItems.reduce(
-                        (acc: Record<string, any[]>, item: any) => {
-                          const headerName = item.parent_header_name;
-                          if (!headerName) return acc;
-
-                          if (!acc[headerName]) {
-                            acc[headerName] = [];
-                          }
-
-                          acc[headerName].push(item);
-                          return acc;
-                        },
-                        {},
-                      );
-
-                      const orderedRows: any[] = [
-                        ...directItems,
-                        ...Object.entries(groupedMap).flatMap(
-                          ([headerName, items]) => [
-                            {
-                              id: `header-${headerName}`,
-                              type: "synthetic-header",
-                              headerName,
-                            },
-                            ...items,
-                          ],
-                        ),
-                      ];
-
-                      return orderedRows.map((lineItem: any, index: number) => {
-                        if (lineItem.type === "synthetic-header") {
-                          return (
-                             <tr key={lineItem.id} className="bg-transparent">
-                              <td
-                                colSpan={6}
-                                className="px-0 py-0 border border-gray-300 bg-white"
-                              >
-                                <div className="w-full bg-gray-700 px-3 py-2 text-white">
-                                  <span className="text-[15px] font-semibold tracking-wide">
-                                    {lineItem.headerName || ""}
-                                  </span>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        }
-
-                        return (
-                          <tr
-                            key={lineItem.id || index}
-                            className="bg-white transition-colors hover:bg-gray-50"
-                          >
-                            <td className="border border-gray-300 px-3 py-2 text-center align-middle">
-                              <span>{lineItem.qty || 0}</span>
-                            </td>
-
-                            <td className="border border-gray-300 px-3 py-2 align-middle">
-                              <span className="text-sm font-medium text-gray-900">
-                                {lineItem.item || "-"}
-                              </span>
-                            </td>
-
-                            <td className="border border-gray-300 px-3 py-2 align-top">
-                              <div className="max-h-[90px] overflow-y-auto pr-1 text-sm leading-6 text-gray-700">
-                                {lineItem.description || "-"}
-                              </div>
-                            </td>
-
-                            <td className="border border-gray-300 px-3 py-2 text-right align-middle">
-                              ${Number(lineItem.rate || 0).toFixed(2)}
-                            </td>
-
-                            <td className="border border-gray-300 px-3 py-2 text-right align-middle">
-                              ${Number(lineItem.estimatedPrice || 0).toFixed(2)}
-                            </td>
-
-                            <td className="border border-gray-300 px-3 py-2 text-right font-medium align-middle">
-                              ${(lineItem.total || 0).toFixed(2)}
-                            </td>
-                          </tr>
-                        );
-                      });
-                    })()}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td
-                        colSpan={5}
-                        className="border border-gray-300 px-3 py-2"
-                      />
-                      <td className="border border-gray-300 px-3 py-2 text-right font-bold">
-                        ${subtotal.toFixed(2)}
-                      </td>
-                      <td className="border border-gray-300 px-3 py-2" />
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            ) : (
-              <InvoiceLineItemsManager
-                lineItems={inlineInvoiceData.lineItems}
-                setLineItems={(updater) =>
-                  setInlineInvoiceData((prev) => ({
-                    ...prev,
-                    lineItems:
-                      typeof updater === "function"
-                        ? updater(prev.lineItems)
-                        : updater,
-                  }))
-                }
-                selectedSupplierId={selectedSupplierId}
-                fetchProducts={fetchProducts}
-                getFilteredProducts={getFilteredProducts}
-                onSelectProductData={(rowId, product) => {
-                  selectProduct(rowId, product);
-                }}
-              />
-            )}
-
-            <div className="flex justify-end mt-4">
-              <div className="text-right min-w-[200px]">
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm text-gray-700">
-                    Payments / Credits:
-                  </span>
-                  <span className="text-sm text-gray-700">
-                    ${(inlineInvoiceData.paymentCredits || 0).toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between bg-gray-100 px-3 py-2 rounded">
-                  <span className="font-bold text-sm text-gray-700">
-                    Balance Due:
-                  </span>
-                  <span className="font-bold text-sm text-gray-700">
-                    $
-                    {parseFloat(
-                      (inlineInvoiceData.balanceDue || 0).toString(),
-                    ).toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {validationErrors.lineItems && (
-              <p className="text-red-500 text-xs mt-2">
-                {validationErrors.lineItems}
-              </p>
-            )}
-          </div>
-
-          {/* Notes Section */}
-          <div className="mb-6 overflow-x-auto">
-            <table className="w-full border-collapse">
-              <tbody>
-                <tr>
-                  <td
-                    className="border border-gray-300 p-3 bg-white text-sm"
-                    style={{ minHeight: "120px" }}
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setInlineInvoiceData((prev) => ({
+                        ...prev,
+                        billToAddressEnabled: !prev.billToAddressEnabled,
+                      }))
+                    }
+                    className={`mr-1 px-3 py-1 rounded text-xs font-medium transition-colors ${
+                      inlineInvoiceData.billToAddressEnabled
+                        ? "bg-red-100 text-red-700 hover:bg-red-200"
+                        : "bg-green-100 text-green-700 hover:bg-green-200"
+                    }`}
                   >
-                    <Textarea
-                      value={inlineInvoiceData.notes}
-                      onChange={(e) => {
-                        setInlineInvoiceData((prev) => ({
-                          ...prev,
-                          notes: e.target.value,
-                        }));
-                      }}
-                      className="w-full min-h-[100px] border-0 p-0 focus-visible:ring-0 resize-none"
-                      placeholder="NOTES&#10;JDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE"
-                      readOnly={isViewMode}
-                    />
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Footer disclaimer and Total */}
-          <div className="mb-6">
-            <div className="border border-gray-300 p-3 text-xs text-center bg-white">
-              <p>
-                JDP is not responsible for repair of lamps & landscaping, house
-                owner utilities including cables, sprinkler systems, television
-                or telephone cables, etc. that may be cut or damaged during
-                installation. Price are subject to change prior to receipt of
-                down payment.
-              </p>
-            </div>
-            <div className="flex justify-end mt-4">
-              <div className="text-right">
-                {/* <div className="flex items-center gap-4">
-                      <span className="text-xl font-bold">Total</span>
-                      <span className="text-2xl font-bold">
-                        ${calculateInvoiceSubtotal().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div> */}
-              </div>
-            </div>
-            <div className="text-center text-sm text-blue-500 font-bold">
-              <p>1432 Oakpointe Drive Waconia, MN 55387 paul@jdpelectric.us</p>
-            </div>
-          </div>
-          <div className="secnacher">
-            {/* Customer Acceptance Section */}
-            <div className="mt-8">
-              {/* Top separator line */}
-              <div className="border-t border-gray-300 mb-6"></div>
-
-              {/* Customer Acceptance Header */}
-              <div className="flex justify-between items-center mb-5">
-                <div className="flex flex-col">
-                  <div className="text-sm font-medium text-gray-700 mb-1">
-                    Customer Acceptance
-                  </div>
-                  <div className="text-sm font-medium text-gray-700">
-                    Authorized Signature
-                  </div>
-                </div>
-                <div className="text-sm font-medium text-gray-700">Date</div>
-              </div>
-
-              {/* Signature Fields */}
-              <div className="flex justify-between items-center mb-5">
-                <div className="flex flex-col w-3/5">
-                  <div className="border-b border-gray-800 h-0.5 mb-2"></div>
-                  <div className="text-xs text-gray-700 text-center">
-                    Signature
-                  </div>
-                </div>
-                <div className="flex flex-col w-1/3">
-                  <div className="border-b border-gray-800 h-0.5 mb-2"></div>
-                  <div className="text-xs text-gray-700 text-center">Date</div>
+                    {inlineInvoiceData.billToAddressEnabled ? (
+                      <>
+                        <svg
+                          className="w-3 h-3 inline mr-1"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        Disable
+                      </>
+                    ) : (
+                      <>
+                        <svg
+                          className="w-3 h-3 inline mr-1"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        Enable
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
 
-              {/* Disclaimer Box */}
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mt-5">
-                <div className="text-xs text-gray-700 leading-relaxed">
-                  By signing above, you agree to the terms and pricing outlined
-                  in this estimate. This becomes a binding agreement upon
-                  signature.
+              {inlineInvoiceData.billToAddressEnabled && (
+                <Textarea
+                  value={inlineInvoiceData.billToAddress || ""}
+                  onChange={(e) =>
+                    setInlineInvoiceData({
+                      ...inlineInvoiceData,
+                      billToAddress: e.target.value,
+                    })
+                  }
+                  className="mt-0 border-0 rounded-none min-h-[76px]"
+                  placeholder="Enter billing address (defaults to customer/supplier address, can be edited)"
+                  rows={3}
+                  readOnly={isViewMode}
+                />
+              )}
+
+              {!inlineInvoiceData.billToAddressEnabled && (
+                <div className="bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                  <div className="flex items-center">
+                    <svg
+                      className="w-4 h-4 mr-2 text-yellow-500"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    This address defaults to the customer/supplier address but
+                    can be changed if billing address differs from job location
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Customer Information */}
+            <div className="mb-4">
+              <Label className="block bg-gray-600 text-white px-3 py-2 text-xs font-semibold">
+                Customer Name / Address
+              </Label>
+              <div className="border border-gray-300 p-3 min-h-[92px]">
+                <Input
+                  value={
+                    selectedJob?.type === "contract-based"
+                      ? selectedJob?.contractorName ||
+                        selectedJob?.contractor?.name ||
+                        inlineInvoiceData.customerName
+                      : inlineInvoiceData.customerName
+                  }
+                  onChange={(e) =>
+                    setInlineInvoiceData((prev) => ({
+                      ...prev,
+                      customerName: e.target.value,
+                    }))
+                  }
+                  className="mb-1 h-8 border-0 p-0 focus-visible:ring-0"
+                  placeholder={
+                    selectedJob?.type === "contract-based"
+                      ? "Contractor Name"
+                      : "Customer Name"
+                  }
+                  readOnly
+                />
+                <Textarea
+                  value={
+                    selectedJob?.type === "contract-based"
+                      ? selectedJob?.contractorAddress ||
+                        selectedJob?.contractor?.address ||
+                        inlineInvoiceData.customerAddress
+                      : inlineInvoiceData.customerAddress
+                  }
+                  onChange={(e) =>
+                    setInlineInvoiceData((prev) => ({
+                      ...prev,
+                      customerAddress: e.target.value,
+                    }))
+                  }
+                  className="border-0 p-0 resize-none focus-visible:ring-0 min-h-[64px]"
+                  rows={3}
+                  placeholder={
+                    selectedJob?.type === "contract-based"
+                      ? "Contractor Address"
+                      : "Customer Address"
+                  }
+                  readOnly
+                />
+              </div>
+            </div>
+
+            {/* PO and Project */}
+            <div className="mb-4">
+              <div className="grid grid-cols-3 gap-0">
+                <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-xs font-semibold">
+                  P.O. No.
+                </Label>
+                <Label className="bg-gray-600 text-white px-3 py-2 text-center text-xs font-semibold">
+                  Project
+                </Label>
+                <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-xs font-semibold">
+                  Rep
+                </Label>
+              </div>
+
+              <div className="grid grid-cols-3 gap-0">
+                <div>
+                  <Input
+                    value={inlineInvoiceData.poNumber}
+                    onChange={(e) =>
+                      setInlineInvoiceData((prev) => ({
+                        ...prev,
+                        poNumber: e.target.value,
+                      }))
+                    }
+                    className="h-9 px-3 py-2 text-sm rounded-none border-t-0"
+                    placeholder="PO Number"
+                    readOnly={isViewMode}
+                  />
+                </div>
+
+                <Input
+                  value={inlineInvoiceData.project || ""}
+                  onChange={(e) =>
+                    setInlineInvoiceData((prev) => ({
+                      ...prev,
+                      project: e.target.value,
+                    }))
+                  }
+                  className="h-9 px-3 py-2 text-sm rounded-none border-t-0"
+                  placeholder="Project"
+                  readOnly={isViewMode}
+                />
+
+                <Input
+                  value={inlineInvoiceData.rep}
+                  onChange={(e) =>
+                    setInlineInvoiceData((prev) => ({
+                      ...prev,
+                      rep: e.target.value,
+                    }))
+                  }
+                  className="h-9 px-3 py-2 text-sm rounded-none border-t-0"
+                  placeholder="Rep"
+                  readOnly={isViewMode}
+                />
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <div className="grid grid-cols-3 gap-0">
+                <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-xs font-semibold">
+                  Due Date
+                </Label>
+                <Label className="bg-gray-600 text-white px-3 py-2 text-center text-xs font-semibold">
+                  Payment / Credits
+                </Label>
+                <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-xs font-semibold">
+                  Balance Due
+                </Label>
+              </div>
+
+              <div className="grid grid-cols-3 gap-0">
+                <div>
+                  <Input
+                    type="date"
+                    value={inlineInvoiceData.dueDate}
+                    onChange={(e) =>
+                      setInlineInvoiceData((prev) => ({
+                        ...prev,
+                        dueDate: e.target.value,
+                      }))
+                    }
+                    className="h-9 px-3 py-2 text-sm rounded-none border-t-0"
+                    readOnly={isViewMode}
+                  />
+                </div>
+
+                <Input
+                  value={inlineInvoiceData.paymentCredits}
+                  onChange={(e) =>
+                    setInlineInvoiceData((prev) => ({
+                      ...prev,
+                      paymentCredits: parseFloat(e.target.value) || 0,
+                    }))
+                  }
+                  className="h-9 px-3 py-2 text-sm rounded-none border-t-0"
+                  placeholder="Payment / Credits"
+                  readOnly={isViewMode}
+                />
+
+                <Input
+                  value={inlineInvoiceData.balanceDue}
+                  onChange={(e) =>
+                    setInlineInvoiceData((prev) => ({
+                      ...prev,
+                      balanceDue: e.target.value,
+                    }))
+                  }
+                  className="h-9 px-3 py-2 text-sm rounded-none border-t-0"
+                  placeholder="Balance Due"
+                  readOnly={isViewMode}
+                />
+              </div>
+            </div>
+
+            {/* Line Items Table */}
+            <div className="mb-4 mt-3">
+              {isViewMode ? (
+                <div className="overflow-x-auto mt-2">
+                  <table className="w-full border-collapse border border-gray-300">
+                    <thead>
+                      <tr className="bg-gray-700 text-white">
+                        <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold w-[90px]">
+                          Qty
+                        </th>
+                        <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold">
+                          Item
+                        </th>
+                        <th className="border border-gray-300 px-3 py-2 text-left text-xs font-semibold">
+                          Description
+                        </th>
+                        <th className="border border-gray-300 px-3 py-2 text-right text-xs font-semibold w-[120px]">
+                          Rate
+                        </th>
+                        <th className="border border-gray-300 px-3 py-2 text-right text-xs font-semibold w-[140px]">
+                          Estimated Price
+                        </th>
+                        <th className="border border-gray-300 px-3 py-2 text-right text-xs font-semibold w-[120px]">
+                          Total
+                        </th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {(() => {
+                        const lineItems = inlineInvoiceData.lineItems || [];
+
+                        const getHeaderName = (item: any) =>
+                          item.parent_header_name ||
+                          item.parentHeaderName ||
+                          null;
+
+                        const normalizedItems = lineItems
+                          .filter((item: any) => item.type !== "header")
+                          .map((item: any) => ({
+                            ...item,
+                            qty: item.qty ?? item.stock_quantity ?? 0,
+                            item: item.item ?? item.product_name ?? "-",
+                            rate: item.rate ?? item.unit_cost ?? 0,
+                            estimatedPrice:
+                              item.estimatedPrice ?? item.estimated_price ?? 0,
+                            total: item.total ?? item.total_cost ?? 0,
+                            parent_header_name: getHeaderName(item),
+                          }));
+
+                        const directItems = normalizedItems.filter(
+                          (item: any) => !item.parent_header_name,
+                        );
+
+                        const groupedMap = normalizedItems.reduce(
+                          (acc: Record<string, any[]>, item: any) => {
+                            const headerName = item.parent_header_name;
+                            if (!headerName) return acc;
+
+                            if (!acc[headerName]) {
+                              acc[headerName] = [];
+                            }
+
+                            acc[headerName].push(item);
+                            return acc;
+                          },
+                          {},
+                        );
+
+                        const orderedRows: any[] = [
+                          ...directItems,
+                          ...Object.entries(groupedMap).flatMap(
+                            ([headerName, items]) => [
+                              {
+                                id: `header-${headerName}`,
+                                type: "synthetic-header",
+                                headerName,
+                              },
+                              ...items,
+                            ],
+                          ),
+                        ];
+
+                        return orderedRows.map(
+                          (lineItem: any, index: number) => {
+                            if (lineItem.type === "synthetic-header") {
+                              return (
+                                <tr
+                                  key={lineItem.id}
+                                  className="bg-transparent"
+                                >
+                                  <td
+                                    colSpan={6}
+                                    className="px-0 py-0 border border-gray-300 bg-white"
+                                  >
+                                    <div className="w-full bg-gray-700 px-3 py-2 text-white">
+                                      <span className="text-sm font-semibold tracking-wide">
+                                        {lineItem.headerName || ""}
+                                      </span>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            }
+
+                            return (
+                              <tr
+                                key={lineItem.id || index}
+                                className="bg-white transition-colors hover:bg-gray-50"
+                              >
+                                <td className="border border-gray-300 px-3 py-2 text-center align-middle text-sm">
+                                  <span>{lineItem.qty || 0}</span>
+                                </td>
+
+                                <td className="border border-gray-300 px-3 py-2 align-middle">
+                                  <span className="text-sm font-medium text-gray-900">
+                                    {lineItem.item || "-"}
+                                  </span>
+                                </td>
+
+                                <td className="border border-gray-300 px-3 py-2 align-top">
+                                  <div className="max-h-[72px] overflow-y-auto pr-1 text-sm leading-5 text-gray-700">
+                                    {lineItem.description || "-"}
+                                  </div>
+                                </td>
+
+                                <td className="border border-gray-300 px-3 py-2 text-right align-middle text-sm">
+                                  ${Number(lineItem.rate || 0).toFixed(2)}
+                                </td>
+
+                                <td className="border border-gray-300 px-3 py-2 text-right align-middle text-sm">
+                                  $
+                                  {Number(lineItem.estimatedPrice || 0).toFixed(
+                                    2,
+                                  )}
+                                </td>
+
+                                <td className="border border-gray-300 px-3 py-2 text-right font-medium align-middle text-sm">
+                                  ${(lineItem.total || 0).toFixed(2)}
+                                </td>
+                              </tr>
+                            );
+                          },
+                        );
+                      })()}
+                    </tbody>
+
+                    <tfoot>
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="border border-gray-300 px-3 py-2"
+                        />
+                        <td className="border border-gray-300 px-3 py-2 text-right font-bold text-sm">
+                          ${subtotal.toFixed(2)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              ) : (
+                <InvoiceLineItemsManager
+                  lineItems={inlineInvoiceData.lineItems}
+                  invalidHeaderKeys={invalidHeaderKeys}
+                  setInvalidHeaderKeys={setInvalidHeaderKeys}
+                  setLineItems={(updater) =>
+                    setInlineInvoiceData((prev) => ({
+                      ...prev,
+                      lineItems:
+                        typeof updater === "function"
+                          ? updater(prev.lineItems)
+                          : updater,
+                    }))
+                  }
+                  selectedSupplierId={selectedSupplierId}
+                  fetchProducts={fetchProducts}
+                  getFilteredProducts={getFilteredProducts}
+                  onSelectProductData={(rowId, product) => {
+                    selectProduct(rowId, product);
+                  }}
+                />
+              )}
+
+              <div className="flex justify-end mt-3">
+                <div className="text-right min-w-[200px]">
+                  <div className="flex justify-between mb-1.5">
+                    <span className="text-sm text-gray-700">
+                      Payments / Credits:
+                    </span>
+                    <span className="text-sm text-gray-700">
+                      ${(inlineInvoiceData.paymentCredits || 0).toFixed(2)}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between bg-gray-100 px-3 py-2 rounded">
+                    <span className="font-bold text-sm text-gray-700">
+                      Balance Due:
+                    </span>
+                    <span className="font-bold text-sm text-gray-700">
+                      $
+                      {parseFloat(
+                        (inlineInvoiceData.balanceDue || 0).toString(),
+                      ).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {validationErrors.lineItems && (
+                <p className="text-red-500 text-xs mt-2">
+                  {validationErrors.lineItems}
+                </p>
+              )}
+            </div>
+
+            {/* Notes Section */}
+            <div className="mb-4 overflow-x-auto">
+              <table className="w-full border-collapse">
+                <tbody>
+                  <tr>
+                    <td
+                      className="border border-gray-300 p-3 bg-white text-sm"
+                      style={{ minHeight: "96px" }}
+                    >
+                      <Textarea
+                        value={inlineInvoiceData.notes}
+                        onChange={(e) => {
+                          setInlineInvoiceData((prev) => ({
+                            ...prev,
+                            notes: e.target.value,
+                          }));
+                        }}
+                        className="w-full min-h-[84px] border-0 p-0 focus-visible:ring-0 resize-none"
+                        placeholder="NOTES&#10;JDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE"
+                        readOnly={isViewMode}
+                      />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer disclaimer and Total */}
+            <div className="mb-4">
+              <div className="border border-gray-300 px-3 py-2.5 text-xs text-center bg-white leading-5">
+                <p>
+                  JDP is not responsible for repair of lamps & landscaping,
+                  house owner utilities including cables, sprinkler systems,
+                  television or telephone cables, etc. that may be cut or
+                  damaged during installation. Price are subject to change prior
+                  to receipt of down payment.
+                </p>
+              </div>
+
+              <div className="text-center text-sm text-blue-500 font-bold mt-3">
+                <p>
+                  1432 Oakpointe Drive Waconia, MN 55387 paul@jdpelectric.us
+                </p>
+              </div>
+            </div>
+
+            <div className="secnacher">
+              {/* Customer Acceptance Section */}
+              <div className="mt-5">
+                <div className="border-t border-gray-300 mb-4"></div>
+
+                <div className="flex justify-between items-center mb-3">
+                  <div className="flex flex-col">
+                    <div className="text-sm font-medium text-gray-700">
+                      Customer Acceptance
+                    </div>
+                    <div className="text-sm font-medium text-gray-700">
+                      Authorized Signature
+                    </div>
+                  </div>
+                  <div className="text-sm font-medium text-gray-700">Date</div>
+                </div>
+
+                <div className="flex justify-between items-center mb-3">
+                  <div className="flex flex-col w-3/5">
+                    <div className="border-b border-gray-800 h-0.5 mb-1.5"></div>
+                    <div className="text-xs text-gray-700 text-center">
+                      Signature
+                    </div>
+                  </div>
+                  <div className="flex flex-col w-1/3">
+                    <div className="border-b border-gray-800 h-0.5 mb-1.5"></div>
+                    <div className="text-xs text-gray-700 text-center">
+                      Date
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-md px-3 py-2.5 mt-3">
+                  <div className="text-xs text-gray-700 leading-5">
+                    By signing above, you agree to the terms and pricing
+                    outlined in this estimate. This becomes a binding agreement
+                    upon signature.
+                  </div>
                 </div>
               </div>
             </div>
@@ -2431,7 +2461,7 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
 
         {/* Action Buttons */}
         {!isViewMode && (
-          <div className="border-t bg-gray-50 px-8 py-6">
+          <div className="sticky bottom-0 border-t bg-gray-50 px-5 py-3 z-20">
             <div className="flex items-center justify-between">
               <Button
                 variant="outline"
@@ -2439,11 +2469,12 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
                   onOpenChange(false);
                   setValidationErrors({});
                 }}
-                className="border-gray-300"
+                className="border-gray-300 h-9"
               >
                 <X className="h-4 w-4 mr-2" />
                 Cancel
               </Button>
+
               <div className="flex gap-3">
                 <motion.div
                   whileHover={{ scale: 1.02 }}
@@ -2452,11 +2483,10 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
                   <Button
                     onClick={handleSaveInvoiceAsDraft}
                     variant="outline"
-                    size="lg"
-                    className="border-primary text-primary hover:bg-primary/5"
+                    className="border-primary text-primary hover:bg-primary/5 h-9"
                     disabled={savingDraft || sendingInvoice}
                   >
-                    <FileText className="h-5 w-5 mr-2" />
+                    <FileText className="h-4 w-4 mr-2" />
                     {savingDraft ? "Saving..." : "Save as Draft"}
                   </Button>
                 </motion.div>
@@ -2467,11 +2497,10 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
                 >
                   <Button
                     onClick={handlePreviewAndSend}
-                    size="lg"
-                    className="bg-primary hover:bg-primary/90 text-white"
+                    className="bg-primary hover:bg-primary/90 text-white h-9"
                     disabled={savingDraft || sendingInvoice}
                   >
-                    <Eye className="h-5 w-5 mr-2" />
+                    <Eye className="h-4 w-4 mr-2" />
                     {sendingInvoice
                       ? "Sending..."
                       : "Preview & Send to Customer"}
@@ -2484,16 +2513,17 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
 
         {/* View Mode - Only Close Button */}
         {isViewMode && (
-          <div className="border-t bg-gray-50 px-8 py-6">
+          <div className="sticky bottom-0 border-t bg-gray-50 px-5 py-3 z-20">
             <div className="flex items-center justify-between">
               <Button
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                className="border-gray-300"
+                className="border-gray-300 h-9"
               >
                 <X className="h-4 w-4 mr-2" />
                 Close
               </Button>
+
               <div className="flex gap-3">
                 <motion.div
                   whileHover={{ scale: 1.02 }}
@@ -2502,11 +2532,10 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
                   <Button
                     onClick={handleSaveInvoiceAsDraft}
                     variant="outline"
-                    size="lg"
-                    className="border-primary text-primary hover:bg-primary/5"
+                    className="border-primary text-primary hover:bg-primary/5 h-9"
                     disabled={savingDraft || sendingInvoice}
                   >
-                    <FileText className="h-5 w-5 mr-2" />
+                    <FileText className="h-4 w-4 mr-2" />
                     {savingDraft ? "Saving..." : "Save as Draft"}
                   </Button>
                 </motion.div>
@@ -2517,11 +2546,10 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
                 >
                   <Button
                     onClick={handlePreviewAndSend}
-                    size="lg"
-                    className="bg-primary hover:bg-primary/90 text-white"
+                    className="bg-primary hover:bg-primary/90 text-white h-9"
                     disabled={savingDraft || sendingInvoice}
                   >
-                    <Eye className="h-5 w-5 mr-2" />
+                    <Eye className="h-4 w-4 mr-2" />
                     {sendingInvoice
                       ? "Sending..."
                       : "Preview & Send to Customer"}
@@ -2531,8 +2559,6 @@ const totalAmount = Number((subtotal + taxAmount).toFixed(2));
             </div>
           </div>
         )}
-        {/* </Card>
-        </motion.div> */}
       </Card>
     );
   }

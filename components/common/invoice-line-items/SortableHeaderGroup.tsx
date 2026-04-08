@@ -51,8 +51,11 @@ interface SortableHeaderGroupProps {
   onSelectProduct: (rowId: string, product: ProductType) => void;
   onAddCustomFromSearch?: (rowId: string, value: string) => void;
   getFilteredProducts: (query: string) => ProductType[];
-  isDuplicateSection?: boolean;
+  duplicateItemRowId?: string | null;
+  duplicateRowRef?: React.MutableRefObject<HTMLElement | null>;
+  dropdownPortalRef?: React.MutableRefObject<HTMLElement | null>;
   isJobDetail?: boolean;
+  isInvalidHeader?: boolean;
 }
 
 const SortableHeaderGroup = ({
@@ -66,8 +69,12 @@ const SortableHeaderGroup = ({
   onSelectProduct,
   onAddCustomFromSearch,
   getFilteredProducts,
-  isDuplicateSection = false,
   isJobDetail = false,
+  duplicateRowRef,
+  dropdownPortalRef,
+  duplicateItemRowId,
+  isInvalidHeader
+  
 }: SortableHeaderGroupProps) => {
   const isVirtualStandaloneHeader =
     group.header.headerKey === "standalone_header_key";
@@ -99,23 +106,27 @@ const SortableHeaderGroup = ({
     <tbody
       ref={setNodeRef}
       style={style}
+      className="overflow-visible"
       // className={isDuplicateSection ? "animate-pulse" : ""}
     >
       {!isVirtualStandaloneHeader && (
         <tr>
           <td
             colSpan={7}
-            className={`border-x border-b border-slate-300 p-0 transition-all duration-300 ${
-              isDuplicateSection ? "bg-amber-50/30" : "bg-transparent"
-            }`}
+            // className={`border-x border-b p-0 transition-all duration-300 ${
+            //   isInvalidHeader
+            //     ? "border-red-300 bg-red-50/40 "
+            //     : "border-slate-300"
+            // }`}
+            className="p-0 border-0 bg-transparent overflow-visible"
           >
             <div
-              className={`relative flex items-center justify-between gap-3 px-4 py-3 text-white transition-all duration-300 ${
-                isDuplicateSection
-                  ? "bg-[#334155] ring-1 ring-amber-200/80"
+              className={`relative z-10 flex items-center justify-between gap-3 px-4 py-3 text-white transform-gpu overflow-visible rounded-[2px] transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                isInvalidHeader
+                  ? "bg-[#334155] scale-[1.003] shadow-[0px_5px_15px_rgb(210_0_0_/_35%)] border border-[#ff000066]"
                   : isDragging
-                    ? "bg-[#334155]"
-                    : "bg-gray-800"
+                    ? "bg-[#334155] scale-[1.002] shadow-[0_6px_18px_rgba(15,23,42,0.18)]"
+                    : "bg-gray-800 hover:shadow-[0_4px_14px_rgba(15,23,42,0.10)]"
               }`}
             >
               <div className="flex items-center gap-3 min-w-0">
@@ -133,33 +144,30 @@ const SortableHeaderGroup = ({
                   onChange={(e) =>
                     onUpdateRow(group.header.id, "headerName", e.target.value)
                   }
-                  className="
-                  h-9 w-[240px]
-                  bg-transparent px-2
-                  text-[20px] font-medium text-white
-                  border border-transparent rounded-md
-                  shadow-none outline-none
-                  transition-all duration-200
-                  placeholder:text-white/50
-                  focus-visible:border-white/15
-                  focus-visible:bg-white/5
-                  focus-visible:ring-0
-                  focus-visible:ring-transparent
-                  focus-visible:ring-offset-0
-                  focus:outline-none
-                  !ring-0 !ring-transparent !ring-offset-0
-                "
+                  className={`
+  h-9 w-[240px]
+  bg-transparent px-2
+  text-[20px] font-medium text-white
+  border rounded-md
+  shadow-none outline-none
+  transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]
+  placeholder:text-white/45
+  focus-visible:bg-white/5
+  focus-visible:ring-0
+  focus-visible:ring-offset-0
+  focus:outline-none
+  !ring-0 !ring-offset-0
+  ${
+    isInvalidHeader
+      ? "border-red-300/90 bg-red-50/20 focus:border-red-300"
+      : "border-transparent focus-visible:border-white/15"
+  }
+`}
                   placeholder="Type your header name"
                 />
               </div>
 
               <div className="flex items-center gap-2">
-                {isDuplicateSection && (
-                  <span className="rounded-full border border-amber-200/30 bg-amber-100/10 px-3 py-1 text-[11px] font-medium text-amber-50">
-                    Item already exists in this section
-                  </span>
-                )}
-
                 <button
                   type="button"
                   onClick={() =>
@@ -221,6 +229,9 @@ const SortableHeaderGroup = ({
           onAddCustomFromSearch={onAddCustomFromSearch}
           getFilteredProducts={getFilteredProducts}
           isJobDetail={isJobDetail}
+          isDuplicateItem={duplicateItemRowId === lineItem.id}
+          duplicateRowRef={duplicateRowRef}
+          dropdownPortalRef={dropdownPortalRef}
         />
       ))}
     </tbody>

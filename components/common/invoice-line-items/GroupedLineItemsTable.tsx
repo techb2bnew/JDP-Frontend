@@ -74,9 +74,11 @@ interface GroupedLineItemsTableProps {
   handleAddStandaloneLineItem: () => void;
   handleAddStandaloneCustomItem: () => void;
   handleAddHeaderWithFirstItem: () => void;
-
-  duplicateSectionHeaderKey?: string | null;
-  isJobDetail?:boolean
+  duplicateItemRowId?: string | null;
+  duplicateRowRef?: React.MutableRefObject<HTMLElement | null>;
+  dropdownPortalRef?: React.MutableRefObject<HTMLElement | null>;
+  isJobDetail?:boolean;
+  invalidHeaderKeys?: string[];
 }
 
 const GroupedLineItemsTable = ({
@@ -101,7 +103,10 @@ const GroupedLineItemsTable = ({
   activeDraggedItem,
   getFilteredProducts,
   subtotal,
-  duplicateSectionHeaderKey,
+  duplicateItemRowId,
+  duplicateRowRef,
+  dropdownPortalRef,
+  invalidHeaderKeys=[],
   isJobDetail=false
 }: GroupedLineItemsTableProps) => {
   return (
@@ -161,16 +166,30 @@ const GroupedLineItemsTable = ({
                   <th className="border border-gray-300 px-3 py-2 text-left min-w-[320px]">
                     Description
                   </th>
-                  <th className="border border-gray-300 px-3 py-2 text-left w-[120px]">
+                  <th
+                    className={`border border-gray-300 px-3 py-2 text-left ${
+                      isJobDetail ? "w-[85px]" : "w-[120px]"
+                    }`}
+                  >
                     Rate
                   </th>
-                  <th className="border border-gray-300 px-3 py-2 text-left w-[160px]">
+                  <th
+                    className={`border border-gray-300 px-3 py-2 text-left ${
+                      isJobDetail ? "w-[125px]" : "w-[160px]"
+                    }`}
+                  >
                     Estimated Price
                   </th>
-                  <th className="border border-gray-300 px-3 py-2 text-left w-[140px]">
+                  <th
+                    className={`border border-gray-300 px-3 py-2 text-left ${
+                      isJobDetail ? "w-[85px]" : "w-[140px]"
+                    }`}
+                  >
                     Total
                   </th>
-                  <th className="border border-gray-300 px-3 py-2 text-left w-[90px]">
+                  <th className={`border border-gray-300 px-3 py-2 text-left ${
+                      isJobDetail ? "w-[85px]" : "w-[90px]"
+                    }`}>
                     Action
                   </th>
                 </tr>
@@ -189,11 +208,13 @@ const GroupedLineItemsTable = ({
                   onSelectProduct={onSelectProduct}
                   onAddCustomFromSearch={onAddCustomFromSearch}
                   getFilteredProducts={getFilteredProducts}
-                  isDuplicateSection={
-                    !!duplicateSectionHeaderKey &&
-                    group.header.headerKey === duplicateSectionHeaderKey
-                  }
+                  duplicateItemRowId={duplicateItemRowId}
+                  duplicateRowRef={duplicateRowRef}
+                  dropdownPortalRef={dropdownPortalRef}
                   isJobDetail={isJobDetail}
+                  isInvalidHeader={invalidHeaderKeys.includes(
+                    group.header.headerKey || "",
+                  )}
                 />
               ))}
 

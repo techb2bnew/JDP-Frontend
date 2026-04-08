@@ -150,7 +150,9 @@ export function BlueSheetApprovalDialog({
   const [activeRow, setActiveRow] = useState<number | null>(null)
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null)
   // Reference to CustomInvoiceDialog's "preview & send" handler
-  const previewAndSendRef = useRef<(() => Promise<void>) | null>(null)
+  const previewAndSendRef = useRef<(() => Promise<void>) | null>(null);
+  const [invalidHeaderKeys, setInvalidHeaderKeys] = useState<string[]>([]);
+
 
   // ─── Reset when dialog opens ───────────────────────────────────────────────
   useEffect(() => {
@@ -822,6 +824,29 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
     return comparisons
   }
 
+   const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
+   const invalidHeaders = lineItems.filter(
+     (item: any) =>
+       item?.type === "header" &&
+       item?.headerKey !== "standalone_header_key" &&
+       !String(item?.headerName || "").trim(),
+   );
+ 
+   if (invalidHeaders.length > 0) {
+     const invalidKeys = invalidHeaders
+       .map((item: any) => item.headerKey)
+       .filter(Boolean);
+ 
+     setInvalidHeaderKeys(invalidKeys);
+ 
+     toast.error("Please fill in all header group names before submitting");
+     return false;
+   }
+ 
+   setInvalidHeaderKeys([]);
+   return true;
+ };
+
   // ─── Proceed / Final Approval ──────────────────────────────────────────────
   const handleProceedToReview = async () => {
     if (isBlueSheetEditMode || isSupplierEditMode) {
@@ -846,6 +871,10 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
   const handleFinalApproval = async () => {
   const finalBlueSheet = editedBlueSheet || blueSheet;
   if (!finalBlueSheet) return;
+
+  // if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
+  //     return;
+  //   }
  
   try {
     setIsApproving(true);
@@ -2121,6 +2150,9 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                   <div className="mt-6">
                     <CustomInvoiceDialog
                       open={true}
+                      invalidHeaderKeys={invalidHeaderKeys}
+                      setInvalidHeaderKeys={setInvalidHeaderKeys}
+                      validateHeaderGroupsBeforeSubmit={validateHeaderGroupsBeforeSubmit}
                       onOpenChange={() => setIsCustomInvoiceOpen(false)}
                       blueSheet={currentBlueSheet}
                       // Let CustomInvoiceDialog derive labor cost from labor_entries
