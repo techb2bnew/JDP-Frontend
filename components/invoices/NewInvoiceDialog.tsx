@@ -229,6 +229,33 @@ export const NewInvoiceDialog = ({
     paymentHistory: [] as any[],
   });
 
+    const [jobSearch, setJobSearch] = useState("");
+  const [showJobResults, setShowJobResults] = useState(false);
+  const [isLoadingJobs, setIsLoadingJobs] = useState(false);
+  
+  const fetchJobsList = async (searchQuery: string = "") => {
+    try {
+      setIsLoadingJobs(true);
+  
+      const response = searchQuery
+        ? await apiClient.searchJobsByQuery(searchQuery, 1, 10)
+        : await apiClient.getJobs(1, 10);
+  
+      const jobsData =
+        response.data?.jobs ||
+        response.data?.data ||
+        response.data ||
+        [];
+  
+      setJobsList(jobsData);
+    } catch (error) {
+      console.error("Error fetching jobs:", error);
+      setJobsList([]);
+    } finally {
+      setIsLoadingJobs(false);
+    }
+  };
+
   // Update form when job is provided
   useEffect(() => {
     if (currentJob) {
@@ -886,82 +913,83 @@ export const NewInvoiceDialog = ({
     return true;
   };
 
-  const fetchJobsList = async (searchQuery: string = "") => {
-    try {
-      const response = searchQuery
-        ? await apiClient.searchJobsByQuery(searchQuery, 1, 10)
-        : await apiClient.getJobs(1, 10);
+  // const fetchJobsList = async (searchQuery: string = "") => {
+  //   try {
+  //     const response = searchQuery
+  //       ? await apiClient.searchJobsByQuery(searchQuery, 1, 10)
+  //       : await apiClient.getJobs(1, 10);
 
-      const jobsData = response.data || [];
-      console.log(jobsData, "jobsData");
-      setJobsList(jobsData);
-    } catch (error) {
-      console.error("Error fetching jobs:", error);
-    }
-  };
+  //     const jobsData = response.data || [];
+  //     console.log(jobsData, "jobsData");
+  //     setJobsList(jobsData);
+  //   } catch (error) {
+  //     console.error("Error fetching jobs:", error);
+  //   }
+  // };
 
-  const handleJobSelection = (jobId: string) => {
-    const job = jobsList.find((j: any) => j.id === jobId);
-    if (job) {
-      setEstimateCost(job?.estimatedCost);
-      setSelectedJob(job);
+   const handleJobSelection = (job: any) => {
+  if (!job) return;
 
-      // Determine if it's contract-based
-      const isContractBased =
-        job.type === "contract_based" || job.type === "contract-based";
+  setEstimateCost(job?.estimatedCost);
+  setSelectedJob(job);
 
-      // Get customer/contractor name and address
-      let customerName = "";
-      let customerAddress = "";
+  const isContractBased =
+    job.type === "contract_based" || job.type === "contract-based";
 
-      if (isContractBased) {
-        customerName =
-          job.contractorName ||
-          job.contractor?.contractor_name ||
-          job.contractor?.name ||
-          job.contractor?.full_name ||
-          "";
-        customerAddress =
-          job.contractorAddress ||
-          job.contractor?.address ||
-          job.location ||
-          job.address ||
-          "";
-      } else {
-        customerName =
-          job.customerName ||
-          job.customer?.customer_name ||
-          job.customer?.name ||
-          "";
-        customerAddress =
-          job.location || job.address || job.customer?.address || "";
-      }
+  let customerName = "";
+  let customerAddress = "";
 
-      setInlineInvoiceData((prev) => ({
-        ...prev,
-        jobId: job.id,
-        customerName: customerName,
-        customerAddress: customerAddress,
-        billToAddress: job.billToAddress || "",
-        project: job.title || "",
-      }));
+  if (isContractBased) {
+    customerName =
+      job.contractorName ||
+      job.contractor?.contractor_name ||
+      job.contractor?.name ||
+      job.contractor?.full_name ||
+      "";
 
-      console.log("Selected job:", job);
-      console.log("isContractBased:", isContractBased);
-      console.log("customerName:", customerName);
-      console.log("customerAddress:", customerAddress);
-      console.log("Updated inlineInvoiceData:", {
-        jobId: job.id,
-        customerName: customerName,
-        customerAddress: customerAddress,
-        project: job.title,
-      });
-    }
-  };
+    customerAddress =
+      job.contractorAddress ||
+      job.contractor?.address ||
+      job.location ||
+      job.address ||
+      "";
+  } else {
+    customerName =
+      job.customerName ||
+      job.customer?.customer_name ||
+      job.customer?.name ||
+      "";
+
+    customerAddress =
+      job.location || job.address || job.customer?.address || "";
+  }
+
+  setInlineInvoiceData((prev) => ({
+    ...prev,
+    jobId: job.id,
+    customerName,
+    customerAddress,
+    billToAddress: job.billToAddress || "",
+    project: job.title || job.job_title || "",
+  }));
+
+  setJobSearch(job.title || job.job_title || "");
+  setShowJobResults(false);
+
+  if (validationErrors.jobId) {
+    setValidationErrors((prev) => {
+      const newErrors = { ...prev };
+      delete newErrors.jobId;
+      return newErrors;
+    });
+  }
+};
 
   const handleSaveInvoiceAsDraft = async () => {
     // Validation
     const errors: Record<string, string> = {};
+        console.log(errors, "::errors");
+
 
     if (!inlineInvoiceData.jobId) {
       errors.jobId = "Please select a job first";
@@ -982,7 +1010,6 @@ export const NewInvoiceDialog = ({
     if (invoiceItemRows.length === 0) {
       errors.lineItems = "Please add at least one product item";
     }
-    console.log(errors, "errors");
 
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
@@ -1192,6 +1219,7 @@ const validateLineItems = (lineItems: any[] = []) => {
   const handlePreviewAndSend = async () => {
     // Validation
     const errors: Record<string, string> = {};
+    
 
     if (!inlineInvoiceData.jobId) {
       errors.jobId = "Please select a job first";
@@ -1209,6 +1237,8 @@ const validateLineItems = (lineItems: any[] = []) => {
     }
 
     if (Object.keys(errors).length > 0) {
+          console.log(errors,"::errors");
+
       setValidationErrors(errors);
       toast.error("Please fix the validation errors");
       return;
@@ -1863,46 +1893,129 @@ const validateLineItems = (lineItems: any[] = []) => {
             </div>
 
             {/* Job Selection */}
-            <div className="mb-4">
-              <Label className="block bg-gray-600 text-white px-3 py-2 text-xs font-semibold">
-                Select Job
-              </Label>
-              <div className="border border-gray-300 p-3">
-                <Select
-                  value={inlineInvoiceData.jobId?.toString() || ""}
-                  onValueChange={(value) => {
-                    if (!isViewMode) {
-                      handleJobSelection(value);
-                      setValidationErrors((prev) => ({ ...prev, jobId: "" }));
-                    }
-                  }}
-                  disabled={isViewMode}
-                >
-                  <SelectTrigger
-                    className={`h-9 border-primary/30 focus:border-primary bg-white ${validationErrors.jobId ? "border-red-500" : ""} ${isViewMode ? "opacity-50" : ""}`}
-                  >
-                    <SelectValue placeholder="Select a job..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {jobsList.length > 0 ? (
-                      jobsList.map((job: any) => (
-                        <SelectItem key={job.id} value={job.id.toString()}>
-                          #{job.id} - {job.title}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="none" disabled>
-                        No jobs available
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
 
-                {validationErrors.jobId && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {validationErrors.jobId}
-                  </p>
-                )}
+            <div className="border border-gray-300 p-3">
+              <div className="mb-4">
+                <Label className="block bg-gray-600 text-white px-3 py-2 text-xs font-semibold">
+                  Select Job
+                </Label>
+                <div className="border border-gray-300 p-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="job">Job *</Label>
+                    <div className="relative">
+                      <Input
+                        id="job"
+                        value={jobSearch}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setJobSearch(value);
+
+                          const selectedName =
+                            selectedJob?.title || selectedJob?.job_title || "";
+
+                          if (selectedJob && value !== selectedName) {
+                            setSelectedJob(null);
+                            setInlineInvoiceData((prev) => ({
+                              ...prev,
+                              jobId: "",
+                              customerName: "",
+                              customerAddress: "",
+                              billToAddress: "",
+                              project: "",
+                            }));
+                          }
+
+                          setShowJobResults(true);
+
+                          if (value.trim().length > 0) {
+                            fetchJobsList(value);
+                          } else {
+                            fetchJobsList("");
+                          }
+
+                          if (validationErrors.jobId) {
+                            setValidationErrors((prev) => {
+                              const newErrors = { ...prev };
+                              delete newErrors.jobId;
+                              return newErrors;
+                            });
+                          }
+                        }}
+                        onFocus={() => {
+                          if (selectedJob) {
+                            setJobSearch(
+                              selectedJob.title || selectedJob.job_title || "",
+                            );
+                          } else {
+                            fetchJobsList("");
+                            setShowJobResults(true);
+                          }
+                        }}
+                        onBlur={() => {
+                          setTimeout(() => setShowJobResults(false), 200);
+                        }}
+                        placeholder="Search job..."
+                        disabled={isViewMode}
+                        className={`pr-10 ${
+                          validationErrors.jobId ? "border-red-500" : ""
+                        } ${isViewMode ? "opacity-50 cursor-not-allowed" : ""}`}
+                      />
+
+                      <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+
+                      {showJobResults && !isViewMode && (
+                        <div className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1 rounded-md">
+                          {isLoadingJobs ? (
+                            <div className="p-3 flex items-center justify-center">
+                              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mr-2"></div>
+                              <span className="text-sm text-muted-foreground">
+                                Loading jobs...
+                              </span>
+                            </div>
+                          ) : jobsList.length > 0 ? (
+                            jobsList.map((job: any) => (
+                              <div
+                                key={job.id}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  handleJobSelection(job);
+                                }}
+                                className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100 last:border-b-0"
+                              >
+                                <div className="font-medium">
+                                  {job.title || job.job_title}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  {job.customer?.customer_name ||
+                                    job.customer?.company_name ||
+                                    job.contractor?.company_name ||
+                                    job.contractor?.contractor_name ||
+                                    "No customer linked"}
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="p-3 text-sm text-muted-foreground text-center">
+                              No jobs found
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* {validationErrors.jobId && (
+                    <p className="text-sm text-red-600 mt-1">
+                      {validationErrors.jobId}
+                    </p>
+                  )} */}
+                  </div>
+
+                  {validationErrors.jobId && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {validationErrors.jobId}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -2097,18 +2210,37 @@ const validateLineItems = (lineItems: any[] = []) => {
                   />
                 </div>
 
-                <Input
-                  value={inlineInvoiceData.project || ""}
-                  onChange={(e) =>
-                    setInlineInvoiceData((prev) => ({
-                      ...prev,
-                      project: e.target.value,
-                    }))
-                  }
-                  className="h-9 px-3 py-2 text-sm rounded-none border-t-0"
-                  placeholder="Project"
-                  readOnly={isViewMode}
-                />
+                <div className="space-y-1">
+                  <Input
+                    value={inlineInvoiceData.project || ""}
+                    onChange={(e) =>
+                      setInlineInvoiceData((prev) => ({
+                        ...prev,
+                        project: e.target.value,
+                      }))
+                    }
+                    className="h-9 px-3 py-2 text-sm rounded-none border-t-0 transition-all border-gray-300 focus:border-primary"
+                    placeholder="Project"
+                    readOnly={isViewMode}
+                  />
+
+                  {validationErrors.project && (
+                    <div className="flex items-center gap-1 text-red-500 text-xs mt-1">
+                      <svg
+                        className="w-3 h-3"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M18 10A8 8 0 11.001 10 8 8 0 0118 10zm-9-4a1 1 0 00-2 0v4a1 1 0 002 0V6zm0 8a1 1 0 100-2 1 1 0 000 2z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      <span>{validationErrors.project}</span>
+                    </div>
+                  )}
+                </div>
 
                 <Input
                   value={inlineInvoiceData.rep}
