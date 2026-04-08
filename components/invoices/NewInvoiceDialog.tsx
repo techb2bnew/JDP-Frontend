@@ -30,6 +30,7 @@ import {
   Eye,
   X,
   FileText,
+  Send,
 } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -59,6 +60,8 @@ interface NewInvoiceDialogProps {
   isViewMode?: boolean;
   viewInvoiceData?: any;
   renderInline?: boolean;
+  onNavigateToJobAfterSend?: (jobId: string | number, estimateId?: number) => void;
+
 }
 
 export interface CreateEstimatePayload {
@@ -139,6 +142,7 @@ export const NewInvoiceDialog = ({
   isViewMode = false,
   viewInvoiceData,
   renderInline,
+  onNavigateToJobAfterSend
 }: NewInvoiceDialogProps) => {
   console.log("trsting jobs", jobs);
   const [currentStep, setCurrentStep] = useState(1);
@@ -988,6 +992,8 @@ export const NewInvoiceDialog = ({
     if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
       return;
     }
+    if (!validateLineItems(inlineInvoiceData.lineItems)) return;
+
 
     setValidationErrors({});
     setSavingDraft(true);
@@ -1162,6 +1168,26 @@ export const NewInvoiceDialog = ({
       setSavingDraft(false);
     }
   };
+// parent component
+const [invalidLineItemIds, setInvalidLineItemIds] = useState<string[]>([]);
+
+const validateLineItems = (lineItems: any[] = []) => {
+  const invalidItems = lineItems.filter((row) => {
+    if (row.type !== "item") return false;
+
+    const name = String(row.item || row.product_name || "").trim();
+    return !name;
+  });
+
+  if (invalidItems.length > 0) {
+    setInvalidLineItemIds(invalidItems.map((row) => row.id));
+    toast.error("Item's product_name is not allowed to be empty");
+    return false;
+  }
+
+  setInvalidLineItemIds([]);
+  return true;
+};
 
   const handlePreviewAndSend = async () => {
     // Validation
@@ -1190,6 +1216,8 @@ export const NewInvoiceDialog = ({
     if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
       return;
     }
+   if (!validateLineItems(inlineInvoiceData.lineItems)) return;
+
 
     setValidationErrors({});
     setSendingInvoice(true);
@@ -2328,6 +2356,8 @@ export const NewInvoiceDialog = ({
                           : updater,
                     }))
                   }
+                  invalidLineItemIds={invalidLineItemIds}
+                  setInvalidLineItemIds={setInvalidLineItemIds}
                   selectedSupplierId={selectedSupplierId}
                   fetchProducts={fetchProducts}
                   getFilteredProducts={getFilteredProducts}

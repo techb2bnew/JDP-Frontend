@@ -1022,8 +1022,26 @@ export function JobDetailsPage({
     paymentHistory: [] as any[],
   });
 
-  console.log(inlineInvoiceData.lineItems, "::lineeitems");
+// parent component
+const [invalidLineItemIds, setInvalidLineItemIds] = useState<string[]>([]);
 
+const validateLineItems = (lineItems: any[] = []) => {
+  const invalidItems = lineItems.filter((row) => {
+    if (row.type !== "item") return false;
+
+    const name = String(row.item || row.product_name || "").trim();
+    return !name;
+  });
+
+  if (invalidItems.length > 0) {
+    setInvalidLineItemIds(invalidItems.map((row) => row.id));
+    toast.error("Item's product_name is not allowed to be empty");
+    return false;
+  }
+
+  setInvalidLineItemIds([]);
+  return true;
+};
   const allowedStatuses = [
     "draft",
     "pending",
@@ -5084,6 +5102,9 @@ const handlePrintInvoice = async (invoice: any) => {
       return;
     }
 
+    if (!validateLineItems(inlineInvoiceData.lineItems)) return;
+
+
     setInvoiceValidationErrors({});
     setIsLoadingDraft(true);
     try {
@@ -5272,6 +5293,7 @@ const handlePrintInvoice = async (invoice: any) => {
      if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
        return;
      }
+     if (!validateLineItems(inlineInvoiceData.lineItems)) return;
 
     // First save as draft
     try {
@@ -7438,6 +7460,8 @@ const handlePrintInvoice = async (invoice: any) => {
                               : updater,
                         }))
                       }
+                      invalidLineItemIds={invalidLineItemIds}
+                      setInvalidLineItemIds={setInvalidLineItemIds}
                       isJobDetail={true}
                       selectedSupplierId={selectedSupplierId}
                       fetchProducts={fetchProducts}
@@ -10078,7 +10102,7 @@ const handlePrintInvoice = async (invoice: any) => {
       </Button>
     </div>
   </DialogContent>
-</Dialog>
+      </Dialog>
 
       {/* Bluesheet approval dialog (opens from Bluesheets Data card) */}
       <BlueSheetApprovalDialog

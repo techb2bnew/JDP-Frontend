@@ -50,8 +50,10 @@ interface InvoiceLineItemsManagerProps {
   getFilteredProducts: (query: string) => ProductType[];
   onSelectProductData?: (rowId: string, product: ProductType) => void;
   isJobDetail?:boolean
-  invalidHeaderKeys?:string
+  invalidHeaderKeys?:string[]
   setInvalidHeaderKeys?: () => void;
+  invalidLineItemIds?: string[];
+  setInvalidLineItemIds?: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
 const createRowId = () =>
@@ -280,20 +282,15 @@ const InvoiceLineItemsManager = ({
   onSelectProductData,
   isJobDetail=false,
   invalidHeaderKeys,
-  setInvalidHeaderKeys
+  setInvalidHeaderKeys,
+  invalidLineItemIds,
+  setInvalidLineItemIds
 
 }: InvoiceLineItemsManagerProps) => {
   const [activeDraggedItem, setActiveDraggedItem] =
     useState<LineItemType | null>(null);
 const [duplicateItemRowId, setDuplicateItemRowId] = useState<string | null>(null);
 
-const highlightInvalidHeaders = (headerKeys: string[] = []) => {
-  setInvalidHeaderKeys(headerKeys);
-};
-
-const clearInvalidHeaderHighlight = () => {
-  setInvalidHeaderKeys([]);
-};
 
 const highlightDuplicateItem = (rowId: string | null) => {
   if (!rowId) return;
@@ -421,55 +418,65 @@ const dropdownPortalRef = useRef<HTMLElement | null>(null);
     });
   };
 
-  // const handleUpdateLineItem = (rowId: string, field: string, value: any) => {
-  //   // if (field === "headerName") {
-  //   //   setInvalidHeaderKeys((prev) =>
-  //   //     prev.filter((key) => key !== row.headerKey),
-  //   //   );
-  //   // }
-  //   setLineItems((prev) => {
-  //     const updatedRows = prev.map((row) => {
-  //       if (row.id !== rowId) return row;
 
-  //       const updated = { ...row, [field]: value };
+//   const handleUpdateLineItem = (rowId: string, field: string, value: any) => {
+//   setLineItems((prev) => {
+//     const updatedRows = prev.map((row) => {
+//       if (row.id !== rowId) return row;
 
-  //       if (
-  //         updated.type === "item" &&
-  //         ["qty", "rate", "estimatedPrice"].includes(field)
-  //       ) {
-  //         const qty = Number(updated.qty) || 0;
-  //         const priceToUse =
-  //           Number(updated.estimatedPrice) > 0
-  //             ? Number(updated.estimatedPrice)
-  //             : Number(updated.rate) || 0;
+//       const updated = { ...row, [field]: value };
 
-  //         updated.total = qty * priceToUse;
-  //       }
+//       if (
+//         updated.type === "item" &&
+//         ["qty", "rate", "estimatedPrice"].includes(field)
+//       ) {
+//         const qty = Number(updated.qty) || 0;
+//         const priceToUse =
+//           Number(updated.estimatedPrice) > 0
+//             ? Number(updated.estimatedPrice)
+//             : Number(updated.rate) || 0;
 
-  //       return updated;
-  //     });
+//         updated.total = qty * priceToUse;
+//       }
 
-  //     const changedHeader = updatedRows.find(
-  //       (row) => row.id === rowId && row.type === "header",
-  //     );
+//       return updated;
+//     });
 
-  //     if (changedHeader && field === "headerName") {
-  //       updatedRows.forEach((row) => {
-  //         if (
-  //           row.type === "item" &&
-  //           row.parentHeaderKey === changedHeader.headerKey
-  //         ) {
-  //           row.parentHeaderName = value || null;
-  //         }
-  //       });
-  //     }
+//     const changedHeader = updatedRows.find(
+//       (row) => row.id === rowId && row.type === "header",
+//     );
 
-  //     return updatedRows;
-  //   });
-  // };
+//     if (changedHeader && field === "headerName") {
+//       updatedRows.forEach((row) => {
+//         if (
+//           row.type === "item" &&
+//           row.parentHeaderKey === changedHeader.headerKey
+//         ) {
+//           row.parentHeaderName = value || null;
+//         }
+//       });
 
+//       const trimmedValue = String(value || "").trim();
 
-  const handleUpdateLineItem = (rowId: string, field: string, value: any) => {
+//       setInvalidHeaderKeys((prev) => {
+//         const withoutCurrent = prev.filter(
+//           (key) => key !== changedHeader.headerKey,
+//         );
+
+//         if (!trimmedValue && changedHeader.headerKey) {
+//           return [...withoutCurrent, changedHeader.headerKey];
+//         }
+
+//         return withoutCurrent;
+//       });
+//     }
+
+//     return updatedRows;
+//   });
+// };
+ 
+
+const handleUpdateLineItem = (rowId: string, field: string, value: any) => {
   setLineItems((prev) => {
     const updatedRows = prev.map((row) => {
       if (row.id !== rowId) return row;
@@ -492,39 +499,17 @@ const dropdownPortalRef = useRef<HTMLElement | null>(null);
       return updated;
     });
 
-    const changedHeader = updatedRows.find(
-      (row) => row.id === rowId && row.type === "header",
-    );
-
-    if (changedHeader && field === "headerName") {
-      updatedRows.forEach((row) => {
-        if (
-          row.type === "item" &&
-          row.parentHeaderKey === changedHeader.headerKey
-        ) {
-          row.parentHeaderName = value || null;
-        }
-      });
-
-      const trimmedValue = String(value || "").trim();
-
-      setInvalidHeaderKeys((prev) => {
-        const withoutCurrent = prev.filter(
-          (key) => key !== changedHeader.headerKey,
-        );
-
-        if (!trimmedValue && changedHeader.headerKey) {
-          return [...withoutCurrent, changedHeader.headerKey];
-        }
-
-        return withoutCurrent;
-      });
-    }
-
     return updatedRows;
   });
+
+  if (field === "item" || field === "product_name") {
+    const nextValue = String(value || "").trim();
+    if (nextValue) {
+      setInvalidLineItemIds((prev) => prev.filter((id) => id !== rowId));
+    }
+  }
 };
-  const handleRemoveLineItem = (rowId: string) => {
+const handleRemoveLineItem = (rowId: string) => {
     setLineItems((prev) => {
       const target = prev.find((row) => row.id === rowId);
       if (!target) return prev;
@@ -899,6 +884,7 @@ const dropdownPortalRef = useRef<HTMLElement | null>(null);
        duplicateRowRef={duplicateRowRef}
        dropdownPortalRef={dropdownPortalRef}
        invalidHeaderKeys={invalidHeaderKeys}
+       invalidLineItemIds={invalidLineItemIds}
     />
   );
 };

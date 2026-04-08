@@ -79,6 +79,7 @@ interface GroupedLineItemsTableProps {
   dropdownPortalRef?: React.MutableRefObject<HTMLElement | null>;
   isJobDetail?:boolean;
   invalidHeaderKeys?: string[];
+  invalidLineItemIds?: string[];
 }
 
 const GroupedLineItemsTable = ({
@@ -107,7 +108,8 @@ const GroupedLineItemsTable = ({
   duplicateRowRef,
   dropdownPortalRef,
   invalidHeaderKeys=[],
-  isJobDetail=false
+  isJobDetail=false,
+  invalidLineItemIds=[]
 }: GroupedLineItemsTableProps) => {
   return (
     <div className="space-y-4">
@@ -215,6 +217,7 @@ const GroupedLineItemsTable = ({
                   isInvalidHeader={invalidHeaderKeys.includes(
                     group.header.headerKey || "",
                   )}
+                  invalidLineItemIds={invalidLineItemIds}
                 />
               ))}
 

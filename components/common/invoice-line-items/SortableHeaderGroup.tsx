@@ -56,6 +56,7 @@ interface SortableHeaderGroupProps {
   dropdownPortalRef?: React.MutableRefObject<HTMLElement | null>;
   isJobDetail?: boolean;
   isInvalidHeader?: boolean;
+  invalidLineItemIds:string[]
 }
 
 const SortableHeaderGroup = ({
@@ -73,7 +74,8 @@ const SortableHeaderGroup = ({
   duplicateRowRef,
   dropdownPortalRef,
   duplicateItemRowId,
-  isInvalidHeader
+  isInvalidHeader,
+  invalidLineItemIds=[]
   
 }: SortableHeaderGroupProps) => {
   const isVirtualStandaloneHeader =
@@ -145,24 +147,24 @@ const SortableHeaderGroup = ({
                     onUpdateRow(group.header.id, "headerName", e.target.value)
                   }
                   className={`
-  h-9 w-[240px]
-  bg-transparent px-2
-  text-[20px] font-medium text-white
-  border rounded-md
-  shadow-none outline-none
-  transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]
-  placeholder:text-white/45
-  focus-visible:bg-white/5
-  focus-visible:ring-0
-  focus-visible:ring-offset-0
-  focus:outline-none
-  !ring-0 !ring-offset-0
-  ${
-    isInvalidHeader
-      ? "border-red-300/90 bg-red-50/20 focus:border-red-300"
-      : "border-transparent focus-visible:border-white/15"
-  }
-`}
+                      h-9 w-[240px]
+                      bg-transparent px-2
+                      text-[20px] font-medium text-white
+                      border rounded-md
+                      shadow-none outline-none
+                      transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]
+                      placeholder:text-white/45
+                      focus-visible:bg-white/5
+                      focus-visible:ring-0
+                      focus-visible:ring-offset-0
+                      focus:outline-none
+                      !ring-0 !ring-offset-0
+                      ${
+                        isInvalidHeader
+                          ? "border-red-300/90 bg-red-50/20 focus:border-red-300"
+                          : "border-transparent focus-visible:border-white/15"
+                      }
+                    `}
                   placeholder="Type your header name"
                 />
               </div>
@@ -232,6 +234,7 @@ const SortableHeaderGroup = ({
           isDuplicateItem={duplicateItemRowId === lineItem.id}
           duplicateRowRef={duplicateRowRef}
           dropdownPortalRef={dropdownPortalRef}
+          isInvalidItem={invalidLineItemIds?.includes(lineItem.id)}
         />
       ))}
     </tbody>

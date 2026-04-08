@@ -1,9 +1,9 @@
-'use client'
+"use client";
 
-import { useState } from "react"
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { Button } from "../ui/button"
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Button } from "../ui/button";
 import {
   LayoutDashboard,
   BarChart3,
@@ -23,46 +23,57 @@ import {
   Bell,
   Clock,
   PanelLeftClose,
-  PanelLeftOpen
-} from "lucide-react"
-import { cn } from "../../lib/utils"
-import { LogoutConfirmationDialog } from "../LogoutConfirmationDialog"
-import { usePermissions } from "../../contexts/PermissionContext"
-import Image from "next/image"
-import { getUserData } from "../../utils/auth"
+  PanelLeftOpen,
+} from "lucide-react";
+import { cn } from "../../lib/utils";
+import { LogoutConfirmationDialog } from "../LogoutConfirmationDialog";
+import { usePermissions } from "../../contexts/PermissionContext";
+import Image from "next/image";
+import { getUserData } from "../../utils/auth";
 interface SidebarProps {
-  currentPath: string
-  onLogout: () => void
+  currentPath: string;
+  onLogout: () => void;
 }
 
 export function Sidebar({ currentPath, onLogout }: SidebarProps) {
-  const [showLogoutDialog, setShowLogoutDialog] = useState(false)
-  const [expandedProfiles, setExpandedProfiles] = useState(false)
-  const [isCollapsed, setIsCollapsed] = useState(false)
-  const router = useRouter()
-  const { hasAnyPermission } = usePermissions()
-  
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [expandedProfiles, setExpandedProfiles] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const router = useRouter();
+  const { hasAnyPermission } = usePermissions();
+
   // Check if user is staff
   const isStaffUser = () => {
-    if (typeof window === 'undefined') return false
-    const userData = getUserData()
-    if (!userData?.user) return false
+    if (typeof window === "undefined") return false;
+    const userData = getUserData();
+    if (!userData?.user) return false;
     // Check if user role is 'staff' or user has staff permissions
-    const userRole = userData.user.role?.toLowerCase() || userData.user.role_type?.toLowerCase() || ''
-    const isStaffRole = userRole === 'staff' || userRole === 'staff_member' || userRole.includes('staff')
+    const userRole =
+      userData.user.role?.toLowerCase() ||
+      userData.user.role_type?.toLowerCase() ||
+      "";
+    const isStaffRole =
+      userRole === "staff" ||
+      userRole === "staff_member" ||
+      userRole.includes("staff");
     // Also check if user has staff module permissions
-    const hasStaffPermissions = hasAnyPermission('staff', ['view', 'create', 'edit', 'delete'])
-    return isStaffRole || hasStaffPermissions
-  }
+    const hasStaffPermissions = hasAnyPermission("staff", [
+      "view",
+      "create",
+      "edit",
+      "delete",
+    ]);
+    return isStaffRole || hasStaffPermissions;
+  };
 
   // Check if user is super admin (based on email)
   const isSuperAdmin = () => {
-    if (typeof window === 'undefined') return false
-    const userData = getUserData()
-    if (!userData?.user) return false
+    if (typeof window === "undefined") return false;
+    const userData = getUserData();
+    if (!userData?.user) return false;
     // Check if email is jdpadmin2@yopmail.com
-    return userData.user.email === 'jdpadmin2@yopmail.com'
-  }
+    return userData.user.email === "jdpadmin2@yopmail.com";
+  };
 
   const navigation = [
     {
@@ -72,7 +83,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       href: "/dashboard",
       description: "Overview of key metrics and summaries",
       module: "dashboard",
-      requiredActions: ["view"]
+      requiredActions: ["view"],
     },
     {
       id: "analytics",
@@ -81,7 +92,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       href: "/analytics",
       description: "Reports, performance charts, and usage stats",
       module: "reports",
-      requiredActions: ["view"]
+      requiredActions: ["view"],
     },
     {
       id: "products",
@@ -90,7 +101,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       href: "/products",
       description: "Manage product listings and details",
       module: "products",
-      requiredActions: ["view", "create", "edit", "delete"]
+      requiredActions: ["view", "create", "edit", "delete"],
     },
     {
       id: "orders",
@@ -99,7 +110,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       href: "/orders",
       description: "Track and manage customer orders",
       module: "orders",
-      requiredActions: ["view", "create", "edit", "delete"]
+      requiredActions: ["view", "create", "edit", "delete"],
     },
     {
       id: "invoices",
@@ -108,7 +119,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       href: "/invoices",
       description: "View and generate billing documents",
       module: "invoices",
-      requiredActions: ["view", "create", "edit", "delete"]
+      requiredActions: ["view", "create", "edit", "delete"],
     },
     {
       id: "timesheets",
@@ -117,7 +128,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       href: "/timesheets",
       description: "Review and approve employee timesheets",
       module: "invoices",
-      requiredActions: ["view", "create", "edit", "delete"]
+      requiredActions: ["view", "create", "edit", "delete"],
     },
     {
       id: "customers",
@@ -126,7 +137,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       href: "/customers",
       description: "Customer database and interactions",
       module: "customers",
-      requiredActions: ["view", "create", "edit", "delete"]
+      requiredActions: ["view", "create", "edit", "delete"],
     },
     // {
     //   id: "jobs",
@@ -144,7 +155,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       href: "/tracking",
       description: "Real-time job progress and resource tracking",
       module: "tracking",
-      requiredActions: ["view"]
+      requiredActions: ["view"],
     },
     {
       id: "contractors",
@@ -153,7 +164,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       href: "/contractors",
       description: "Directory of available contractors",
       module: "contractors",
-      requiredActions: ["view", "create", "edit", "delete"]
+      requiredActions: ["view", "create", "edit", "delete"],
     },
     {
       id: "staff",
@@ -162,7 +173,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       href: "/staff",
       description: "Administer staff accounts and permissions",
       module: "staff",
-      requiredActions: ["view", "create", "edit", "delete"]
+      requiredActions: ["view", "create", "edit", "delete"],
     },
     {
       id: "suppliers",
@@ -172,7 +183,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       description: "Manage your suppliers and vendor relationships.",
       module: "suppliers",
       requiredActions: ["view", "create", "edit", "delete"],
-      staffOnly: true
+      staffOnly: true,
     },
     {
       id: "staff-timeline-admin",
@@ -182,7 +193,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       description: "Manage staff timeline and hours (Super Admin)",
       module: "staff",
       requiredActions: ["view", "create", "edit", "delete"],
-      superAdminOnly: true
+      superAdminOnly: true,
     },
     {
       id: "notifications",
@@ -191,8 +202,8 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       href: "/notifications",
       description: "Manage and view system alerts and messages",
       module: "notification",
-      requiredActions: ["view", "create", "edit", "delete"]
-    }, 
+      requiredActions: ["view", "create", "edit", "delete"],
+    },
     {
       id: "role",
       name: "Role & Permission",
@@ -200,7 +211,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       href: "/role",
       description: "Role & Permission",
       module: "role_permission",
-      requiredActions: ["view", "create", "edit", "delete"]
+      requiredActions: ["view", "create", "edit", "delete"],
     },
     {
       id: "configuration",
@@ -209,7 +220,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       href: "/configuration",
       description: "Configure system-wide settings for pricing and rates",
       module: "configuration",
-      requiredActions: ["view", "create", "edit", "delete"]
+      requiredActions: ["view", "create", "edit", "delete"],
     },
 
     {
@@ -220,37 +231,37 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
       description: "Manage your work timeline and hours",
       module: "staff_timeline",
       requiredActions: ["view", "create", "edit", "delete"],
-      staffOnly: true
+      staffOnly: true,
     },
-  ]
+  ];
 
   // Filter navigation items based on permissions
-  const filteredNavigation = navigation.filter(item => {
+  const filteredNavigation = navigation.filter((item) => {
     // Staff Timeline Admin - only show for super admin
-    if (item.id === 'staff-timeline-admin' || (item as any).superAdminOnly) {
-      return isSuperAdmin()
+    if (item.id === "staff-timeline-admin" || (item as any).superAdminOnly) {
+      return isSuperAdmin();
     }
-    
+
     // Staff Timeline - only show for staff users with view permission
-    if (item.id === 'staff-timeline') {
+    if (item.id === "staff-timeline") {
       // super admin ko hide karna hai
-      if (isSuperAdmin()) return false
-      return isStaffUser() && hasAnyPermission('staff_timeline', ['view'])
+      if (isSuperAdmin()) return false;
+      return isStaffUser() && hasAnyPermission("staff_timeline", ["view"]);
     }
-    
+
     // Special handling for Staff Management - check for labour or lead_labour permissions
-    if (item.id === 'staff') {
-      return hasAnyPermission('labour', item.requiredActions) || 
-             hasAnyPermission('lead_labour', item.requiredActions) ||
-             hasAnyPermission('staff', item.requiredActions) ||
-             hasAnyPermission('suppliers', item.requiredActions)
+    if (item.id === "staff") {
+      return (
+        hasAnyPermission("labour", item.requiredActions) ||
+        hasAnyPermission("lead_labour", item.requiredActions) ||
+        hasAnyPermission("staff", item.requiredActions) ||
+        hasAnyPermission("suppliers", item.requiredActions)
+      );
     }
-    
-    
-    
+
     // For all other items, use standard permission check
-    return hasAnyPermission(item.module, item.requiredActions)
-  })
+    return hasAnyPermission(item.module, item.requiredActions);
+  });
 
   // const profileSubItems = [
   //   {
@@ -260,89 +271,92 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
   //     description: "Manage staff member profiles"
   //   },
   //   {
-  //     id: "lead-labour-profile", 
+  //     id: "lead-labour-profile",
   //     name: "Lead Labour Profile",
   //     href: "/profiles/lead-labour",
   //     description: "Manage lead labour profiles"
   //   },
   //   {
   //     id: "labour-profile",
-  //     name: "Labour Profile", 
+  //     name: "Labour Profile",
   //     href: "/profiles/labour",
   //     description: "Manage labour profiles"
   //   }
   // ]
 
   const handleLogoutClick = () => {
-    setShowLogoutDialog(true)
-  }
+    setShowLogoutDialog(true);
+  };
 
   const handleLogoutConfirm = () => {
-    setShowLogoutDialog(false)
-    onLogout()
-  }
+    setShowLogoutDialog(false);
+    onLogout();
+  };
 
   const toggleProfiles = () => {
-    setExpandedProfiles(!expandedProfiles)
-  }
+    setExpandedProfiles(!expandedProfiles);
+  };
 
   const isActive = (href: string) => {
-    return currentPath === href || currentPath.startsWith(href + '/')
-  }
+    return currentPath === href || currentPath.startsWith(href + "/");
+  };
 
   return (
     <>
-      <aside className={cn(
-        "bg-sidebar sticky top-0 h-screen border-r border-sidebar-border flex flex-col animate-fade-in shadow-sm transition-all duration-300 overflow-x-hidden",
-        isCollapsed ? "w-16" : "w-64"
-      )}>
-        <div className="p-5 border-b border-sidebar-border bg-gradient-to-r from-sidebar to-sidebar-accent/20 relative">
+      <aside
+        className={cn(
+          "bg-sidebar sticky top-0 h-screen border-r border-[#00a1ff]/20 flex flex-col animate-fade-in shadow-sm transition-all duration-300",
+          isCollapsed ? "w-16" : "w-64",
+        )}
+      >
+        <div className="relative p-5 pr-16 border-b  border-[#00a1ff]/20 bg-gradient-to-r from-sidebar to-sidebar-accent/20">
+          {" "}
           {!isCollapsed && (
             <div className="flex items-center justify-center space-x-3">
               <div className="text-center">
                 <Image
-                  src='/assets/logos/logo-jdp.png'
+                  src="/assets/logos/logo-jdp.png"
                   alt="logo"
                   width={168}
                   height={63}
-                  className='w-[140px] '
+                  className="w-[140px] "
                 />
-                <p className="font-semibold text-md pt-3">JDP Electrical Services</p>
+                <p className="font-semibold text-md pt-3">
+                  JDP Electrical Services
+                </p>
               </div>
             </div>
           )}
           {isCollapsed && (
             <div className="flex items-center justify-center">
               <Image
-                src='/assets/logos/logo-jdp.png'
+                src="/assets/logos/logo-jdp.png"
                 alt="logo"
                 width={40}
                 height={30}
-                className='w-10 h-6'
+                className="w-10 h-6"
               />
             </div>
           )}
           <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "absolute top-3 h-[45px] w-[45px] p-0 hover:bg-sidebar-accent bg-sidebar-accent",
-              isCollapsed ? "right-[-50px]" : "right-[-50px]"
-            )}
+            type="button"
+            variant="outline"
+            size="icon"
+            className="absolute top-3 right-3 z-50 h-9 w-9 rounded-md border  border-[#00a1ff]/20 bg-background text-foreground shadow-md hover:bg-muted"
             onClick={() => setIsCollapsed(!isCollapsed)}
           >
             {isCollapsed ? (
-              <PanelLeftOpen className="h-[35px] w-[35px]" />
+              <PanelLeftOpen className="h-5 w-5" />
             ) : (
-              <PanelLeftClose className="h-[35px] w-[35px]" />
+              <PanelLeftClose className="h-5 w-5" />
             )}
           </Button>
         </div>
-        
+
         <nav className="flex-1 p-4 space-y-1">
           {filteredNavigation.map((item) => {
-            const active = isActive(item.href)
-            const Icon = item.icon
+            const active = isActive(item.href);
+            const Icon = item.icon;
 
             return (
               // <Link key={item.id} href={item.href} prefetch={true}>
@@ -476,7 +490,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
           </div> */}
         </nav>
 
-        <div className="p-4 border-t border-sidebar-border bg-sidebar-accent/10">
+        <div className="p-4 border-t  border-[#00a1ff]/20 bg-sidebar-accent/10">
           {/* <Button
             variant="ghost"
             size="sm"
@@ -493,7 +507,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
             onClick={handleLogoutClick}
             className={cn(
               "w-full logout-button h-10",
-              isCollapsed ? "justify-center p-0" : "justify-start text-left"
+              isCollapsed ? "justify-center p-0" : "justify-start text-left",
             )}
             title={isCollapsed ? "Logout" : ""}
           >
@@ -509,5 +523,5 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
         onConfirm={handleLogoutConfirm}
       />
     </>
-  )
+  );
 }

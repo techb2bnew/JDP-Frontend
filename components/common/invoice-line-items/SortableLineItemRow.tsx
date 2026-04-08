@@ -49,6 +49,7 @@ interface SortableLineItemRowProps {
   duplicateRowRef?: React.MutableRefObject<HTMLElement | null>;
   dropdownPortalRef?: React.MutableRefObject<HTMLElement | null>;
   isDuplicateItem?: boolean;
+  isInvalidItem?: boolean;
 }
 
 const SortableLineItemRow = ({
@@ -63,7 +64,9 @@ const SortableLineItemRow = ({
   isJobDetail=false,
   duplicateRowRef,
   dropdownPortalRef,
-  isDuplicateItem=false
+  isDuplicateItem=false,
+  isInvalidItem
+  
   
 }: SortableLineItemRowProps) => {
   const {
@@ -96,14 +99,23 @@ const SortableLineItemRow = ({
     };
   }, [lineItem.id, lineItem.showSearchResults, onUpdateRow]);
 
- 
-  // const style: React.CSSProperties = {
-  //   transform: CSS.Transform.toString(transform),
-  //   transition: isDragging ? "none" : transition,
-  //   position: "relative",
-  //   zIndex: isDragging ? 1 : "auto",
-  //   opacity: isDragging ? 0.12 : 1,
-  //   boxShadow:isDuplicateItem ? "#3b82f680 0px 5px 15px" : ""
+ const rowHighlightClass = isInvalidItem
+  ? "bg-red-50/80 ring-2 ring-red-400 scale-[1.003] will-change-transform"
+  : isDuplicateItem
+    ? "bg-sky-50/80 ring-2 ring-sky-400 scale-[1.003] will-change-transform"
+    : "hover:bg-gray-50";
+
+const rowBoxShadow = isInvalidItem
+  ? "0px 5px 15px rgba(220,38,38,0.35)"
+  : isDuplicateItem
+    ? "#3b82f680 0px 5px 15px"
+    : "";
+
+const cellClass = isInvalidItem
+  ? "border-red-300 bg-red-50/60"
+  : isDuplicateItem
+    ? "border-sky-300 bg-sky-50/60"
+    : "border-gray-300";
 
     const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -111,9 +123,12 @@ const SortableLineItemRow = ({
     position: "relative",
     zIndex: isDragging ? 50 : isDuplicateItem ? 10 : 0.5,
     opacity: isDragging ? 0.12 : 1,
-    boxShadow: isDuplicateItem ? "#3b82f680 0px 5px 15px" : "",
+    // boxShadow: isDuplicateItem ? "#3b82f680 0px 5px 15px" : "",
+     boxShadow: rowBoxShadow,
   };
   // };
+  console.log(isInvalidItem,"isInvalidItem");
+  
 
   const filteredProducts = useMemo(
     () => getFilteredProducts(lineItem.searchQuery || ""),
@@ -125,32 +140,30 @@ const SortableLineItemRow = ({
 
   return (
     // <tr
-    //   ref={setNodeRef}
     //   style={style}
-    //   className={`overflow-visible ${
+    //   ref={(node) => {
+    //     setNodeRef(node);
+    //     if (isDuplicateItem && duplicateRowRef) {
+    //       duplicateRowRef.current = node;
+    //     }
+    //   }}
+    //   className={`relative overflow-visible transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
     //     isDragging
-    //       ? "bg-white shadow-lg opacity-95"
-    //       : "hover:bg-gray-50 transition-colors"
+    //       ? "bg-white opacity-95"
+    //       : isDuplicateItem
+    //         ? "bg-sky-50/80 ring-2 ring-sky-400 scale-[1.003] will-change-transform"
+    //         : "hover:bg-gray-50"
     //   }`}
     // >
     <tr
       style={style}
-      ref={(node) => {
-        setNodeRef(node);
-        if (isDuplicateItem && duplicateRowRef) {
-          duplicateRowRef.current = node;
-        }
-      }}
+      ref={setNodeRef}
       className={`relative overflow-visible transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-        isDragging
-          ? "bg-white opacity-95"
-          : isDuplicateItem
-            ? "bg-sky-50/80 ring-2 ring-sky-400 scale-[1.003] will-change-transform"
-            : "hover:bg-gray-50"
+        isDragging ? "bg-white opacity-95" : rowHighlightClass
       }`}
     >
       <td
-        className={`border border-gray-300 px-2 py-2 align-top h-[92px] max-h-[92] ${duplicateCellClass}`}
+        className={`border border-gray-300 px-2 py-2 align-top h-[92px] max-h-[92] ${cellClass}`}
       >
         <div className="flex items-center gap-2 h-[100%]">
           <button
@@ -183,7 +196,7 @@ const SortableLineItemRow = ({
           isJobDetail ? "w-[520px]" : "w-[400px]"
         } border border-gray-300 px-2 py-2 relative h-[92px] overflow-visible max-h-[92] ${
           lineItem.showSearchResults ? "z-[9999]" : "z-[1]"
-        } ${duplicateCellClass}`}
+        } ${cellClass}`}
       >
         {lineItem.isCustomProduct ? (
           <Input
@@ -230,7 +243,7 @@ const SortableLineItemRow = ({
               //   rounded-xl border border-slate-200 bg-white
               //   shadow-2xl max-h-[320px] overflow-y-auto p-2
               // `}
-                  className={`
+              className={`
                 absolute left-0 top-full mt-2
                 z-[999999]
                 ${isJobDetail ? "w-full min-w-[320px]" : ""}
@@ -330,7 +343,7 @@ const SortableLineItemRow = ({
       </td>
 
       <td
-        className={`border border-gray-300 px-2 py-2 max-h-[92] ${duplicateCellClass}`}
+        className={`border border-gray-300 px-2 py-2 max-h-[92] ${cellClass}`}
       >
         <Textarea
           value={lineItem.description}
@@ -343,7 +356,7 @@ const SortableLineItemRow = ({
       </td>
 
       <td
-        className={`border border-gray-300 px-2 py-2 h-[92px] max-h-[92] ${duplicateCellClass}`}
+        className={`border border-gray-300 px-2 py-2 h-[92px] max-h-[92] ${cellClass}`}
       >
         <Input
           type="number"
@@ -357,7 +370,7 @@ const SortableLineItemRow = ({
       </td>
 
       <td
-        className={`border border-gray-300 px-2 py-2 max-h-[92] ${duplicateCellClass}`}
+        className={`border border-gray-300 px-2 py-2 max-h-[92] ${cellClass}`}
       >
         <Input
           type="number"
@@ -375,13 +388,13 @@ const SortableLineItemRow = ({
       </td>
 
       <td
-        className={`border border-gray-300 px-3 py-2 text-right font-medium ${duplicateCellClass}`}
+        className={`border border-gray-300 px-3 py-2 text-right font-medium ${cellClass}`}
       >
         ${(lineItem.total || 0).toFixed(2)}
       </td>
 
       <td
-        className={`border border-gray-300 px-3 py-2 text-center h-[92px] ${duplicateCellClass}`}
+        className={`border border-gray-300 px-3 py-2 text-center h-[92px] ${cellClass}`}
       >
         <button
           type="button"
