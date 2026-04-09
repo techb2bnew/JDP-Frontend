@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -82,6 +82,7 @@ import {
 import { apiClient } from "@/utils/api";
 import Autocomplete from "react-google-autocomplete";
 import { toast } from "sonner";
+import { useSearchParams } from "next/navigation";
 import {
   Tooltip,
   TooltipContent,
@@ -112,6 +113,7 @@ const getInitials = (name: string) => {
 
 export function CustomersPage() {
   const { hasPermission } = usePermissions();
+  const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
@@ -178,6 +180,15 @@ export function CustomersPage() {
     fetchCustomersData(currentPage, itemsPerPage);
     fetchCustomerStats();
   }, [currentPage, itemsPerPage]);
+
+  const focusFromUrl = useMemo(() => {
+    const jobId = searchParams?.get("jobId") || "";
+    const estimateId = searchParams?.get("estimateId") || "";
+    return {
+      jobId: jobId.trim(),
+      estimateId: estimateId.trim(),
+    };
+  }, [searchParams]);
 
   // Fix Google Autocomplete dropdown z-index and pointer events for modal
   useEffect(() => {
@@ -464,6 +475,33 @@ export function CustomersPage() {
       console.error("Error fetching main job details:", error);
     }
   };
+
+  // Auto-select job (and pass estimate focus down) after navigation from invoice send flow
+  useEffect(() => {
+    const jobId = focusFromUrl.jobId;
+    if (!jobId) return;
+    if (!customersWithJobs || customersWithJobs.length === 0) return;
+    if (selectedJob === jobId) return;
+
+    const match = customersWithJobs.find((c: any) =>
+      (c.jobs || []).some((j: any) => j?.id?.toString?.() === jobId),
+    );
+    if (!match) return;
+
+    const customerId = match.id?.toString?.();
+    if (!customerId) return;
+
+    // Ensure the customer accordion is expanded so selection is visible
+    setExpandedCustomers((prev) => {
+      const next = new Set(prev);
+      next.add(customerId);
+      return next;
+    });
+
+    // Select job (this also fetches enhanced job data)
+    selectJob(jobId, customerId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusFromUrl.jobId, customersWithJobs]);
 
   const selectSubJob = async (
     subJobId: string,
@@ -1616,6 +1654,7 @@ export function CustomersPage() {
                           jobs={allJobs}
                           setJobs={handleSetJobs}
                           onJobsRefresh={fetchCustomersWithJobs}
+                          focusEstimateId={focusFromUrl.estimateId}
                         />
                       );
                     })
@@ -1695,6 +1734,7 @@ export function CustomersPage() {
                           jobs={allJobs}
                           setJobs={handleSetJobs}
                           onJobsRefresh={fetchCustomersWithJobs}
+                          focusEstimateId={focusFromUrl.estimateId}
                         />
                       );
                     })()}

@@ -499,6 +499,43 @@ const handleUpdateLineItem = (rowId: string, field: string, value: any) => {
       return updated;
     });
 
+    const changedHeader = updatedRows.find(
+      (row) => row.id === rowId && row.type === "header",
+    );
+
+    if (changedHeader && field === "headerName") {
+      const headerName = String(value || "").trim();
+
+      const propagatedRows = updatedRows.map((row) => {
+        if (
+          row.type === "item" &&
+          row.parentHeaderKey === changedHeader.headerKey
+        ) {
+          return {
+            ...row,
+            parentHeaderName: headerName || null,
+          };
+        }
+        return row;
+      });
+
+      if (typeof setInvalidHeaderKeys === "function") {
+        (setInvalidHeaderKeys as any)((prev: string[] = []) => {
+          const withoutCurrent = prev.filter(
+            (key) => key !== changedHeader.headerKey,
+          );
+
+          if (!headerName && changedHeader.headerKey) {
+            return [...withoutCurrent, changedHeader.headerKey];
+          }
+
+          return withoutCurrent;
+        });
+      }
+
+      return propagatedRows;
+    }
+
     return updatedRows;
   });
 

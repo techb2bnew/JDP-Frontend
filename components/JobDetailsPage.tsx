@@ -239,6 +239,8 @@ interface JobDetailsPageProps {
   jobs: any[];
   setJobs: (jobs: any[]) => void;
   onJobsRefresh?: () => void;
+  /** When provided, auto-scroll + briefly highlight the matching estimate row */
+  focusEstimateId?: string;
 }
 
 type JobDocumentItem = {
@@ -324,6 +326,7 @@ export function JobDetailsPage({
   jobs,
   setJobs,
   onJobsRefresh,
+  focusEstimateId,
 }: JobDetailsPageProps) {
   // Find the job from your jobs array or use sample data
   const job = jobs.find((j) => j.id === jobId) || sampleJobData.job;
@@ -524,6 +527,9 @@ export function JobDetailsPage({
   const [localInvoices, setLocalInvoices] = useState<Invoice[]>([]);
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
   const [isLoadingEstimates, setIsLoadingEstimates] = useState(false);
+  const [highlightEstimateId, setHighlightEstimateId] = useState<string | null>(
+    null,
+  );
 
   // Job Documents state
   const [jobDocuments, setJobDocuments] = useState<JobDocumentItem[]>([]);
@@ -899,6 +905,37 @@ export function JobDetailsPage({
   const [selectedEstimateId, setSelectedEstimateId] = useState<string | null>(
     null,
   );
+
+  // After navigation from send flow: scroll + highlight the created estimate
+  useEffect(() => {
+    const targetId = (focusEstimateId || "").toString().trim();
+    if (!targetId) return;
+    if (!estimates || estimates.length === 0) return;
+
+    const exists = estimates.some((e: any) => e?.id?.toString?.() === targetId);
+    if (!exists) return;
+
+    const el = document.getElementById(`estimate-row-${targetId}`);
+    if (!el) return;
+
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setHighlightEstimateId(targetId);
+  }, [focusEstimateId, estimates]);
+
+  // Keep highlight until user clicks anywhere once, then clear it
+  useEffect(() => {
+    if (!highlightEstimateId) return;
+
+    const handleDocumentClick = () => {
+      setHighlightEstimateId(null);
+    };
+
+    document.addEventListener("click", handleDocumentClick, { once: true });
+
+    return () => {
+      document.removeEventListener("click", handleDocumentClick);
+    };
+  }, [highlightEstimateId]);
   const [products, setProducts] = useState<any[]>([]);
   const [suppliersList, setSuppliersList] = useState<any[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState<number>(1);
@@ -7668,7 +7705,13 @@ const handlePrintInvoice = async (invoice: any) => {
                 estimates.map((invoice: any) => (
                   <div
                     key={invoice.id}
-                    className="p-4 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow bg-gradient-to-r from-white to-gray-50/30"
+                    id={`estimate-row-${invoice.id}`}
+                    className={`p-4 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow bg-gradient-to-r from-white to-gray-50/30 ${
+                      highlightEstimateId &&
+                      invoice?.id?.toString?.() === highlightEstimateId
+                        ? "shadow-[0px_5px_15px_rgba(22,205,255,0.35)] scale-[1.009]"
+                        : ""
+                    }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">

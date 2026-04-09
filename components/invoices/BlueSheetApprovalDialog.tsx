@@ -945,7 +945,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
       (sum: number, entry: any) => sum + Number(entry.total_cost || 0),
       0,
     );
-
+    const totalLaborCost = Number(laborEntriesTotalCost.toFixed(2));
     if (laborEntriesTotalCost > 0) {
       customProducts.push({
         job_id: finalBlueSheet.job_id,
@@ -1038,6 +1038,8 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
       po_number: `BS-${finalBlueSheet.id}`,
       rep: finalBlueSheet.created_by_user?.full_name || "",
       notes: finalBlueSheet.notes || "",
+      // total_labor_hours: totalLaborHours,
+      total_labor_cost: totalLaborCost,
       total_amount: totalAmountForEstimate,
 
       location: isContractBased

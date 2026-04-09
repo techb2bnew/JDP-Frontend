@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -48,6 +48,7 @@ import { motion } from "framer-motion";
 import { Logo } from "../common/Logo";
 import Image from "next/image";
 import InvoiceLineItemsManager from "../common/invoice-line-items/InvoiceLineItemsManager";
+import { useRouter } from "next/navigation";
 // import { formatCurrency, formatDate } from '../../utils/invoiceUtils'
 
 interface NewInvoiceDialogProps {
@@ -145,6 +146,7 @@ export const NewInvoiceDialog = ({
   onNavigateToJobAfterSend
 }: NewInvoiceDialogProps) => {
   console.log("trsting jobs", jobs);
+  const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -193,6 +195,8 @@ export const NewInvoiceDialog = ({
   const [selectedEstimateId, setSelectedEstimateId] = useState<string | null>(
     null,
   );
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+  const [previewEstimateId, setPreviewEstimateId] = useState<number | null>(null);
   const [productsList, setProductsList] = useState<any[]>([]);
   const [jobsList, setJobsList] = useState<any[]>([]);
   const [selectedJob, setSelectedJob] = useState<any>(null);
@@ -228,6 +232,38 @@ export const NewInvoiceDialog = ({
     estimateTotal: 0,
     paymentHistory: [] as any[],
   });
+
+  const previewJobId = useMemo(() => {
+    const fromInline = (inlineInvoiceData as any)?.jobId;
+    if (
+      fromInline !== undefined &&
+      fromInline !== null &&
+      String(fromInline).trim() !== ""
+    ) {
+      return String(fromInline);
+    }
+    if (jobId !== undefined && jobId !== null) return String(jobId);
+    return "";
+  }, [inlineInvoiceData.jobId, jobId]);
+
+  const previewSelectedJob = useMemo(() => {
+    const activeJobId = String(inlineInvoiceData.jobId || jobId || "").trim();
+    const jobFromState =
+      selectedJob ||
+      jobsList.find((j: any) => String(j?.id || "") === activeJobId) ||
+      jobs?.find((j: any) => String(j?.id || "") === activeJobId) ||
+      currentJob;
+
+    const jobName =
+      jobFromState?.title ||
+      jobFromState?.job_title ||
+      (activeJobId ? `Job #${activeJobId}` : "No job selected");
+
+    return {
+      id: activeJobId || "no-job",
+      name: jobName,
+    };
+  }, [inlineInvoiceData.jobId, jobId, selectedJob, jobsList, jobs, currentJob]);
 
     const [jobSearch, setJobSearch] = useState("");
   const [showJobResults, setShowJobResults] = useState(false);
@@ -481,7 +517,7 @@ export const NewInvoiceDialog = ({
   // };
 
   // Send invoice to customer function
-  const sendInvoiceToCustomer = async (invoiceId: number) => {
+  const sendInvoiceToCustomer = async (invoiceId: number): Promise<boolean> => {
     try {
       // Get customer_id or contractor_id from viewInvoiceData if in view mode, otherwise from currentJob
       let customerId: number | null = null;
@@ -694,11 +730,13 @@ export const NewInvoiceDialog = ({
       }
 
       toast.success("Invoice sent successfully to customer!");
+      return true;
     } catch (error) {
       console.error("Error sending invoice to customer:", error);
       toast.error(
         `Failed to send invoice to customer: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
+      return false;
     }
   };
 
@@ -1284,6 +1322,9 @@ const validateLineItems = (lineItems: any[] = []) => {
 
         return base;
       });
+      console.log(inlineInvoiceData.lineItems,"customProducts");
+      // return;
+      
 
       // Get customer_id or contractor_id - from viewInvoiceData if in view mode, otherwise from currentJob
       let customerId: number | null = null;
@@ -1361,7 +1402,8 @@ const validateLineItems = (lineItems: any[] = []) => {
           ? inlineInvoiceData.billToAddress || ""
           : "",
         notes: inlineInvoiceData.notes || "",
-        status: "sent",
+        // Create as draft first; send happens from preview modal confirmation
+        status: "draft",
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
         custom_products: customProducts,
         total_amount: subtotal,
@@ -1384,19 +1426,50 @@ const validateLineItems = (lineItems: any[] = []) => {
       });
 
       const response = await apiClient.createEstimate(payload as any);
-      toast.success("Invoice created successfully!");
+      const createdId =
+        Number((response as any)?.data?.id) ||
+        Number((response as any)?.id) ||
+        Number((response as any)?.data?.data?.id) ||
+        null;
 
-      // Send invoice to customer using estimate ID
-      await sendInvoiceToCustomer(response.data.id);
-
-      // Refresh the estimates list
-      if (onInvoiceSaved) {
-        onInvoiceSaved(payload);
+      if (!createdId) {
+        throw new Error("Estimate ID not returned from createEstimate");
       }
 
+      setPreviewEstimateId(createdId);
+      toast.success("Invoice created successfully!");
+
+      // Open preview dialog; send is triggered from modal button
+      setShowPreviewDialog(true);
+    } catch (error) {
+      console.error("Error sending invoice:", error);
+      toast.error("Failed to send invoice");
+    } finally {
+      setSendingInvoice(false);
+    }
+  };
+
+  const handleSendFromPreview = async () => {
+    if (!previewEstimateId) {
+      toast.error("Estimate not found. Please try preview again.");
+      return;
+    }
+
+    setSendingInvoice(true);
+    try {
+      const ok = await sendInvoiceToCustomer(previewEstimateId);
+      if (!ok) return;
+
+      // Now that the flow is complete, allow parent to refresh/navigate if it wants
+      onInvoiceSaved?.({
+        id: previewEstimateId,
+        job_id: previewJobId,
+      });
+
+      setShowPreviewDialog(false);
       onOpenChange(false);
 
-      // Reset form
+      // Reset form (same shape as existing reset logic)
       setInlineInvoiceData({
         date: new Date().toISOString().split("T")[0],
         estimateNumber: "",
@@ -1422,6 +1495,17 @@ const validateLineItems = (lineItems: any[] = []) => {
       });
       setSelectedJob(null);
       setValidationErrors({});
+      setPreviewEstimateId(null);
+
+      if (onNavigateToJobAfterSend) {
+        onNavigateToJobAfterSend(previewJobId, previewEstimateId);
+      }
+
+      router.push(
+        `/customers?jobId=${encodeURIComponent(previewJobId)}&estimateId=${encodeURIComponent(
+          String(previewEstimateId),
+        )}`,
+      );
     } catch (error) {
       console.error("Error sending invoice:", error);
       toast.error("Failed to send invoice");
@@ -2721,6 +2805,351 @@ const validateLineItems = (lineItems: any[] = []) => {
             </div>
           </div>
         )}
+
+        {/* Invoice Preview Modal (reused from JobDetailsPage pattern) */}
+        <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
+          <DialogContent className="min-w-[80%] max-h-[90vh] overflow-y-auto p-0">
+            <div className="bg-gray-100 p-3 md:p-4">
+              <div
+                id="invoice-preview-print"
+                className="bg-white p-4 md:p-5 shadow-lg"
+              >
+                {/* Header */}
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <Image
+                      src="/assets/logos/logo-jdp.png"
+                      alt="logo"
+                      width={168}
+                      height={63}
+                      className="w-[120px]"
+                    />
+                    <p className="text-xs text-gray-600 mt-1">952-449-1088</p>
+                  </div>
+
+                  <div className="text-right space-y-1">
+                    <div className="text-center flex justify-center items-center">
+                      <div className="text-sm font-bold bg-gray-800 text-white px-4 py-2 w-[160px]">
+                        Date
+                      </div>
+                      <div className="text-sm border border-gray-800 px-4 py-2 w-[160px]">
+                        {new Date(inlineInvoiceData.date).toLocaleDateString(
+                          "en-US",
+                          {
+                            month: "2-digit",
+                            day: "2-digit",
+                            year: "numeric",
+                          },
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="text-center flex justify-center items-center">
+                      <div className="text-sm font-bold bg-gray-800 text-white px-4 py-2 w-[160px]">
+                        {(inlineInvoiceData.invoiceType === "Custom"
+                          ? inlineInvoiceData.customInvoiceType
+                          : inlineInvoiceData.invoiceType) || "ESTIMATE"}{" "}
+                        #
+                      </div>
+                      <div className="text-sm border border-gray-800 px-4 py-2 w-[160px]">
+                        {previewEstimateId || inlineInvoiceData.estimateNumber || "Draft"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Selected Job (display-only) */}
+                <div className="mb-4">
+                  <Label className="block bg-gray-800 text-white px-3 py-2 text-xs font-bold">
+                     Job
+                  </Label>
+                  <div className="border border-gray-800 px-3 py-2">
+                    <Select value={previewSelectedJob.id} disabled>
+                      <SelectTrigger className="h-9 border-primary/30 bg-gray-100 text-gray-700 cursor-not-allowed">
+                        <SelectValue>{previewSelectedJob.name}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={previewSelectedJob.id}>
+                          {previewSelectedJob.name}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {inlineInvoiceData.billToAddressEnabled && (
+                  <>
+                    <div className="bg-gray-800 text-white px-3 py-2 mb-2">
+                      <div className="text-xs font-bold">Bill TO</div>
+                    </div>
+                    {inlineInvoiceData.billToAddress && (
+                      <div className="text-gray-600 mt-1 font-medium border border-gray-800 px-3 py-2 text-sm mb-3">
+                        {inlineInvoiceData.billToAddress}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* To Section */}
+                <div className="bg-gray-800 text-white px-3 py-2 mb-2 mt-2">
+                  <div className="text-xs font-bold">TO</div>
+                </div>
+                <div className="mb-4 border border-gray-800 px-3 py-2">
+                  <div className="font-semibold text-sm">
+                    {inlineInvoiceData.customerName || "Customer"}
+                  </div>
+                  <div className="text-gray-600 text-sm leading-5">
+                    {inlineInvoiceData.customerAddress || ""}
+                  </div>
+                </div>
+
+                
+
+                {/* Project Details */}
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div>
+                    <div className="text-sm font-semibold border border-gray-800 px-3 py-2">
+                      P.O. No.
+                    </div>
+                    <div className="text-gray-600 border border-gray-800 px-3 py-2 text-sm min-h-[40px]">
+                      {inlineInvoiceData.poNumber}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="bg-gray-800 text-white text-sm font-semibold border border-gray-800 px-3 py-2">
+                      Project
+                    </div>
+                    <div className="text-gray-600 border border-gray-800 px-3 py-2 text-sm min-h-[40px]">
+                      {inlineInvoiceData.project}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Rep and Due Date */}
+                <div className="mb-3">
+                  <table className="w-full border-collapse border border-gray-300">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-sm">
+                          Rep
+                        </th>
+                        <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-sm">
+                          Due Date
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="border border-gray-300 px-3 py-2 text-sm">
+                          {inlineInvoiceData.rep || "JDP"}
+                        </td>
+                        <td className="border border-gray-300 px-3 py-2 text-sm">
+                          {inlineInvoiceData.dueDate || ""}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Line Items Table */}
+                <div className="mb-4">
+                  <table className="w-full border-collapse border border-gray-300">
+                    <thead>
+                      <tr className="bg-gray-800 text-white">
+                        <th className="border border-gray-300 px-3 py-2 text-left text-sm">
+                          Qty
+                        </th>
+                        <th className="border border-gray-300 px-3 py-2 text-left text-sm">
+                          Item
+                        </th>
+                        <th className="border border-gray-300 px-3 py-2 text-left text-sm">
+                          Description
+                        </th>
+                        <th className="border border-gray-300 px-3 py-2 text-right text-sm">
+                          Rate
+                        </th>
+                        <th className="border border-gray-300 px-3 py-2 text-right text-sm">
+                          Amount
+                        </th>
+                        <th className="border border-gray-300 px-3 py-2 text-right text-sm">
+                          Total
+                        </th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {(() => {
+                        const lineItems = inlineInvoiceData.lineItems || [];
+
+                        const getHeaderName = (item: any) =>
+                          item.parent_header_name ||
+                          item.parentHeaderName ||
+                          null;
+
+                        const normalizedItems = lineItems
+                          .filter((item: any) => item.type !== "header")
+                          .map((item: any) => ({
+                            ...item,
+                            qty: item.qty ?? item.stock_quantity ?? 0,
+                            item: item.item ?? item.product_name ?? "-",
+                            rate: item.rate ?? item.unit_cost ?? 0,
+                            estimatedPrice:
+                              item.estimatedPrice ?? item.estimated_price ?? 0,
+                            total: item.total ?? item.total_cost ?? 0,
+                            parent_header_name: getHeaderName(item),
+                          }));
+
+                        const directItems = normalizedItems.filter(
+                          (item: any) => !item.parent_header_name,
+                        );
+
+                        const groupedMap = normalizedItems.reduce(
+                          (acc: Record<string, any[]>, item: any) => {
+                            const headerName = item.parent_header_name;
+                            if (!headerName) return acc;
+
+                            if (!acc[headerName]) {
+                              acc[headerName] = [];
+                            }
+
+                            acc[headerName].push(item);
+                            return acc;
+                          },
+                          {},
+                        );
+
+                        const orderedRows: any[] = [
+                          ...directItems,
+                          ...Object.entries(groupedMap).flatMap(
+                            ([headerName, items]) => [
+                              {
+                                id: `header-${headerName}`,
+                                type: "synthetic-header",
+                                headerName,
+                              },
+                              ...items,
+                            ],
+                          ),
+                        ];
+
+                        return orderedRows.map(
+                          (lineItem: any, index: number) => {
+                            if (lineItem.type === "synthetic-header") {
+                              return (
+                                <tr key={lineItem.id} className="bg-transparent">
+                                  <td
+                                    colSpan={6}
+                                    className="px-0 py-0 border border-gray-300 bg-white"
+                                  >
+                                    <div className="w-full bg-gray-800 px-3 py-2 text-white">
+                                      <span className="text-sm font-semibold tracking-wide">
+                                        {lineItem.headerName || ""}
+                                      </span>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            }
+
+                            return (
+                              <tr
+                                key={lineItem.id || index}
+                                className="bg-white transition-colors hover:bg-gray-50"
+                              >
+                                <td className="border border-gray-300 px-3 py-2 text-center align-middle text-sm">
+                                  <span>{lineItem.qty || 0}</span>
+                                </td>
+                                <td className="border border-gray-300 px-3 py-2 align-middle">
+                                  <span className="text-sm font-medium text-gray-900">
+                                    {lineItem.item || "-"}
+                                  </span>
+                                </td>
+                                <td className="border border-gray-300 px-3 py-2 align-top">
+                                  <div className="max-h-[72px] overflow-y-auto pr-1 text-sm leading-5 text-gray-700">
+                                    {lineItem.description || "-"}
+                                  </div>
+                                </td>
+                                <td className="border border-gray-300 px-3 py-2 text-right align-middle text-sm">
+                                  ${Number(lineItem.rate || 0).toFixed(2)}
+                                </td>
+                                <td className="border border-gray-300 px-3 py-2 text-right align-middle text-sm">
+                                  $
+                                  {Number(lineItem.estimatedPrice || 0).toFixed(
+                                    2,
+                                  )}
+                                </td>
+                                <td className="border border-gray-300 px-3 py-2 text-right font-medium align-middle text-sm">
+                                  ${(lineItem.total || 0).toFixed(2)}
+                                </td>
+                              </tr>
+                            );
+                          },
+                        );
+                      })()}
+                    </tbody>
+                  </table>
+
+                  <div className="flex justify-end mt-3">
+                    <div className="text-right">
+                      <div className="font-bold text-base">
+                        ${calculateInvoiceSubtotal().toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notes Section */}
+                <div className="border-t pt-3 mb-4">
+                  <div className="bg-gray-100 px-3 py-2 rounded text-center">
+                    <div className="text-sm font-medium whitespace-pre-line leading-5">
+                      {inlineInvoiceData.notes ||
+                        "Final payment to complete project billing"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Disclaimer */}
+                <div className="text-xs text-gray-600 mb-4 leading-5">
+                  <p>
+                    JDP is not responsible for repair of lamps & landscaping,
+                    house owner utilities including cables, sprinkler systems,
+                    television or telephone cables, etc. that may be cut or
+                    damaged during installation. Price are subject to change
+                    prior to receipt of down payment.
+                  </p>
+                </div>
+
+                {/* Total and Contact */}
+                <div className="text-center mb-4">
+                  <div className="text-sm text-blue-600">
+                    EMAIL: jen@jdpelectric.us 952-449-1088
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer Buttons */}
+            <div className="sticky bottom-0 z-20 flex justify-center gap-3 border-t bg-gray-50 p-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowPreviewDialog(false)}
+                className="flex items-center gap-2"
+              >
+                <X className="h-4 w-4" />
+                Close
+              </Button>
+
+              <Button
+                onClick={handleSendFromPreview}
+                disabled={sendingInvoice}
+                className="bg-gray-800 hover:bg-gray-900 text-white flex items-center gap-2"
+              >
+                <Send className="h-4 w-4" />
+                {sendingInvoice ? "Sending..." : "Send Invoice"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </Card>
     );
   }
