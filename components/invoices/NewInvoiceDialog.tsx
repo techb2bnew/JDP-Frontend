@@ -1048,16 +1048,16 @@ export const NewInvoiceDialog = ({
     if (invoiceItemRows.length === 0) {
       errors.lineItems = "Please add at least one product item";
     }
+        if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
+          return;
+        }
+        if (!validateLineItems(inlineInvoiceData.lineItems)) return;
 
-    if (Object.keys(errors).length > 0) {
-      setValidationErrors(errors);
-      toast.error("Please fix the validation errors");
-      return;
-    }
-    if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
-      return;
-    }
-    if (!validateLineItems(inlineInvoiceData.lineItems)) return;
+        if (Object.keys(errors).length > 0) {
+          setValidationErrors(errors);
+          toast.error("Please fix the validation errors");
+          return;
+        }
 
 
     setValidationErrors({});
@@ -1273,18 +1273,17 @@ const validateLineItems = (lineItems: any[] = []) => {
     ) {
       errors.lineItems = "Please add at least one product item";
     }
+      if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
+        return;
+      }
+      if (!validateLineItems(inlineInvoiceData.lineItems)) return;
 
-    if (Object.keys(errors).length > 0) {
-          console.log(errors,"::errors");
-
-      setValidationErrors(errors);
-      toast.error("Please fix the validation errors");
-      return;
-    }
-    if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
-      return;
-    }
-   if (!validateLineItems(inlineInvoiceData.lineItems)) return;
+      if (Object.keys(errors).length > 0) {
+        setValidationErrors(errors);
+        toast.error("Please fix the validation errors");
+        return;
+      }
+  
 
 
     setValidationErrors({});

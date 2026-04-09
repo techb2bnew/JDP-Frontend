@@ -321,7 +321,8 @@ export const CustomInvoiceDialog = ({
     estimateTotal: 0,
     paymentHistory: [] as any[]
   });
-
+   const [invalidLineItemIds, setInvalidLineItemIds] = useState<string[]>([]);
+  
 
 
   useEffect(() => {
@@ -833,8 +834,23 @@ console.log(totalAmount,"amounttt");
     }
   }
 
-  console.log(products,"productsss");
+  const validateLineItems = (lineItems: any[] = []) => {
+    const invalidItems = lineItems.filter((row) => {
+      if (row.type !== "item") return false;
   
+      const name = String(row.item || row.product_name || "").trim();
+      return !name;
+    });
+  
+    if (invalidItems.length > 0) {
+      setInvalidLineItemIds(invalidItems.map((row) => row.id));
+      toast.error("Item's product_name is not allowed to be empty");
+      return false;
+    }
+  
+    setInvalidLineItemIds([]);
+    return true;
+  };
 
    
 
@@ -889,6 +905,11 @@ console.log(totalAmount,"amounttt");
     if (validLineItems.length === 0 && !hasBlueSheetMaterials) {
       errors.lineItems = "Please add at least one product item with name";
     }
+       
+    if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
+      return;
+    }
+      if (!validateLineItems(inlineInvoiceData.lineItems)) return;
 
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
@@ -896,10 +917,7 @@ console.log(totalAmount,"amounttt");
       return;
     }
 
-    
-    if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
-      return;
-    }
+ 
 
     setValidationErrors({});
     setSendingInvoice(true);
@@ -1869,6 +1887,8 @@ console.log(totalAmount,"amounttt");
             <InvoiceLineItemsManager
               lineItems={inlineInvoiceData.lineItems}
               invalidHeaderKeys={invalidHeaderKeys}
+              invalidLineItemIds={invalidLineItemIds}
+              setInvalidLineItemIds={setInvalidLineItemIds}
               setInvalidHeaderKeys={setInvalidHeaderKeys}
               setLineItems={setManagedLineItems}
               selectedSupplierId={selectedSupplierId}

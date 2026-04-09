@@ -5129,17 +5129,19 @@ const handlePrintInvoice = async (invoice: any) => {
     if (validLineItems.length === 0) {
       errors.lineItems = "Please add at least one product item with name";
     }
+        if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
+          return;
+        }
+
+        if (!validateLineItems(inlineInvoiceData.lineItems)) return;
+
 
     if (Object.keys(errors).length > 0) {
       setInvoiceValidationErrors(errors);
       toast.error("Please fix the validation errors");
       return;
     }
-    if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
-      return;
-    }
 
-    if (!validateLineItems(inlineInvoiceData.lineItems)) return;
 
 
     setInvoiceValidationErrors({});
@@ -5320,17 +5322,16 @@ const handlePrintInvoice = async (invoice: any) => {
     if (validLineItems.length === 0) {
       errors.lineItems = "Please add at least one product item with name";
     }
+     if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
+       return;
+     }
+     if (!validateLineItems(inlineInvoiceData.lineItems)) return;
 
     if (Object.keys(errors).length > 0) {
       setInvoiceValidationErrors(errors);
       toast.error("Please fix the validation errors");
       return;
     }
-
-     if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
-       return;
-     }
-     if (!validateLineItems(inlineInvoiceData.lineItems)) return;
 
     // First save as draft
     try {

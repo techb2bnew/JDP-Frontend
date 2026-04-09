@@ -2776,9 +2776,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                       open={true}
                       invalidHeaderKeys={invalidHeaderKeys}
                       setInvalidHeaderKeys={setInvalidHeaderKeys}
-                      validateHeaderGroupsBeforeSubmit={
-                        validateHeaderGroupsBeforeSubmit
-                      }
+                      validateHeaderGroupsBeforeSubmit={ validateHeaderGroupsBeforeSubmit}
                       onOpenChange={() => setIsCustomInvoiceOpen(false)}
                       blueSheet={currentBlueSheet}
                       // Let CustomInvoiceDialog derive labor cost from labor_entries
