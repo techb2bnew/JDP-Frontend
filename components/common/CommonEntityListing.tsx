@@ -13,6 +13,8 @@ type JobType = {
   job_title?: string;
   title?: string;
   status?: string;
+  address?: string;
+  location?: string;
   subJobs?: {
     id: string | number;
     job_title?: string;
@@ -98,6 +100,13 @@ export default function CommonEntityListing({
   itemsPerPage,
   totalItems,
 }: CommonEntityListingProps) {
+  const truncateWords = (value?: string, maxWords = 2) => {
+    if (!value) return "";
+    const words = value.trim().split(/\s+/);
+    if (words.length <= maxWords) return value.trim();
+    return `${words.slice(0, maxWords).join(" ")}...`;
+  };
+
   const shouldShowFooter =
     !!footer &&
     !isLoading &&
@@ -285,13 +294,26 @@ export default function CommonEntityListing({
                                               </div>
                                             </div>
 
-                                            <div className="min-w-0 flex-1">
+                                            {/* <div className="min-w-0 flex-1">
                                               <div className="w-[100px] truncate text-sm font-semibold text-slate-700">
                                                 {job.job_title || job.title}
                                               </div>
                                               <div className="text-xs font-medium capitalize text-slate-500">
                                                 {job.status}
                                               </div>
+                                            </div> */}
+                                            <div className="min-w-0 flex-1 relative">
+                                              <div className="w-[100px] truncate text-sm font-semibold text-slate-700">
+                                                {truncateWords(job.job_title || job.title,2)}
+
+                                              </div>
+                                              <span className="absolute right-0 top-1/2 -translate-y-1/2 rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold capitalize text-sky-600">
+                                                  {job.status}
+                                                </span> 
+                                                  <div className="text-xs font-medium capitalize text-slate-500">
+                                                {truncateWords(job.address || job.location , 1)}
+                                              </div>
+                                             
                                             </div>
                                           </div>
                                         </div>

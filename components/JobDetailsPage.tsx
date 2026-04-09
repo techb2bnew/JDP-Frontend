@@ -519,6 +519,9 @@ export function JobDetailsPage({
   >([]);
   const dispatch = useDispatch();
   const [isLoading, setIsLoading] = useState(false);
+  const [quickbookActionLoading, setQuickbookActionLoading] = useState<
+    "send" | "save" | null
+  >(null);
   const [isLoadingDraft, setIsLoadingDraft] = useState(false);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -949,6 +952,8 @@ export function JobDetailsPage({
   const [isMarkingPaidId, setIsMarkingPaidId] = useState<number | null>(null);
   const [isPaidLoading, setIsPaidLoading] = useState(false);
   const [isApprovingId, setIsApprovingId] = useState<number | null>(null);
+  const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
+  const [invoiceToMarkPaid, setInvoiceToMarkPaid] = useState<any | null>(null);
   const handleApproveInvoice = async (invoice: any) => {
     if (!invoice?.id) {
       toast.error("Invoice ID not found");
@@ -2175,6 +2180,20 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
     } finally {
       setIsMarkingPaidId(null);
     }
+  };
+
+  const openMarkAsPaidDialog = (invoice: any) => {
+    if (!invoice?.id) return;
+    if (String(invoice.status || "").toLowerCase() === "paid") return;
+    setInvoiceToMarkPaid(invoice);
+    setShowMarkPaidDialog(true);
+  };
+
+  const confirmMarkAsPaid = async () => {
+    if (!invoiceToMarkPaid) return;
+    await handleMarkAsPaid(invoiceToMarkPaid);
+    setShowMarkPaidDialog(false);
+    setInvoiceToMarkPaid(null);
   };
   // const handleDeleteProduct = async (productId: string | number) => {
   //   try {
@@ -5032,6 +5051,14 @@ const handlePrintInvoice = async (invoice: any) => {
     return apiType.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
+  const getSelectedInvoiceTypeLabel = () => {
+    if (inlineInvoiceData.invoiceType === "Custom") {
+      const customType = String(inlineInvoiceData.customInvoiceType || "").trim();
+      return customType || "Invoice";
+    }
+    return inlineInvoiceData.invoiceType || "Invoice";
+  };
+
   // Fetch suppliers with search
   const fetchSuppliers = async (searchQuery: string = "") => {
     try {
@@ -5648,6 +5675,72 @@ const handlePrintInvoice = async (invoice: any) => {
       toast.error("Failed to send invoice");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleQuickbookFromPreview = async (action: "send" | "save") => {
+    setQuickbookActionLoading(action);
+    try {
+      const customProducts = sanitizeCustomProductsForPayload(
+        inlineInvoiceData.lineItems,
+        Number(jobId),
+      );
+
+      const selectedInvoiceType =
+        inlineInvoiceData.invoiceType === "Custom"
+          ? inlineInvoiceData.customInvoiceType
+          : inlineInvoiceData.invoiceType;
+
+      const payload = {
+        job_id: Number(jobId),
+        estimate_title: inlineInvoiceData.project || job.title,
+        ...(job.type === "contract-based"
+          ? { contractor_id: Number(job.contractor) || 0 }
+          : { customer_id: Number(job.customer?.id || job.customer) || 0 }),
+        priority: "medium" as "low" | "medium" | "high",
+        service_type:
+          job.type === "contract-based" ? "contract_based" : "service_based",
+        email_address:
+          job.type === "contract-based"
+            ? contractorData?.email || job.email || "contractor@example.com"
+            : customerData?.email ||
+              job.customer?.email ||
+              job.email ||
+              "customer@example.com",
+        estimate_date: inlineInvoiceData.date,
+        po_number: inlineInvoiceData.poNumber || "",
+        rep: inlineInvoiceData.rep || "",
+        due_date: inlineInvoiceData.dueDate || "",
+        payment_credits: inlineInvoiceData.paymentCredits || 0,
+        balance_due: inlineInvoiceData.balanceDue || "",
+        ...(inlineInvoiceData.billToAddressEnabled && {
+          bill_to_address: inlineInvoiceData.billToAddress || "",
+        }),
+        status: "draft",
+        invoice_type: mapInvoiceTypeToAPI(selectedInvoiceType),
+        notes: inlineInvoiceData.notes || "",
+        custom_products: customProducts,
+        total_amount: calculateInvoiceSubtotal(),
+        invoice_source: "quickbook",
+        quickbook_action:
+          action === "send" ? "sendtoquickbook" : "sevetoquickbook",
+      };
+
+      await apiClient.createEstimate(payload as any);
+      toast.success(
+        action === "send"
+          ? "Send Invoice from QuickBooks"
+          : "Save Invoice to QuickBooks",
+      );
+    } catch (error) {
+      console.error("Quickbook action failed:", error);
+      toast.error(
+        action === "send"
+          ? "Failed to send invoice from QuickBooks"
+          : "Failed to save invoice to QuickBooks",
+      );
+    } finally {
+      setQuickbookActionLoading(null);
     }
   };
 
@@ -7763,6 +7856,32 @@ const handlePrintInvoice = async (invoice: any) => {
                             {invoice.status || "draft"}
                           </Badge>
                         </div>
+                        {String(invoice.invoice_type || "").toLowerCase() !==
+                          "estimate" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openMarkAsPaidDialog(invoice)}
+                            disabled={
+                              isMarkingPaidId === invoice.id ||
+                              String(invoice.status || "").toLowerCase() ===
+                                "paid"
+                            }
+                            className={`${
+                              String(invoice.status || "").toLowerCase() ===
+                              "paid"
+                                ? "opacity-60 cursor-default"
+                                : ""
+                            }`}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                            {String(invoice.status || "").toLowerCase() === "paid"
+                              ? "Already Paid"
+                              : isMarkingPaidId === invoice.id
+                                ? "Marking..."
+                                : "Mark As Paid"}
+                          </Button>
+                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
@@ -7804,6 +7923,33 @@ const handlePrintInvoice = async (invoice: any) => {
                               <FileText className="h-4 w-4 mr-2 text-green-600" />
                               <span>Duplicate</span>
                             </DropdownMenuItem>
+                            {String(invoice.invoice_type || "").toLowerCase() !==
+                              "estimate" && (
+                              <DropdownMenuItem
+                                onClick={() => openMarkAsPaidDialog(invoice)}
+                                className={`cursor-pointer ${
+                                  String(invoice.status || "").toLowerCase() ===
+                                  "paid"
+                                    ? "opacity-60 cursor-default"
+                                    : ""
+                                }`}
+                                disabled={
+                                  isMarkingPaidId === invoice.id ||
+                                  String(invoice.status || "").toLowerCase() ===
+                                    "paid"
+                                }
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                                <span>
+                                  {String(invoice.status || "").toLowerCase() ===
+                                  "paid"
+                                    ? "Already Paid"
+                                    : isMarkingPaidId === invoice.id
+                                      ? "Marking..."
+                                      : "Mark As Paid"}
+                                </span>
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
                               onClick={() => {
                                 const currentStatus = String(
@@ -7835,39 +7981,6 @@ const handlePrintInvoice = async (invoice: any) => {
                                     : "Approve"}
                               </span>
                             </DropdownMenuItem>
-                            {/* {( */}
-                            <DropdownMenuItem
-                              onClick={() => {
-                                if (
-                                  String(invoice.status || "").toLowerCase() !==
-                                  "paid"
-                                ) {
-                                  handleMarkAsPaid(invoice);
-                                }
-                              }}
-                              className={`cursor-pointer ${
-                                String(invoice.status || "").toLowerCase() ===
-                                "paid"
-                                  ? "opacity-60 cursor-default"
-                                  : ""
-                              }`}
-                              disabled={
-                                isMarkingPaidId === invoice.id ||
-                                String(invoice.status || "").toLowerCase() ===
-                                  "paid"
-                              }
-                            >
-                              <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
-                              <span>
-                                {String(invoice.status || "").toLowerCase() ===
-                                "paid"
-                                  ? "Already Paid"
-                                  : isMarkingPaidId === invoice.id
-                                    ? "Marking..."
-                                    : "Mark As Paid"}
-                              </span>
-                            </DropdownMenuItem>
-                            {/* // )} */}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               onClick={() => handleDeleteInvoice(invoice.id)}
@@ -9698,6 +9811,37 @@ const handlePrintInvoice = async (invoice: any) => {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog open={showMarkPaidDialog} onOpenChange={setShowMarkPaidDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mark invoice as paid?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will update invoice status to paid for
+              {" "}
+              <span className="font-medium">
+                #{invoiceToMarkPaid?.invoice_number || invoiceToMarkPaid?.id}
+              </span>
+              .
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={isPaidLoading}
+              onClick={() => setInvoiceToMarkPaid(null)}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmMarkAsPaid}
+              disabled={isPaidLoading}
+              className="bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+            >
+              {isPaidLoading ? "Updating..." : "Confirm"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Invoice Preview Modal */}
       <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
   <DialogContent className="min-w-[80%] max-h-[90vh] overflow-y-auto p-0">
@@ -10135,6 +10279,28 @@ const handlePrintInvoice = async (invoice: any) => {
         <X className="h-4 w-4" />
         Close
       </Button>
+      <Button
+        variant="outline"
+        onClick={() => handleQuickbookFromPreview("save")}
+        disabled={quickbookActionLoading !== null}
+        className="flex items-center gap-2"
+      >
+        <FileText className="h-4 w-4" />
+        {quickbookActionLoading === "save"
+          ? "Saving..."
+          : `Save ${getSelectedInvoiceTypeLabel()} to QuickBooks`}
+      </Button>
+
+      <Button
+        onClick={() => handleQuickbookFromPreview("send")}
+        disabled={quickbookActionLoading !== null}
+        className="bg-gray-800 hover:bg-gray-900 text-white flex items-center gap-2"
+      >
+        <Send className="h-4 w-4" />
+        {quickbookActionLoading === "send"
+          ? "Sending..."
+          : `Send ${getSelectedInvoiceTypeLabel()} from QuickBooks`}
+      </Button>
 
       <Button
         onClick={handleSendFromPreview}
@@ -10142,8 +10308,10 @@ const handlePrintInvoice = async (invoice: any) => {
         className="bg-gray-800 hover:bg-gray-900 text-white flex items-center gap-2"
       >
         <Send className="h-4 w-4" />
-        {isLoading ? "Sending..." : "Send Invoice"}
+        {isLoading ? "Sending..." : `Send ${getSelectedInvoiceTypeLabel()}`}
       </Button>
+
+      
     </div>
   </DialogContent>
       </Dialog>

@@ -151,6 +151,9 @@ export const NewInvoiceDialog = ({
   const [loading, setLoading] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [sendingInvoice, setSendingInvoice] = useState(false);
+  const [quickbookActionLoading, setQuickbookActionLoading] = useState<
+    "send" | "save" | null
+  >(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [localJobs, setLocalJobs] = useState<any[]>(jobs || []);
   const [suppliers, setSuppliers] = useState<
@@ -875,6 +878,14 @@ export const NewInvoiceDialog = ({
     return mapping[uiType] || "estimate";
   };
 
+  const getSelectedInvoiceTypeLabel = () => {
+    if (inlineInvoiceData.invoiceType === "Custom") {
+      const customType = String(inlineInvoiceData.customInvoiceType || "").trim();
+      return customType || "Invoice";
+    }
+    return inlineInvoiceData.invoiceType || "Invoice";
+  };
+
   const getAvailableEstimates = () => {
     return [];
   };
@@ -1510,6 +1521,182 @@ const validateLineItems = (lineItems: any[] = []) => {
       toast.error("Failed to send invoice");
     } finally {
       setSendingInvoice(false);
+    }
+  };
+
+  const handleQuickbookFromPreview = async (action: "send" | "save") => {
+    if (!previewEstimateId) {
+      toast.error("Estimate not found. Please try preview again.");
+      return;
+    }
+
+    setQuickbookActionLoading(action);
+    try {
+      const invoiceItemRows = inlineInvoiceData.lineItems.filter(
+        (item: any) => item.type !== "header",
+      );
+
+      const customProducts = invoiceItemRows.map((item: any) => {
+        const base = {
+          product_name: item.item,
+          description: item.description || "",
+          supplier_id: item.supplierId || selectedSupplierId || 1,
+          supplier_sku: item.item?.substring?.(0, 10) || "",
+          jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          stock_quantity: item.qty,
+          unit: "unit",
+          job_id: Number(inlineInvoiceData.jobId),
+          unit_cost: item.rate,
+          jdp_price: item.rate,
+          estimated_price: item.estimatedPrice || 0,
+          total_cost: item.total,
+          is_custom: item.isCustomProduct === true,
+          section_name: item.parentHeaderName || null,
+          parent_header_name: item.parentHeaderName || null,
+        } as any;
+
+        if (!item.isCustomProduct && item.productId) {
+          base.id = item.productId;
+        }
+        return base;
+      });
+
+      const selectedInvoiceType =
+        inlineInvoiceData.invoiceType === "Custom"
+          ? inlineInvoiceData.customInvoiceType
+          : inlineInvoiceData.invoiceType;
+      const selectedJobFromList =
+        jobsList.find(
+          (j: any) => String(j?.id ?? "") === String(inlineInvoiceData.jobId ?? ""),
+        ) ||
+        selectedJob ||
+        currentJob;
+
+      const isContractBased =
+        selectedJobFromList?.type === "contract_based" ||
+        selectedJobFromList?.type === "contract-based";
+
+      const customerId =
+        selectedJobFromList?.customer_id ??
+        selectedJobFromList?.customer?.id ??
+        (typeof selectedJobFromList?.customer === "number"
+          ? selectedJobFromList.customer
+          : null);
+
+      const contractorId =
+        selectedJobFromList?.contractor_id ??
+        selectedJobFromList?.contractor?.id ??
+        (typeof selectedJobFromList?.contractor === "number"
+          ? selectedJobFromList.contractor
+          : null);
+
+         
+          
+      const payload: any = {
+        job_id: Number(inlineInvoiceData.jobId),
+        invoice_type: mapInvoiceTypeToAPI(selectedInvoiceType),
+        estimate_title:
+          inlineInvoiceData.project ||
+          selectedJobFromList?.title ||
+          selectedJobFromList?.job_title ||
+          currentJob?.title,
+        priority: "medium" as "low" | "medium" | "high",
+        service_type: isContractBased ? "contract_based" : "service_based",
+        email_address:
+          selectedJobFromList?.email ||
+          selectedJobFromList?.customer?.email ||
+          selectedJobFromList?.contractor?.email ||
+          currentJob?.email ||
+          "customer@example.com",
+        estimate_date: inlineInvoiceData.date,
+        due_date: inlineInvoiceData.dueDate || "",
+        po_number: inlineInvoiceData.poNumber || "",
+        rep: inlineInvoiceData.rep || "",
+        payment_credits: inlineInvoiceData.paymentCredits || 0,
+        balance_due: inlineInvoiceData.balanceDue || "",
+        notes: inlineInvoiceData.notes || "",
+        total_amount: calculateInvoiceSubtotal(),
+        custom_products: customProducts,
+        invoice_source: "quickbook",
+        quickbook_action:
+          action === "send" ? "sendtoquickbook" : "sevetoquickbook",
+          ...(isContractBased
+        ? { contractor_id: contractorId }
+        : { customer_id: customerId }),
+      };
+
+      const qbResponse = await apiClient.createEstimate(payload as any);
+      const createdId =
+        Number((qbResponse as any)?.data?.id) ||
+        Number((qbResponse as any)?.id) ||
+        Number((qbResponse as any)?.data?.data?.id) ||
+        previewEstimateId;
+      toast.success(
+        action === "send"
+          ? "Send Invoice from QuickBooks"
+          : "Save Invoice to QuickBooks",
+      );
+
+      onInvoiceSaved?.({
+        id: createdId,
+        job_id: previewJobId,
+      });
+
+      setShowPreviewDialog(false);
+      onOpenChange(false);
+
+      setInlineInvoiceData({
+        date: new Date().toISOString().split("T")[0],
+        estimateNumber: "",
+        customerName: "",
+        customerAddress: "",
+        billToAddress: "",
+        billToAddressEnabled: true,
+        poNumber: "",
+        project: "",
+        jobId: jobId || "",
+        rep: "",
+        dueDate: "",
+        paymentCredits: 0,
+        balanceDue: "",
+        lineItems: [],
+        notes: "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
+        signatureText: "ACCEPTED BY________________DATE_____",
+        invoiceType: "Estimate",
+        customInvoiceType: "",
+        paymentPercentage: 0,
+        estimateTotal: 0,
+        paymentHistory: [],
+      });
+      setSelectedJob(null);
+      setValidationErrors({});
+      setPreviewEstimateId(null);
+
+      if (onNavigateToJobAfterSend) {
+        onNavigateToJobAfterSend(previewJobId, createdId);
+      }
+
+      router.push(
+        `/customers?jobId=${encodeURIComponent(previewJobId)}&estimateId=${encodeURIComponent(
+          String(createdId),
+        )}`,
+      );
+    } catch (error: any) {
+      console.error("Quickbook action failed:", error);
+      const apiMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        "";
+
+      toast.error(
+        apiMessage ||
+          (action === "send"
+            ? "Failed to send invoice from QuickBooks"
+            : "Failed to save invoice to QuickBooks"),
+      );
+    } finally {
+      setQuickbookActionLoading(null);
     }
   };
 
@@ -3144,7 +3331,32 @@ const validateLineItems = (lineItems: any[] = []) => {
                 className="bg-gray-800 hover:bg-gray-900 text-white flex items-center gap-2"
               >
                 <Send className="h-4 w-4" />
-                {sendingInvoice ? "Sending..." : "Send Invoice"}
+                {sendingInvoice
+                  ? "Sending..."
+                  : `Send ${getSelectedInvoiceTypeLabel()}`}
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => handleQuickbookFromPreview("save")}
+                disabled={quickbookActionLoading !== null}
+                className="flex items-center gap-2"
+              >
+                <FileText className="h-4 w-4" />
+                {quickbookActionLoading === "save"
+                  ? "Saving..."
+                  : `Save ${getSelectedInvoiceTypeLabel()} to QuickBooks`}
+              </Button>
+
+              <Button
+                onClick={() => handleQuickbookFromPreview("send")}
+                disabled={quickbookActionLoading !== null}
+                className="bg-gray-800 hover:bg-gray-900 text-white flex items-center gap-2"
+              >
+                <Send className="h-4 w-4" />
+                {quickbookActionLoading === "send"
+                  ? "Sending..."
+                  : `Send ${getSelectedInvoiceTypeLabel()} from QuickBooks`}
               </Button>
             </div>
           </DialogContent>

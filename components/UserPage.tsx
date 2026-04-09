@@ -536,14 +536,14 @@ export function UserPage({ onViewDetails }: UserPageProps) {
 
         <div className="flex items-center gap-3">
           <Button variant="outline" className="gap-2">
-            <Upload className="h-4 w-4" />
+            <Download className="h-4 w-4" />
             Import
           </Button>
           <Button variant="outline" className="gap-2" onClick={() => {
             downloadCSV(filteredUsers, `users-export-${new Date().toISOString().split('T')[0]}.csv`);
             toast.success('CSV export started');
           }}>
-            <Download className="h-4 w-4" />
+            <Upload className="h-4 w-4" />
             Export
           </Button>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>

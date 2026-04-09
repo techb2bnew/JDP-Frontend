@@ -1062,7 +1062,11 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
     await apiClient.createEstimate(estimatePayload);
     await apiClient.approveBluesheet(finalBlueSheet.id, "approved");
     onApprovalComplete(finalBlueSheet);
-    toast.success("BlueSheet approved & estimate created!");
+    if(action === "send"){
+     toast.success("Invoice Sent from Quickbook Successfullly");
+    }else{
+      toast.success("Invoice Save to Quickbook Successfullly");
+    }
     onClose();
   } catch (error: any) {
     toast.error(error?.message || "Failed to create estimate.");

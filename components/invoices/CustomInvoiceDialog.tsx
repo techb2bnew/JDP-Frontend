@@ -1897,6 +1897,7 @@ console.log(totalAmount,"amounttt");
               onSelectProductData={(rowId, product) => {
                 selectProduct(rowId, product);
               }}
+              summaryLaborTotal={viewInvoiceData?.labor_total_cost}
             />
           </div>
 

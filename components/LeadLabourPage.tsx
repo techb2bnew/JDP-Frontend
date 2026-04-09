@@ -1675,7 +1675,7 @@ useEffect(() => {
           <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
             <DialogTrigger asChild>
               <Button variant="outline" className="gap-2" onClick={() => setShowImportDialog(true)}>
-                <Upload className="h-4 w-4" />
+                <Download className="h-4 w-4" />
                 Import
               </Button>
             </DialogTrigger>
@@ -1716,7 +1716,7 @@ useEffect(() => {
             </DialogContent>
           </Dialog>
           <Button variant="outline" className="gap-2" onClick={exportToCSV}>
-            <Download className="h-4 w-4" />
+            <Upload className="h-4 w-4" />
             Export
           </Button>
           {canCreateLeadLabour && (

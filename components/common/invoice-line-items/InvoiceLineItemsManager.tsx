@@ -54,6 +54,8 @@ interface InvoiceLineItemsManagerProps {
   setInvalidHeaderKeys?: () => void;
   invalidLineItemIds?: string[];
   setInvalidLineItemIds?: React.Dispatch<React.SetStateAction<string[]>>;
+  /** Passed through to GroupedLineItemsTable; omit everywhere except CustomInvoiceDialog. */
+  summaryLaborTotal?: number;
 }
 
 const createRowId = () =>
@@ -284,8 +286,8 @@ const InvoiceLineItemsManager = ({
   invalidHeaderKeys,
   setInvalidHeaderKeys,
   invalidLineItemIds,
-  setInvalidLineItemIds
-
+  setInvalidLineItemIds,
+  summaryLaborTotal,
 }: InvoiceLineItemsManagerProps) => {
   const [activeDraggedItem, setActiveDraggedItem] =
     useState<LineItemType | null>(null);
@@ -904,6 +906,7 @@ const handleRemoveLineItem = (rowId: string) => {
       onDragEnd={handleDragEnd}
       activeDraggedItem={activeDraggedItem}
       onAddHeaderWithFirstItem={handleAddHeaderWithFirstItem}
+      handleAddHeaderWithFirstItem={handleAddHeaderWithFirstItem}
       handleAddStandaloneLineItem={handleAddStandaloneLineItem}
       handleAddStandaloneCustomItem={handleAddStandaloneCustomItem}
       onAddLineItemUnderHeader={handleAddLineItemUnderHeader}
@@ -922,6 +925,7 @@ const handleRemoveLineItem = (rowId: string) => {
        dropdownPortalRef={dropdownPortalRef}
        invalidHeaderKeys={invalidHeaderKeys}
        invalidLineItemIds={invalidLineItemIds}
+       summaryLaborTotal={summaryLaborTotal}
     />
   );
 };

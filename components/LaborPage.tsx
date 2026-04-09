@@ -1388,7 +1388,7 @@ const fetchLaborById = async (id: string) => {
           <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
             <DialogTrigger asChild>
               <Button variant="outline" className="gap-2" onClick={() => setShowImportDialog(true)}>
-                <Upload className="h-4 w-4" />
+                <Download className="h-4 w-4" />
                 Import
               </Button>
             </DialogTrigger>
@@ -1436,7 +1436,7 @@ const fetchLaborById = async (id: string) => {
             const selectedLaborData = filteredLabors.filter(labor => selectedLabors.includes(String(labor.id)));
             downloadCSV(selectedLaborData, `labor-export-${new Date().toISOString().split('T')[0]}.csv`);
           }}>
-            <Download className="h-4 w-4" />
+            <Upload className="h-4 w-4" />
             Export
           </Button>
           {canCreateLabour && (

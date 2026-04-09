@@ -184,6 +184,9 @@ export function InvoicesPage() {
   const [invoiceTypeFilter, setInvoiceTypeFilter] = useState('');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<string | number | null>(null);
+  const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false);
+  const [invoiceToMarkPaid, setInvoiceToMarkPaid] = useState<any | null>(null);
+  const [isPaidLoading, setIsPaidLoading] = useState(false);
 
   const dispatch = useDispatch();
   const router = useRouter();
@@ -642,6 +645,108 @@ const handleViewInvoice = (invoice: any) => {
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const sanitizeCustomProductsForPayload = (products: any[] = [], jobId: number) => {
+    return products
+      .filter((item: any) => {
+        const productName = String(item.product_name || item.item || "").trim();
+        return !!productName;
+      })
+      .map((item: any) => {
+        const productPayload: any = {
+          product_name: String(item.product_name || item.item || "").trim(),
+          description: item.description || "",
+          jdp_sku:
+            item.jdpSKU ||
+            item.jdp_sku ||
+            `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          stock_quantity: Number(item.stock_quantity || item.qty || 1),
+          unit: item.unit || "unit",
+          job_id: Number(jobId),
+          unit_cost: Number(item.unit_cost || item.rate || 0),
+          jdp_price: Number(item.jdp_price || item.rate || 0),
+          estimated_price: Number(item.estimated_price || item.estimatedPrice || 0),
+          total_cost: Number(item.total_cost || item.total || 0),
+          is_custom: item.is_custom === true || item.isCustomProduct === true,
+          section_name: null,
+          section_type: null,
+          parent_header_name: item.parent_header_name || item.parentHeaderName || null,
+        };
+
+        if (item.isCustomProduct !== true && item.productId) {
+          productPayload.id = item.productId;
+        }
+        if (!productPayload.id && item.id && !item.type) {
+          productPayload.id = item.id;
+        }
+        return productPayload;
+      });
+  };
+
+  const handleMarkAsPaid = async (invoice: any) => {
+    if (!invoice?.id) {
+      toast.error("Invoice ID not found");
+      return;
+    }
+    if (String(invoice.status || "").toLowerCase() === "paid") return;
+
+    try {
+      setIsPaidLoading(true);
+      const estimateResponse = await apiClient.getEstimateById(invoice.id);
+      const estimateData = estimateResponse?.data || estimateResponse;
+
+      const customProducts = sanitizeCustomProductsForPayload(
+        Array.isArray(estimateData?.products) ? estimateData.products : [],
+        Number(estimateData.job_id),
+      );
+
+      const payload = {
+        job_id: Number(estimateData.job_id),
+        estimate_title: estimateData.estimate_title || "",
+        ...(estimateData.contractor_id
+          ? { contractor_id: Number(estimateData.contractor_id) }
+          : { customer_id: Number(estimateData.customer_id) }),
+        priority: estimateData.priority || "medium",
+        service_type: estimateData.service_type || "service_based",
+        email_address: estimateData.email_address || "",
+        estimate_date: estimateData.estimate_date || "",
+        po_number: estimateData.po_number || "",
+        rep: estimateData.rep || "",
+        due_date: estimateData.due_date || "",
+        payment_credits: Number(estimateData.payment_credits || 0),
+        balance_due: estimateData.balance_due || "",
+        ...(estimateData.bill_to_address && {
+          bill_to_address: estimateData.bill_to_address,
+        }),
+        invoice_type: estimateData.invoice_type || "estimate",
+        notes: estimateData.notes || "",
+        custom_products: customProducts,
+        status: "paid",
+      };
+
+      await apiClient.updateEstimate(Number(invoice.id), payload as any);
+      toast.success("Invoice marked as paid");
+      await fetchEstimates();
+    } catch (error: any) {
+      console.error("Error marking invoice as paid:", error);
+      const apiMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to mark invoice as paid";
+      toast.error(apiMessage);
+    } finally {
+      setIsPaidLoading(false);
+      setShowMarkPaidDialog(false);
+      setInvoiceToMarkPaid(null);
+    }
+  };
+
+  const openMarkAsPaidDialog = (invoice: any) => {
+    if (!invoice?.id) return;
+    if (String(invoice.status || "").toLowerCase() === "paid") return;
+    setInvoiceToMarkPaid(invoice);
+    setShowMarkPaidDialog(true);
   };
 
 
@@ -1198,6 +1303,28 @@ const handleViewInvoice = (invoice: any) => {
                                         <Download className="w-4 h-4" />
                                       </Button>
                                     )}
+                                    {hasPermission("invoices", "edit") &&
+                                      String(invoice.invoice_type || "").toLowerCase() !==
+                                        "estimate" && (
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={() => openMarkAsPaidDialog(invoice)}
+                                        disabled={
+                                          isPaidLoading ||
+                                          String(invoice.status || "").toLowerCase() ===
+                                            "paid"
+                                        }
+                                        title={
+                                          String(invoice.status || "").toLowerCase() ===
+                                          "paid"
+                                            ? "Already Paid"
+                                            : "Mark As Paid"
+                                        }
+                                      >
+                                        <CheckCircle className="w-4 h-4 text-green-600" />
+                                      </Button>
+                                    )}
                                     {hasPermission("invoices", "delete") && (
                                       <Button
                                         variant="outline"
@@ -1368,6 +1495,41 @@ const handleViewInvoice = (invoice: any) => {
               disabled={isDeleting}
             >
               {isDeleting ? 'Deleting...' : 'Yes'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showMarkPaidDialog} onOpenChange={setShowMarkPaidDialog}>
+        <AlertDialogContent className="animate-scale-in bg-white max-w-md">
+          <AlertDialogHeader className="text-center">
+            <AlertDialogTitle className="text-xl">
+              Mark invoice as paid?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              This will update status to paid for invoice{" "}
+              <span className="font-medium">
+                #{invoiceToMarkPaid?.invoice_number || invoiceToMarkPaid?.id}
+              </span>
+              .
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel
+              onClick={() => {
+                setShowMarkPaidDialog(false);
+                setInvoiceToMarkPaid(null);
+              }}
+              disabled={isPaidLoading}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => handleMarkAsPaid(invoiceToMarkPaid)}
+              disabled={isPaidLoading}
+              className="bg-green-600 text-white hover:bg-green-700"
+            >
+              {isPaidLoading ? "Updating..." : "Confirm"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

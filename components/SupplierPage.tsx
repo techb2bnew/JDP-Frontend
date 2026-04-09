@@ -855,7 +855,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
           <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
             <DialogTrigger asChild>
               <Button variant="outline" className="gap-2" onClick={() => setShowImportDialog(true)}>
-                <Upload className="h-4 w-4" />
+                <Download className="h-4 w-4" />
                 Import
               </Button>
             </DialogTrigger>
@@ -914,7 +914,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
               toast.success('CSV export started')
             }}
           >
-            <Download className="h-4 w-4" />
+            <Upload className="h-4 w-4" />
             Export
           </Button>
 

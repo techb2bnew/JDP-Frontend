@@ -1251,7 +1251,7 @@ useEffect(() => {
       {hasPermission('products', 'create') && (
         <>
           <Button variant="outline" onClick={handleImport}>
-            <Upload className="h-4 w-4 mr-2" />
+            <Download className="h-4 w-4 mr-2" />
             Import Products
           </Button>
           
@@ -1307,7 +1307,7 @@ useEffect(() => {
       )}
       {hasPermission('products', 'view') && (
         <Button variant="outline" onClick={handleExport}>
-          <Download className="h-4 w-4 mr-2" />
+          <Upload className="h-4 w-4 mr-2" />
           Export Products
         </Button>
       )}

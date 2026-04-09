@@ -80,6 +80,12 @@ interface GroupedLineItemsTableProps {
   isJobDetail?:boolean;
   invalidHeaderKeys?: string[];
   invalidLineItemIds?: string[];
+  /**
+   * When > 0, the table footer shows Material Total, Total Labor Cost, and a
+   * final row that makes the Material + Labor relationship explicit.
+   * Omit or pass 0 to keep the default single subtotal row (all other callers).
+   */
+  summaryLaborTotal?: number;
 }
 
 const GroupedLineItemsTable = ({
@@ -109,8 +115,15 @@ const GroupedLineItemsTable = ({
   dropdownPortalRef,
   invalidHeaderKeys=[],
   isJobDetail=false,
-  invalidLineItemIds=[]
+  invalidLineItemIds=[],
+  summaryLaborTotal,
 }: GroupedLineItemsTableProps) => {
+  const showLaborSummary =
+    typeof summaryLaborTotal === "number" && summaryLaborTotal > 0;
+  const materialTotal = subtotal;
+  const laborAmt = showLaborSummary ? summaryLaborTotal : 0;
+  const grandTotal = showLaborSummary ? materialTotal + laborAmt : materialTotal;
+
   return (
     <div className="space-y-4">
       <DndContext
@@ -222,16 +235,61 @@ const GroupedLineItemsTable = ({
               ))}
 
               <tfoot>
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="border border-gray-300 px-3 py-2"
-                  />
-                  <td className="border border-gray-300 px-3 py-2 text-right font-bold">
-                    ${subtotal.toFixed(2)}
-                  </td>
-                  <td className="border border-gray-300 px-3 py-2" />
-                </tr>
+                {showLaborSummary ? (
+                  <>
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="border border-gray-300 px-3 py-2 text-right font-medium"
+                      >
+                         Total
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-right font-bold">
+                        ${materialTotal.toFixed(2)}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2" />
+                    </tr>
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="border border-gray-300 px-3 py-2 text-right font-medium"
+                      >
+                        Total Labor Cost
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-right font-bold">
+                        ${laborAmt.toFixed(2)}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2" />
+                    </tr>
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="border border-gray-300 px-3 py-2 text-right"
+                      >
+                        <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-sm">
+                          <span className="font-semibold text-gray-800">
+                            Total Material + Labor
+                          </span>
+                        </div>
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-right font-bold text-base">
+                        ${grandTotal.toFixed(2)}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2" />
+                    </tr>
+                  </>
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="border border-gray-300 px-3 py-2"
+                    />
+                    <td className="border border-gray-300 px-3 py-2 text-right font-bold">
+                      ${subtotal.toFixed(2)}
+                    </td>
+                    <td className="border border-gray-300 px-3 py-2" />
+                  </tr>
+                )}
               </tfoot>
             </table>
           </div>
