@@ -870,198 +870,205 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
   }
 
   
-  const handleFinalApproval = async (action: "send" | "save") => {
-    const finalBlueSheet = editedBlueSheet || blueSheet;
-    if (!finalBlueSheet) return;
+ const handleFinalApproval = async (action: "send" | "save") => {
+  const finalBlueSheet = editedBlueSheet || blueSheet;
+  if (!finalBlueSheet) return;
 
-    try {
-      if (action === "send") {
-        setIsApproving(true);
-      } else {
-        setIsSaving(true);
-      }
+  try {
+    if (action === "send") {
+      setIsApproving(true);
+    } else {
+      setIsSaving(true);
+    }
 
-      const customProducts = finalBlueSheet.material_entries.map(
-        (item: any) => {
-          // const parentHeaderKey =
-          //   item.parent_header_key ??
-          //   item.parentHeaderKey ??
-          //   null;
+    const isContractBased = finalBlueSheet.job.job_type === "contract_based";
 
-          const parentHeaderName =
-            item.parent_header_name ??
-            item.parentHeaderName ??
-            item.section_name ??
-            null;
+    const customProducts = finalBlueSheet.material_entries.map((item: any) => {
+      const parentHeaderName =
+        item.parent_header_name ??
+        item.parentHeaderName ??
+        item.section_name ??
+        null;
 
-          const sectionName = parentHeaderName;
+      const sectionName = parentHeaderName;
 
-          const resolvedProductId = item.product_id ?? item.product?.id ?? null;
+      const resolvedProductId = item.product_id ?? item.product?.id ?? null;
 
-          return {
-            ...(resolvedProductId ? { id: resolvedProductId } : {}),
-            ...(resolvedProductId ? { product_id: resolvedProductId } : {}),
-            job_id: finalBlueSheet.job_id,
-            product_name: item.material_name,
-            description:
-              item.product?.description ||
-              item.description ||
-              item.material_name,
-            supplier_id:
-              item.supplier_id ??
-              item.product?.supplier_id ??
-              item.product?.suppliers?.id ??
-              1,
-            supplier_sku: item.product?.supplier_sku || item.supplier_sku || "",
-            jdp_sku: item.product?.jdp_sku || item.jdp_sku || "",
-            unit: item.unit || "piece",
-            stock_quantity: item.total_ordered || 0,
-            unit_cost: item.unit_cost || 0,
-            estimated_price: item.unit_cost || 0,
-            total_cost:
-              item.total_cost ??
-              (item.total_ordered || 0) * (item.unit_cost || 0),
-            jdp_price: item.jdp_price || 0,
-            total_ordered: item.total_ordered || 0,
-            material_used: item.material_used || 0,
-            is_custom: item.is_custom === true || !resolvedProductId,
+      const qty = Number(item.total_ordered ?? item.material_used ?? 0);
 
-            section_name: sectionName,
-            section_type: sectionName ? "room_header" : null,
-            // parent_header_key: parentHeaderKey,
-            parent_header_name: parentHeaderName,
-          };
-        },
+      const estimateUnitPrice = Number(item.jdp_price ?? 0);
+      const internalUnitCost = Number(item.unit_cost ?? 0);
+
+      // ✅ ROUNDING FIX
+      const roundedEstimateUnitPrice = Number(estimateUnitPrice.toFixed(2));
+      const roundedInternalUnitCost = Number(internalUnitCost.toFixed(2));
+      const roundedRowTotal = Number(
+        (qty * roundedEstimateUnitPrice).toFixed(2),
       );
 
-      const laborEntriesTotalCost = (finalBlueSheet.labor_entries ?? []).reduce(
-        (sum: number, entry: any) => sum + (entry.total_cost || 0),
-        0,
-      );
+      return {
+        ...(resolvedProductId ? { id: resolvedProductId } : {}),
+        ...(resolvedProductId ? { product_id: resolvedProductId } : {}),
+        job_id: finalBlueSheet.job_id,
+        product_name: item.material_name,
+        description:
+          item.product?.description || item.description || item.material_name,
+        supplier_id:
+          item.supplier_id ??
+          item.product?.supplier_id ??
+          item.product?.suppliers?.id ??
+          1,
+        supplier_sku: item.product?.supplier_sku || item.supplier_sku || "",
+        jdp_sku: item.product?.jdp_sku || item.jdp_sku || "",
+        unit: item.unit || "piece",
+        stock_quantity: qty,
 
-      if (laborEntriesTotalCost > 0) {
-        customProducts.push({
-          job_id: finalBlueSheet.job_id,
-          product_name: "Labor total cost",
-          description: "Total labor cost from BlueSheet labor entries",
-          supplier_id: 1,
-          supplier_sku: "LABOR_TOTAL",
-          jdp_sku: `LABOR-TOTAL-${Date.now().toString(36)}`,
-          unit: "unit",
-          stock_quantity: 1,
-          unit_cost: laborEntriesTotalCost,
-          estimated_price: laborEntriesTotalCost,
-          total_cost: laborEntriesTotalCost,
-          jdp_price: laborEntriesTotalCost,
-          total_ordered: 1,
-          material_used: 0,
-          is_custom: true,
+        // internal
+        unit_cost: roundedInternalUnitCost,
 
-          // no header mapping for labor summary row
-          section_name: null,
-          section_type: null,
-          // parent_header_key: null,
-          parent_header_name: null,
-        });
-      }
+        // ✅ estimate (FIXED)
+        estimated_price: roundedEstimateUnitPrice,
+        total_cost: roundedRowTotal,
+        jdp_price: roundedEstimateUnitPrice,
 
-      const materialTotalForEstimate = (
-        finalBlueSheet.material_entries ?? []
-      ).reduce(
-        (sum: number, item: any) =>
-          sum +
-          (item.total_cost ||
-            (item.total_ordered || 0) * (item.unit_cost || 0) ||
-            0),
-        0,
-      );
+        total_ordered: qty,
+        material_used: Number(item.material_used ?? qty),
+        is_custom: item.is_custom === true || !resolvedProductId,
 
-      const totalAmountForEstimate =
+        section_name: sectionName,
+        section_type: sectionName ? "room_header" : null,
+        parent_header_name: parentHeaderName,
+      };
+    });
+
+    const laborEntriesTotalCost = (finalBlueSheet.labor_entries ?? []).reduce(
+      (sum: number, entry: any) => sum + Number(entry.total_cost || 0),
+      0,
+    );
+
+    if (laborEntriesTotalCost > 0) {
+      customProducts.push({
+        job_id: finalBlueSheet.job_id,
+        product_name: "Labor total cost",
+        description: "Total labor cost from BlueSheet labor entries",
+        supplier_id: 1,
+        supplier_sku: "LABOR_TOTAL",
+        jdp_sku: `LABOR-TOTAL-${Date.now().toString(36)}`,
+        unit: "unit",
+        stock_quantity: 1,
+
+        unit_cost: laborEntriesTotalCost,
+        estimated_price: laborEntriesTotalCost,
+        total_cost: laborEntriesTotalCost,
+        jdp_price: laborEntriesTotalCost,
+
+        total_ordered: 1,
+        material_used: 0,
+        is_custom: true,
+        section_name: null,
+        section_type: null,
+        parent_header_name: null,
+      });
+    }
+
+    // ✅ FIX: total_amount now follows the same JDP pricing shown in listing
+    const materialTotalForEstimate = (finalBlueSheet.material_entries ?? []).reduce(
+      (sum: number, item: any) => {
+        const qty = Number(item.total_ordered ?? item.material_used ?? 0);
+        const estimateUnitPrice = Number(item.jdp_price ?? 0);
+        return sum + qty * estimateUnitPrice;
+      },
+      0,
+    );
+
+    const totalAmountForEstimate = Number(
+      (
         materialTotalForEstimate +
         laborEntriesTotalCost +
-        (finalBlueSheet.additional_charges ?? 0);
+        Number(finalBlueSheet.additional_charges ?? 0)
+      ).toFixed(2),
+    );
 
-      const bluesheetIds =
-        selectedBlueSheets.length > 0
-          ? selectedBlueSheets.map((bs) => bs.id)
-          : [finalBlueSheet.id];
+    const bluesheetIds =
+      selectedBlueSheets.length > 0
+        ? selectedBlueSheets.map((bs) => bs.id)
+        : [finalBlueSheet.id];
 
-      const today = new Date().toISOString().split("T")[0];
-      const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split("T")[0];
+    const today = new Date().toISOString().split("T")[0];
+    const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split("T")[0];
 
-      const isContractBased = finalBlueSheet.job.job_type === "contract_based";
+    const estimatePayload = {
+      job_id: finalBlueSheet.job_id,
+      estimate_title: `BlueSheet #${finalBlueSheet.id} — ${finalBlueSheet.job.job_title}`,
+      priority:
+        (finalBlueSheet.job.priority as "low" | "medium" | "high") ||
+        "medium",
+      service_type: isContractBased ? "contract_based" : "service_based",
+      invoice_type: "estimate",
+      status: "draft",
+      estimate_date: today,
+      due_date: thirtyDaysLater,
+      invoice_number: `INV-BS-${finalBlueSheet.id}-${Date.now()
+        .toString()
+        .slice(-6)}`,
+      issue_date: today,
 
-      const estimatePayload = {
-        job_id: finalBlueSheet.job_id,
-        estimate_title: `BlueSheet #${finalBlueSheet.id} — ${finalBlueSheet.job.job_title}`,
-        priority:
-          (finalBlueSheet.job.priority as "low" | "medium" | "high") ||
-          "medium",
-        service_type:
-          finalBlueSheet.job.job_type === "contract_based"
-            ? "contract_based"
-            : "service_based",
-        invoice_type: "estimate",
-        status: "draft",
-        estimate_date: today,
-        due_date: thirtyDaysLater,
-        invoice_number: `INV-BS-${finalBlueSheet.id}-${Date.now()
-          .toString()
-          .slice(-6)}`,
-        issue_date: today,
-        email_address: isContractBased
-          ? finalBlueSheet.job.contractor?.email ||
-            finalBlueSheet.job.bill_to_email ||
-            ""
-          : finalBlueSheet.job.customer?.email ||
-            finalBlueSheet.job.bill_to_email ||
-            "",
+      email_address: isContractBased
+        ? finalBlueSheet.job.contractor?.email ||
+          finalBlueSheet.job.bill_to_email ||
+          ""
+        : finalBlueSheet.job.customer?.email ||
+          finalBlueSheet.job.bill_to_email ||
+          "",
 
-        bill_to_address: isContractBased
-          ? finalBlueSheet.job.contractor?.address ||
-            finalBlueSheet.job.bill_to_address ||
-            ""
-          : finalBlueSheet.job.bill_to_address ||
-            finalBlueSheet.job.customer?.address ||
-            "",
-        ...(isContractBased
-          ? { contractor_id: finalBlueSheet.job.contractor?.id ?? 0 }
-          : { customer_id: finalBlueSheet.job.customer?.id ?? 0 }),
-        po_number: `BS-${finalBlueSheet.id}`,
-        rep: finalBlueSheet.created_by_user?.full_name || "",
-        notes: finalBlueSheet.notes || "",
-        total_amount: totalAmountForEstimate,
-        location: isContractBased
-          ? finalBlueSheet.job.contractor?.address ||
-            finalBlueSheet.job.bill_to_address ||
-            ""
-          : finalBlueSheet.job.bill_to_address ||
-            finalBlueSheet.job.customer?.address ||
-            "",
-        bluesheet_ids: bluesheetIds,
-        valid_until: thirtyDaysLater,
-        description: finalBlueSheet.notes || "",
-        custom_products: customProducts,
-        invoice_source: "quickbook",
-        quickbook_action:
-          action === "send" ? "sendtoquickbook" : "sevetoquickbook",
-      };
-      console.log(estimatePayload, "estimatePayload");
+      bill_to_address: isContractBased
+        ? finalBlueSheet.job.contractor?.address ||
+          finalBlueSheet.job.bill_to_address ||
+          ""
+        : finalBlueSheet.job.bill_to_address ||
+          finalBlueSheet.job.customer?.address ||
+          "",
 
-      await apiClient.createEstimate(estimatePayload);
-      await apiClient.approveBluesheet(finalBlueSheet.id, "approved");
-      onApprovalComplete(finalBlueSheet);
-      toast.success("BlueSheet approved & estimate created!");
-      onClose();
-    } catch (error: any) {
-      toast.error(error?.message || "Failed to create estimate.");
-    } finally {
-      setIsSaving(false);
-      setIsApproving(false);
-    }
-  };
+      ...(isContractBased
+        ? { contractor_id: finalBlueSheet.job.contractor?.id ?? 0 }
+        : { customer_id: finalBlueSheet.job.customer?.id ?? 0 }),
+
+      po_number: `BS-${finalBlueSheet.id}`,
+      rep: finalBlueSheet.created_by_user?.full_name || "",
+      notes: finalBlueSheet.notes || "",
+      total_amount: totalAmountForEstimate,
+
+      location: isContractBased
+        ? finalBlueSheet.job.contractor?.address ||
+          finalBlueSheet.job.bill_to_address ||
+          ""
+        : finalBlueSheet.job.bill_to_address ||
+          finalBlueSheet.job.customer?.address ||
+          "",
+
+      bluesheet_ids: bluesheetIds,
+      valid_until: thirtyDaysLater,
+      description: finalBlueSheet.notes || "",
+      custom_products: customProducts,
+      invoice_source: "quickbook",
+      quickbook_action:
+        action === "send" ? "sendtoquickbook" : "sevetoquickbook",
+    };
+
+    await apiClient.createEstimate(estimatePayload);
+    await apiClient.approveBluesheet(finalBlueSheet.id, "approved");
+    onApprovalComplete(finalBlueSheet);
+    toast.success("BlueSheet approved & estimate created!");
+    onClose();
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to create estimate.");
+  } finally {
+    setIsSaving(false);
+    setIsApproving(false);
+  }
+};
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(amount)
