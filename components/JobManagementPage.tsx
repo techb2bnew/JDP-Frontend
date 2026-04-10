@@ -392,6 +392,26 @@ useEffect(() => {
     }
   }
 
+  const handleViewSubJob = async (subJobId: string) => {
+    if (subJobId === selectedJobId) return
+    try {
+      setLoading(true)
+      const jobDetails = await apiClient.getJobById(subJobId)
+      setJobs(prevJobs => {
+        const exists = prevJobs.some(j => j.id === subJobId)
+        if (exists) return prevJobs.map(j => (j.id === subJobId ? jobDetails : j))
+        return [...prevJobs, jobDetails]
+      })
+      setSelectedJobId(subJobId)
+      setCurrentView('details')
+    } catch (error) {
+      console.error('Error fetching sub-job details:', error)
+      toast.error('Failed to load job details')
+    } finally {
+      setLoading(false)
+    }
+  }
+
 
   const handleCreateJob = () => {
     setCurrentView('create')
@@ -609,6 +629,7 @@ useEffect(() => {
         onBack={handleBackToList}
         jobs={jobs}
         setJobs={setJobs}
+        onViewSubJob={handleViewSubJob}
       />
     )
   }

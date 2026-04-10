@@ -3,7 +3,7 @@ import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
 import { Badge } from './ui/badge'
-import { ArrowLeft, Upload, Download, Send, FileText, AlertTriangle, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Upload, Send, FileText, AlertTriangle, CheckCircle } from 'lucide-react'
 
 interface Job {
   id: string
@@ -156,7 +156,7 @@ export function InvoiceComparison({ onBack }: InvoiceComparisonProps) {
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" className="gap-2">
-            <Download className="h-4 w-4" />
+            <Upload className="h-4 w-4" />
             Export Report
           </Button>
           <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2">

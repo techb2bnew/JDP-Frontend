@@ -23,7 +23,7 @@ import {
   Clock,
   Save,
   Edit,
-  Download,
+  Upload,
   Filter,
   Search,
   CheckCircle,
@@ -585,7 +585,7 @@ export function StaffProfilePage() {
                     <p className="text-sm text-muted-foreground">View and manage leave applications</p>
                   </div>
                   <Button>
-                    <Download className="h-4 w-4 mr-2" />
+                    <Upload className="h-4 w-4 mr-2" />
                     Export Leave Data
                   </Button>
                 </div>
@@ -663,7 +663,7 @@ export function StaffProfilePage() {
                       January 2025
                     </Button>
                     <Button>
-                      <Download className="h-4 w-4 mr-2" />
+                      <Upload className="h-4 w-4 mr-2" />
                       Export Timesheet
                     </Button>
                   </div>

@@ -15,6 +15,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "./ui/checkbox";
@@ -41,7 +49,6 @@ import {
   PlusCircle,
   Receipt,
   Search,
-  Upload,
   Download,
   File,
   MoreVertical,
@@ -241,6 +248,8 @@ interface JobDetailsPageProps {
   onJobsRefresh?: () => void;
   /** When provided, auto-scroll + briefly highlight the matching estimate row */
   focusEstimateId?: string;
+  /** Sub-jobs table: navigate to this sub-job’s full detail view */
+  onViewSubJob?: (subJobId: string) => void;
 }
 
 type JobDocumentItem = {
@@ -327,6 +336,7 @@ export function JobDetailsPage({
   setJobs,
   onJobsRefresh,
   focusEstimateId,
+  onViewSubJob,
 }: JobDetailsPageProps) {
   // Find the job from your jobs array or use sample data
   const job = jobs.find((j) => j.id === jobId) || sampleJobData.job;
@@ -334,7 +344,8 @@ export function JobDetailsPage({
   console.log("Job data:", job);
   console.log("Labor timesheets:", job.labor_timesheets);
   console.log("Bluesheets data:", job.bluesheets);
-
+  console.log(job.subJobs,"job.subJobs");
+  
   // Use real job data for materials, timeLogs, and invoices
   // const materials = job.assignedMaterialsDetails || sampleJobData.materials
   // console.log(materials,"testmateris")
@@ -2993,6 +3004,14 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
     }).format(amount);
   };
 
+  const formatCurrencyWholeUSD = (amount: number) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+
   type StatusType = "in-progress" | "sent" | "paid" | "approved" | "pending";
 
   const getStatusBadge = (status: string) => {
@@ -3295,6 +3314,35 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
       day: "numeric",
       year: "numeric",
     });
+  };
+
+  const formatDueDateMMDDYYYY = (dateString: string) => {
+    const d = new Date(dateString);
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleDateString("en-US", {
+      month: "2-digit",
+      day: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  const subJobTypeLabel = (sj: any) => {
+    const t = (sj.job_type ?? sj.type ?? "") as string;
+    if (t === "contract_based" || t === "contract-based")
+      return "Contract Based";
+    if (t === "service_based" || t === "service-based")
+      return "Service Based";
+    if (typeof t === "string" && t.trim())
+      return t
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+    return "—";
+  };
+
+  const subJobAddress = (sj: any) => {
+    const parts = [sj.address, sj.city_zip].filter(Boolean);
+    if (parts.length) return parts.join(", ");
+    return ((sj.location ?? "") as string) || "";
   };
 
   const getInvoiceTypeColor = (type: string) => {
@@ -6197,7 +6245,8 @@ const handlePrintInvoice = async (invoice: any) => {
         originalJob.job_type === "service_based" ||
         originalJob.job_type === "contract_based"
           ? originalJob.job_type
-          : originalJob.type === "contract-based"
+          : originalJob.type === "contract-based" ||
+              originalJob.type === "contract_based"
             ? "contract_based"
             : "service_based";
 
@@ -6205,6 +6254,7 @@ const handlePrintInvoice = async (invoice: any) => {
       const payload: any = {
         job_title: changeOrderTitle, // New title
         job_type: normalizedJobType,
+        changes_order: "change order",
         description: originalJob.description || "",
         priority: originalJob.priority || "medium",
         address: originalJob.address || "",
@@ -6240,15 +6290,23 @@ const handlePrintInvoice = async (invoice: any) => {
             : undefined),
       };
 
-      // Add customer_id or contractor_id based on job type
-      if (
-        originalJob.job_type === "service_based" ||
-        originalJob.type === "service_based"
-      ) {
-        payload.customer_id = originalJob.customer_id || originalJob.customer;
-      } else {
-        payload.contractor_id =
-          originalJob.contractor_id || originalJob.contractor;
+      // Match service vs contract by API job_type (hyphen/underscore UI variants already normalized above)
+      if (normalizedJobType === "service_based") {
+        const rawCustomerId =
+          originalJob.customer_id ??
+          originalJob.customer?.id ??
+          originalJob.customer;
+        if (rawCustomerId != null && String(rawCustomerId).trim() !== "") {
+          payload.customer_id = Number(rawCustomerId);
+        }
+      } else if (normalizedJobType === "contract_based") {
+        const rawContractorId =
+          originalJob.contractor_id ??
+          originalJob.contractor?.id ??
+          originalJob.contractor;
+        if (rawContractorId != null && String(rawContractorId).trim() !== "") {
+          payload.contractor_id = Number(rawContractorId);
+        }
       }
 
       console.log("Creating change order with payload:", payload);
@@ -7117,6 +7175,119 @@ const handlePrintInvoice = async (invoice: any) => {
             </div>
           </div>
         </div>
+
+        {/* Sub-Jobs (change orders) — main job only; listed above Transaction History */}
+        {Array.isArray(job.subJobs) && job.subJobs.length > 0 && (
+          <Card className="bg-white shadow-sm border border-primary/10">
+            <CardHeader className="bg-gradient-to-r from-primary/5 to-blue-50/50 border-b border-primary/10">
+              <CardTitle className="text-primary flex items-center gap-2">
+                <Briefcase className="h-5 w-5" />
+                Sub-Jobs
+                <Badge variant="secondary" className="ml-1 font-normal">
+                  {job.subJobs.length}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 sm:p-6">
+              <div className="overflow-x-auto rounded-md border border-slate-100">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
+                      <TableHead className="font-semibold text-slate-700">
+                        Job Title
+                      </TableHead>
+                      <TableHead className="font-semibold text-slate-700">
+                        Type
+                      </TableHead>
+                      <TableHead className="font-semibold text-slate-700 min-w-[140px] max-w-[280px]">
+                        Address
+                      </TableHead>
+                      <TableHead className="font-semibold text-slate-700 whitespace-nowrap">
+                        Due Date
+                      </TableHead>
+                      <TableHead className="text-right font-semibold text-slate-700 whitespace-nowrap">
+                        Est. Cost
+                      </TableHead>
+                      <TableHead className="font-semibold text-slate-700">
+                        Status
+                      </TableHead>
+                      {onViewSubJob ? (
+                        <TableHead className="w-14 text-center font-semibold text-slate-700 p-2">
+                          Action
+                        </TableHead>
+                      ) : null}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {job.subJobs.map((sj: any) => {
+                      const addr = subJobAddress(sj);
+                      const sid = String(sj.id);
+                      const isCurrentSubJob = sid === String(jobId);
+                      return (
+                        <TableRow key={sid}>
+                          <TableCell className="font-medium text-slate-900 max-w-[220px]">
+                            {sj.job_title || sj.title || "—"}
+                          </TableCell>
+                          <TableCell className="text-slate-700">
+                            {subJobTypeLabel(sj)}
+                          </TableCell>
+                          <TableCell
+                            className="max-w-[280px] text-slate-700 truncate"
+                            title={addr || undefined}
+                          >
+                            {addr || "—"}
+                          </TableCell>
+                          <TableCell className="text-slate-600 whitespace-nowrap tabular-nums">
+                            {sj.due_date || sj.dueDate
+                              ? formatDueDateMMDDYYYY(
+                                  sj.due_date || sj.dueDate,
+                                )
+                              : "—"}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums whitespace-nowrap">
+                            {formatCurrencyWholeUSD(
+                              Number(
+                                sj.estimated_cost ??
+                                  sj.estimatedCost ??
+                                  0,
+                              ),
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {getStatusBadge(sj.status || "")}
+                          </TableCell>
+                          {onViewSubJob ? (
+                            <TableCell className="p-1 text-center w-14">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                disabled={isCurrentSubJob}
+                                className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10 disabled:opacity-40 disabled:pointer-events-none"
+                                title={
+                                  isCurrentSubJob
+                                    ? "Current job"
+                                    : "View sub-job details"
+                                }
+                                aria-label={`View sub-job ${sj.job_title || sj.title || sid}`}
+                                onClick={() =>
+                                  !isCurrentSubJob && onViewSubJob(sid)
+                                }
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          ) : null}
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Transaction History Section */}
         <Card className="bg-white shadow-sm border border-primary/10">
           <CardHeader className="bg-gradient-to-r from-primary/5 to-blue-50/50 border-b border-primary/10">
@@ -7162,7 +7333,7 @@ const handlePrintInvoice = async (invoice: any) => {
                 }}
               >
                 <PlusCircle className="h-4 w-4 mr-2" />
-                {showInlineInvoiceForm ? "Cancel" : "Add Invoice"}
+                {showInlineInvoiceForm ? "Cancel" : "Create Invoice"}
               </Button>
             </div>
           </CardHeader>
@@ -7856,7 +8027,7 @@ const handlePrintInvoice = async (invoice: any) => {
                             {invoice.status || "draft"}
                           </Badge>
                         </div>
-                        {String(invoice.invoice_type || "").toLowerCase() !==
+                        {/* {String(invoice.invoice_type || "").toLowerCase() !==
                           "estimate" && (
                           <Button
                             variant="outline"
@@ -7881,7 +8052,7 @@ const handlePrintInvoice = async (invoice: any) => {
                                 ? "Marking..."
                                 : "Mark As Paid"}
                           </Button>
-                        )}
+                        )} */}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
@@ -8552,7 +8723,7 @@ const handlePrintInvoice = async (invoice: any) => {
                 onClick={() => setShowUploadDocumentModal(true)}
                 className="gap-2"
               >
-                <Upload className="h-4 w-4" />
+                <Download className="h-4 w-4" />
                 Upload Document
               </Button>
             </div>
@@ -8709,7 +8880,7 @@ const handlePrintInvoice = async (invoice: any) => {
                   }
                 }}
               >
-                <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <Download className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                 <p className="text-sm text-gray-600 mb-2">
                   Click to upload or drag and drop
                 </p>
@@ -8750,7 +8921,7 @@ const handlePrintInvoice = async (invoice: any) => {
               disabled={isUploadingDocument}
               className="gap-2 text-white"
             >
-              <Upload className="h-4 w-4" />
+              <Download className="h-4 w-4" />
               {isUploadingDocument ? "Uploading..." : "Upload Document"}
             </Button>
           </DialogFooter>

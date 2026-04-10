@@ -27,7 +27,6 @@ import {
   AlertCircle,
   XCircle,
   Calendar as CalendarIcon,
-  FileDown,
   Receipt,
   Printer,
   Mail,
@@ -1087,17 +1086,10 @@ export function OrdersPage() {
               </Select> */}
 
               {/* {hasPermission('orders', 'view') && (
-                <Button variant="outline" onClick={() => handleExport('csv')}>
-                  <FileDown className="h-4 w-4 mr-2" />
-                  CSV
-                </Button>
+                <Button variant="outline" onClick={() => handleExport('csv')}>CSV</Button>
               )}
-              
               {hasPermission('orders', 'view') && (
-                <Button variant="outline" onClick={() => handleExport('pdf')}>
-                  <Download className="h-4 w-4 mr-2" />
-                  PDF
-                </Button>
+                <Button variant="outline" onClick={() => handleExport('pdf')}>PDF</Button>
               )} */}
 
               <Button variant="default" onClick={handleOpenAddOrderModal} className="bg-primary text-primary-foreground hover:bg-primary/90">

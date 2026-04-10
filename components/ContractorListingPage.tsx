@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { JobDetailsPage } from './JobDetailsPage'
 import { apiClient } from '../utils/api'
@@ -61,6 +61,10 @@ import {
   Plus
 } from 'lucide-react'
 import CommonEntityListing from './common/CommonEntityListing'
+import {
+  annotateJobsForListing,
+  sortEntitiesByRecentJobActivity,
+} from '@/lib/entityListingRecentActivity'
 
 interface Job {
   id: number
@@ -1042,23 +1046,30 @@ export function ContractorListingPage() {
   }
 
   // Filter and sort contractors (status + sort only; search is server-side via globalSearch)
-  const filteredContractors = contractors
-    .filter(contractor => {
-      const matchesStatus = statusFilter === 'all' || contractor.status === statusFilter
-      return matchesStatus
-    })
-    .sort((a, b) => {
-      if (!sortBy) return 0
+  const filteredContractors = useMemo(() => {
+    const withJobs = contractors.map((c) => ({
+      ...c,
+      jobs: annotateJobsForListing(c.jobs || []),
+    }))
+    return sortEntitiesByRecentJobActivity(
+      withJobs.filter((contractor) => {
+        const matchesStatus =
+          statusFilter === 'all' || contractor.status === statusFilter
+        return matchesStatus
+      }),
+      (a, b) => {
+        if (!sortBy) return 0
 
-      const aValue = a[sortBy] || ''
-      const bValue = b[sortBy] || ''
+        const aValue = a[sortBy] || ''
+        const bValue = b[sortBy] || ''
 
-      if (sortOrder === 'asc') {
-        return aValue.toString().localeCompare(bValue.toString())
-      } else {
+        if (sortOrder === 'asc') {
+          return aValue.toString().localeCompare(bValue.toString())
+        }
         return bValue.toString().localeCompare(aValue.toString())
-      }
-    })
+      },
+    )
+  }, [contractors, statusFilter, sortBy, sortOrder])
 
   // Handle sorting
   const handleSort = (field: string) => {
@@ -2799,8 +2810,7 @@ export function ContractorListingPage() {
         </div>
 
         {/* Contractor Listings */}
-          <div className="min-w-0 flex-1">
-          <div className="h-[calc(100vh-240px)] min-h-0">
+        <div className="min-w-0 flex-1 min-h-0">
            <CommonEntityListing
               data={filteredContractors}
               emptyText="No contractors found"
@@ -2860,8 +2870,7 @@ export function ContractorListingPage() {
                 </div>
               }
             />
-            </div>
-            </div>
+        </div>
 
 
       </div>
@@ -2889,6 +2898,7 @@ export function ContractorListingPage() {
               <ContractorDetailsPage
                 contractorId={selectedContractor}
                 onBack={handleBackFromContractorDetails}
+                onJobsMutated={fetchContractorsData}
               />
             </div>
           ) : null}
@@ -2907,10 +2917,7 @@ export function ContractorListingPage() {
                 </p>
               </div>
               {/* <div className="flex gap-3">
-                <Button variant="outline" className="gap-2">
-                  <Download className="h-4 w-4" />
-                  Export Report
-                </Button>
+                <Button variant="outline" className="gap-2">Export Report</Button>
                 <Button className="bg-primary text-white hover:bg-primary/90 gap-2">
                   <Send className="h-4 w-4" />
                   Generate Invoice
@@ -2977,15 +2984,15 @@ export function ContractorListingPage() {
             </Card>
 
             {/* Job Details - Show main job or sub-job based on selection */}
-            {selectedJobData && (
+            {(selectedJobData) && (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <h3 className="text-xl font-medium text-gray-900">
                     {selectedSubJob ? 'Sub-Job Details' : 'Job Details'}
                   </h3>
-                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+                  {selectedJobData.subJobs?.length ? <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
                     {selectedJobData.subJobs?.length || 0} Sub-Jobs
-                  </Badge>
+                  </Badge>:null}
                 </div>
 
                 {/* Show sub-job details if sub-job is selected */}
@@ -3030,7 +3037,8 @@ export function ContractorListingPage() {
                       assignedLeadLaborDetails: jobData.assignedLeadLaborDetails || [],
                       // Include materials/bluesheets data - use enhanced data if available
                       assignedMaterialsDetails: jobData.assignedMaterialsDetails || [],
-                      bluesheets: jobData.bluesheets || []
+                      bluesheets: jobData.bluesheets || [],
+                      subJobs: (selectedJobData as any).subJobs ?? [],
                     }
 
                     const allJobs = [jobWithCustomerData]
@@ -3084,6 +3092,9 @@ export function ContractorListingPage() {
                         jobs={allJobs}
                         setJobs={handleSetJobs}
                         onJobsRefresh={fetchContractorsData}
+                        onViewSubJob={(subJobId) =>
+                          selectSubJob(subJobId, selectedJob!, selectedContractor!)
+                        }
                       />
                     )
                   })
@@ -3127,7 +3138,11 @@ export function ContractorListingPage() {
                       assignedLeadLaborDetails: jobData.assignedLeadLaborDetails || [],
                       // Include materials/bluesheets data - use enhanced data if available
                       assignedMaterialsDetails: jobData.assignedMaterialsDetails || [],
-                      bluesheets: jobData.bluesheets || []
+                      bluesheets: jobData.bluesheets || [],
+                      subJobs:
+                        (selectedJobData as any).subJobs ??
+                        (jobData as any)?.subJobs ??
+                        [],
                     }
 
                     const allJobs = [jobWithCustomerData]
@@ -3173,6 +3188,13 @@ export function ContractorListingPage() {
                         jobs={allJobs}
                         setJobs={handleSetJobs}
                         onJobsRefresh={fetchContractorsData}
+                        onViewSubJob={(subJobId) =>
+                          selectSubJob(
+                            subJobId,
+                            selectedJobData.id.toString(),
+                            selectedContractor!,
+                          )
+                        }
                       />
                     )
                   })()

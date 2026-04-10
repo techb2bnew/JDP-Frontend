@@ -2559,6 +2559,8 @@ export const apiClient = {
     assigned_labor_ids?: string;
     assigned_material_ids?: string;
     status: string;
+    /** Set when creating a job from the Change Order flow */
+    changes_order?: string;
   }) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
     const token = getAuthToken();

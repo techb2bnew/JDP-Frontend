@@ -48,7 +48,6 @@ import {
   CheckCircle,
   Eye,
   Filter,
-  Download,
   RefreshCw,
   ArrowUpRight,
   ArrowDownRight,
@@ -520,10 +519,7 @@ export function AnalyticsPage() {
               <SelectItem value="1year">1 Year</SelectItem>
             </SelectContent>
           </Select> */}
-          {/* <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button> */}
+          {/* <Button variant="outline" size="sm">Export</Button> */}
           <Button
             variant="outline"
             size="sm"

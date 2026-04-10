@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -133,6 +133,14 @@ interface ProductFormData {
   description?: string;
 }
 
+/** Job APIs use `bill_to_address`; support camelCase too. */
+function resolveBillToAddressFromJob(job: any): string {
+  if (!job) return "";
+  const v = job.bill_to_address ?? job.billToAddress;
+  if (v == null || v === "") return "";
+  return String(v).trim();
+}
+
 export const NewInvoiceDialog = ({
   open,
   onOpenChange,
@@ -209,6 +217,8 @@ export const NewInvoiceDialog = ({
   const [estimateCost, setEstimateCost] = useState(null);
 
   const currentJob = selectedJob || jobs?.find((j: any) => j.id === jobId);
+  /** Avoid re-applying bill from job on re-renders after user edits (same job id). */
+  const billToSyncedJobIdRef = useRef<string | number | null>(null);
   const [invalidHeaderKeys, setInvalidHeaderKeys] = useState<string[]>([]);
 
   // Inline Invoice Data State
@@ -271,21 +281,35 @@ export const NewInvoiceDialog = ({
     const [jobSearch, setJobSearch] = useState("");
   const [showJobResults, setShowJobResults] = useState(false);
   const [isLoadingJobs, setIsLoadingJobs] = useState(false);
-  
-  const fetchJobsList = async (searchQuery: string = "") => {
+
+  const JOB_SEARCH_DEBOUNCE_MS = 800;
+  const jobSearchFetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+
+  useEffect(() => {
+    return () => {
+      if (jobSearchFetchTimeoutRef.current !== null) {
+        clearTimeout(jobSearchFetchTimeoutRef.current);
+        jobSearchFetchTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  const fetchJobsList = useCallback(async (searchQuery: string = "") => {
     try {
       setIsLoadingJobs(true);
-  
+
       const response = searchQuery
         ? await apiClient.searchJobsByQuery(searchQuery, 1, 10)
         : await apiClient.getJobs(1, 10);
-  
+
       const jobsData =
         response.data?.jobs ||
         response.data?.data ||
         response.data ||
         [];
-  
+
       setJobsList(jobsData);
     } catch (error) {
       console.error("Error fetching jobs:", error);
@@ -293,7 +317,7 @@ export const NewInvoiceDialog = ({
     } finally {
       setIsLoadingJobs(false);
     }
-  };
+  }, []);
 
   // Update form when job is provided
   useEffect(() => {
@@ -333,13 +357,30 @@ export const NewInvoiceDialog = ({
           "";
       }
 
-      setInlineInvoiceData((prev) => ({
-        ...prev,
-        customerName: customerName,
-        customerAddress: customerAddress,
-        project: currentJob.title || "",
-        jobId: currentJob.id || jobId,
-      }));
+      const stableJobKey = currentJob.id ?? jobId;
+      const shouldApplyBillTo =
+        billToSyncedJobIdRef.current === null ||
+        String(billToSyncedJobIdRef.current) !== String(stableJobKey);
+
+      if (shouldApplyBillTo) {
+        billToSyncedJobIdRef.current = stableJobKey;
+        setInlineInvoiceData((prev) => ({
+          ...prev,
+          customerName: customerName,
+          customerAddress: customerAddress,
+          billToAddress: resolveBillToAddressFromJob(currentJob),
+          project: currentJob.title || currentJob.job_title || "",
+          jobId: currentJob.id || jobId,
+        }));
+      } else {
+        setInlineInvoiceData((prev) => ({
+          ...prev,
+          customerName: customerName,
+          customerAddress: customerAddress,
+          project: currentJob.title || currentJob.job_title || "",
+          jobId: currentJob.id || jobId,
+        }));
+      }
     }
   }, [currentJob, jobId]);
 
@@ -979,6 +1020,7 @@ export const NewInvoiceDialog = ({
    const handleJobSelection = (job: any) => {
   if (!job) return;
 
+  billToSyncedJobIdRef.current = job.id;
   setEstimateCost(job?.estimatedCost);
   setSelectedJob(job);
 
@@ -1018,7 +1060,7 @@ export const NewInvoiceDialog = ({
     jobId: job.id,
     customerName,
     customerAddress,
-    billToAddress: job.billToAddress || "",
+    billToAddress: resolveBillToAddressFromJob(job),
     project: job.title || job.job_title || "",
   }));
 
@@ -1212,6 +1254,7 @@ export const NewInvoiceDialog = ({
       onOpenChange(false);
 
       // Reset form
+      billToSyncedJobIdRef.current = null;
       setInlineInvoiceData({
         date: new Date().toISOString().split("T")[0],
         estimateNumber: "",
@@ -1480,6 +1523,7 @@ const validateLineItems = (lineItems: any[] = []) => {
       onOpenChange(false);
 
       // Reset form (same shape as existing reset logic)
+      billToSyncedJobIdRef.current = null;
       setInlineInvoiceData({
         date: new Date().toISOString().split("T")[0],
         estimateNumber: "",
@@ -1645,6 +1689,7 @@ const validateLineItems = (lineItems: any[] = []) => {
       setShowPreviewDialog(false);
       onOpenChange(false);
 
+      billToSyncedJobIdRef.current = null;
       setInlineInvoiceData({
         date: new Date().toISOString().split("T")[0],
         estimateNumber: "",
@@ -2041,7 +2086,7 @@ const validateLineItems = (lineItems: any[] = []) => {
     fetchProductsList();
     fetchSuppliersList();
     fetchJobsList();
-  }, []);
+  }, [fetchJobsList]);
   console.log(renderInline, "renderInline");
 
   console.log(jobsList, "jobsListjobsListjobsList");
@@ -2184,6 +2229,7 @@ const validateLineItems = (lineItems: any[] = []) => {
                             selectedJob?.title || selectedJob?.job_title || "";
 
                           if (selectedJob && value !== selectedName) {
+                            billToSyncedJobIdRef.current = null;
                             setSelectedJob(null);
                             setInlineInvoiceData((prev) => ({
                               ...prev,
@@ -2197,11 +2243,17 @@ const validateLineItems = (lineItems: any[] = []) => {
 
                           setShowJobResults(true);
 
-                          if (value.trim().length > 0) {
-                            fetchJobsList(value);
-                          } else {
-                            fetchJobsList("");
+                          if (jobSearchFetchTimeoutRef.current !== null) {
+                            clearTimeout(jobSearchFetchTimeoutRef.current);
                           }
+                          jobSearchFetchTimeoutRef.current = setTimeout(() => {
+                            jobSearchFetchTimeoutRef.current = null;
+                            if (value.trim().length > 0) {
+                              void fetchJobsList(value);
+                            } else {
+                              void fetchJobsList("");
+                            }
+                          }, JOB_SEARCH_DEBOUNCE_MS);
 
                           if (validationErrors.jobId) {
                             setValidationErrors((prev) => {

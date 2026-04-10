@@ -246,7 +246,7 @@ export function SupplierFormDialog({
                 <Autocomplete
                   apiKey={
                     process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
-                    'AIzaSyBtb6hSmwJ9_OznDC5e8BcZM90ms4WD_DE'
+                    'AIzaSyBEQp-ZFMYZjsTNyximu2pAifQ9EWA4W3M'
                   }
                   onPlaceSelected={(place: any) => {
                     const address = place?.formatted_address || place?.name || ''

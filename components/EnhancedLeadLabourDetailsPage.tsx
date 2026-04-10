@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
-import { ArrowLeft, Download, Edit, FileText, CheckCircle, XCircle } from 'lucide-react'
+import { ArrowLeft, Upload, Edit, FileText, CheckCircle, XCircle } from 'lucide-react'
 
 interface EnhancedLeadLabourDetailsPageProps {
   leadLabourId: string
@@ -62,7 +62,7 @@ export function EnhancedLeadLabourDetailsPage({ leadLabourId, onBack }: Enhanced
         
         <div className="flex items-center gap-3">
           <Button variant="outline" className="gap-2">
-            <Download className="h-4 w-4" />
+            <Upload className="h-4 w-4" />
             Export
           </Button>
           <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2">

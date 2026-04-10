@@ -22,7 +22,6 @@ import {
   X,
   Briefcase,
   FileText,
-  Upload,
   Download,
   CheckCircle,
   Clock,
@@ -475,7 +474,7 @@ export function LabourLeadDetailsPage() {
                     <p className="text-sm text-muted-foreground mb-2">No ID proof uploaded</p>
                     <Button variant="outline" size="sm" asChild>
                       <label htmlFor="id-proof-upload" className="cursor-pointer">
-                        <Upload className="w-3 h-3 mr-1" />
+                        <Download className="w-3 h-3 mr-1" />
                         Upload ID Proof
                       </label>
                     </Button>
@@ -535,7 +534,7 @@ export function LabourLeadDetailsPage() {
                     <p className="text-sm text-muted-foreground mb-2">No driving license uploaded</p>
                     <Button variant="outline" size="sm" asChild>
                       <label htmlFor="license-upload" className="cursor-pointer">
-                        <Upload className="w-3 h-3 mr-1" />
+                        <Download className="w-3 h-3 mr-1" />
                         Upload License
                       </label>
                     </Button>
@@ -583,7 +582,7 @@ export function LabourLeadDetailsPage() {
                     <p className="text-sm text-muted-foreground mb-2">No resume uploaded</p>
                     <Button variant="outline" size="sm" asChild>
                       <label htmlFor="resume-upload" className="cursor-pointer">
-                        <Upload className="w-3 h-3 mr-1" />
+                        <Download className="w-3 h-3 mr-1" />
                         Upload Resume
                       </label>
                     </Button>

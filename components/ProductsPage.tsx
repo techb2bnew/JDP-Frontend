@@ -1260,7 +1260,7 @@ useEffect(() => {
             <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  <Upload className="h-5 w-5" />
+                  <Download className="h-5 w-5" />
                   Import Products from CSV
                 </DialogTitle>
                 <DialogDescription>

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
-import { ArrowLeft, Download, Edit, FileText, Briefcase, Clock, CheckCircle, Mail, Phone, MapPin, Calendar, DollarSign, User } from 'lucide-react'
+import { ArrowLeft, Edit, FileText, Briefcase, Clock, CheckCircle, Mail, Phone, MapPin, Calendar, DollarSign, User } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
 import { toast } from 'sonner'
 
@@ -421,10 +421,7 @@ export function LaborDetailsPage({ laborId, onBack }: LaborDetailsPageProps) {
           </div>
         </div>
         {/* <div className="flex items-center gap-3">
-          <Button variant="outline" className="gap-2" onClick={() => toast.info('Export functionality coming soon')}>
-            <Download className="h-4 w-4" />
-            Export
-          </Button>
+          <Button variant="outline" className="gap-2" onClick={() => toast.info('Export functionality coming soon')}>Export</Button>
           <Button onClick={() => toast.info('Edit functionality coming soon')} className="gap-2 bg-primary text-white hover:bg-[#0090e6]">
             <Edit className="h-4 w-4" />
             Edit Details

@@ -1,7 +1,7 @@
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
-import { ArrowLeft, Download, Edit, FileText, Shield, CheckCircle, XCircle } from 'lucide-react'
+import { ArrowLeft, Upload, Edit, FileText, Shield, CheckCircle, XCircle } from 'lucide-react'
 
 interface UserDetailsPageProps {
   userId: string
@@ -90,7 +90,7 @@ export function UserDetailsPage({ userId, onBack }: UserDetailsPageProps) {
         
         <div className="flex items-center gap-3">
           <Button variant="outline" className="gap-2">
-            <Download className="h-4 w-4" />
+            <Upload className="h-4 w-4" />
             Export
           </Button>
           <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2">

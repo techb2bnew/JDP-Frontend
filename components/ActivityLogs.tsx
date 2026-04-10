@@ -35,16 +35,22 @@ type ActivityLogsProps = {
 
 type ApiUser = {
   id: number;
-  full_name: string;
-  email?: string;
+  full_name?: string | null;
+  /** Some endpoints use `name` instead of full_name */
+  name?: string | null;
+  email?: string | null;
   phone?: string;
   role?: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  username?: string | null;
 };
 
 type ApiLeadLabor = {
   id: number;
   labor_code: string;
   users?: ApiUser;
+  user?: ApiUser;
 };
 
 type ApiAssignedLeadLabor = {
@@ -66,8 +72,10 @@ type ApiLaborTimesheet = {
   created_at: string;
   labor?: {
     users?: ApiUser;
+    user?: ApiUser;
   } | null;
   lead_labor?: ApiLeadLabor | null;
+  created_by_user?: ApiUser | null;
 };
 
 type ApiMaterialEntry = {
@@ -146,6 +154,9 @@ type JobActivityApiResponse = {
       updated_at: string;
       created_by_user?: ApiUser;
       updated_by_user?: ApiUser | null;
+      /** Plain-text fallbacks when user object is not nested */
+      created_by_name?: string | null;
+      updated_by_name?: string | null;
     };
     total_orders?: number;
     regular_hours?: {
@@ -488,9 +499,53 @@ const ActivityTimelineItem = ({
   );
 };
 
-const getSafeUserName = (name?: string | null) => {
-  const clean = name?.trim();
-  return clean || "System";
+/** Non-empty display string, or null (never treat "system" as a real name). */
+const normalizeActorLabel = (raw?: string | null): string | null => {
+  const s = raw?.trim();
+  if (!s) return null;
+  const lower = s.toLowerCase();
+  if (
+    lower === "system" ||
+    lower === "null" ||
+    lower === "undefined" ||
+    lower === "n/a"
+  ) {
+    return null;
+  }
+  return s;
+};
+
+const nameFromUser = (u?: ApiUser | null): string | null => {
+  if (!u) return null;
+  const combined = [u.first_name, u.last_name]
+    .map(normalizeActorLabel)
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  return (
+    normalizeActorLabel(u.full_name) ||
+    normalizeActorLabel(u.name) ||
+    normalizeActorLabel(combined || null) ||
+    normalizeActorLabel(u.email) ||
+    normalizeActorLabel(u.username)
+  );
+};
+
+/** Try each user object or plain string; avoid falsely showing "System" when a real actor exists later in the list. */
+const resolveActor = (
+  ...candidates: Array<ApiUser | string | null | undefined>
+): string => {
+  for (const c of candidates) {
+    if (c == null) continue;
+    if (typeof c === "string") {
+      const n = normalizeActorLabel(c);
+      if (n) return n;
+      continue;
+    }
+    const n = nameFromUser(c);
+    if (n) return n;
+  }
+  return "Unknown user";
 };
 
 const mapApiResponseToActivities = (
@@ -504,13 +559,17 @@ const mapApiResponseToActivities = (
 
   const job = payload.job;
 
-  const createdBy =
-    getSafeUserName(activityAudit?.job_created_by?.full_name) ||
-    getSafeUserName(job.created_by_user?.full_name);
+  const createdBy = resolveActor(
+    activityAudit?.job_created_by,
+    job.created_by_user,
+    job.created_by_name,
+  );
 
-  const updatedBy =
-    getSafeUserName(activityAudit?.job_updated_by?.full_name) ||
-    getSafeUserName(job.updated_by_user?.full_name);
+  const updatedBy = resolveActor(
+    activityAudit?.job_updated_by,
+    job.updated_by_user,
+    job.updated_by_name,
+  );
 
   result.push({
     id: `job-created-${job.id}`,
@@ -538,9 +597,14 @@ const mapApiResponseToActivities = (
 
   if (payload.assigned_lead_labor?.length) {
     payload.assigned_lead_labor.forEach((lead) => {
-      const assignedLeadName = getSafeUserName(lead.user?.full_name);
-      const assignedBy = getSafeUserName(
-        activityAudit?.lead_labor_assigned_by?.full_name
+      const assignedLeadName =
+        nameFromUser(lead.user) ||
+        normalizeActorLabel(lead.labor_code) ||
+        "Lead labor";
+      const assignedBy = resolveActor(
+        activityAudit?.lead_labor_assigned_by,
+        job.updated_by_user,
+        job.created_by_user,
       );
       const sortDate = job.updated_at || job.created_at;
 
@@ -559,9 +623,14 @@ const mapApiResponseToActivities = (
 
   if (payload.assigned_labor?.length) {
     payload.assigned_labor.forEach((labor) => {
-      const assignedLaborName = getSafeUserName(labor.user?.full_name);
-      const assignedBy = getSafeUserName(
-        activityAudit?.labor_assigned_by?.full_name
+      const assignedLaborName =
+        nameFromUser(labor.user) ||
+        normalizeActorLabel(labor.labor_code) ||
+        "Labor";
+      const assignedBy = resolveActor(
+        activityAudit?.labor_assigned_by,
+        job.updated_by_user,
+        job.created_by_user,
       );
       const sortDate = job.updated_at || job.created_at;
 
@@ -580,9 +649,13 @@ const mapApiResponseToActivities = (
 
   if (payload.labor_timesheets?.length) {
     payload.labor_timesheets.forEach((timesheet) => {
-      const workerName =
-        getSafeUserName(timesheet.lead_labor?.users?.full_name) ||
-        getSafeUserName(timesheet.labor?.users?.full_name);
+      const workerName = resolveActor(
+        timesheet.created_by_user,
+        timesheet.lead_labor?.users,
+        timesheet.lead_labor?.user,
+        timesheet.labor?.users,
+        timesheet.labor?.user,
+      );
 
       const sortDate = timesheet.created_at || timesheet.date;
 
@@ -603,7 +676,11 @@ const mapApiResponseToActivities = (
 
   if (activityAudit?.invoice_activity?.length) {
     activityAudit.invoice_activity.forEach((invoice, index) => {
-      const sentBy = getSafeUserName(invoice.sent_by_user?.full_name);
+      const sentBy = resolveActor(
+        invoice.sent_by_user,
+        job.updated_by_user,
+        job.created_by_user,
+      );
       const sortDate = invoice.invoice_sent_at || job.updated_at || job.created_at;
 
       result.push({
@@ -627,9 +704,13 @@ const mapApiResponseToActivities = (
         (entry) => entry.bluesheet_id === sheet.id
       );
 
-      const submittedBy =
-        getSafeUserName(bluesheetAuditEntry?.submitted_by?.full_name) ||
-        getSafeUserName(sheet.created_by_user?.full_name);
+      const submittedBy = resolveActor(
+        bluesheetAuditEntry?.submitted_by,
+        sheet.created_by_user,
+        sheet.updated_by_user,
+        job.updated_by_user,
+        job.created_by_user,
+      );
 
       const sortDate =
         bluesheetAuditEntry?.submitted_at || sheet.created_at || sheet.date;
@@ -671,10 +752,13 @@ const mapApiResponseToActivities = (
   }
 
   if (job.status) {
-    const statusActor =
-      getSafeUserName(activityAudit?.job_updated_by?.full_name) ||
-      getSafeUserName(job.updated_by_user?.full_name) ||
-      getSafeUserName(job.created_by_user?.full_name);
+    const statusActor = resolveActor(
+      activityAudit?.job_updated_by,
+      job.updated_by_user,
+      job.updated_by_name,
+      job.created_by_user,
+      job.created_by_name,
+    );
 
     const sortDate = job.updated_at || job.created_at;
 

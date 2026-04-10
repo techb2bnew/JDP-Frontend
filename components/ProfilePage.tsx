@@ -733,7 +733,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
                   id="address"
                   apiKey={
                     process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
-                    "AIzaSyBtb6hSmwJ9_OznDC5e8BcZM90ms4WD_DE"
+                    "AIzaSyBEQp-ZFMYZjsTNyximu2pAifQ9EWA4W3M"
                   }
                   options={{
                     types: ["address"],

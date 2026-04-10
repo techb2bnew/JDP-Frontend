@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -16,6 +16,9 @@ import {
   TrendingUp,
   DollarSign,
   Eye,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { globalApiCall } from "../utils/globalApiHandler";
 import {
@@ -28,6 +31,16 @@ import {
 } from "./ui/table";
 import { apiClient } from "../utils/api";
 import { JobDetailsPage } from "./JobDetailsPage";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
+import { toast } from "sonner";
 
 interface Job {
   id: number;
@@ -59,11 +72,14 @@ interface ContractorDetails {
 interface ContractorDetailsPageProps {
   contractorId: string;
   onBack: () => void;
+  /** When jobs are deleted/updated here, parent listing can refetch (e.g. contractors sidebar). */
+  onJobsMutated?: () => void;
 }
 
 export function ContractorDetailsPage({
   contractorId,
   onBack,
+  onJobsMutated,
 }: ContractorDetailsPageProps) {
   const [contractor, setContractor] = useState<ContractorDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -80,6 +96,14 @@ export function ContractorDetailsPage({
   // Pagination state
   const [jobsPage, setJobsPage] = useState(1);
   const jobsPerPage = 10;
+  const [jobDeleteTarget, setJobDeleteTarget] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+  const [isDeletingJob, setIsDeletingJob] = useState(false);
+  const [expandedTableJobs, setExpandedTableJobs] = useState<Set<string>>(
+    new Set(),
+  );
 
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 
@@ -184,12 +208,62 @@ export function ContractorDetailsPage({
     }
   };
 
+  const selectSubJob = async (subJobId: string) => {
+    if (!selectedJob) return;
+    setSelectedSubJob(subJobId);
+    setIsJobDetailsLoading(true);
+    setEnhancedJobData(null);
+    try {
+      const jobDetails = await apiClient.getJobById(subJobId);
+      setEnhancedJobData(jobDetails);
+    } catch (error) {
+      console.error("Error fetching sub-job details:", error);
+    } finally {
+      setIsJobDetailsLoading(false);
+    }
+  };
+
   const handleBackFromJobDetails = () => {
     setSelectedJob(null);
     setSelectedSubJob(null);
     setEnhancedJobData(null);
     setIsJobDetailsLoading(false);
   };
+
+  const toggleTableJobExpansion = (jobId: string) => {
+    setExpandedTableJobs((prev) => {
+      const next = new Set(prev);
+      if (next.has(jobId)) next.delete(jobId);
+      else next.add(jobId);
+      return next;
+    });
+  };
+
+  const handleConfirmDeleteJob = async () => {
+    if (!jobDeleteTarget) return;
+    setIsDeletingJob(true);
+    try {
+      await apiClient.deleteJob(jobDeleteTarget.id);
+      toast.success("Job deleted successfully");
+      const deletedId = jobDeleteTarget.id;
+      setJobDeleteTarget(null);
+      if (selectedJob === deletedId) {
+        setSelectedJob(null);
+        setSelectedSubJob(null);
+        setEnhancedJobData(null);
+      }
+      await fetchContractorDetails();
+      onJobsMutated?.();
+    } catch (error) {
+      console.error("Error deleting job:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete job",
+      );
+    } finally {
+      setIsDeletingJob(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const baseClasses = "text-xs font-medium px-2 py-1 rounded-full border";
 
@@ -254,6 +328,43 @@ export function ContractorDetailsPage({
       minimumFractionDigits: 0,
     }).format(amount || 0);
   };
+
+  /** Match CustomersPage job statistics: derive from `jobs` when present; else API aggregates */
+  const listingJobStats = useMemo(() => {
+    if (!contractor) {
+      return {
+        totalJobs: 0,
+        completedJobs: 0,
+        ongoingJobs: 0,
+        totalRevenue: 0,
+      };
+    }
+    const jobs = contractor.jobs || [];
+    if (jobs.length === 0) {
+      return {
+        totalJobs: contractor.total_jobs ?? 0,
+        completedJobs: contractor.completed_jobs ?? 0,
+        ongoingJobs: contractor.ongoing_jobs ?? 0,
+        totalRevenue: Number(contractor.total_revenue ?? 0),
+      };
+    }
+    const totalJobs = jobs.length;
+    const completedJobs = jobs.filter(
+      (job: any) =>
+        job.status === "completed" || job.status === "complete",
+    ).length;
+    const ongoingJobs = jobs.filter(
+      (job: any) =>
+        job.status === "in_progress" ||
+        job.status === "ongoing" ||
+        job.status === "pending" ||
+        job.status === "in-progress",
+    ).length;
+    const totalRevenue = jobs.reduce((sum: number, job: any) => {
+      return sum + (job.totalEstimatedCost || job.estimated_cost || 0);
+    }, 0);
+    return { totalJobs, completedJobs, ongoingJobs, totalRevenue };
+  }, [contractor]);
 
   if (isLoading) {
     return (
@@ -376,7 +487,7 @@ export function ContractorDetailsPage({
           <CardContent className="p-6 text-center">
             <Briefcase className="w-8 h-8 text-primary mx-auto mb-3" />
             <div className="text-2xl font-bold text-gray-900 mb-1">
-              {contractor.total_jobs || 0}
+              {listingJobStats.totalJobs}
             </div>
             <div className="text-sm text-gray-600">Total Jobs</div>
           </CardContent>
@@ -386,7 +497,7 @@ export function ContractorDetailsPage({
           <CardContent className="p-6 text-center">
             <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-3" />
             <div className="text-2xl font-bold text-gray-900 mb-1">
-              {contractor.completed_jobs || 0}
+              {listingJobStats.completedJobs}
             </div>
             <div className="text-sm text-gray-600">Completed</div>
           </CardContent>
@@ -396,9 +507,9 @@ export function ContractorDetailsPage({
           <CardContent className="p-6 text-center">
             <TrendingUp className="w-8 h-8 text-blue-500 mx-auto mb-3" />
             <div className="text-2xl font-bold text-gray-900 mb-1">
-              {contractor.ongoing_jobs || 0}
+              {listingJobStats.ongoingJobs}
             </div>
-            <div className="text-sm text-gray-600">Ongoing</div>
+            <div className="text-sm text-gray-600">In Progess</div>
           </CardContent>
         </Card>
 
@@ -406,7 +517,7 @@ export function ContractorDetailsPage({
           <CardContent className="p-6 text-center">
             <DollarSign className="w-8 h-8 text-green-600 mx-auto mb-3" />
             <div className="text-2xl font-bold text-gray-900 mb-1">
-              {formatCurrency(contractor.total_revenue || 0)}
+              {formatCurrency(listingJobStats.totalRevenue)}
             </div>
             <div className="text-sm text-gray-600">Total Revenue</div>
           </CardContent>
@@ -416,15 +527,17 @@ export function ContractorDetailsPage({
       {selectedJob ? (
         <div className="mt-8 space-y-4">
           <div className="flex items-center gap-2">
-            <h3 className="text-xl font-medium text-gray-900">Job Details</h3>
-            {selectedJobData && (
+            <h3 className="text-xl font-medium text-gray-900">
+              {selectedSubJob ? "Sub-Job Details" : "Job Details"}
+            </h3>
+            {(selectedJobData && selectedJobData.subJobs?.length) ? (
               <Badge
                 variant="outline"
                 className="bg-primary/10 text-primary border-primary/20"
               >
                 {selectedJobData.subJobs?.length || 0} Sub-Jobs
               </Badge>
-            )}
+            ):null}
           </div>
 
           {isJobDetailsLoading ? (
@@ -439,99 +552,211 @@ export function ContractorDetailsPage({
               </CardContent>
             </Card>
           ) : selectedJobData ? (
-            (() => {
-              const jobData =
-                enhancedJobData &&
-                enhancedJobData.id?.toString() === selectedJobData.id.toString()
-                  ? enhancedJobData
-                  : selectedJobData;
+            selectedSubJob ? (
+              selectedJobData.subJobs?.map((subJob: Job) => {
+                if (subJob.id.toString() !== selectedSubJob) return null;
 
-              const jobWithContractorData = {
-                ...jobData,
-                id: selectedJobData.id.toString(),
-                contractor: (selectedJobData as any).contractor_id?.toString(),
-                customer:
-                  (selectedJobData as any).customer?.id?.toString() ||
-                  (selectedJobData as any).customer_id?.toString(),
-                customerName:
-                  (selectedJobData as any).customer?.customer_name ||
-                  (selectedJobData as any).customer?.company_name,
-                customerEmail: (selectedJobData as any).customer?.email,
-                title: selectedJobData.job_title,
-                type:
-                  selectedJobData.job_type === "contract_based"
-                    ? "contract-based"
-                    : "service-based",
-                location: selectedJobData.address,
-                address: selectedJobData.address,
-                cityZip: (selectedJobData as any).city_zip,
-                estimatedCost: (selectedJobData as any).estimated_cost,
-                estimatedHours: (selectedJobData as any).estimated_hours,
-                startDate: (selectedJobData as any).created_at,
-                dueDate: selectedJobData.due_date,
-                priority: (selectedJobData as any).priority,
-                status: selectedJobData.status,
-                progress: (selectedJobData as any).progress || 0,
-                labor_timesheets:
-                  jobData.labor_timesheets ||
-                  (selectedJobData as any).labor_timesheets ||
-                  [],
-                assigned_labor_ids:
-                  jobData.assigned_labor_ids ||
-                  (selectedJobData as any).assigned_labor_ids,
-                assigned_lead_labor_ids:
-                  jobData.assigned_lead_labor_ids ||
-                  (selectedJobData as any).assigned_lead_labor_ids,
-                assignedLaborDetails: jobData.assignedLaborDetails || [],
-                assignedLeadLaborDetails:
-                  jobData.assignedLeadLaborDetails || [],
-                assignedMaterialsDetails:
-                  jobData.assignedMaterialsDetails || [],
-                bluesheets: jobData.bluesheets || [],
-              };
+                const jobData =
+                  enhancedJobData &&
+                  enhancedJobData.id?.toString() === subJob.id.toString()
+                    ? enhancedJobData
+                    : subJob;
 
-              const allJobs = [jobWithContractorData];
+                const jobWithContractorData = {
+                  ...jobData,
+                  id: subJob.id.toString(),
+                  contractor: (selectedJobData as any).contractor_id?.toString(),
+                  customer:
+                    (subJob as any).customer?.id?.toString() ||
+                    (subJob as any).customer_id?.toString(),
+                  customerName:
+                    (subJob as any).customer?.customer_name ||
+                    (subJob as any).customer?.company_name,
+                  customerEmail: (subJob as any).customer?.email,
+                  title: subJob.job_title,
+                  type:
+                    subJob.job_type === "contract_based"
+                      ? "contract-based"
+                      : "service-based",
+                  location: subJob.address,
+                  address: subJob.address,
+                  cityZip: (subJob as any).city_zip,
+                  estimatedCost: (subJob as any).estimated_cost,
+                  estimatedHours: (subJob as any).estimated_hours,
+                  startDate: (subJob as any).created_at,
+                  dueDate: subJob.due_date,
+                  priority: (subJob as any).priority,
+                  status: subJob.status,
+                  progress: (subJob as any).progress || 0,
+                  labor_timesheets:
+                    jobData.labor_timesheets ||
+                    (subJob as any).labor_timesheets ||
+                    [],
+                  assigned_labor_ids:
+                    jobData.assigned_labor_ids ||
+                    (subJob as any).assigned_labor_ids,
+                  assigned_lead_labor_ids:
+                    jobData.assigned_lead_labor_ids ||
+                    (subJob as any).assigned_lead_labor_ids,
+                  assignedLaborDetails: jobData.assignedLaborDetails || [],
+                  assignedLeadLaborDetails:
+                    jobData.assignedLeadLaborDetails || [],
+                  assignedMaterialsDetails:
+                    jobData.assignedMaterialsDetails || [],
+                  bluesheets: jobData.bluesheets || [],
+                  subJobs: (selectedJobData as any).subJobs ?? [],
+                };
 
-              const handleSetJobs = async (updatedJobs: any[]) => {
-                if (updatedJobs.length > 0) {
-                  const updatedJob = updatedJobs[0];
+                const allJobs = [jobWithContractorData];
 
-                  try {
-                    const freshJobData = await apiClient.getJobById(
-                      updatedJob.id,
-                    );
-                    setEnhancedJobData(freshJobData);
-                  } catch (error) {
-                    console.error("Error refreshing job data:", error);
+                const handleSetJobs = async (updatedJobs: any[]) => {
+                  if (updatedJobs.length > 0) {
+                    const updatedJob = updatedJobs[0];
+                    try {
+                      const freshJobData = await apiClient.getJobById(
+                        updatedJob.id,
+                      );
+                      setEnhancedJobData(freshJobData);
+                    } catch (error) {
+                      console.error("Error refreshing job data:", error);
+                    }
+
+                    setContractor((prev) => {
+                      if (!prev) return prev;
+                      return {
+                        ...prev,
+                        jobs:
+                          prev.jobs?.map((job: any) =>
+                            job.id.toString() === selectedJob
+                              ? {
+                                  ...job,
+                                  subJobs:
+                                    job.subJobs?.map((sj: any) =>
+                                      sj.id.toString() === updatedJob.id
+                                        ? { ...sj, ...updatedJob }
+                                        : sj,
+                                    ) || [],
+                                }
+                              : job,
+                          ) || [],
+                      };
+                    });
                   }
+                };
 
-                  setContractor((prev) => {
-                    if (!prev) return prev;
+                return (
+                  <JobDetailsPage
+                    key={subJob.id}
+                    jobId={subJob.id.toString()}
+                    onBack={() => setSelectedSubJob(null)}
+                    jobs={allJobs}
+                    setJobs={handleSetJobs}
+                    onJobsRefresh={fetchContractorDetails}
+                    onViewSubJob={(id) => void selectSubJob(id)}
+                  />
+                );
+              })
+            ) : (
+              (() => {
+                const jobData =
+                  enhancedJobData &&
+                  enhancedJobData.id?.toString() ===
+                    selectedJobData.id.toString()
+                    ? enhancedJobData
+                    : selectedJobData;
 
-                    return {
-                      ...prev,
-                      jobs:
-                        prev.jobs?.map((job: any) =>
-                          job.id.toString() === selectedJob
-                            ? { ...job, ...updatedJob }
-                            : job,
-                        ) || [],
-                    };
-                  });
-                }
-              };
+                const jobWithContractorData = {
+                  ...jobData,
+                  id: selectedJobData.id.toString(),
+                  contractor: (selectedJobData as any).contractor_id?.toString(),
+                  customer:
+                    (selectedJobData as any).customer?.id?.toString() ||
+                    (selectedJobData as any).customer_id?.toString(),
+                  customerName:
+                    (selectedJobData as any).customer?.customer_name ||
+                    (selectedJobData as any).customer?.company_name,
+                  customerEmail: (selectedJobData as any).customer?.email,
+                  title: selectedJobData.job_title,
+                  type:
+                    selectedJobData.job_type === "contract_based"
+                      ? "contract-based"
+                      : "service-based",
+                  location: selectedJobData.address,
+                  address: selectedJobData.address,
+                  cityZip: (selectedJobData as any).city_zip,
+                  estimatedCost: (selectedJobData as any).estimated_cost,
+                  estimatedHours: (selectedJobData as any).estimated_hours,
+                  startDate: (selectedJobData as any).created_at,
+                  dueDate: selectedJobData.due_date,
+                  priority: (selectedJobData as any).priority,
+                  status: selectedJobData.status,
+                  progress: (selectedJobData as any).progress || 0,
+                  labor_timesheets:
+                    jobData.labor_timesheets ||
+                    (selectedJobData as any).labor_timesheets ||
+                    [],
+                  assigned_labor_ids:
+                    jobData.assigned_labor_ids ||
+                    (selectedJobData as any).assigned_labor_ids,
+                  assigned_lead_labor_ids:
+                    jobData.assigned_lead_labor_ids ||
+                    (selectedJobData as any).assigned_lead_labor_ids,
+                  assignedLaborDetails: jobData.assignedLaborDetails || [],
+                  assignedLeadLaborDetails:
+                    jobData.assignedLeadLaborDetails || [],
+                  assignedMaterialsDetails:
+                    jobData.assignedMaterialsDetails || [],
+                  bluesheets: jobData.bluesheets || [],
+                  subJobs:
+                    (selectedJobData as any).subJobs ??
+                    (jobData as any)?.subJobs ??
+                    [],
+                };
 
-              return (
-                <JobDetailsPage
-                  key={selectedJobData.id}
-                  jobId={selectedJobData.id.toString()}
-                  onBack={handleBackFromJobDetails}
-                  jobs={allJobs}
-                  setJobs={handleSetJobs}
-                  onJobsRefresh={fetchContractorDetails}
-                />
-              );
-            })()
+                const allJobs = [jobWithContractorData];
+
+                const handleSetJobs = async (updatedJobs: any[]) => {
+                  if (updatedJobs.length > 0) {
+                    const updatedJob = updatedJobs[0];
+
+                    try {
+                      const freshJobData = await apiClient.getJobById(
+                        updatedJob.id,
+                      );
+                      setEnhancedJobData(freshJobData);
+                    } catch (error) {
+                      console.error("Error refreshing job data:", error);
+                    }
+
+                    setContractor((prev) => {
+                      if (!prev) return prev;
+
+                      return {
+                        ...prev,
+                        jobs:
+                          prev.jobs?.map((job: any) =>
+                            job.id.toString() === selectedJob
+                              ? { ...job, ...updatedJob }
+                              : job,
+                          ) || [],
+                      };
+                    });
+                  }
+                };
+
+                return (
+                  <JobDetailsPage
+                    key={selectedJobData.id}
+                    jobId={selectedJobData.id.toString()}
+                    onBack={handleBackFromJobDetails}
+                    jobs={allJobs}
+                    setJobs={handleSetJobs}
+                    onJobsRefresh={fetchContractorDetails}
+                    onViewSubJob={(id) => void selectSubJob(id)}
+                  />
+                );
+              })()
+            )
           ) : (
             <Card className="border-0 shadow-sm">
               <CardContent className="p-10 text-center">
@@ -577,42 +802,185 @@ export function ContractorDetailsPage({
                   </TableHeader>
 
                   <TableBody>
-                    {paginatedJobs.map((job) => (
-                      <TableRow key={job.id}>
-                        <TableCell className="font-medium">
-                          {job.job_title || "N/A"}
-                        </TableCell>
+                    {paginatedJobs.map((job) => {
+                      const jobId = job.id.toString();
+                      const hasSubJobs =
+                        Array.isArray(job.subJobs) && job.subJobs.length > 0;
+                      const isExpanded = expandedTableJobs.has(jobId);
 
-                        <TableCell className="capitalize">
-                          {(job.job_type || "N/A").replace(/_/g, " ")}
-                        </TableCell>
+                      return (
+                        <React.Fragment key={jobId}>
+                          <TableRow>
+                            <TableCell className="font-medium">
+                              {job.job_title || "N/A"}
+                            </TableCell>
 
-                        <TableCell className="max-w-[240px] truncate">
-                          {job.address || "N/A"}
-                        </TableCell>
+                            <TableCell className="capitalize">
+                              {(job.job_type || "N/A").replace(/_/g, " ")}
+                            </TableCell>
 
-                        <TableCell>
-                          {job.due_date ? formatDate(job.due_date) : "N/A"}
-                        </TableCell>
+                            <TableCell className="max-w-[240px] truncate">
+                              {job.address || "N/A"}
+                            </TableCell>
 
-                        <TableCell>
-                          {formatCurrency(job.estimated_cost || 0)}
-                        </TableCell>
+                            <TableCell>
+                              {job.due_date ? formatDate(job.due_date) : "N/A"}
+                            </TableCell>
 
-                        <TableCell>{getStatusBadge(job.status)}</TableCell>
+                            <TableCell>
+                              {formatCurrency(job.estimated_cost || 0)}
+                            </TableCell>
 
-                        <TableCell className="text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => selectJob(job.id.toString())}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            View
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                            <TableCell>{getStatusBadge(job.status)}</TableCell>
+
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                {hasSubJobs && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => toggleTableJobExpansion(jobId)}
+                                  >
+                                    {isExpanded ? (
+                                      <ChevronDown className="h-4 w-4 mr-1" />
+                                    ) : (
+                                      <ChevronRight className="h-4 w-4 mr-1" />
+                                    )}
+                                    {isExpanded ? "Hide Sub Jobs" : "Show Sub Jobs"}
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => selectJob(jobId)}
+                                >
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  View
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  title="Delete job"
+                                  className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                  onClick={() =>
+                                    setJobDeleteTarget({
+                                      id: jobId,
+                                      title: job.job_title || "this job",
+                                    })
+                                  }
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+
+                          {hasSubJobs && (
+                            <TableRow className="border-b-0 hover:bg-transparent data-[state=selected]:bg-transparent">
+                              <TableCell colSpan={7} className="p-0">
+                                <div
+                                  className={`grid transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none ${
+                                    isExpanded
+                                      ? "grid-rows-[1fr]"
+                                      : "grid-rows-[0fr]"
+                                  }`}
+                                >
+                                  <div className="min-h-0 overflow-hidden">
+                                    <div className="border-border bg-muted/30 border-b border-t px-3 pb-3 pt-2">
+                                      <div className="overflow-x-auto rounded-lg border bg-background">
+                                        <Table>
+                                          <TableHeader>
+                                            <TableRow>
+                                              <TableHead>Job Title</TableHead>
+                                              <TableHead>Type</TableHead>
+                                              <TableHead>Address</TableHead>
+                                              <TableHead>Due Date</TableHead>
+                                              <TableHead>Est. Cost</TableHead>
+                                              <TableHead>Status</TableHead>
+                                              <TableHead className="text-right">
+                                                Action
+                                              </TableHead>
+                                            </TableRow>
+                                          </TableHeader>
+                                          <TableBody>
+                                            {job.subJobs?.map((subJob: Job) => (
+                                              <TableRow
+                                                key={`${jobId}-${subJob.id}`}
+                                              >
+                                                <TableCell className="font-medium">
+                                                  {subJob.job_title || "N/A"}
+                                                </TableCell>
+                                                <TableCell className="capitalize">
+                                                  {(
+                                                    subJob.job_type || "N/A"
+                                                  ).replace(/_/g, " ")}
+                                                </TableCell>
+                                                <TableCell className="max-w-[240px] truncate">
+                                                  {subJob.address || "N/A"}
+                                                </TableCell>
+                                                <TableCell>
+                                                  {subJob.due_date
+                                                    ? formatDate(
+                                                        subJob.due_date,
+                                                      )
+                                                    : "N/A"}
+                                                </TableCell>
+                                                <TableCell>
+                                                  {formatCurrency(
+                                                    subJob.estimated_cost || 0,
+                                                  )}
+                                                </TableCell>
+                                                <TableCell>
+                                                  {getStatusBadge(
+                                                    subJob.status,
+                                                  )}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                  <div className="flex items-center justify-end gap-1">
+                                                    <Button
+                                                      variant="outline"
+                                                      size="sm"
+                                                      onClick={() =>
+                                                        selectJob(
+                                                          subJob.id.toString(),
+                                                        )
+                                                      }
+                                                    >
+                                                      <Eye className="h-4 w-4 mr-1" />
+                                                      View
+                                                    </Button>
+                                                    <Button
+                                                      variant="outline"
+                                                      size="sm"
+                                                      title="Delete sub-job"
+                                                      className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                      onClick={() =>
+                                                        setJobDeleteTarget({
+                                                          id: subJob.id.toString(),
+                                                          title:
+                                                            subJob.job_title ||
+                                                            "this sub-job",
+                                                        })
+                                                      }
+                                                    >
+                                                      <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                  </div>
+                                                </TableCell>
+                                              </TableRow>
+                                            ))}
+                                          </TableBody>
+                                        </Table>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -664,6 +1032,37 @@ export function ContractorDetailsPage({
           </CardContent>
         </Card>
       )}
+
+      <AlertDialog
+        open={!!jobDeleteTarget}
+        onOpenChange={(open) => {
+          if (!open && !isDeletingJob) setJobDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this job?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The job &quot;
+              {jobDeleteTarget?.title}&quot; will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingJob}>
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isDeletingJob}
+              className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+              onClick={() => void handleConfirmDeleteJob()}
+            >
+              {isDeletingJob ? "Deleting…" : "Delete job"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -33,7 +33,7 @@ import {
   Briefcase,
   CalendarDays,
   Eye,
-  Download,
+  Upload,
   Trash2,
   Edit,
   Users,
@@ -90,6 +90,10 @@ import {
   TooltipTrigger,
 } from "../components/ui/tooltip";
 import CommonEntityListing from "./common/CommonEntityListing";
+import {
+  annotateJobsForListing,
+  sortEntitiesByRecentJobActivity,
+} from "@/lib/entityListingRecentActivity";
 // Static customers data removed - now using API data from /customer/getCustomers
 
 const getStatusColor = (status: string) => {
@@ -174,6 +178,14 @@ export function CustomersPage() {
   const [customersWithJobs, setCustomersWithJobs] = useState<any[]>([]);
   const [allCustomersWithJobs, setAllCustomersWithJobs] = useState<any[]>([]); // Store original list for filtering
   const [paginatedCustomers, setPaginatedCustomers] = useState<any[]>([]);
+  const [jobDeleteTarget, setJobDeleteTarget] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+  const [isDeletingJob, setIsDeletingJob] = useState(false);
+  const [expandedTableJobs, setExpandedTableJobs] = useState<Set<string>>(
+    new Set(),
+  );
 
   // Fetch customers data and stats on component mount and when page changes
   useEffect(() => {
@@ -448,6 +460,15 @@ export function CustomersPage() {
     });
   };
 
+  const toggleTableJobExpansion = (jobId: string) => {
+    setExpandedTableJobs((prev) => {
+      const next = new Set(prev);
+      if (next.has(jobId)) next.delete(jobId);
+      else next.add(jobId);
+      return next;
+    });
+  };
+
   const selectCustomer = (customerId: string) => {
     setSelectedCustomer(customerId);
     setSelectedJob(null);
@@ -524,6 +545,30 @@ export function CustomersPage() {
       console.log("Enhanced job data set:", jobDetails);
     } catch (error) {
       console.error("Error fetching job details:", error);
+    }
+  };
+
+  const handleConfirmDeleteJob = async () => {
+    if (!jobDeleteTarget) return;
+    setIsDeletingJob(true);
+    try {
+      await apiClient.deleteJob(jobDeleteTarget.id);
+      toast.success("Job deleted successfully");
+      const deletedId = jobDeleteTarget.id;
+      setJobDeleteTarget(null);
+      if (selectedJob === deletedId) {
+        setSelectedJob(null);
+        setSelectedSubJob(null);
+        setEnhancedJobData(null);
+      }
+      await fetchCustomersWithJobs();
+    } catch (error) {
+      console.error("Error deleting job:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete job",
+      );
+    } finally {
+      setIsDeletingJob(false);
     }
   };
 
@@ -887,21 +932,26 @@ export function CustomersPage() {
           };
         });
 
-        // Sort by total_jobs descending, then by name
-        customersWithJobsArray.sort((a: any, b: any) => {
-          if (b.total_jobs !== a.total_jobs) {
-            return b.total_jobs - a.total_jobs;
-          }
-          return (a.customer_name || "").localeCompare(b.customer_name || "");
-        });
+        const sortedWithRecent = sortEntitiesByRecentJobActivity(
+          customersWithJobsArray.map((c: any) => ({
+            ...c,
+            jobs: annotateJobsForListing(c.jobs || []),
+          })),
+          (a: any, b: any) => {
+            if (b.total_jobs !== a.total_jobs) {
+              return b.total_jobs - a.total_jobs;
+            }
+            return (a.customer_name || "").localeCompare(b.customer_name || "");
+          },
+        );
 
         // Set customers directly from API response (server-side pagination)
-        setCustomersWithJobs(customersWithJobsArray);
-        setPaginatedCustomers(customersWithJobsArray); // Use API response directly
-        setAllCustomersWithJobs(customersWithJobsArray); // Store current page list
+        setCustomersWithJobs(sortedWithRecent);
+        setPaginatedCustomers(sortedWithRecent);
+        setAllCustomersWithJobs(sortedWithRecent);
 
         // Also set for table view compatibility
-        const transformedCustomers = customersWithJobsArray.map(
+        const transformedCustomers = sortedWithRecent.map(
           (apiCustomer: any) => ({
             id: apiCustomer.id?.toString() || `CUST-${Date.now()}`,
             name: apiCustomer.customer_name || apiCustomer.name || "",
@@ -974,16 +1024,38 @@ export function CustomersPage() {
         // If nothing from API, fall back to simple name filter on current page
         if (customersFromSearch.length === 0) {
           const searchLower = term.toLowerCase();
-          const fallback = allCustomersWithJobs.filter((customer: any) =>
+          const fallbackRaw = allCustomersWithJobs.filter((customer: any) =>
             (customer.customer_name || customer.name || "")
               .toLowerCase()
               .includes(searchLower),
           );
+          const fallback = sortEntitiesByRecentJobActivity(
+            fallbackRaw.map((c: any) => ({
+              ...c,
+              jobs: annotateJobsForListing(c.jobs || []),
+            })),
+            (a: any, b: any) => {
+              if (b.total_jobs !== a.total_jobs) {
+                return b.total_jobs - a.total_jobs;
+              }
+              return (a.customer_name || "").localeCompare(
+                b.customer_name || "",
+              );
+            },
+          );
           setCustomersWithJobs(fallback);
           setPaginatedCustomers(fallback);
         } else {
-          setCustomersWithJobs(customersFromSearch);
-          setPaginatedCustomers(customersFromSearch);
+          const searchSorted = sortEntitiesByRecentJobActivity(
+            customersFromSearch.map((c: any) => ({
+              ...c,
+              jobs: annotateJobsForListing(c.jobs || []),
+            })),
+            (a: any, b: any) =>
+              (a.customer_name || "").localeCompare(b.customer_name || ""),
+          );
+          setCustomersWithJobs(searchSorted);
+          setPaginatedCustomers(searchSorted);
         }
       } catch (error) {
         console.error("Error searching customers/jobs:", error);
@@ -1382,8 +1454,7 @@ export function CustomersPage() {
         </div>
 
         {/* Customer Listings */}
-        <div className="min-w-0 flex-1">
-          <div className="h-[calc(100vh-240px)] min-h-0">
+        <div className="min-w-0 flex-1 min-h-0">
             <CommonEntityListing
               data={paginatedCustomers}
               isLoading={isLoadingCustomers}
@@ -1444,7 +1515,6 @@ export function CustomersPage() {
                 </div>
               }
             />
-          </div>
         </div>
       </div>
 
@@ -1466,7 +1536,7 @@ export function CustomersPage() {
             <div className="flex gap-2">
               {hasPermission("customers", "view") && (
                 <Button variant="outline" onClick={handleExportCustomers}>
-                  <Download className="h-4 w-4 mr-2" />
+                  <Upload className="h-4 w-4 mr-2" />
                   Export Customers
                 </Button>
               )}
@@ -1560,12 +1630,12 @@ export function CustomersPage() {
                   <h3 className="text-xl font-medium text-gray-900">
                     {selectedSubJob ? "Sub-Job Details" : "Job Details"}
                   </h3>
-                  <Badge
+                 { selectedJobData.subJobs?.length ? <Badge
                     variant="outline"
                     className="bg-primary/10 text-primary border-primary/20"
                   >
                     {selectedJobData.subJobs?.length || 0} Sub-Jobs
-                  </Badge>
+                  </Badge>:null}
                 </div>
 
                 {/* Show sub-job details if sub-job is selected */}
@@ -1611,6 +1681,8 @@ export function CustomersPage() {
                           jobData.assignedLaborDetails || [],
                         assignedLeadLaborDetails:
                           jobData.assignedLeadLaborDetails || [],
+                        subJobs:
+                          (selectedJobData as any).subJobs ?? [],
                       };
 
                       const allJobs = [jobWithCustomerData];
@@ -1655,6 +1727,13 @@ export function CustomersPage() {
                           setJobs={handleSetJobs}
                           onJobsRefresh={fetchCustomersWithJobs}
                           focusEstimateId={focusFromUrl.estimateId}
+                          onViewSubJob={(subJobId) =>
+                            selectSubJob(
+                              subJobId,
+                              selectedJob!,
+                              selectedCustomer!,
+                            )
+                          }
                         />
                       );
                     })
@@ -1701,6 +1780,10 @@ export function CustomersPage() {
                           jobData.assignedLaborDetails || [],
                         assignedLeadLaborDetails:
                           jobData.assignedLeadLaborDetails || [],
+                        subJobs:
+                          selectedJobData.subJobs ??
+                          (jobData as any)?.subJobs ??
+                          [],
                       };
 
                       const allJobs = [jobWithCustomerData];
@@ -1735,6 +1818,13 @@ export function CustomersPage() {
                           setJobs={handleSetJobs}
                           onJobsRefresh={fetchCustomersWithJobs}
                           focusEstimateId={focusFromUrl.estimateId}
+                          onViewSubJob={(subJobId) =>
+                            selectSubJob(
+                              subJobId,
+                              selectedJobData.id.toString(),
+                              selectedCustomer!,
+                            )
+                          }
                         />
                       );
                     })()}
@@ -1936,46 +2026,210 @@ export function CustomersPage() {
                       </TableHeader>
 
                       <TableBody>
-                        {selectedCustomerData.jobs.map((job: any) => (
-                          <TableRow key={job.id}>
-                            <TableCell className="font-medium">
-                              {job.job_title || "N/A"}
-                            </TableCell>
+                        {selectedCustomerData.jobs.map((job: any) => {
+                          const jobId = job.id.toString();
+                          const hasSubJobs =
+                            Array.isArray(job.subJobs) && job.subJobs.length > 0;
+                          const isExpanded = expandedTableJobs.has(jobId);
 
-                            <TableCell className="capitalize">
-                              {(job.job_type || "N/A").replace("_", " ")}
-                            </TableCell>
+                          return (
+                            <React.Fragment key={jobId}>
+                              <TableRow key={jobId}>
+                                <TableCell className="font-medium">
+                                  {job.job_title || "N/A"}
+                                </TableCell>
 
-                            <TableCell className="max-w-[240px] truncate">
-                              {job.address || "N/A"}
-                            </TableCell>
+                                <TableCell className="capitalize">
+                                  {(job.job_type || "N/A").replace("_", " ")}
+                                </TableCell>
 
-                            <TableCell>
-                              {job.due_date ? formatDate(job.due_date) : "N/A"}
-                            </TableCell>
+                                <TableCell className="max-w-[240px] truncate">
+                                  {job.address || "N/A"}
+                                </TableCell>
 
-                            <TableCell>
-                              {formatCurrency(job.estimated_cost || 0)}
-                            </TableCell>
-                            <TableCell>{getStatusBadge(job.status)}</TableCell>
+                                <TableCell>
+                                  {job.due_date
+                                    ? formatDate(job.due_date)
+                                    : "N/A"}
+                                </TableCell>
 
-                            <TableCell className="text-right">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  selectJob(
-                                    job.id.toString(),
-                                    selectedCustomerData.id.toString(),
-                                  )
-                                }
-                              >
-                                <Eye className="h-4 w-4 mr-1" />
-                                View
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                                <TableCell>
+                                  {formatCurrency(job.estimated_cost || 0)}
+                                </TableCell>
+                                <TableCell>{getStatusBadge(job.status)}</TableCell>
+
+                                <TableCell className="text-right">
+                                  <div className="flex items-center justify-end gap-1">
+                                    {hasSubJobs && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                          toggleTableJobExpansion(jobId)
+                                        }
+                                      >
+                                        {isExpanded ? (
+                                          <ChevronDown className="h-4 w-4 mr-1" />
+                                        ) : (
+                                          <ChevronRight className="h-4 w-4 mr-1" />
+                                        )}
+                                        {isExpanded
+                                          ? "Hide Sub Jobs"
+                                          : "Show Sub Jobs"}
+                                      </Button>
+                                    )}
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        selectJob(
+                                          jobId,
+                                          selectedCustomerData.id.toString(),
+                                        )
+                                      }
+                                    >
+                                      <Eye className="h-4 w-4 mr-1" />
+                                      View
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      title="Delete job"
+                                      className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                      onClick={() =>
+                                        setJobDeleteTarget({
+                                          id: jobId,
+                                          title:
+                                            job.job_title ||
+                                            job.title ||
+                                            "this job",
+                                        })
+                                      }
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+
+                              {hasSubJobs && (
+                                <TableRow
+                                  key={`${jobId}-subjobs`}
+                                  className="border-b-0 hover:bg-transparent data-[state=selected]:bg-transparent"
+                                >
+                                  <TableCell colSpan={7} className="p-0">
+                                    <div
+                                      className={`grid transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none ${
+                                        isExpanded
+                                          ? "grid-rows-[1fr]"
+                                          : "grid-rows-[0fr]"
+                                      }`}
+                                    >
+                                      <div className="min-h-0 overflow-hidden">
+                                        <div className="border-border bg-muted/30 border-b border-t px-3 pb-3 pt-2">
+                                          <div className="overflow-x-auto rounded-lg border bg-background">
+                                            <Table>
+                                              <TableHeader>
+                                                <TableRow>
+                                                  <TableHead>Job Title</TableHead>
+                                                  <TableHead>Type</TableHead>
+                                                  <TableHead>Address</TableHead>
+                                                  <TableHead>Due Date</TableHead>
+                                                  <TableHead>Est. Cost</TableHead>
+                                                  <TableHead>Status</TableHead>
+                                                  <TableHead className="text-right">
+                                                    Action
+                                                  </TableHead>
+                                                </TableRow>
+                                              </TableHeader>
+                                              <TableBody>
+                                                {job.subJobs.map(
+                                                  (subJob: any) => (
+                                                    <TableRow
+                                                      key={`${jobId}-${subJob.id}`}
+                                                    >
+                                                      <TableCell className="font-medium">
+                                                        {subJob.job_title ||
+                                                          "N/A"}
+                                                      </TableCell>
+                                                      <TableCell className="capitalize">
+                                                        {(
+                                                          subJob.job_type ||
+                                                          "N/A"
+                                                        ).replace("_", " ")}
+                                                      </TableCell>
+                                                      <TableCell className="max-w-[240px] truncate">
+                                                        {subJob.address ||
+                                                          "N/A"}
+                                                      </TableCell>
+                                                      <TableCell>
+                                                        {subJob.due_date
+                                                          ? formatDate(
+                                                              subJob.due_date,
+                                                            )
+                                                          : "N/A"}
+                                                      </TableCell>
+                                                      <TableCell>
+                                                        {formatCurrency(
+                                                          subJob.estimated_cost ||
+                                                            0,
+                                                        )}
+                                                      </TableCell>
+                                                      <TableCell>
+                                                        {getStatusBadge(
+                                                          subJob.status,
+                                                        )}
+                                                      </TableCell>
+                                                      <TableCell className="text-right">
+                                                        <div className="flex items-center justify-end gap-1">
+                                                          <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                              selectSubJob(
+                                                                subJob.id.toString(),
+                                                                jobId,
+                                                                selectedCustomerData.id.toString(),
+                                                              )
+                                                            }
+                                                          >
+                                                            <Eye className="h-4 w-4 mr-1" />
+                                                            View
+                                                          </Button>
+                                                          <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            title="Delete sub-job"
+                                                            className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                            onClick={() =>
+                                                              setJobDeleteTarget({
+                                                                id: subJob.id.toString(),
+                                                                title:
+                                                                  subJob.job_title ||
+                                                                  subJob.title ||
+                                                                  "this sub-job",
+                                                              })
+                                                            }
+                                                          >
+                                                            <Trash2 className="h-4 w-4" />
+                                                          </Button>
+                                                        </div>
+                                                      </TableCell>
+                                                    </TableRow>
+                                                  ),
+                                                )}
+                                              </TableBody>
+                                            </Table>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
@@ -2507,6 +2761,37 @@ export function CustomersPage() {
             >
               {isLoading ? "Deleting..." : "Yes"}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!jobDeleteTarget}
+        onOpenChange={(open) => {
+          if (!open && !isDeletingJob) setJobDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this job?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The job &quot;
+              {jobDeleteTarget?.title}&quot; will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingJob}>
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isDeletingJob}
+              className="bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+              onClick={() => void handleConfirmDeleteJob()}
+            >
+              {isDeletingJob ? "Deleting…" : "Delete job"}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

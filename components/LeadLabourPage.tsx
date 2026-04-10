@@ -826,7 +826,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
               }`}
             onClick={() => document.getElementById(`file-${type}`)?.click()}
           >
-            <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+            <Download className="h-8 w-8 mx-auto mb-2 text-gray-400" />
             <p className="text-sm text-gray-600">Upload file here</p>
             <p className="text-xs text-gray-500 mt-1">or click to browse</p>
             <input
@@ -1493,7 +1493,7 @@ useEffect(() => {
             <Autocomplete 
               apiKey={
                 process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
-                "AIzaSyBtb6hSmwJ9_OznDC5e8BcZM90ms4WD_DE"
+                "AIzaSyBEQp-ZFMYZjsTNyximu2pAifQ9EWA4W3M"
               }
               onPlaceSelected={(place: any) => {
                 const address = place?.formatted_address || place?.name || "";

@@ -13,7 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { toast } from 'sonner'
 import { CustomInvoiceDialog } from './CustomInvoiceDialog'
 import {
-  Upload,
   FileText,
   CheckSquare,
   AlertCircle,
@@ -1140,7 +1139,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                 value="upload"
                 className={`gap-2 text-base ${currentStep === "upload" ? "bg-white" : ""}`}
               >
-                <Upload className="h-5 w-5" />
+                <Download className="h-5 w-5" />
                 Upload & Compare
               </TabsTrigger>
               <TabsTrigger
@@ -1202,7 +1201,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                           {isUploading ? (
                             <RefreshCw className="h-4 w-4 animate-spin" />
                           ) : (
-                            <Upload className="h-4 w-4" />
+                            <Download className="h-4 w-4" />
                           )}
                           {isUploading ? "Processing..." : "Choose File"}
                         </Button>

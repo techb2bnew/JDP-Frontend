@@ -22,7 +22,6 @@ import {
   Plus,
   Trash2,
   FileText,
-  Upload,
   Download,
   Globe,
   CreditCard,
@@ -570,7 +569,7 @@ export function SupplierDetailsPage() {
                       <p className="text-sm text-muted-foreground mb-2">No {docType} uploaded</p>
                       <Button variant="outline" size="sm" asChild>
                         <label htmlFor={`${docType}-upload`} className="cursor-pointer">
-                          <Upload className="w-3 h-3 mr-1" />
+                          <Download className="w-3 h-3 mr-1" />
                           Upload {docType}
                         </label>
                       </Button>

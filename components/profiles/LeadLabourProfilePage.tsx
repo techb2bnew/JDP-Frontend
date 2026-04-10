@@ -417,7 +417,7 @@ export function LeadLabourProfilePage() {
                               </Button>
                             )}
                             <Button variant="outline" size="sm" disabled={!isEditing}>
-                              <Upload className="h-4 w-4 mr-2" />
+                              <Download className="h-4 w-4 mr-2" />
                               Upload
                             </Button>
                           </div>
@@ -452,7 +452,7 @@ export function LeadLabourProfilePage() {
                               </Button>
                             )}
                             <Button variant="outline" size="sm" disabled={!isEditing}>
-                              <Upload className="h-4 w-4 mr-2" />
+                              <Download className="h-4 w-4 mr-2" />
                               Upload
                             </Button>
                           </div>
@@ -482,7 +482,7 @@ export function LeadLabourProfilePage() {
                               </Button>
                             )}
                             <Button variant="outline" size="sm" disabled={!isEditing}>
-                              <Upload className="h-4 w-4 mr-2" />
+                              <Download className="h-4 w-4 mr-2" />
                               Upload
                             </Button>
                           </div>
@@ -543,7 +543,7 @@ export function LeadLabourProfilePage() {
                     <p className="text-sm text-muted-foreground">View and manage leave applications</p>
                   </div>
                   <Button>
-                    <Download className="h-4 w-4 mr-2" />
+                    <Upload className="h-4 w-4 mr-2" />
                     Export Leave Data
                   </Button>
                 </div>
@@ -621,7 +621,7 @@ export function LeadLabourProfilePage() {
                       January 2025
                     </Button>
                     <Button>
-                      <Download className="h-4 w-4 mr-2" />
+                      <Upload className="h-4 w-4 mr-2" />
                       Export Timesheet
                     </Button>
                   </div>
