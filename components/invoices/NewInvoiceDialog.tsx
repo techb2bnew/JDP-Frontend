@@ -136,9 +136,147 @@ interface ProductFormData {
 /** Job APIs use `bill_to_address`; support camelCase too. */
 function resolveBillToAddressFromJob(job: any): string {
   if (!job) return "";
-  const v = job.bill_to_address ?? job.billToAddress;
+  const v =
+    job.bill_to_address ??
+    job.billToAddress ??
+    job.bill_to ??
+    job.billTo;
   if (v == null || v === "") return "";
   return String(v).trim();
+}
+
+/** Normalize API/UI job type (`type`, `job_type`, hyphen vs underscore). */
+function normalizeJobServiceType(job: any): "contract_based" | "service_based" | null {
+  if (!job) return null;
+  const raw = job.type ?? job.job_type ?? job.service_type ?? "";
+  const s = String(raw).toLowerCase().replace(/-/g, "_").trim();
+  if (s === "contract_based") return "contract_based";
+  if (s === "service_based") return "service_based";
+  return null;
+}
+
+function isJobContractBased(job: any): boolean {
+  return normalizeJobServiceType(job) === "contract_based";
+}
+
+function resolveContractorIdFromJob(job: any): number | null {
+  if (!job) return null;
+  const raw =
+    job.contractor_id ??
+    job.contractorId ??
+    (job.contractor && typeof job.contractor === "object"
+      ? (job.contractor as { id?: unknown }).id
+      : null) ??
+    (typeof job.contractor === "number" ? job.contractor : null) ??
+    (typeof job.contractor === "string" && String(job.contractor).trim() !== ""
+      ? Number(job.contractor)
+      : null);
+  if (raw == null || raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function resolveCustomerIdFromJob(job: any): number | null {
+  if (!job) return null;
+  const raw =
+    job.customer_id ??
+    job.customerId ??
+    (job.customer && typeof job.customer === "object"
+      ? (job.customer as { id?: unknown }).id
+      : null) ??
+    (typeof job.customer === "number" ? job.customer : null) ??
+    (typeof job.customer === "string" && String(job.customer).trim() !== ""
+      ? Number(job.customer)
+      : null);
+  if (raw == null || raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function resolveJobForInvoicePayload(
+  inlineJobId: string | number | null | undefined,
+  jobsList: any[],
+  jobs?: any[] | null,
+  selectedJob?: any | null,
+  currentJob?: any | null,
+): any | null {
+  const idStr =
+    inlineJobId !== undefined && inlineJobId !== null
+      ? String(inlineJobId).trim()
+      : "";
+  if (!idStr) {
+    return selectedJob || currentJob || null;
+  }
+  return (
+    jobsList.find((j: any) => String(j?.id ?? "") === idStr) ||
+    jobs?.find((j: any) => String(j?.id ?? "") === idStr) ||
+    (selectedJob && String(selectedJob?.id ?? "") === idStr
+      ? selectedJob
+      : null) ||
+    (currentJob && String(currentJob?.id ?? "") === idStr ? currentJob : null) ||
+    null
+  );
+}
+
+function resolveInvoiceEmailFromJob(job: any, contractBased: boolean): string {
+  if (!job) return "";
+  if (contractBased) {
+    const e =
+      job.contractor_email ?? job.contractor?.email ?? job.email;
+    return e != null && String(e).trim() !== "" ? String(e).trim() : "";
+  }
+  const e = job.customer_email ?? job.customer?.email ?? job.email;
+  return e != null && String(e).trim() !== "" ? String(e).trim() : "";
+}
+
+function resolveInvoiceLocationFromJob(
+  job: any,
+  contractBased: boolean,
+): string {
+  if (!job) return "";
+  const jobAddr = String(job.address ?? job.location ?? "").trim();
+  if (jobAddr) return jobAddr;
+  if (contractBased) {
+    return String(
+      job.contractorAddress ?? job.contractor?.address ?? "",
+    ).trim();
+  }
+  return String(
+    job.customerAddress ?? job.customer?.address ?? "",
+  ).trim();
+}
+
+/** Secondary line under job title in job picker (customer vs contractor). */
+function resolveJobListSubLabel(job: any): string {
+  if (!job) return "";
+  if (isJobContractBased(job)) {
+    const raw =
+      job.contractorName ??
+      job.contractor_name ??
+      (job.contractor &&
+      typeof job.contractor === "object" &&
+      !Array.isArray(job.contractor)
+        ? (job.contractor as any).contractor_name ??
+          (job.contractor as any).company_name ??
+          (job.contractor as any).name ??
+          (job.contractor as any).full_name
+        : null) ??
+      job.contractor_company_name ??
+      job.contractorCompanyName;
+    if (raw != null && String(raw).trim() !== "") return String(raw).trim();
+    return "No contractor linked";
+  }
+  const raw =
+    job.customerName ??
+    (job.customer &&
+    typeof job.customer === "object" &&
+    !Array.isArray(job.customer)
+      ? (job.customer as any).customer_name ??
+        (job.customer as any).company_name ??
+        (job.customer as any).name
+      : null);
+  if (raw != null && String(raw).trim() !== "") return String(raw).trim();
+  return "No customer linked";
 }
 
 export const NewInvoiceDialog = ({
@@ -278,7 +416,38 @@ export const NewInvoiceDialog = ({
     };
   }, [inlineInvoiceData.jobId, jobId, selectedJob, jobsList, jobs, currentJob]);
 
-    const [jobSearch, setJobSearch] = useState("");
+  const navigateAfterInvoiceSent = useCallback(
+    (estimateId: number) => {
+      const jid = previewJobId;
+      const est = String(estimateId);
+      const jobForNav = jid
+        ? resolveJobForInvoicePayload(
+            jid,
+            jobsList,
+            jobs,
+            selectedJob,
+            currentJob,
+          )
+        : null;
+
+      if (isJobContractBased(jobForNav) && jid) {
+        const cid = resolveContractorIdFromJob(jobForNav);
+        const q = new URLSearchParams();
+        q.set("jobId", jid);
+        q.set("estimateId", est);
+        if (cid) q.set("contractorId", String(cid));
+        router.push(`/contractors?${q.toString()}`);
+        return;
+      }
+
+      router.push(
+        `/customers?jobId=${encodeURIComponent(jid)}&estimateId=${encodeURIComponent(est)}`,
+      );
+    },
+    [previewJobId, jobsList, jobs, selectedJob, currentJob, router],
+  );
+
+  const [jobSearch, setJobSearch] = useState("");
   const [showJobResults, setShowJobResults] = useState(false);
   const [isLoadingJobs, setIsLoadingJobs] = useState(false);
 
@@ -322,10 +491,8 @@ export const NewInvoiceDialog = ({
   // Update form when job is provided
   useEffect(() => {
     if (currentJob) {
-      // Determine if it's contract-based
-      const isContractBased =
-        currentJob.type === "contract_based" ||
-        currentJob.type === "contract-based";
+      // Determine if it's contract-based (API often uses job_type)
+      const isContractBased = isJobContractBased(currentJob);
 
       // Get customer/contractor name and address
       let customerName = "";
@@ -567,12 +734,15 @@ export const NewInvoiceDialog = ({
       let customerId: number | null = null;
       let contractorId: number | null = null;
       let isContractBased = false;
+      /** Resolved job row for create mode (email / bill-to fallbacks) */
+      let createModeJob: any | null = null;
 
       if (isViewMode && viewInvoiceData) {
         // In view mode, get from viewInvoiceData
         isContractBased =
           viewInvoiceData.service_type === "contract_based" ||
           viewInvoiceData.job?.job_type === "contract_based" ||
+          isJobContractBased(viewInvoiceData.job) ||
           (viewInvoiceData.contractor_id !== null &&
             viewInvoiceData.contractor_id !== undefined);
 
@@ -602,51 +772,32 @@ export const NewInvoiceDialog = ({
           viewInvoiceData: viewInvoiceData,
         });
       } else {
-        // In create mode, get from currentJob
-        const currentJob = jobsList.find(
-          (j: any) => j.id === inlineInvoiceData.jobId,
+        createModeJob = resolveJobForInvoicePayload(
+          inlineInvoiceData.jobId,
+          jobsList,
+          jobs,
+          selectedJob,
+          currentJob,
         );
-        if (!currentJob) {
+        if (!createModeJob) {
           throw new Error("Job not found");
         }
 
-        isContractBased =
-          currentJob.type === "contract_based" ||
-          currentJob.type === "contract-based";
+        isContractBased = isJobContractBased(createModeJob);
 
         if (isContractBased) {
-          contractorId =
-            currentJob.contractor_id ||
-            (currentJob.contractor && typeof currentJob.contractor === "number"
-              ? Number(currentJob.contractor)
-              : null) ||
-            (currentJob.contractor && typeof currentJob.contractor === "string"
-              ? Number(currentJob.contractor)
-              : null) ||
-            null;
-          console.log(
-            "Create mode - contractor_id from currentJob:",
-            contractorId,
-          );
+          contractorId = resolveContractorIdFromJob(createModeJob);
+          console.log("Create mode - contractor_id from jobRow:", contractorId);
         } else {
-          customerId =
-            currentJob.customer_id ||
-            (currentJob.customer && typeof currentJob.customer === "number"
-              ? currentJob.customer
-              : null) ||
-            (currentJob.customer && typeof currentJob.customer === "string"
-              ? Number(currentJob.customer)
-              : null) ||
-            Number(currentJob?.customer) ||
-            null;
-          console.log("Create mode - customer_id from currentJob:", customerId);
+          customerId = resolveCustomerIdFromJob(createModeJob);
+          console.log("Create mode - customer_id from jobRow:", customerId);
         }
       }
 
       if (!customerId && !contractorId) {
         console.error("Customer/Contractor ID not found");
         toast.error("Customer/Contractor ID is missing. Cannot send invoice.");
-        return;
+        return false;
       }
 
       // Get token properly
@@ -672,18 +823,22 @@ export const NewInvoiceDialog = ({
         throw new Error("No authentication token found");
       }
 
-      // Get customer email - from viewInvoiceData in view mode, otherwise from currentJob
+      // Get customer / contractor email
       let customerEmail = "customer@example.com";
       if (isViewMode && viewInvoiceData) {
         customerEmail =
-          viewInvoiceData.customer?.email ||
+          (isContractBased
+            ? viewInvoiceData.contractor?.email
+            : viewInvoiceData.customer?.email) ||
           viewInvoiceData.email_address ||
           "customer@example.com";
-      } else {
-        const currentJob = jobsList.find(
-          (j: any) => j.id === inlineInvoiceData.jobId,
+      } else if (createModeJob) {
+        const partyEmail = resolveInvoiceEmailFromJob(
+          createModeJob,
+          isContractBased,
         );
-        customerEmail = currentJob?.email || "customer@example.com";
+        customerEmail =
+          partyEmail || createModeJob.email || "customer@example.com";
       }
 
       const payload: any = {
@@ -700,7 +855,10 @@ export const NewInvoiceDialog = ({
         customerEmail: customerEmail,
         customerAddress: inlineInvoiceData.customerAddress || "",
         billToAddress: inlineInvoiceData.billToAddressEnabled
-          ? inlineInvoiceData.billToAddress || ""
+          ? inlineInvoiceData.billToAddress ||
+            (createModeJob
+              ? resolveBillToAddressFromJob(createModeJob)
+              : "")
           : "",
         poNumber: inlineInvoiceData.poNumber || "",
         project: inlineInvoiceData.project || "",
@@ -1024,8 +1182,7 @@ export const NewInvoiceDialog = ({
   setEstimateCost(job?.estimatedCost);
   setSelectedJob(job);
 
-  const isContractBased =
-    job.type === "contract_based" || job.type === "contract-based";
+  const isContractBased = isJobContractBased(job);
 
   let customerName = "";
   let customerAddress = "";
@@ -1148,16 +1305,18 @@ export const NewInvoiceDialog = ({
 
         return base;
       });
-      // Get customer_id or contractor_id - from viewInvoiceData if in view mode, otherwise from currentJob
+      // Get customer_id or contractor_id - from viewInvoiceData if in view mode, otherwise from resolved job row
       let customerId: number | null = null;
       let contractorId: number | null = null;
       let isContractBased = false;
+      let draftJob: any | null = null;
 
       if (isViewMode && viewInvoiceData) {
         // In view mode, get from viewInvoiceData
         isContractBased =
           viewInvoiceData.service_type === "contract_based" ||
           viewInvoiceData.job?.job_type === "contract_based" ||
+          isJobContractBased(viewInvoiceData.job) ||
           (viewInvoiceData.contractor_id !== null &&
             viewInvoiceData.contractor_id !== undefined);
 
@@ -1179,50 +1338,87 @@ export const NewInvoiceDialog = ({
             : null) ||
           null;
       } else {
-        // In create mode, get from currentJob
-        isContractBased =
-          currentJob?.type === "contract_based" ||
-          currentJob?.type === "contract-based";
-
-        if (isContractBased) {
-          contractorId =
-            currentJob.contractor_id ||
-            (currentJob.contractor && typeof currentJob.contractor === "number"
-              ? Number(currentJob.contractor)
-              : null) ||
-            (currentJob.contractor && typeof currentJob.contractor === "string"
-              ? Number(currentJob.contractor)
-              : null) ||
-            null;
-        } else {
-          customerId =
-            currentJob.customer_id ||
-            (currentJob.customer && typeof currentJob.customer === "number"
-              ? currentJob.customer
-              : null) ||
-            (currentJob.customer && typeof currentJob.customer === "string"
-              ? Number(currentJob.customer)
-              : null) ||
-            Number(currentJob?.customer) ||
-            null;
+        draftJob = resolveJobForInvoicePayload(
+          inlineInvoiceData.jobId,
+          jobsList,
+          jobs,
+          selectedJob,
+          currentJob,
+        );
+        if (!draftJob) {
+          toast.error("Job not found");
+          setSavingDraft(false);
+          return;
         }
+        isContractBased = isJobContractBased(draftJob);
+        contractorId = isContractBased
+          ? resolveContractorIdFromJob(draftJob)
+          : null;
+        customerId = !isContractBased
+          ? resolveCustomerIdFromJob(draftJob)
+          : null;
       }
+
+      const emailForDraft =
+        isViewMode && viewInvoiceData
+          ? (isContractBased
+              ? viewInvoiceData.contractor?.email
+              : viewInvoiceData.customer?.email) ||
+            viewInvoiceData.email_address ||
+            "customer@example.com"
+          : draftJob
+            ? resolveInvoiceEmailFromJob(draftJob, isContractBased) ||
+              draftJob.email ||
+              "customer@example.com"
+            : currentJob?.email || "customer@example.com";
+
+      const billToForDraft = inlineInvoiceData.billToAddressEnabled
+        ? inlineInvoiceData.billToAddress ||
+          (draftJob ? resolveBillToAddressFromJob(draftJob) : "") ||
+          (isViewMode && viewInvoiceData
+            ? viewInvoiceData.bill_to_address || ""
+            : "")
+        : "";
+
+      const locationForDraft =
+        (draftJob || currentJob
+          ? resolveInvoiceLocationFromJob(
+              draftJob || currentJob,
+              isContractBased,
+            )
+          : "") ||
+        (isViewMode && viewInvoiceData
+          ? String(
+              viewInvoiceData.job?.address ||
+                viewInvoiceData.location ||
+                viewInvoiceData.customer?.address ||
+                viewInvoiceData.contractor?.address ||
+                "",
+            ).trim()
+          : "") ||
+        String(inlineInvoiceData.customerAddress || "").trim();
 
       const payload: any = {
         job_id: Number(inlineInvoiceData.jobId),
-        estimate_title: inlineInvoiceData.project || currentJob?.title,
+        estimate_title:
+          inlineInvoiceData.project ||
+          draftJob?.title ||
+          draftJob?.job_title ||
+          (isViewMode && viewInvoiceData?.estimate_title) ||
+          currentJob?.title ||
+          currentJob?.job_title,
         priority: "medium" as "low" | "medium" | "high",
         service_type: isContractBased ? "contract_based" : "service_based",
-        email_address: currentJob?.email || "customer@example.com",
+        email_address: emailForDraft,
         estimate_date: inlineInvoiceData.date,
         po_number: inlineInvoiceData.poNumber || "",
         rep: inlineInvoiceData.rep || "",
         due_date: inlineInvoiceData.dueDate || "",
         payment_credits: inlineInvoiceData.paymentCredits || 0,
         balance_due: inlineInvoiceData.balanceDue || "",
-        bill_to_address: inlineInvoiceData.billToAddressEnabled
-          ? inlineInvoiceData.billToAddress || ""
-          : "",
+        bill_to_address: billToForDraft,
+        location: locationForDraft,
+        description: inlineInvoiceData.notes || "",
         notes: inlineInvoiceData.notes || "",
         status: "draft",
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
@@ -1379,16 +1575,18 @@ const validateLineItems = (lineItems: any[] = []) => {
       // return;
       
 
-      // Get customer_id or contractor_id - from viewInvoiceData if in view mode, otherwise from currentJob
+      // Get customer_id or contractor_id - from viewInvoiceData if in view mode, otherwise from resolved job row
       let customerId: number | null = null;
       let contractorId: number | null = null;
       let isContractBased = false;
+      let previewJob: any | null = null;
 
       if (isViewMode && viewInvoiceData) {
         // In view mode, get from viewInvoiceData
         isContractBased =
           viewInvoiceData.service_type === "contract_based" ||
           viewInvoiceData.job?.job_type === "contract_based" ||
+          isJobContractBased(viewInvoiceData.job) ||
           (viewInvoiceData.contractor_id !== null &&
             viewInvoiceData.contractor_id !== undefined);
 
@@ -1410,50 +1608,87 @@ const validateLineItems = (lineItems: any[] = []) => {
             : null) ||
           null;
       } else {
-        // In create mode, get from currentJob
-        isContractBased =
-          currentJob?.type === "contract_based" ||
-          currentJob?.type === "contract-based";
-
-        if (isContractBased) {
-          contractorId =
-            currentJob.contractor_id ||
-            (currentJob.contractor && typeof currentJob.contractor === "number"
-              ? Number(currentJob.contractor)
-              : null) ||
-            (currentJob.contractor && typeof currentJob.contractor === "string"
-              ? Number(currentJob.contractor)
-              : null) ||
-            null;
-        } else {
-          customerId =
-            currentJob.customer_id ||
-            (currentJob.customer && typeof currentJob.customer === "number"
-              ? currentJob.customer
-              : null) ||
-            (currentJob.customer && typeof currentJob.customer === "string"
-              ? Number(currentJob.customer)
-              : null) ||
-            Number(currentJob?.customer) ||
-            null;
+        previewJob = resolveJobForInvoicePayload(
+          inlineInvoiceData.jobId,
+          jobsList,
+          jobs,
+          selectedJob,
+          currentJob,
+        );
+        if (!previewJob) {
+          toast.error("Job not found");
+          setSendingInvoice(false);
+          return;
         }
+        isContractBased = isJobContractBased(previewJob);
+        contractorId = isContractBased
+          ? resolveContractorIdFromJob(previewJob)
+          : null;
+        customerId = !isContractBased
+          ? resolveCustomerIdFromJob(previewJob)
+          : null;
       }
+
+      const emailForPreview =
+        isViewMode && viewInvoiceData
+          ? (isContractBased
+              ? viewInvoiceData.contractor?.email
+              : viewInvoiceData.customer?.email) ||
+            viewInvoiceData.email_address ||
+            "customer@example.com"
+          : previewJob
+            ? resolveInvoiceEmailFromJob(previewJob, isContractBased) ||
+              previewJob.email ||
+              "customer@example.com"
+            : currentJob?.email || "customer@example.com";
+
+      const billToForPreview = inlineInvoiceData.billToAddressEnabled
+        ? inlineInvoiceData.billToAddress ||
+          (previewJob ? resolveBillToAddressFromJob(previewJob) : "") ||
+          (isViewMode && viewInvoiceData
+            ? viewInvoiceData.bill_to_address || ""
+            : "")
+        : "";
+
+      const locationForPreview =
+        (previewJob || currentJob
+          ? resolveInvoiceLocationFromJob(
+              previewJob || currentJob,
+              isContractBased,
+            )
+          : "") ||
+        (isViewMode && viewInvoiceData
+          ? String(
+              viewInvoiceData.job?.address ||
+                viewInvoiceData.location ||
+                viewInvoiceData.customer?.address ||
+                viewInvoiceData.contractor?.address ||
+                "",
+            ).trim()
+          : "") ||
+        String(inlineInvoiceData.customerAddress || "").trim();
 
       const payload: any = {
         job_id: Number(inlineInvoiceData.jobId),
-        estimate_title: inlineInvoiceData.project || currentJob?.title,
+        estimate_title:
+          inlineInvoiceData.project ||
+          previewJob?.title ||
+          previewJob?.job_title ||
+          (isViewMode && viewInvoiceData?.estimate_title) ||
+          currentJob?.title ||
+          currentJob?.job_title,
         priority: "medium" as "low" | "medium" | "high",
         service_type: isContractBased ? "contract_based" : "service_based",
-        email_address: currentJob?.email || "customer@example.com",
+        email_address: emailForPreview,
         estimate_date: inlineInvoiceData.date,
         po_number: inlineInvoiceData.poNumber || "",
         rep: inlineInvoiceData.rep || "",
         due_date: inlineInvoiceData.dueDate || "",
         payment_credits: inlineInvoiceData.paymentCredits || 0,
         balance_due: inlineInvoiceData.balanceDue || "",
-        bill_to_address: inlineInvoiceData.billToAddressEnabled
-          ? inlineInvoiceData.billToAddress || ""
-          : "",
+        bill_to_address: billToForPreview,
+        location: locationForPreview,
+        description: inlineInvoiceData.notes || "",
         notes: inlineInvoiceData.notes || "",
         // Create as draft first; send happens from preview modal confirmation
         status: "draft",
@@ -1555,11 +1790,7 @@ const validateLineItems = (lineItems: any[] = []) => {
         onNavigateToJobAfterSend(previewJobId, previewEstimateId);
       }
 
-      router.push(
-        `/customers?jobId=${encodeURIComponent(previewJobId)}&estimateId=${encodeURIComponent(
-          String(previewEstimateId),
-        )}`,
-      );
+      navigateAfterInvoiceSent(previewEstimateId);
     } catch (error) {
       console.error("Error sending invoice:", error);
       toast.error("Failed to send invoice");
@@ -1609,33 +1840,30 @@ const validateLineItems = (lineItems: any[] = []) => {
         inlineInvoiceData.invoiceType === "Custom"
           ? inlineInvoiceData.customInvoiceType
           : inlineInvoiceData.invoiceType;
-      const selectedJobFromList =
-        jobsList.find(
-          (j: any) => String(j?.id ?? "") === String(inlineInvoiceData.jobId ?? ""),
-        ) ||
-        selectedJob ||
-        currentJob;
+      const selectedJobFromList = resolveJobForInvoicePayload(
+        inlineInvoiceData.jobId,
+        jobsList,
+        jobs,
+        selectedJob,
+        currentJob,
+      );
 
-      const isContractBased =
-        selectedJobFromList?.type === "contract_based" ||
-        selectedJobFromList?.type === "contract-based";
+      const isContractBased = isJobContractBased(selectedJobFromList);
 
-      const customerId =
-        selectedJobFromList?.customer_id ??
-        selectedJobFromList?.customer?.id ??
-        (typeof selectedJobFromList?.customer === "number"
-          ? selectedJobFromList.customer
-          : null);
+      const customerId = !isContractBased
+        ? resolveCustomerIdFromJob(selectedJobFromList)
+        : null;
 
-      const contractorId =
-        selectedJobFromList?.contractor_id ??
-        selectedJobFromList?.contractor?.id ??
-        (typeof selectedJobFromList?.contractor === "number"
-          ? selectedJobFromList.contractor
-          : null);
+      const contractorId = isContractBased
+        ? resolveContractorIdFromJob(selectedJobFromList)
+        : null;
 
-         
-          
+      const qbEmail = selectedJobFromList
+        ? resolveInvoiceEmailFromJob(selectedJobFromList, isContractBased) ||
+          selectedJobFromList.email ||
+          "customer@example.com"
+        : currentJob?.email || "customer@example.com";
+
       const payload: any = {
         job_id: Number(inlineInvoiceData.jobId),
         invoice_type: mapInvoiceTypeToAPI(selectedInvoiceType),
@@ -1646,27 +1874,37 @@ const validateLineItems = (lineItems: any[] = []) => {
           currentJob?.title,
         priority: "medium" as "low" | "medium" | "high",
         service_type: isContractBased ? "contract_based" : "service_based",
-        email_address:
-          selectedJobFromList?.email ||
-          selectedJobFromList?.customer?.email ||
-          selectedJobFromList?.contractor?.email ||
-          currentJob?.email ||
-          "customer@example.com",
+        email_address: qbEmail,
         estimate_date: inlineInvoiceData.date,
         due_date: inlineInvoiceData.dueDate || "",
         po_number: inlineInvoiceData.poNumber || "",
         rep: inlineInvoiceData.rep || "",
         payment_credits: inlineInvoiceData.paymentCredits || 0,
         balance_due: inlineInvoiceData.balanceDue || "",
+        bill_to_address: inlineInvoiceData.billToAddressEnabled
+          ? inlineInvoiceData.billToAddress ||
+            (selectedJobFromList
+              ? resolveBillToAddressFromJob(selectedJobFromList)
+              : "")
+          : "",
+        location: selectedJobFromList
+          ? resolveInvoiceLocationFromJob(
+              selectedJobFromList,
+              isContractBased,
+            )
+          : "",
+        description: inlineInvoiceData.notes || "",
         notes: inlineInvoiceData.notes || "",
         total_amount: calculateInvoiceSubtotal(),
         custom_products: customProducts,
         invoice_source: "quickbook",
         quickbook_action:
           action === "send" ? "sendtoquickbook" : "sevetoquickbook",
-          ...(isContractBased
-        ? { contractor_id: contractorId }
-        : { customer_id: customerId }),
+        ...(isContractBased && contractorId
+          ? { contractor_id: contractorId }
+          : customerId
+            ? { customer_id: customerId }
+            : {}),
       };
 
       const qbResponse = await apiClient.createEstimate(payload as any);
@@ -1721,11 +1959,7 @@ const validateLineItems = (lineItems: any[] = []) => {
         onNavigateToJobAfterSend(previewJobId, createdId);
       }
 
-      router.push(
-        `/customers?jobId=${encodeURIComponent(previewJobId)}&estimateId=${encodeURIComponent(
-          String(createdId),
-        )}`,
-      );
+      navigateAfterInvoiceSent(createdId);
     } catch (error: any) {
       console.error("Quickbook action failed:", error);
       const apiMessage =
@@ -2308,11 +2542,7 @@ const validateLineItems = (lineItems: any[] = []) => {
                                   {job.title || job.job_title}
                                 </div>
                                 <div className="text-sm text-muted-foreground">
-                                  {job.customer?.customer_name ||
-                                    job.customer?.company_name ||
-                                    job.contractor?.company_name ||
-                                    job.contractor?.contractor_name ||
-                                    "No customer linked"}
+                                  {resolveJobListSubLabel(job)}
                                 </div>
                               </div>
                             ))

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { JobDetailsPage } from './JobDetailsPage'
 import { apiClient } from '../utils/api'
 import { ContractorDetailsPage } from './ContractorDetailsPage'
@@ -902,8 +902,59 @@ const InvoiceTemplate = ({ subJob, job, contractor }: { subJob: SubJob, job: Job
   )
 }
 
+/** Resolve contractor + main/sub job for deep-link navigation (e.g. after creating an estimate). */
+function resolveContractorJobNavigation(
+  contractors: any[],
+  jobId: string,
+  preferredContractorId?: string,
+): {
+  contractorId: string
+  parentJobId: string
+  subJobId: string | null
+} | null {
+  const jid = (jobId || '').trim()
+  if (!jid || !Array.isArray(contractors)) return null
+
+  const tryContractor = (ct: any) => {
+    if (!ct) return null
+    for (const j of ct.jobs || []) {
+      if (j?.id != null && String(j.id) === jid) {
+        return {
+          contractorId: String(ct.id),
+          parentJobId: String(j.id),
+          subJobId: null as string | null,
+        }
+      }
+      for (const sj of j.subJobs || []) {
+        if (sj?.id != null && String(sj.id) === jid) {
+          return {
+            contractorId: String(ct.id),
+            parentJobId: String(j.id),
+            subJobId: String(sj.id),
+          }
+        }
+      }
+    }
+    return null
+  }
+
+  const pref = (preferredContractorId || '').trim()
+  if (pref) {
+    const ct = contractors.find((c) => c?.id != null && String(c.id) === pref)
+    const hit = tryContractor(ct)
+    if (hit) return hit
+  }
+
+  for (const ct of contractors) {
+    const hit = tryContractor(ct)
+    if (hit) return hit
+  }
+  return null
+}
+
 export function ContractorListingPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { hasPermission } = usePermissions()
   const [selectedContractor, setSelectedContractor] = useState<string | null>(null)
   const [selectedJob, setSelectedJob] = useState<string | null>(null)
@@ -1588,6 +1639,72 @@ export function ContractorListingPage() {
       console.error('Error fetching job details:', error)
     }
   }
+
+  const focusFromUrl = useMemo(() => {
+    const contractorId = searchParams?.get('contractorId') || ''
+    const jobId = searchParams?.get('jobId') || ''
+    const estimateId = searchParams?.get('estimateId') || ''
+    return {
+      contractorId: contractorId.trim(),
+      jobId: jobId.trim(),
+      estimateId: estimateId.trim(),
+    }
+  }, [searchParams])
+
+  // Open the right contractor job (or sub-job) after estimate send — same idea as CustomersPage ?jobId=&estimateId=
+  useEffect(() => {
+    const jobId = focusFromUrl.jobId
+    if (!jobId) return
+    if (!contractors || contractors.length === 0) return
+
+    const resolved = resolveContractorJobNavigation(
+      contractors,
+      jobId,
+      focusFromUrl.contractorId,
+    )
+    if (!resolved) return
+
+    if (resolved.subJobId) {
+      if (
+        selectedSubJob === resolved.subJobId &&
+        selectedJob === resolved.parentJobId &&
+        selectedContractor === resolved.contractorId
+      ) {
+        return
+      }
+    } else {
+      if (
+        selectedJob === jobId &&
+        selectedContractor === resolved.contractorId &&
+        !selectedSubJob
+      ) {
+        return
+      }
+    }
+
+    setExpandedContractors((prev) => {
+      const next = new Set(prev)
+      next.add(resolved.contractorId)
+      return next
+    })
+    setExpandedJobs((prev) => {
+      const next = new Set(prev)
+      next.add(resolved.parentJobId)
+      return next
+    })
+
+    if (resolved.subJobId) {
+      setExpandedSubJobs((prev) => {
+        const next = new Set(prev)
+        next.add(resolved.subJobId!)
+        return next
+      })
+      void selectSubJob(resolved.subJobId, resolved.parentJobId, resolved.contractorId)
+    } else {
+      void selectJob(jobId, resolved.contractorId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusFromUrl.jobId, focusFromUrl.contractorId, contractors])
 
   const handleGenerateInvoice = (subJob: SubJob) => {
     setInvoiceSubJob(subJob)
@@ -2990,15 +3107,40 @@ export function ContractorListingPage() {
                   <h3 className="text-xl font-medium text-gray-900">
                     {selectedSubJob ? 'Sub-Job Details' : 'Job Details'}
                   </h3>
-                  {selectedJobData.subJobs?.length ? <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-                    {selectedJobData.subJobs?.length || 0} Sub-Jobs
-                  </Badge>:null}
+                  {!selectedSubJob && selectedJobData.subJobs?.length ? (
+                    <Badge
+                      variant="outline"
+                      className="bg-primary/10 text-primary border-primary/20"
+                    >
+                      {selectedJobData.subJobs?.length || 0} Sub-Jobs
+                    </Badge>
+                  ) : null}
                 </div>
 
                 {/* Show sub-job details if sub-job is selected */}
                 {selectedSubJob ? (
-                  selectedJobData.subJobs.map((subJob: Job) => {
-                    if (subJob.id.toString() !== selectedSubJob) return null
+                  (() => {
+                    const subFromList = selectedJobData.subJobs?.find(
+                      (s: Job) => s.id.toString() === selectedSubJob,
+                    )
+                    const subJob: Job | any =
+                      subFromList ??
+                      (enhancedJobData != null &&
+                      String(enhancedJobData.id) === selectedSubJob
+                        ? enhancedJobData
+                        : null)
+
+                    if (!subJob) {
+                      return (
+                        <Card className="border-0 shadow-sm">
+                          <CardContent className="p-10 text-center">
+                            <p className="text-sm text-muted-foreground">
+                              Loading sub-job…
+                            </p>
+                          </CardContent>
+                        </Card>
+                      )
+                    }
 
                     // Use enhanced job data if available (from API call), otherwise use subJob data
                     const jobData = enhancedJobData && enhancedJobData.id.toString() === subJob.id.toString() ? enhancedJobData : subJob
@@ -3038,7 +3180,8 @@ export function ContractorListingPage() {
                       // Include materials/bluesheets data - use enhanced data if available
                       assignedMaterialsDetails: jobData.assignedMaterialsDetails || [],
                       bluesheets: jobData.bluesheets || [],
-                      subJobs: (selectedJobData as any).subJobs ?? [],
+                      /* Sub-job detail: do not pass parent's subJobs — table is main-job only */
+                      subJobs: [],
                     }
 
                     const allJobs = [jobWithCustomerData]
@@ -3095,9 +3238,10 @@ export function ContractorListingPage() {
                         onViewSubJob={(subJobId) =>
                           selectSubJob(subJobId, selectedJob!, selectedContractor!)
                         }
+                        focusEstimateId={focusFromUrl.estimateId || undefined}
                       />
                     )
-                  })
+                  })()
                 ) : (
                   /* Show main job details if no sub-job is selected */
                   (() => {
@@ -3195,6 +3339,7 @@ export function ContractorListingPage() {
                             selectedContractor!,
                           )
                         }
+                        focusEstimateId={focusFromUrl.estimateId || undefined}
                       />
                     )
                   })()

@@ -208,8 +208,18 @@ export function ContractorDetailsPage({
     }
   };
 
-  const selectSubJob = async (subJobId: string) => {
-    if (!selectedJob) return;
+  /** `parentJobId` required when opening a sub-job from the jobs table (main job not yet selected). */
+  const selectSubJob = async (
+    subJobId: string,
+    parentJobId?: string | null,
+  ) => {
+    const parentId =
+      parentJobId != null && String(parentJobId).trim() !== ""
+        ? String(parentJobId)
+        : selectedJob;
+    if (!parentId) return;
+
+    setSelectedJob(parentId);
     setSelectedSubJob(subJobId);
     setIsJobDetailsLoading(true);
     setEnhancedJobData(null);
@@ -530,14 +540,16 @@ export function ContractorDetailsPage({
             <h3 className="text-xl font-medium text-gray-900">
               {selectedSubJob ? "Sub-Job Details" : "Job Details"}
             </h3>
-            {(selectedJobData && selectedJobData.subJobs?.length) ? (
+            {selectedJobData &&
+            !selectedSubJob &&
+            selectedJobData.subJobs?.length ? (
               <Badge
                 variant="outline"
                 className="bg-primary/10 text-primary border-primary/20"
               >
                 {selectedJobData.subJobs?.length || 0} Sub-Jobs
               </Badge>
-            ):null}
+            ) : null}
           </div>
 
           {isJobDetailsLoading ? (
@@ -553,8 +565,28 @@ export function ContractorDetailsPage({
             </Card>
           ) : selectedJobData ? (
             selectedSubJob ? (
-              selectedJobData.subJobs?.map((subJob: Job) => {
-                if (subJob.id.toString() !== selectedSubJob) return null;
+              (() => {
+                const subFromList = selectedJobData.subJobs?.find(
+                  (s: Job) => s.id.toString() === selectedSubJob,
+                );
+                const subJob: Job | any =
+                  subFromList ??
+                  (enhancedJobData != null &&
+                  String(enhancedJobData.id) === selectedSubJob
+                    ? enhancedJobData
+                    : null);
+
+                if (!subJob) {
+                  return (
+                    <Card key="subjob-loading" className="border-0 shadow-sm">
+                      <CardContent className="p-10 text-center">
+                        <p className="text-sm text-muted-foreground">
+                          Loading sub-job…
+                        </p>
+                      </CardContent>
+                    </Card>
+                  );
+                }
 
                 const jobData =
                   enhancedJobData &&
@@ -604,7 +636,8 @@ export function ContractorDetailsPage({
                   assignedMaterialsDetails:
                     jobData.assignedMaterialsDetails || [],
                   bluesheets: jobData.bluesheets || [],
-                  subJobs: (selectedJobData as any).subJobs ?? [],
+                  /* Sub-job detail: do not pass parent's subJobs — table is main-job only */
+                  subJobs: [],
                 };
 
                 const allJobs = [jobWithContractorData];
@@ -652,10 +685,12 @@ export function ContractorDetailsPage({
                     jobs={allJobs}
                     setJobs={handleSetJobs}
                     onJobsRefresh={fetchContractorDetails}
-                    onViewSubJob={(id) => void selectSubJob(id)}
+                    onViewSubJob={(id) =>
+                      void selectSubJob(id, selectedJob ?? undefined)
+                    }
                   />
                 );
-              })
+              })()
             ) : (
               (() => {
                 const jobData =
@@ -752,7 +787,9 @@ export function ContractorDetailsPage({
                     jobs={allJobs}
                     setJobs={handleSetJobs}
                     onJobsRefresh={fetchContractorDetails}
-                    onViewSubJob={(id) => void selectSubJob(id)}
+                    onViewSubJob={(id) =>
+                      void selectSubJob(id, selectedJob ?? undefined)
+                    }
                   />
                 );
               })()
@@ -844,7 +881,7 @@ export function ContractorDetailsPage({
                                     {isExpanded ? (
                                       <ChevronDown className="h-4 w-4 mr-1" />
                                     ) : (
-                                      <ChevronRight className="h-4 w-4 mr-1" />
+                                      <ChevronRight className="h-4 w-4 " />
                                     )}
                                     {isExpanded ? "Hide Sub Jobs" : "Show Sub Jobs"}
                                   </Button>
@@ -854,8 +891,8 @@ export function ContractorDetailsPage({
                                   size="sm"
                                   onClick={() => selectJob(jobId)}
                                 >
-                                  <Eye className="h-4 w-4 mr-1" />
-                                  View
+                                  <Eye className="h-4 w-4 " />
+                                  
                                 </Button>
                                 <Button
                                   variant="outline"
@@ -941,13 +978,14 @@ export function ContractorDetailsPage({
                                                       variant="outline"
                                                       size="sm"
                                                       onClick={() =>
-                                                        selectJob(
+                                                        void selectSubJob(
                                                           subJob.id.toString(),
+                                                          jobId,
                                                         )
                                                       }
                                                     >
-                                                      <Eye className="h-4 w-4 mr-1" />
-                                                      View
+                                                      <Eye className="h-4 w-4" />
+                                                      
                                                     </Button>
                                                     <Button
                                                       variant="outline"

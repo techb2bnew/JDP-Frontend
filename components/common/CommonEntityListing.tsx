@@ -172,6 +172,8 @@ export default function CommonEntityListing({
                     onOpenChange={() => {
                       if (!hasJobs) return;
                       onToggleParent(parentId);
+                      /* Always re-focus parent: clears job/sub-job in listing pages so detail + jobs table shows */
+                      onSelectParent(parentId);
                     }}
                     className={`min-w-0 overflow-hidden rounded-[22px] border transition-all duration-300 ${
                       isExpanded && hasJobs

@@ -345,6 +345,16 @@ export function JobDetailsPage({
   console.log("Labor timesheets:", job.labor_timesheets);
   console.log("Bluesheets data:", job.bluesheets);
   console.log(job.subJobs,"job.subJobs");
+
+  /** Sub-jobs table only for main jobs — hide if `subJobs` wrongly includes current job (siblings from parent). */
+  const subJobsForTable = useMemo(() => {
+    const list = job?.subJobs;
+    if (!Array.isArray(list) || list.length === 0) return [];
+    const idStr = String(jobId);
+    if (list.some((sj: any) => String(sj?.id) === idStr)) return [];
+    return list;
+  }, [job, jobId]);
+
   
   // Use real job data for materials, timeLogs, and invoices
   // const materials = job.assignedMaterialsDetails || sampleJobData.materials
@@ -7177,14 +7187,14 @@ const handlePrintInvoice = async (invoice: any) => {
         </div>
 
         {/* Sub-Jobs (change orders) — main job only; listed above Transaction History */}
-        {Array.isArray(job.subJobs) && job.subJobs.length > 0 && (
+        {subJobsForTable.length > 0 && (
           <Card className="bg-white shadow-sm border border-primary/10">
             <CardHeader className="bg-gradient-to-r from-primary/5 to-blue-50/50 border-b border-primary/10">
               <CardTitle className="text-primary flex items-center gap-2">
                 <Briefcase className="h-5 w-5" />
                 Sub-Jobs
                 <Badge variant="secondary" className="ml-1 font-normal">
-                  {job.subJobs.length}
+                  {subJobsForTable.length}
                 </Badge>
               </CardTitle>
             </CardHeader>
@@ -7219,7 +7229,7 @@ const handlePrintInvoice = async (invoice: any) => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {job.subJobs.map((sj: any) => {
+                    {subJobsForTable.map((sj: any) => {
                       const addr = subJobAddress(sj);
                       const sid = String(sj.id);
                       const isCurrentSubJob = sid === String(jobId);

@@ -474,6 +474,7 @@ export function CustomersPage() {
     setSelectedJob(null);
     setSelectedSubJob(null);
     setEnhancedJobData(null);
+    setExpandedTableJobs(new Set());
     // Jobs are already loaded in fetchCustomersWithJobs, no need to fetch again
   };
 
@@ -1630,12 +1631,14 @@ export function CustomersPage() {
                   <h3 className="text-xl font-medium text-gray-900">
                     {selectedSubJob ? "Sub-Job Details" : "Job Details"}
                   </h3>
-                 { selectedJobData.subJobs?.length ? <Badge
-                    variant="outline"
-                    className="bg-primary/10 text-primary border-primary/20"
-                  >
-                    {selectedJobData.subJobs?.length || 0} Sub-Jobs
-                  </Badge>:null}
+                  {!selectedSubJob && selectedJobData.subJobs?.length ? (
+                    <Badge
+                      variant="outline"
+                      className="bg-primary/10 text-primary border-primary/20"
+                    >
+                      {selectedJobData.subJobs?.length || 0} Sub-Jobs
+                    </Badge>
+                  ) : null}
                 </div>
 
                 {/* Show sub-job details if sub-job is selected */}
@@ -1681,8 +1684,8 @@ export function CustomersPage() {
                           jobData.assignedLaborDetails || [],
                         assignedLeadLaborDetails:
                           jobData.assignedLeadLaborDetails || [],
-                        subJobs:
-                          (selectedJobData as any).subJobs ?? [],
+                        /* Sub-job detail: do not pass parent's subJobs — table is main-job only */
+                        subJobs: [],
                       };
 
                       const allJobs = [jobWithCustomerData];
@@ -2088,8 +2091,8 @@ export function CustomersPage() {
                                         )
                                       }
                                     >
-                                      <Eye className="h-4 w-4 mr-1" />
-                                      View
+                                      <Eye className="h-4 w-4 " />
+                                      
                                     </Button>
                                     <Button
                                       variant="outline"
@@ -2193,8 +2196,8 @@ export function CustomersPage() {
                                                               )
                                                             }
                                                           >
-                                                            <Eye className="h-4 w-4 mr-1" />
-                                                            View
+                                                            <Eye className="h-4 w-4" />
+                                                            
                                                           </Button>
                                                           <Button
                                                             variant="outline"
