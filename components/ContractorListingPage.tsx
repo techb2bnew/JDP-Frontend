@@ -3356,7 +3356,7 @@ export function ContractorListingPage() {
                 Address
               </Label>
               <Autocomplete
-                apiKey="AIzaSyBtb6hSmwJ9_OznDC5e8BcZM90ms4WD_DE"
+                apiKey="AIzaSyBEQp-ZFMYZjsTNyximu2pAifQ9EWA4W3M"
                 onPlaceSelected={(place: any) => {
                   if (place) {
                     // Keep overlay disabled during selection to prevent modal close
