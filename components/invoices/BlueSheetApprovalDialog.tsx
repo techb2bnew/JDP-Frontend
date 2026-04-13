@@ -2844,7 +2844,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                           <Send className="h-4 w-4" />
                           {isApproving
                             ? "Sending..."
-                            : "Send Invoice From Quickbook"}
+                            : "Send Invoice From Quickbookkkk"}
                         </Button>
 
                         <Button

@@ -127,7 +127,7 @@ export function Sidebar({ currentPage, onPageChange, onLogout, isSuperAdmin = fa
     {
       id: "labour-profile",
       name: "Labor Profile", 
-      description: "Manage labour profiles"
+      description: "Manage labor profiles"
     }
   ]
 

@@ -5981,6 +5981,11 @@ const handlePrintInvoice = async (invoice: any) => {
           ? "Send Invoice from QuickBooks"
           : "Save Invoice to QuickBooks",
       );
+
+      // Close add-invoice popup flow after successful QuickBooks action.
+      setShowPreviewDialog(false);
+      setShowInlineInvoiceForm(false);
+      setEditingInvoiceId(null);
     } catch (error) {
       console.error("Quickbook action failed:", error);
       toast.error(
