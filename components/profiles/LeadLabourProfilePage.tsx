@@ -501,8 +501,8 @@ export function LeadLabourProfilePage() {
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <div>
-                    <h3 className="text-lg font-medium">Lead Labour Permissions</h3>
-                    <p className="text-sm text-muted-foreground">Configure access permissions for this lead labour</p>
+                    <h3 className="text-lg font-medium">Lead Labor Permissions</h3>
+                    <p className="text-sm text-muted-foreground">Configure access permissions for this lead labor</p>
                   </div>
                 </div>
 

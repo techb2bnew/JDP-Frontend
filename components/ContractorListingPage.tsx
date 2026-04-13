@@ -2656,7 +2656,7 @@ export function ContractorListingPage() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div>
-                      <span className="text-sm text-muted-foreground">Lead Labour:</span>
+                      <span className="text-sm text-muted-foreground">Lead Labor:</span>
                       <div className="flex items-center gap-2 mt-1">
                         <UserCheck className="h-3 w-3 text-primary" />
                         <span className="font-medium">{subJob.leadLabour}</span>
@@ -2757,12 +2757,12 @@ export function ContractorListingPage() {
                 </CardContent>
               </Card>
 
-              {/* Labour Timesheet */}
+              {/* Labor Timesheet */}
               <Card className="border-blue-200">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Timer className="h-4 w-4 text-blue-600" />
-                    Labour Timesheet
+                    Labor Timesheet
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -2771,7 +2771,7 @@ export function ContractorListingPage() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Labour Name</TableHead>
+                            <TableHead>Labor Name</TableHead>
                             <TableHead>Date</TableHead>
                             <TableHead>Hours</TableHead>
                             <TableHead>Rate</TableHead>

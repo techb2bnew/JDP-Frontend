@@ -275,16 +275,16 @@ export function StaffManagementPage({
         if (responseData.success && responseData.data) {
           setLeadLabourDetailData(responseData.data)
         } else {
-          toast.error('Failed to load lead labour details')
+          toast.error('Failed to load lead labor details')
           setLeadLabourDetailData(null)
         }
       } else {
-        toast.error('Failed to load lead labour details')
+        toast.error('Failed to load lead labor details')
         setLeadLabourDetailData(null)
       }
     } catch (error) {
-      console.error('Error fetching lead labour details:', error)
-      toast.error('Failed to load lead labour details')
+      console.error('Error fetching lead labor details:', error)
+      toast.error('Failed to load lead labor details')
       setLeadLabourDetailData(null)
     } finally {
       setIsLeadLabourDetailLoading(false)
@@ -705,7 +705,7 @@ export function StaffManagementPage({
                 <HardHat className="h-6 w-6 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Lead Labour</p>
+                <p className="text-sm text-gray-600">Lead Labor</p>
                 <p className="text-2xl font-medium text-[#2b2b2b]">{isStatsLoading ? '...' : staffStats.lead_labor}</p>
               </div>
             </div>
@@ -855,7 +855,7 @@ function AllStaffPage() {
                 <HardHat className="h-6 w-6 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Lead Labour</p>
+                <p className="text-sm text-gray-600">Lead Labor</p>
                 <p className="text-2xl font-medium text-[#2b2b2b]">{isStatsLoading ? '...' : staffStats.lead_labor}</p>
               </div>
             </div>

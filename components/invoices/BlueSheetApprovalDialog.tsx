@@ -152,6 +152,9 @@ export function BlueSheetApprovalDialog({
   const previewAndSendRef = useRef<(() => Promise<void>) | null>(null);
   const [invalidHeaderKeys, setInvalidHeaderKeys] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [customInvoiceProcessing, setCustomInvoiceProcessing] = useState(false);
+  const estimateActionsDisabled =
+    isSaving || isApproving || isApprovingCustomer || customInvoiceProcessing;
 
 
   // ─── Reset when dialog opens ───────────────────────────────────────────────
@@ -169,6 +172,7 @@ export function BlueSheetApprovalDialog({
       setEditedSupplierInvoice(null)
       setFilteredProducts([])
       setActiveRow(null)
+      setCustomInvoiceProcessing(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }, [isOpen, blueSheet])
@@ -2786,6 +2790,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                       registerPreviewAndSend={(fn) => {
                         previewAndSendRef.current = fn;
                       }}
+                      onProcessingChange={setCustomInvoiceProcessing}
                       onDone={onClose}
                       onLineItemsSync={syncCustomInvoiceLineItemsToBlueSheet}
                     />
@@ -2823,9 +2828,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                         </Button> */}
                         <Button
                           onClick={() => handleFinalApproval("save")}
-                          disabled={
-                            isSaving || isApproving || isApprovingCustomer
-                          }
+                          disabled={estimateActionsDisabled}
                           className="bg-emerald-600 text-white hover:bg-emerald-700 gap-2 h-11 text-sm px-6 rounded-lg shadow-sm"
                           size="lg"
                         >
@@ -2834,7 +2837,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                         </Button>
                         <Button
                           onClick={() => handleFinalApproval("send")}
-                          disabled={ isSaving || isApproving || isApprovingCustomer}
+                          disabled={estimateActionsDisabled}
                           className="bg-emerald-600 text-white hover:bg-emerald-700 gap-2 h-11 text-sm px-6 rounded-lg shadow-sm"
                           size="lg"
                         >
@@ -2854,12 +2857,12 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                               setIsApprovingCustomer(false);
                             }
                           }}
-                          disabled={isApproving || isApprovingCustomer}
+                          disabled={estimateActionsDisabled}
                           className="bg-emerald-600 text-white hover:bg-emerald-700 gap-2 h-11 text-sm px-6 rounded-lg shadow-sm"
                           size="lg"
                         >
                           <Send className="h-4 w-4" />
-                          {isApprovingCustomer
+                          {isApprovingCustomer || customInvoiceProcessing
                             ? "Sending..."
                             : "Send Invoice Directly"}
                         </Button>

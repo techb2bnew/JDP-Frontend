@@ -102,7 +102,7 @@ export function LabourLeadDetailsPage() {
   const handleSave = () => {
     setProfile(editedProfile)
     setIsEditing(false)
-    console.log('Saving labour lead profile:', editedProfile)
+    console.log('Saving labor lead profile:', editedProfile)
   }
 
   const handleInputChange = (field: keyof LabourLeadProfile, value: any) => {
@@ -153,8 +153,8 @@ export function LabourLeadDetailsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Labour Lead Profile</h1>
-          <p className="text-muted-foreground">Lead labour management and permissions</p>
+          <h1 className="text-2xl font-semibold text-foreground">Labor Lead Profile</h1>
+          <p className="text-muted-foreground">Lead labor management and permissions</p>
         </div>
         <div className="flex gap-2">
           {isEditing ? (
@@ -205,7 +205,7 @@ export function LabourLeadDetailsPage() {
                         {profile.status.charAt(0).toUpperCase() + profile.status.slice(1)}
                       </Badge>
                       <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
-                        Lead Labour
+                        Lead Labor
                       </Badge>
                     </div>
                   </div>
@@ -611,7 +611,7 @@ export function LabourLeadDetailsPage() {
             <CardContent>
               <div className="space-y-6">
                 <p className="text-sm text-muted-foreground">
-                  Configure specific permissions for this lead labour. These permissions control what actions they can perform in the system.
+                  Configure specific permissions for this lead labor. These permissions control what actions they can perform in the system.
                 </p>
                 
                 <div className="grid gap-4">

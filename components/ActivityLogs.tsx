@@ -661,10 +661,10 @@ const mapApiResponseToActivities = (
 
       result.push({
         id: `timesheet-${timesheet.id}`,
-        title: "Labour Hours Logged",
+        title: "Labor Hours Logged",
         description: `${workerName} logged ${
           timesheet.work_activity || "00:00:00"
-        } labour hours.`,
+        } labor hours.`,
         dateLabel: formatDateLabel(sortDate),
         userName: workerName,
         type: "labour_hours_logged",

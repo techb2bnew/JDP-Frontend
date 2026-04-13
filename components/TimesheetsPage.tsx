@@ -24,7 +24,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { useEffect, useState } from 'react'
 import { apiClient } from '@/utils/api'
 import { LoadingSpinner } from './common/LoadingSpinner'
-import { Calendar } from './ui/calendar'
+import { Calendar as MultiDateCalendar, DateObject } from "react-multi-date-picker"
 
 
 
@@ -83,6 +83,7 @@ export function TimesheetsPage() {
     };
   } | null>(null);
    const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined })
+  const [selectedRanges, setSelectedRanges] = useState<DateObject[][]>([])
   const [statusFilter, setStatusFilter] = useState('all');
   const [employeeFilter, setEmployeeFilter] = useState('all');
   const [allEmployeeOptions, setAllEmployeeOptions] = useState<string[]>([]);
@@ -882,46 +883,89 @@ const fetchTimesheetsByDateRange = async () => {
                <div className="flex items-center gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-[240px] justify-start text-left font-normal">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dateRange?.from ? (
-                        dateRange?.to ? (
-                          <>
-                            {format(dateRange.from, "LLL dd, y")} -{" "}
-                            {format(dateRange.to, "LLL dd, y")}
-                          </>
+                    <Button
+                      variant="outline"
+                      className="relative h-10 w-[260px] justify-start border-sky-300 bg-sky-50/90 pr-10 text-left font-normal text-sky-900 shadow-sm hover:bg-sky-100/90 hover:text-sky-950"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4 shrink-0 text-sky-600" />
+                      <span className="flex-1 truncate">
+                        {dateRange?.from ? (
+                          dateRange?.to ? (
+                            <>
+                              {format(dateRange.from, "LLL dd, y")} -{" "}
+                              {format(dateRange.to, "LLL dd, y")}
+                            </>
+                          ) : (
+                            format(dateRange.from, "LLL dd, y")
+                          )
                         ) : (
-                          format(dateRange.from, "LLL dd, y")
-                        )
-                      ) : (
-                        <span>Pick a date range</span>
+                          <span className="text-sky-800">Pick date ranges</span>
+                        )}
+                      </span>
+                      {dateRange?.from && (
+                        <button
+                          type="button"
+                          aria-label="Clear date range"
+                          className="absolute right-2 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md hover:bg-sky-200/80"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedRanges([]);
+                            setDateRange({ from: undefined, to: undefined });
+                            fetchAlltimesheets();
+                          }}
+                        >
+                          <X className="h-3.5 w-3.5 text-sky-700" />
+                        </button>
                       )}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      initialFocus
-                      mode="range"
-                      defaultMonth={dateRange?.from}
-                      selected={dateRange as any}
-                      onSelect={(range: any) => setDateRange(range || { from: undefined, to: undefined })}
+                  <PopoverContent
+                    className="z-[300] w-auto rounded-xl border border-slate-200 bg-white p-3 text-slate-900 shadow-[0_16px_48px_-12px_rgba(15,23,42,0.35)]"
+                    align="start"
+                    sideOffset={8}
+                    collisionPadding={16}
+                  >
+                    <MultiDateCalendar
+                      multiple
+                      range
+                      value={selectedRanges}
+                      onChange={(value) => {
+                        const values = (
+                          Array.isArray(value) ? value : value ? [value] : []
+                        ) as unknown as DateObject[][];
+                        setSelectedRanges(values);
+
+                        const allDates = values
+                          .flat()
+                          .map((d) =>
+                            d instanceof DateObject
+                              ? d.toDate()
+                              : new Date(d as any),
+                          )
+                          .filter(
+                            (d) => d instanceof Date && !Number.isNaN(d.getTime()),
+                          );
+
+                        if (allDates.length === 0) {
+                          setDateRange({ from: undefined, to: undefined });
+                          return;
+                        }
+
+                        const sorted = [...allDates].sort(
+                          (a, b) => a.getTime() - b.getTime(),
+                        );
+                        setDateRange({
+                          from: sorted[0],
+                          to: sorted[sorted.length - 1],
+                        });
+                      }}
                       numberOfMonths={2}
+                      disableMonthPicker={false}
+                      disableYearPicker={false}
+                      className="w-full"
                     />
                   </PopoverContent>
                 </Popover>
-                {dateRange?.from && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setDateRange({ from: undefined, to: undefined });
-                      fetchAlltimesheets(); // Reset to all timesheets
-                    }}
-                    className="px-2"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
               </div>
 
               <span className="text-sm text-muted-foreground">{filteredTimesheets.length} timesheets</span>

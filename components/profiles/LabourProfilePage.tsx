@@ -437,7 +437,7 @@ export function LabourProfilePage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="leadLabour">Lead Labour</Label>
+                    <Label htmlFor="leadLabour">Lead Labor</Label>
                     <Input
                       id="leadLabour"
                       value={profile.leadLabour}
@@ -589,7 +589,7 @@ export function LabourProfilePage() {
                 <div className="flex justify-between items-center">
                   <div>
                     <h3 className="text-lg font-medium">Labour Permissions</h3>
-                    <p className="text-sm text-muted-foreground">Configure access permissions for this labour</p>
+                    <p className="text-sm text-muted-foreground">Configure access permissions for this labor</p>
                   </div>
                 </div>
 

@@ -314,7 +314,7 @@ const JobDetailsModal = ({ job, onViewCompleteJob }: { job: any, onViewCompleteJ
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Assigned Labour</label>
+              <label className="text-sm font-medium text-muted-foreground">Assigned Labor</label>
               <div className="space-y-1">
                 {job.assignedLabour.map((labor: string, index: number) => (
                   <div key={index} className="flex items-center gap-2 p-2 bg-secondary/50 rounded-lg border border-secondary">
@@ -544,9 +544,9 @@ export function LiveTrackingPage() {
                             </div>
                           </div>
 
-                          {/* Assigned Labour */}
+                          {/* Assigned Labor */}
                           <div className="space-y-1">
-                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Assigned Labour</label>
+                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Assigned Labor</label>
                             <div className="space-y-1">
                               {job.assignedLabour.map((labor, index) => (
                                 <div key={index} className="flex items-center gap-2 p-1.5 bg-secondary/30 rounded-md border border-secondary/50">

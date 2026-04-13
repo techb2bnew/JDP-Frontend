@@ -801,7 +801,7 @@ const fetchLeadLabourData = async () => {
           full_name: item.users?.full_name || 'N/A',
           email: item.users?.email || 'N/A',
           phone: item.users?.phone || 'N/A',
-          role: item.users?.role || 'Lead Labour'
+          role: item.users?.role || 'Lead Labor'
         }));
 
         setLeadLabours(mappedData);

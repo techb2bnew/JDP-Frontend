@@ -121,12 +121,12 @@ export function Sidebar({ currentPage, onPageChange, onLogout, isSuperAdmin = fa
     },
     {
       id: "lead-labour-profile", 
-      name: "Lead Labour Profile",
+      name: "Lead Labor Profile",
       description: "Manage lead labour profiles"
     },
     {
       id: "labour-profile",
-      name: "Labour Profile", 
+      name: "Labor Profile", 
       description: "Manage labour profiles"
     }
   ]

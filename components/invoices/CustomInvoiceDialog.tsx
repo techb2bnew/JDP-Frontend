@@ -37,6 +37,8 @@ interface CustomInvoiceDialogProps {
   invalidHeaderKeys?:string[]
   setInvalidHeaderKeys?: () => void;
   validateHeaderGroupsBeforeSubmit? :()=>void
+  /** Notify parent when estimate send/preview pipeline is running (disables sibling actions). */
+  onProcessingChange?: (processing: boolean) => void
 }
 
 
@@ -122,7 +124,8 @@ export const CustomInvoiceDialog = ({
   onLineItemsSync,
   invalidHeaderKeys,
   setInvalidHeaderKeys,
-  validateHeaderGroupsBeforeSubmit
+  validateHeaderGroupsBeforeSubmit,
+  onProcessingChange
 }: CustomInvoiceDialogProps) => {
   // Derive viewInvoiceData and job list from blueSheet (custom invoice from bluesheet)
   const viewInvoiceData = useMemo(() => {
@@ -224,6 +227,10 @@ export const CustomInvoiceDialog = ({
   const [loading, setLoading] = useState(false)
   const [savingDraft, setSavingDraft] = useState(false)
   const [sendingInvoice, setSendingInvoice] = useState(false)
+
+  useEffect(() => {
+    onProcessingChange?.(sendingInvoice)
+  }, [sendingInvoice, onProcessingChange])
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [localJobs, setLocalJobs] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<{

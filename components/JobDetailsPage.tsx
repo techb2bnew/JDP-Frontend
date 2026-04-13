@@ -53,6 +53,8 @@ import {
   File,
   MoreVertical,
   Briefcase,
+  Upload,
+  UploadCloud,
 } from "lucide-react";
 import {
   BlueSheetApprovalDialog,
@@ -338,8 +340,14 @@ export function JobDetailsPage({
   focusEstimateId,
   onViewSubJob,
 }: JobDetailsPageProps) {
+  const getJobTitle = (jobData: any) =>
+    jobData?.title || jobData?.job_title || "";
+  const getJobDescription = (jobData: any) =>
+    jobData?.description || jobData?.job_description || "";
+
   // Find the job from your jobs array or use sample data
-  const job = jobs.find((j) => j.id === jobId) || sampleJobData.job;
+  const job =
+    jobs.find((j) => String(j?.id) === String(jobId)) || sampleJobData.job;
 
   console.log("Job data:", job);
   console.log("Labor timesheets:", job.labor_timesheets);
@@ -570,6 +578,37 @@ export function JobDetailsPage({
   });
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
   const documentFileInputRef = useRef<HTMLInputElement>(null);
+  const [documentFilePreviewUrl, setDocumentFilePreviewUrl] = useState<
+    string | null
+  >(null);
+
+  const resetDocumentUploadForm = useCallback(() => {
+    setDocumentFormData({ title: "", file: null });
+    if (documentFileInputRef.current) {
+      documentFileInputRef.current.value = "";
+    }
+  }, []);
+
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    const file = documentFormData.file;
+    if (!file) {
+      setDocumentFilePreviewUrl(null);
+      return;
+    }
+    const isImage =
+      file.type.startsWith("image/") ||
+      /\.(jpe?g|png|gif|webp|bmp)$/i.test(file.name);
+    if (!isImage) {
+      setDocumentFilePreviewUrl(null);
+      return;
+    }
+    objectUrl = URL.createObjectURL(file);
+    setDocumentFilePreviewUrl(objectUrl);
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [documentFormData.file]);
   const documentsApiClient = apiClient as typeof apiClient & {
     getJobDocuments: (jobId: number) => Promise<any>;
     uploadJobDocument: (params: {
@@ -686,7 +725,7 @@ export function JobDetailsPage({
 
       toast.success("Document uploaded successfully");
       setShowUploadDocumentModal(false);
-      setDocumentFormData({ title: "", file: null });
+      resetDocumentUploadForm();
       await fetchJobDocuments();
     } catch (error) {
       console.error("Failed to upload document:", error);
@@ -702,6 +741,7 @@ export function JobDetailsPage({
     documentsApiClient,
     fetchJobDocuments,
     jobId,
+    resetDocumentUploadForm,
   ]);
 
   const handleDeleteDocument = useCallback(
@@ -802,23 +842,32 @@ export function JobDetailsPage({
 
   // Function to parse labor IDs and fetch labor data
   const parseLaborIds = async (
-    laborIdsString: string,
+    laborIdsInput: string | string[] | null | undefined,
     isLeadLabor: boolean = false,
   ) => {
-    if (!laborIdsString) return [];
+    if (laborIdsInput == null || laborIdsInput === "") return [];
 
+    let laborIds: unknown[] = [];
     try {
-      const laborIds = JSON.parse(laborIdsString);
-      if (!Array.isArray(laborIds)) return [];
+      if (Array.isArray(laborIdsInput)) {
+        laborIds = laborIdsInput;
+      } else {
+        const trimmed = String(laborIdsInput).trim();
+        if (!trimmed) return [];
+        const parsed = JSON.parse(trimmed);
+        laborIds = Array.isArray(parsed) ? parsed : [parsed];
+      }
+      if (!Array.isArray(laborIds) || laborIds.length === 0) return [];
 
       const laborData = [];
-      for (const id of laborIds) {
+      for (const rawId of laborIds) {
+        const id = String(rawId);
         try {
           if (isLeadLabor) {
             // For lead labor, we'll fetch all and filter by ID since getLeadLaborById doesn't exist
             const response = await apiClient.getLeadLabor(1, 100); // Get a large number to find the specific ID
             const leadLabor = response.data.find(
-              (item: any) => item.id.toString() === id.toString(),
+              (item: any) => item.id.toString() === id,
             );
             if (leadLabor) {
               laborData.push({
@@ -831,7 +880,7 @@ export function JobDetailsPage({
             }
           } else {
             console.log("Fetching labor by ID:", id);
-            const response = await apiClient.getLaborById(id.toString());
+            const response = await apiClient.getLaborById(id);
             console.log("Labor API response:", response);
             if (response) {
               laborData.push({
@@ -860,6 +909,46 @@ export function JobDetailsPage({
     }
   };
 
+  /** API expects JSON stringified id arrays. Include existing job IDs when edited lists are still empty (async load / list view without details). */
+  const buildAssignedLaborIdsField = (
+    editedList: unknown[] | undefined,
+    rawJobIds: unknown,
+    isTouched: boolean,
+  ): string | undefined => {
+    if (Array.isArray(editedList) && editedList.length > 0) {
+      return JSON.stringify(
+        editedList.map((labor: any) => String(labor?.id ?? labor)),
+      );
+    }
+    if (isTouched) {
+      // User explicitly cleared the field; send empty ids instead of fallback.
+      return JSON.stringify([]);
+    }
+    if (rawJobIds == null || rawJobIds === "") return undefined;
+    if (Array.isArray(rawJobIds)) {
+      const ids = rawJobIds.filter(
+        (x) => x != null && String(x).length > 0,
+      ) as unknown[];
+      return ids.length ? JSON.stringify(ids.map(String)) : undefined;
+    }
+    if (typeof rawJobIds === "string") {
+      const t = rawJobIds.trim();
+      if (!t) return undefined;
+      try {
+        const parsed = JSON.parse(t);
+        if (Array.isArray(parsed)) {
+          return parsed.length
+            ? JSON.stringify(parsed.map((x: unknown) => String(x)))
+            : undefined;
+        }
+        return JSON.stringify([String(parsed)]);
+      } catch {
+        return JSON.stringify([t]);
+      }
+    }
+    return undefined;
+  };
+
   // Normalize status helper function
   const normalizeStatus = (status: string | undefined): string => {
     if (!status) return "draft";
@@ -869,12 +958,12 @@ export function JobDetailsPage({
   };
 
   const [editedJob, setEditedJob] = useState({
-    title: job.title,
+    title: getJobTitle(job),
     type: job.type,
     location: job.location || `${job.address || ""}, ${job.cityZip || ""}`,
     address: job.address || "",
     cityZip: job.cityZip || "",
-    description: job.description,
+    description: getJobDescription(job),
     contractor: job.contractor || job.customer,
     startDate: "01/15/2025",
     priority: "High",
@@ -882,6 +971,11 @@ export function JobDetailsPage({
     assignedLabor: job.assignedLaborDetails || [],
     assignedLeadLabor: job.assignedLeadLaborDetails || [],
   });
+  const [isLaborSelectionTouched, setIsLaborSelectionTouched] = useState(false);
+  const [isLeadLaborSelectionTouched, setIsLeadLaborSelectionTouched] =
+    useState(false);
+    console.log(job.assignedLeadLaborDetails,editedJob.assignedLeadLabor,":::lead");
+    
 
   // Load labor data when component mounts
   useEffect(() => {
@@ -889,10 +983,14 @@ export function JobDetailsPage({
       try {
         // Parse and load lead labor data
         if (job.assigned_lead_labor_ids) {
+          console.log(job.assigned_lead_labor_ids,"job.assigned_lead_labor_ids");
+          
           const leadLaborData = await parseLaborIds(
             job.assigned_lead_labor_ids,
             true,
           );
+          console.log(job.assigned_lead_labor_ids,leadLaborData,"leadLaborData");
+          
           setEditedJob((prev) => ({
             ...prev,
             assignedLeadLabor: leadLaborData,
@@ -1154,19 +1252,17 @@ const validateLineItems = (lineItems: any[] = []) => {
         estimated_hours: job.estimatedHours || undefined,
         estimated_cost: job.estimatedCost || undefined,
 
-        assigned_labor_ids:
-          (editedJob.assignedLabor || []).length > 0
-            ? JSON.stringify(
-                editedJob.assignedLabor.map((labor: any) => labor.id),
-              )
-            : undefined,
+        assigned_labor_ids: buildAssignedLaborIdsField(
+          editedJob.assignedLabor,
+          job.assigned_labor_ids,
+          isLaborSelectionTouched,
+        ),
 
-        assigned_lead_labor_ids:
-          (editedJob.assignedLeadLabor || []).length > 0
-            ? JSON.stringify(
-                editedJob.assignedLeadLabor.map((labor: any) => labor.id),
-              )
-            : undefined,
+        assigned_lead_labor_ids: buildAssignedLaborIdsField(
+          editedJob.assignedLeadLabor,
+          job.assigned_lead_labor_ids,
+          isLeadLaborSelectionTouched,
+        ),
 
         assigned_material_ids:
           job.materials && job.materials.length > 0
@@ -1184,21 +1280,51 @@ const validateLineItems = (lineItems: any[] = []) => {
       };
 
       const response = await apiClient.updateJob(jobId, updatePayload);
+      const responseJob = response?.data || {};
 
-      // Update the job data with the new labor assignments
+      // Keep assignment details stable unless user explicitly edited labor selections.
+      const hasEditedLabor =
+        Array.isArray(editedJob.assignedLabor) &&
+        editedJob.assignedLabor.length > 0;
+      const hasEditedLeadLabor =
+        Array.isArray(editedJob.assignedLeadLabor) &&
+        editedJob.assignedLeadLabor.length > 0;
+
+      const nextAssignedLaborDetails = isLaborSelectionTouched
+        ? editedJob.assignedLabor
+        : hasEditedLabor
+          ? editedJob.assignedLabor
+          : job.assignedLaborDetails || [];
+      const nextAssignedLeadLaborDetails = isLeadLaborSelectionTouched
+        ? editedJob.assignedLeadLabor
+        : hasEditedLeadLabor
+          ? editedJob.assignedLeadLabor
+          : job.assignedLeadLaborDetails || [];
+
+      // Update local job object with normalized keys used across the UI.
       const updatedJob = {
         ...job,
+        ...responseJob,
         ...editedJob,
-        assigned_labor_ids: updatePayload.assigned_labor_ids,
-        assigned_lead_labor_ids: updatePayload.assigned_lead_labor_ids,
+        title: editedJob.title,
+        job_title: editedJob.title,
+        description: editedJob.description,
+        assignedLaborDetails: nextAssignedLaborDetails,
+        assignedLeadLaborDetails: nextAssignedLeadLaborDetails,
+        assigned_labor_ids:
+          updatePayload.assigned_labor_ids ?? job.assigned_labor_ids,
+        assigned_lead_labor_ids:
+          updatePayload.assigned_lead_labor_ids ?? job.assigned_lead_labor_ids,
       };
 
       const updatedJobs = jobs.map((j: any) =>
-        j.id === jobId ? updatedJob : j,
+        String(j?.id) === String(jobId) ? updatedJob : j,
       );
       setJobs(updatedJobs);
 
       setIsEditing(false);
+      setIsLaborSelectionTouched(false);
+      setIsLeadLaborSelectionTouched(false);
       setIsSaving(false);
       toast.success("Job updated successfully!");
 
@@ -1239,6 +1365,10 @@ const validateLineItems = (lineItems: any[] = []) => {
   };
 
   const handleCompleteJob = async () => {
+    if (isEditing) {
+      toast.error("Please save or cancel job edits before completing the job.");
+      return;
+    }
     if (job.status === "completed") {
       return;
     }
@@ -1248,16 +1378,17 @@ const validateLineItems = (lineItems: any[] = []) => {
 
       const updatedJob = {
         ...job,
+        ...editedJob,
         status: "completed",
       };
 
-      await apiClient.updateJob(jobId, {
+      const completionPayload = {
         job_title: updatedJob.title,
         job_type:
           updatedJob.type === "service_based"
             ? "service_based"
             : "contract_based",
-        ...(updatedJob.type === "contract-based"
+        ...(updatedJob.type === "contract_based"
           ? {
               contractor_id: job.contractor
                 ? Number(job.contractor)
@@ -1282,30 +1413,71 @@ const validateLineItems = (lineItems: any[] = []) => {
         due_date: job.dueDate || "",
         estimated_hours: job.estimatedHours || undefined,
         estimated_cost: job.estimatedCost || undefined,
-        assigned_labor_ids:
-          (updatedJob.assignedLabor || []).length > 0
-            ? JSON.stringify(
-                updatedJob.assignedLabor.map((labor: any) => labor.id),
-              )
-            : undefined,
-        assigned_lead_labor_ids:
-          (updatedJob.assignedLeadLabor || []).length > 0
-            ? JSON.stringify(
-                updatedJob.assignedLeadLabor.map((labor: any) => labor.id),
-              )
-            : undefined,
+        // Use current edited selections while completing, so assignments do not revert.
+        assigned_labor_ids: buildAssignedLaborIdsField(
+          editedJob.assignedLabor,
+          job.assigned_labor_ids,
+          isLaborSelectionTouched,
+        ),
+        assigned_lead_labor_ids: buildAssignedLaborIdsField(
+          editedJob.assignedLeadLabor,
+          job.assigned_lead_labor_ids,
+          isLeadLaborSelectionTouched,
+        ),
         assigned_material_ids:
           job.materials && job.materials.length > 0
             ? JSON.stringify(job.materials)
             : undefined,
         status: updatedJob.status,
-      });
+      };
+      const response = await apiClient.updateJob(jobId, completionPayload);
+      const responseJob = response?.data || {};
+
+      // Completing a job should not implicitly reassign labor.
+      console.log(editedJob.assignedLabor,editedJob.assignedLeadLabor,job.assignedLeadLaborDetails,"editedJob.assignedLeadLabor");
+      // return;
+      
+      const hasEditedLabor =
+        Array.isArray(editedJob.assignedLabor) &&
+        editedJob.assignedLabor.length > 0;
+      const hasEditedLeadLabor =
+        Array.isArray(editedJob.assignedLeadLabor) &&
+        editedJob.assignedLeadLabor.length > 0;
+
+      const nextAssignedLaborDetails = isLaborSelectionTouched
+        ? editedJob.assignedLabor
+        : hasEditedLabor
+          ? editedJob.assignedLabor
+          : job.assignedLaborDetails || [];
+      const nextAssignedLeadLaborDetails = isLeadLaborSelectionTouched
+        ? editedJob.assignedLeadLabor
+        : hasEditedLeadLabor
+          ? editedJob.assignedLeadLabor
+          : job.assignedLeadLaborDetails || [];
+
+      const completedJob = {
+        ...job,
+        ...responseJob,
+        ...updatedJob,
+        title: updatedJob.title,
+        job_title: updatedJob.title,
+        description: updatedJob.description,
+        assignedLaborDetails: nextAssignedLaborDetails,
+        assignedLeadLaborDetails: nextAssignedLeadLaborDetails,
+        assigned_labor_ids:
+          completionPayload.assigned_labor_ids ?? job.assigned_labor_ids,
+        assigned_lead_labor_ids:
+          completionPayload.assigned_lead_labor_ids ??
+          job.assigned_lead_labor_ids,
+        status: "completed",
+      };
 
       const updatedJobs = jobs.map((j: any) =>
-        j.id === jobId ? updatedJob : j,
+        String(j?.id) === String(jobId) ? completedJob : j,
       );
+      
       setJobs(updatedJobs);
-
+    
       toast.success("Job marked as completed");
     } catch (error) {
       console.error("Error completing job:", error);
@@ -1326,12 +1498,12 @@ const validateLineItems = (lineItems: any[] = []) => {
   const handleCancel = async () => {
     // Reset base fields
     setEditedJob({
-      title: job.title,
+      title: getJobTitle(job),
       type: job.type,
       location: job.location || `${job.address || ""}, ${job.cityZip || ""}`,
       address: job.address || "",
       cityZip: job.cityZip || "",
-      description: job.description,
+      description: getJobDescription(job),
       contractor: job.contractor || job.customer,
       startDate: "01/15/2025",
       priority: "High",
@@ -1365,6 +1537,8 @@ const validateLineItems = (lineItems: any[] = []) => {
       console.error("Failed to hydrate labor data on cancel", e);
     }
 
+    setIsLaborSelectionTouched(false);
+    setIsLeadLaborSelectionTouched(false);
     setIsEditing(false);
   };
 
@@ -2585,6 +2759,9 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
     setTimeLogValidationErrors({});
   };
 
+  console.log(job,"job.customer");
+  
+
   const refreshJobData = async () => {
     try {
       // Set flag to prevent useEffect from running
@@ -2592,12 +2769,14 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
 
       const updatedJobData = await apiClient.getJobById(jobId);
       const updatedJobs = jobs.map((j: any) =>
-        j.id === jobId ? updatedJobData : j,
+        String(j?.id) === String(jobId) ? updatedJobData : j,
       );
       setJobs(updatedJobs);
 
       // Update the current job from the updated jobs array
-      const currentJob = updatedJobs.find((j: any) => j.id === jobId);
+      const currentJob = updatedJobs.find(
+        (j: any) => String(j?.id) === String(jobId),
+      );
       if (currentJob) {
         // Update bluesheets state immediately with fresh data
         if (currentJob.bluesheets) {
@@ -2723,10 +2902,10 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
   };
 
   const [jobFormData, setJobFormData] = useState({
-    title: job.title,
+    title: getJobTitle(job),
     type: job.type,
     location: job.location || `${job.address || ""}, ${job.cityZip || ""}`,
-    description: job.description,
+    description: getJobDescription(job),
   });
 
   // Update editedJob when job data changes
@@ -2740,12 +2919,12 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
     };
 
     setEditedJob({
-      title: job.title,
+      title: getJobTitle(job),
       type: job.type,
       location: job.location || `${job.address || ""}, ${job.cityZip || ""}`,
       address: job.address || "",
       cityZip: job.cityZip || "",
-      description: job.description,
+      description: getJobDescription(job),
       contractor: job.contractor || job.customer,
       startDate:
         (job.created_at && formatDate(job.created_at)) ||
@@ -3085,12 +3264,22 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
   console.log(inlineInvoiceData, "::inlineInvoiceData");
 
   // Fetch customer data
-  const fetchCustomerData = async (customerId: string) => {
+  const fetchCustomerData = async (customerRef: any) => {
     try {
+      const customerId =
+        typeof customerRef === "object" && customerRef !== null
+          ? customerRef.id
+          : customerRef;
+      if (!customerId) {
+        setCustomerData(null);
+        return;
+      }
       const response = await apiClient.getCustomers(1, 100); // Get all customers
       const customers =
         response.data?.customers || response.data?.data || response.data || [];
-      const customer = customers.find((c: any) => c.id === Number(customerId));
+      const customer = customers.find(
+        (c: any) => String(c.id) === String(customerId),
+      );
       if (customer) {
         setCustomerData(customer);
         // Update customer address in inline invoice data
@@ -5172,8 +5361,8 @@ const handlePrintInvoice = async (invoice: any) => {
     if (job.type === "contract-based" && job.contractor) {
       // For contract-based jobs, fetch contractor data
       fetchContractorData(job.contractor);
-    } else if (job.type === "service-based" && job.customer) {
-      // For service-based jobs, fetch customer data
+    } else if (job.customer) {
+      // For service-based jobs, or contract-based fallback where only customer id exists
       fetchCustomerData(job.customer);
     } else {
       console.log("No customer/contractor ID found in job data");
@@ -6427,7 +6616,7 @@ const handlePrintInvoice = async (invoice: any) => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">
-              {job.title}
+              {getJobTitle(job)}
             </h1>
             <p className="text-sm text-gray-600">#{job.id}</p>
           </div>
@@ -6565,7 +6754,11 @@ const handlePrintInvoice = async (invoice: any) => {
                       variant="outline"
                       size="sm"
                       className="gap-2"
-                      onClick={() => setIsEditing(true)}
+                      onClick={() => {
+                        setIsLaborSelectionTouched(false);
+                        setIsLeadLaborSelectionTouched(false);
+                        setIsEditing(true);
+                      }}
                     >
                       <Edit className="h-4 w-4" />
                       Edit
@@ -6576,7 +6769,7 @@ const handlePrintInvoice = async (invoice: any) => {
                     size="sm"
                     className="gap-2"
                     onClick={handleCompleteJob}
-                    disabled={isSaving || job.status === "completed"}
+                    disabled={isSaving || isEditing || job.status === "completed"}
                   >
                     Complete Job
                   </Button>
@@ -6630,7 +6823,15 @@ const handlePrintInvoice = async (invoice: any) => {
                           ) : (
                             <p className="font-medium">
                               {job.customerName ||
+                                customerData?.customer_name ||
+                                job.customer?.customer_name ||
+                                job.customer?.name ||
+                                job.subJobs?.[0]?.customer?.customer_name ||
                                 job.contractorName ||
+                                contractorData?.contractor_name ||
+                                job.contractor?.contractor_name ||
+                                job.contractor?.name ||
+                                job.contractor?.full_name ||
                                 "No customer assigned"}
                             </p>
                           )}
@@ -6937,6 +7138,7 @@ const handlePrintInvoice = async (invoice: any) => {
                             (labor: any) => labor !== undefined,
                           );
 
+                          setIsLeadLaborSelectionTouched(true);
                           setEditedJob((prev) => ({
                             ...prev,
                             assignedLeadLabor: validSelectedItems,
@@ -7014,6 +7216,7 @@ const handlePrintInvoice = async (invoice: any) => {
                             (labor: any) => labor !== undefined,
                           );
 
+                          setIsLaborSelectionTouched(true);
                           setEditedJob((prev) => ({
                             ...prev,
                             assignedLabor: validSelectedItems,
@@ -8303,9 +8506,12 @@ const handlePrintInvoice = async (invoice: any) => {
           </CardHeader>
           <CardContent>
             {isLoadingBluesheets ? (
-              <p className="text-sm text-gray-500 py-4">
-                Loading bluesheets...
-              </p>
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <LoadingSpinner />
+                <p className="mt-3 text-sm text-gray-500">
+                  Loading bluesheets...
+                </p>
+              </div>
             ) : Array.isArray(bluesheets) && bluesheets.length > 0 ? (
               <div className="space-y-3">
                 {bluesheets.map((sheet: any) => (
@@ -8376,9 +8582,11 @@ const handlePrintInvoice = async (invoice: any) => {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-500 py-4">
-                No bluesheets found for this job.
-              </p>
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <p className="text-sm text-gray-500">
+                  No bluesheets found for this job.
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -8733,15 +8941,18 @@ const handlePrintInvoice = async (invoice: any) => {
                 onClick={() => setShowUploadDocumentModal(true)}
                 className="gap-2"
               >
-                <Download className="h-4 w-4" />
+                <Upload className="h-4 w-4" />
                 Upload Document
               </Button>
             </div>
           </CardHeader>
           <CardContent className="pt-6">
             {isLoadingDocuments ? (
-              <div className="py-12 flex justify-center">
+              <div className="py-12 flex flex-col items-center justify-center text-center">
                 <LoadingSpinner />
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Loading documents...
+                </p>
               </div>
             ) : jobDocuments.length === 0 ? (
               // Empty State
@@ -8835,7 +9046,12 @@ const handlePrintInvoice = async (invoice: any) => {
       {/* Upload Document Modal */}
       <Dialog
         open={showUploadDocumentModal}
-        onOpenChange={setShowUploadDocumentModal}
+        onOpenChange={(open) => {
+          setShowUploadDocumentModal(open);
+          if (!open) {
+            resetDocumentUploadForm();
+          }
+        }}
       >
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
@@ -8886,43 +9102,80 @@ const handlePrintInvoice = async (invoice: any) => {
                   );
                   const file = e.dataTransfer.files[0];
                   if (file) {
-                    setDocumentFormData({ ...documentFormData, file });
+                    setDocumentFormData((prev) => ({ ...prev, file }));
                   }
                 }}
               >
-                <Download className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <UploadCloud className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                 <p className="text-sm text-gray-600 mb-2">
-                  Click to upload or drag and drop
+                  {documentFormData.file
+                    ? "Click to change file or drag and drop"
+                    : "Click to upload or drag and drop"}
                 </p>
                 <p className="text-xs text-gray-500">
                   PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, or any other file type
                 </p>
-                {documentFormData.file && (
-                  <p className="mt-4 text-sm text-blue-600 font-medium">
-                    Selected: {documentFormData.file.name}
-                  </p>
-                )}
               </div>
               <input
                 ref={documentFileInputRef}
+                id="document-file"
                 type="file"
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
-                    setDocumentFormData({ ...documentFormData, file });
+                    setDocumentFormData((prev) => ({ ...prev, file }));
                   }
                 }}
               />
+              {documentFormData.file ? (
+                <div className="mt-4 rounded-lg border border-border bg-muted/40 overflow-hidden">
+                  {documentFilePreviewUrl ? (
+                    <div className="p-4 bg-background">
+                      <p className="text-xs font-medium text-muted-foreground mb-2">
+                        Preview
+                      </p>
+                      <div className="flex justify-center rounded-md border bg-white p-2">
+                        <img
+                          src={documentFilePreviewUrl}
+                          alt=""
+                          className="max-h-52 max-w-full rounded object-contain"
+                        />
+                      </div>
+                      <p className="mt-2 text-xs text-muted-foreground truncate text-center">
+                        {documentFormData.file.name}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-4 p-4">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border bg-background shadow-sm">
+                        <FileText className="h-7 w-7 text-primary" />
+                      </div>
+                      <div className="min-w-0 flex-1 text-left space-y-1">
+                        <p className="text-sm font-semibold text-foreground break-all">
+                          {documentFormData.file.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {(documentFormData.file.size / 1024).toFixed(1)} KB
+                          {documentFormData.file.type
+                            ? ` · ${documentFormData.file.type}`
+                            : ""}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Preview not available for this file type. It will
+                          upload as selected.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </div>
           </div>
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => {
-                setShowUploadDocumentModal(false);
-                setDocumentFormData({ title: "", file: null });
-              }}
+              onClick={() => setShowUploadDocumentModal(false)}
             >
               Cancel
             </Button>
@@ -8931,7 +9184,7 @@ const handlePrintInvoice = async (invoice: any) => {
               disabled={isUploadingDocument}
               className="gap-2 text-white"
             >
-              <Download className="h-4 w-4" />
+              <Upload className="h-4 w-4" />
               {isUploadingDocument ? "Uploading..." : "Upload Document"}
             </Button>
           </DialogFooter>

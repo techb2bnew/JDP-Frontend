@@ -430,7 +430,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       if (response.ok) {
         const responseData = await response.json();
         if (responseData.success) {
-          toast.success('Lead Labour created successfully');
+          toast.success('Lead Labor created successfully');
           resetForm();
           setIsCreateDialogOpen(false);
           // Refresh the data
@@ -635,7 +635,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       if (response.ok) {
         const responseData = await response.json();
         if (responseData.success) {
-          toast.success('Lead Labour updated successfully');
+          toast.success('Lead Labor updated successfully');
           resetForm();
           setIsEditDialogOpen(false);
           setEditingLeadLabour(null);
@@ -686,7 +686,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       if (response.ok) {
         const responseData = await response.json();
         if (responseData.success) {
-          toast.success('Lead Labour deleted successfully');
+          toast.success('Lead Labor deleted successfully');
           // Refresh the data
           fetchLeadLabourData(currentPage, itemsPerPage);
         } else {
@@ -950,7 +950,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     // CSV header
     const headers = [
       "ID",
-      "Lead Labour ID",
+      "Lead Labor ID",
       "Name",
       "Email",
       "Phone",
@@ -1988,7 +1988,7 @@ useEffect(() => {
                         onEdit={() => handleEdit(labour)}
                         onDelete={() => handleDelete(labour.id)}
                         itemName={labour.name}
-                        itemType="Lead Labour"
+                        itemType="Lead Labor"
                         showView={canViewLeadLabour}
                         showEdit={canEditLeadLabour}
                         showDelete={canDeleteLeadLabour}

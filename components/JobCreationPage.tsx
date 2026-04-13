@@ -887,7 +887,9 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
         </div>
 
         <div className="space-y-2 mt-3">
-          <Label htmlFor="description">Description *</Label>
+          <Label htmlFor="description" className="font-bold">
+            Description *
+          </Label>
           <Textarea
             id="description"
             value={formData.description}
@@ -897,7 +899,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             }}
             placeholder="Describe the job requirements and scope"
             rows={4}
-            className={validationErrors.description ? 'border-red-500' : ''}
+            className={`min-h-[100px] whitespace-pre-wrap break-words ${validationErrors.description ? 'border-red-500' : ''}`}
             required
           />
           {validationErrors.description && (
@@ -1232,9 +1234,11 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               </div>
             </div>
 
-            <div>
+            <div className="min-w-0">
               <h4 className="font-medium text-[#2b2b2b] mb-2">Description</h4>
-              <p className="text-sm text-gray-700">{formData.description}</p>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
+                {formData.description}
+              </p>
             </div>
 
             {/* Location Information */}

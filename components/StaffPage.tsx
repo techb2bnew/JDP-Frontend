@@ -412,6 +412,25 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       console.error('Error fetching roles:', error);
     }
   };
+
+  /** Map API role id or legacy value to Select value (roleName from roles list). */
+  const resolveStaffRoleSelectValue = (stored: string, roleList: typeof roles) => {
+    if (!stored?.trim() || !roleList.length) return stored?.trim() ?? ''
+    const s = String(stored).trim()
+    const byId = roleList.find((r) => String(r.id) === s)
+    if (byId) return byId.roleName
+    const byName = roleList.find((r) => r.roleName === s)
+    if (byName) return byName.roleName
+    return s
+  }
+
+  useEffect(() => {
+    if (!isStaffDialogOpen || !isEditMode || !editingStaff || roles.length === 0) return
+    const resolved = resolveStaffRoleSelectValue(editingStaff.role, roles)
+    if (!resolved) return
+    setFormData((prev) => (prev.role === resolved ? prev : { ...prev, role: resolved }))
+  }, [isStaffDialogOpen, isEditMode, editingStaff, roles])
+
   const fetchStaffData = async (page: number, limit: number) => {
     try {
       setIsLoadingStaff(true);
@@ -634,7 +653,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       department: staffMember.department,
       dateOfJoining: formatDateForInput(staffMember.dateOfJoining),
       status: staffMember.status,
-      role: staffMember.role
+      role: resolveStaffRoleSelectValue(staffMember.role, roles)
     })
     setValidationErrors({})
     setIsEditMode(true)

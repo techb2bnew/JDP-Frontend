@@ -1,5 +1,5 @@
 import React from "react";
-import { ChevronDown, ChevronRight, Edit, Trash2, User } from "lucide-react";
+import { ChevronDown, ChevronRight, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Collapsible,
@@ -24,6 +24,12 @@ type JobType = {
     job_title?: string;
     title?: string;
     status?: string;
+    address?: string;
+    location?: string;
+    job_address?: string;
+    full_address?: string;
+    bill_to_address?: string;
+    city_zip?: string;
     created_at?: string;
     updated_at?: string;
     __listingRecentlyAdded?: boolean;
@@ -133,6 +139,28 @@ export default function CommonEntityListing({
     return "Sub job";
   };
 
+  /** Address line for any sub-job row (change order or regular sub job). */
+  const subJobAddressLine = (subJob: {
+    address?: string;
+    location?: string;
+    job_address?: string;
+    full_address?: string;
+    bill_to_address?: string;
+    city_zip?: string;
+  }) => {
+    const direct =
+      subJob.address ||
+      subJob.location ||
+      subJob.job_address ||
+      subJob.full_address ||
+      subJob.bill_to_address ||
+      "";
+    if (typeof direct === "string" && direct.trim()) return direct.trim();
+    const cz = subJob.city_zip?.trim();
+    if (cz) return cz;
+    return "";
+  };
+
   const shouldShowFooter =
     !!footer &&
     !isLoading &&
@@ -208,17 +236,11 @@ export default function CommonEntityListing({
                                     <ChevronRight className="h-4 w-4 text-sky-300 opacity-40" />
                                   )}
                                 </div>
-
-                                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/80 ring-1 ring-sky-100">
-                                  <User className="h-4 w-4 text-sky-600" />
-                                </div>
                               </div>
 
                               <div className="min-w-0 flex-1">
-                                <div className="max-w-[100px] text-[15px] font-semibold text-slate-800">
-                                  {getParentName(entity)?.length > 10
-                                    ? getParentName(entity).slice(0, 10) + "..."
-                                    : getParentName(entity)}
+                                <div className="text-[15px] font-semibold leading-snug text-slate-800 break-words">
+                                  {getParentName(entity)}
                                 </div>
                                 <div className="mt-0.5 text-xs text-slate-500">
                                   {totalJobs} jobs
@@ -319,13 +341,13 @@ export default function CommonEntityListing({
 
                                           <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
                                             <div className="min-w-0 flex-1">
-                                              <span className="block truncate text-[11px] font-semibold leading-snug text-slate-800">
+                                              <span className="block text-[11px] font-semibold leading-snug text-slate-800 break-words">
                                                 {truncateWords(
                                                   job.job_title || job.title,
                                                   2,
                                                 )}
                                               </span>
-                                              <div className="truncate text-[10px] font-medium capitalize leading-snug text-slate-500">
+                                              <div className="text-[10px] font-medium capitalize leading-snug text-slate-500 break-words">
                                                 {truncateChars(
                                                   job.address ||
                                                     job.location,
@@ -340,11 +362,6 @@ export default function CommonEntityListing({
                                                   Recently Added
                                                 </span>
                                               )}
-                                              {job.status ? (
-                                                <span className="rounded-full border border-sky-100 bg-sky-50 px-1.5 py-0.5 text-[9px] font-semibold capitalize leading-none text-sky-600">
-                                                  {job.status}
-                                                </span>
-                                              ) : null}
                                             </div>
                                           </div>
                                         </div>
@@ -363,6 +380,8 @@ export default function CommonEntityListing({
                                             subJob.job_title ||
                                             subJob.title ||
                                             "";
+                                          const subJobAddr =
+                                            subJobAddressLine(subJob);
 
                                           return (
                                             <div
@@ -389,35 +408,34 @@ export default function CommonEntityListing({
                                                       : "border-slate-100 bg-white hover:border-cyan-100 hover:bg-sky-50/40"
                                                   }`}
                                                 >
-                                                  <div className="flex min-w-0 items-center gap-1.5">
+                                                  <div className="flex min-w-0 items-start gap-1.5">
                                                     <div
                                                       className="h-3.5 w-3.5 shrink-0"
                                                       aria-hidden
                                                     />
 
-                                                    <div className="flex min-w-0 flex-1 items-start justify-between gap-1.5">
-                                                      <span className="min-w-0 flex-1 truncate text-[10px] font-medium leading-snug text-slate-700">
-                                                        {subJobTitle?.length >
-                                                        12
-                                                          ? subJobTitle.slice(
-                                                              0,
-                                                              12,
-                                                            ) + "..."
-                                                          : subJobTitle}
-                                                      </span>
-
-                                                      <div className="flex max-w-[min(100%,55%)] shrink-0 flex-wrap items-center justify-end gap-0.5">
+                                                    {/* Title + address stack together; badges sit in a separate column so they never push the address down */}
+                                                    <div className="flex min-w-0 flex-1 items-start gap-2">
+                                                      <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+                                                        <span className="text-[10px] font-bold leading-snug text-slate-800 break-words">
+                                                          {subJobTitle}
+                                                        </span>
+                                                        {subJobAddr.length > 0 ? (
+                                                          <p className="text-[9px] font-medium leading-snug text-slate-500">
+                                                            {truncateChars(
+                                                              subJobAddr,
+                                                              15,
+                                                            )}
+                                                          </p>
+                                                        ) : null}
+                                                      </div>
+                                                      <div className="flex shrink-0 flex-col items-end gap-1 self-start">
                                                         {subJob.__listingRecentlyAdded && (
-                                                          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-1 py-0.5 text-[8px] font-semibold leading-none text-emerald-800">
+                                                          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[8px] font-semibold leading-none text-emerald-800">
                                                             Recently Added
                                                           </span>
                                                         )}
-                                                        {subJob.status ? (
-                                                          <span className="rounded-full border border-sky-100 bg-sky-50 px-1.5 py-0.5 text-[9px] font-semibold capitalize leading-none text-sky-600">
-                                                            {subJob.status}
-                                                          </span>
-                                                        ) : null}
-                                                        <span className="rounded-full border border-sky-100 bg-sky-50 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-sky-600">
+                                                        <span className="rounded-full border border-sky-100 bg-sky-50 px-2 py-1 text-[9px] font-semibold leading-none text-sky-600">
                                                           {subJobListingBadgeLabel(
                                                             subJob,
                                                           )}
