@@ -927,7 +927,9 @@ useEffect(() => {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-sm text-gray-700">{job.description}</p>
+                <p className="text-sm leading-relaxed text-gray-700 break-words whitespace-normal overflow-hidden">
+                  {job.description}
+                </p>
 
                 <div className="space-y-3">
                   {job.customerName && (
