@@ -556,7 +556,10 @@ export function DashboardOverview() {
                   </Button>
                 </PopoverTrigger>
 
-                <PopoverContent className="p-3">
+                <PopoverContent
+                  align="end"
+                  className="w-auto overflow-hidden rounded-xl border border-slate-200 bg-white p-3 shadow-[0_12px_32px_-12px_rgba(15,23,42,0.35)]"
+                >
                   <MultiDateCalendar
                     multiple
                     range
