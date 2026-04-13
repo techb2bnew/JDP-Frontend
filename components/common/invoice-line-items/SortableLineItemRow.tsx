@@ -248,7 +248,7 @@ const cellClass = isInvalidItem
                 z-[999999]
                 w-full min-w-full max-w-full
                 rounded-xl border border-slate-200 bg-white
-                shadow-2xl max-h-[320px] overflow-y-auto p-2
+                shadow-2xl overflow-hidden
               `}
               style={{
                 opacity: 1,
@@ -257,7 +257,8 @@ const cellClass = isInvalidItem
               }}
             >
               {filteredProducts.length > 0 ? (
-                <div className="space-y-2">
+                <div className="max-h-[320px] overflow-y-auto p-2">
+                  <div className="space-y-2">
                   {filteredProducts.map((product) => (
                     <div
                       key={product.id}
@@ -314,9 +315,10 @@ const cellClass = isInvalidItem
                       </div>
                     </div>
                   ))}
+                  </div>
                 </div>
               ) : (
-                <div className="p-3">
+                <div className="max-h-[320px] overflow-y-auto p-3">
                   <div className="text-sm text-muted-foreground mb-3">
                     No products found
                   </div>
