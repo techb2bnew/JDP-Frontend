@@ -246,7 +246,7 @@ const cellClass = isInvalidItem
               className={`
                 absolute left-0 top-full mt-2
                 z-[999999]
-                ${isJobDetail ? "w-full min-w-[320px]" : ""}
+                w-full min-w-full max-w-full
                 rounded-xl border border-slate-200 bg-white
                 shadow-2xl max-h-[320px] overflow-y-auto p-2
               `}
