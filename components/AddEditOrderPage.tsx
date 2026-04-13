@@ -18,6 +18,7 @@ import {
 import { apiClient, globalApiCall } from '@/utils/api'
 import { toast } from 'sonner';
 import PhoneInput from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 
 
 export function AddEditOrderPage() {
@@ -958,6 +959,8 @@ export function AddEditOrderPage() {
                       }
                       limitMaxLength
                       international
+                      withCountryCallingCode
+                      countryCallingCodeEditable={false}
                       defaultCountry="US"
                       placeholder="Phone number"
                       className="border border-gray-300 rounded-md px-2 py-2"
