@@ -343,11 +343,11 @@ export function JobDetailsPage({
   const getJobTitle = (jobData: any) =>
     jobData?.title || jobData?.job_title || "";
   const getJobDescription = (jobData: any) =>
-    jobData?.description || jobData?.job_description || "";
+    jobData?.description ?? jobData?.job_description ?? "";
 
   // Find the job from your jobs array or use sample data
   const job =
-    jobs.find((j) => String(j?.id) === String(jobId)) || sampleJobData.job;
+    jobs.find((j) => String(j?.id) === String(jobId)) || {};
 
   console.log("Job data:", job);
   console.log("Labor timesheets:", job.labor_timesheets);
@@ -389,6 +389,8 @@ export function JobDetailsPage({
   const [changeOrderEstimate, setChangeOrderEstimate] = useState<
     number | string
   >("");
+  console.log(job,":job");
+  
 
   const timeLogs = Array.isArray(job.labor_timesheets)
     ? job.labor_timesheets
@@ -948,6 +950,28 @@ export function JobDetailsPage({
     }
     return undefined;
   };
+  const resolveLaborDetailsFromResponse = async (
+    responseJobData: any,
+    fallbackLaborIds: unknown,
+    fallbackLeadLaborIds: unknown,
+  ) => {
+    const laborIdsSource =
+      responseJobData?.assigned_labor_ids ?? fallbackLaborIds;
+    const leadLaborIdsSource =
+      responseJobData?.assigned_lead_labor_ids ?? fallbackLeadLaborIds;
+
+    const [assignedLaborDetails, assignedLeadLaborDetails] = await Promise.all([
+      laborIdsSource ? parseLaborIds(laborIdsSource, false) : Promise.resolve([]),
+      leadLaborIdsSource ? parseLaborIds(leadLaborIdsSource, true) : Promise.resolve([]),
+    ]);
+
+    return {
+      assignedLaborDetails,
+      assignedLeadLaborDetails,
+      assigned_labor_ids: laborIdsSource,
+      assigned_lead_labor_ids: leadLaborIdsSource,
+    };
+  };
 
   // Normalize status helper function
   const normalizeStatus = (status: string | undefined): string => {
@@ -974,8 +998,7 @@ export function JobDetailsPage({
   const [isLaborSelectionTouched, setIsLaborSelectionTouched] = useState(false);
   const [isLeadLaborSelectionTouched, setIsLeadLaborSelectionTouched] =
     useState(false);
-    console.log(job.assignedLeadLaborDetails,editedJob.assignedLeadLabor,":::lead");
-    
+  const skipNextEditedJobSyncRef = useRef(false);
 
   // Load labor data when component mounts
   useEffect(() => {
@@ -1281,25 +1304,19 @@ const validateLineItems = (lineItems: any[] = []) => {
 
       const response = await apiClient.updateJob(jobId, updatePayload);
       const responseJob = response?.data || {};
+      console.log(responseJob,"responseJob");
+      
 
-      // Keep assignment details stable unless user explicitly edited labor selections.
-      const hasEditedLabor =
-        Array.isArray(editedJob.assignedLabor) &&
-        editedJob.assignedLabor.length > 0;
-      const hasEditedLeadLabor =
-        Array.isArray(editedJob.assignedLeadLabor) &&
-        editedJob.assignedLeadLabor.length > 0;
+      const resolvedAssignments = await resolveLaborDetailsFromResponse(
+        responseJob,
+        updatePayload.assigned_labor_ids ?? job.assigned_labor_ids,
+        updatePayload.assigned_lead_labor_ids ?? job.assigned_lead_labor_ids,
+      );
 
-      const nextAssignedLaborDetails = isLaborSelectionTouched
-        ? editedJob.assignedLabor
-        : hasEditedLabor
-          ? editedJob.assignedLabor
-          : job.assignedLaborDetails || [];
-      const nextAssignedLeadLaborDetails = isLeadLaborSelectionTouched
-        ? editedJob.assignedLeadLabor
-        : hasEditedLeadLabor
-          ? editedJob.assignedLeadLabor
-          : job.assignedLeadLaborDetails || [];
+      const nextDescription =
+        responseJob?.job_description ??
+        responseJob?.description ??
+        editedJob.description;
 
       // Update local job object with normalized keys used across the UI.
       const updatedJob = {
@@ -1308,18 +1325,20 @@ const validateLineItems = (lineItems: any[] = []) => {
         ...editedJob,
         title: editedJob.title,
         job_title: editedJob.title,
-        description: editedJob.description,
-        assignedLaborDetails: nextAssignedLaborDetails,
-        assignedLeadLaborDetails: nextAssignedLeadLaborDetails,
-        assigned_labor_ids:
-          updatePayload.assigned_labor_ids ?? job.assigned_labor_ids,
-        assigned_lead_labor_ids:
-          updatePayload.assigned_lead_labor_ids ?? job.assigned_lead_labor_ids,
+        description: nextDescription,
+        job_description: nextDescription,
+        assignedLaborDetails: resolvedAssignments.assignedLaborDetails,
+        assignedLeadLaborDetails: resolvedAssignments.assignedLeadLaborDetails,
+        assigned_labor_ids: resolvedAssignments.assigned_labor_ids,
+        assigned_lead_labor_ids: resolvedAssignments.assigned_lead_labor_ids,
       };
+      console.log(updatedJob,"updatedJob");
+      
 
       const updatedJobs = jobs.map((j: any) =>
         String(j?.id) === String(jobId) ? updatedJob : j,
       );
+      skipNextEditedJobSyncRef.current = true;
       setJobs(updatedJobs);
 
       setIsEditing(false);
@@ -1327,33 +1346,15 @@ const validateLineItems = (lineItems: any[] = []) => {
       setIsLeadLaborSelectionTouched(false);
       setIsSaving(false);
       toast.success("Job updated successfully!");
-
-      // Refresh the labor data asynchronously after save completes (don't block UI)
-      try {
-        if (updatePayload.assigned_lead_labor_ids) {
-          const leadLaborData = await parseLaborIds(
-            updatePayload.assigned_lead_labor_ids,
-            true,
-          );
-          setEditedJob((prev) => ({
-            ...prev,
-            assignedLeadLabor: leadLaborData,
-          }));
-        }
-
-        if (updatePayload.assigned_labor_ids) {
-          const laborData = await parseLaborIds(
-            updatePayload.assigned_labor_ids,
-            false,
-          );
-          setEditedJob((prev) => ({
-            ...prev,
-            assignedLabor: laborData,
-          }));
-        }
-      } catch (error) {
-        console.error("Error refreshing labor data after save:", error);
-      }
+      
+      setEditedJob((prev) => ({
+        ...prev,
+        title: editedJob.title,
+        description: nextDescription,
+        status,
+        assignedLabor: resolvedAssignments.assignedLaborDetails,
+        assignedLeadLabor: resolvedAssignments.assignedLeadLaborDetails,
+      }));
     } catch (error) {
       console.error("Error updating job:", error);
       toast.error(
@@ -1363,7 +1364,6 @@ const validateLineItems = (lineItems: any[] = []) => {
       setIsSaving(false);
     }
   };
-
   const handleCompleteJob = async () => {
     if (isEditing) {
       toast.error("Please save or cancel job edits before completing the job.");
@@ -1433,27 +1433,11 @@ const validateLineItems = (lineItems: any[] = []) => {
       const response = await apiClient.updateJob(jobId, completionPayload);
       const responseJob = response?.data || {};
 
-      // Completing a job should not implicitly reassign labor.
-      console.log(editedJob.assignedLabor,editedJob.assignedLeadLabor,job.assignedLeadLaborDetails,"editedJob.assignedLeadLabor");
-      // return;
-      
-      const hasEditedLabor =
-        Array.isArray(editedJob.assignedLabor) &&
-        editedJob.assignedLabor.length > 0;
-      const hasEditedLeadLabor =
-        Array.isArray(editedJob.assignedLeadLabor) &&
-        editedJob.assignedLeadLabor.length > 0;
-
-      const nextAssignedLaborDetails = isLaborSelectionTouched
-        ? editedJob.assignedLabor
-        : hasEditedLabor
-          ? editedJob.assignedLabor
-          : job.assignedLaborDetails || [];
-      const nextAssignedLeadLaborDetails = isLeadLaborSelectionTouched
-        ? editedJob.assignedLeadLabor
-        : hasEditedLeadLabor
-          ? editedJob.assignedLeadLabor
-          : job.assignedLeadLaborDetails || [];
+      const resolvedAssignments = await resolveLaborDetailsFromResponse(
+        responseJob,
+        completionPayload.assigned_labor_ids ?? job.assigned_labor_ids,
+        completionPayload.assigned_lead_labor_ids ?? job.assigned_lead_labor_ids,
+      );
 
       const completedJob = {
         ...job,
@@ -1462,21 +1446,27 @@ const validateLineItems = (lineItems: any[] = []) => {
         title: updatedJob.title,
         job_title: updatedJob.title,
         description: updatedJob.description,
-        assignedLaborDetails: nextAssignedLaborDetails,
-        assignedLeadLaborDetails: nextAssignedLeadLaborDetails,
-        assigned_labor_ids:
-          completionPayload.assigned_labor_ids ?? job.assigned_labor_ids,
-        assigned_lead_labor_ids:
-          completionPayload.assigned_lead_labor_ids ??
-          job.assigned_lead_labor_ids,
+        job_description: updatedJob.description,
+        assignedLaborDetails: resolvedAssignments.assignedLaborDetails,
+        assignedLeadLaborDetails: resolvedAssignments.assignedLeadLaborDetails,
+        assigned_labor_ids: resolvedAssignments.assigned_labor_ids,
+        assigned_lead_labor_ids: resolvedAssignments.assigned_lead_labor_ids,
         status: "completed",
       };
 
       const updatedJobs = jobs.map((j: any) =>
         String(j?.id) === String(jobId) ? completedJob : j,
       );
-      
+      skipNextEditedJobSyncRef.current = true;
       setJobs(updatedJobs);
+      setEditedJob((prev) => ({
+        ...prev,
+        title: updatedJob.title,
+        description: updatedJob.description,
+        status: "completed",
+        assignedLabor: resolvedAssignments.assignedLaborDetails,
+        assignedLeadLabor: resolvedAssignments.assignedLeadLaborDetails,
+      }));
     
       toast.success("Job marked as completed");
     } catch (error) {
@@ -2901,24 +2891,17 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
     setRefreshMaterials((prev) => !prev);
   };
 
-  const [jobFormData, setJobFormData] = useState({
-    title: getJobTitle(job),
-    type: job.type,
-    location: job.location || `${job.address || ""}, ${job.cityZip || ""}`,
-    description: getJobDescription(job),
-  });
-
-  // Update editedJob when job data changes
   useEffect(() => {
-    // Normalize status: convert "in-progress" to "in_progress" if needed
-    const normalizeStatus = (status: string | undefined): string => {
-      if (!status) return "draft";
-      // Convert hyphen to underscore for consistency
-      if (status === "in-progress") return "in_progress";
-      return status;
-    };
+    if (!job || !jobId) return;
 
-    setEditedJob({
+    // Save/complete ke turant baad local edited state ko stale job se overwrite mat karo
+    if (skipNextEditedJobSyncRef.current) {
+      skipNextEditedJobSyncRef.current = false;
+      return;
+    }
+
+    setEditedJob((prev) => ({
+      ...prev,
       title: getJobTitle(job),
       type: job.type,
       location: job.location || `${job.address || ""}, ${job.cityZip || ""}`,
@@ -2934,8 +2917,27 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
       status: normalizeStatus(job.status),
       assignedLabor: job.assignedLaborDetails || [],
       assignedLeadLabor: job.assignedLeadLaborDetails || [],
-    });
-  }, [job]);
+    }));
+  }, [
+    jobId,
+    job?.id,
+    job?.title,
+    job?.job_title,
+    job?.description,
+    job?.job_description,
+    job?.type,
+    job?.location,
+    job?.address,
+    job?.cityZip,
+    job?.contractor,
+    job?.customer,
+    job?.created_at,
+    job?.createdDate,
+    job?.priority,
+    job?.status,
+    job?.assignedLaborDetails,
+    job?.assignedLeadLaborDetails,
+  ]);
 
   // Update bluesheets when job data changes
   useEffect(() => {

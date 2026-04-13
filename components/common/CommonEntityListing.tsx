@@ -239,7 +239,7 @@ export default function CommonEntityListing({
                               </div>
 
                               <div className="min-w-0 flex-1">
-                                <div className="text-[15px] font-semibold leading-snug text-slate-800 break-words">
+                                <div className="text-[13.4px] font-semibold leading-snug text-slate-800 break-words capitalize">
                                   {getParentName(entity)}
                                 </div>
                                 <div className="mt-0.5 text-xs text-slate-500">
@@ -341,7 +341,7 @@ export default function CommonEntityListing({
 
                                           <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
                                             <div className="min-w-0 flex-1">
-                                              <span className="block text-[11px] font-semibold leading-snug text-slate-800 break-words">
+                                              <span className="block text-[11px] font-semibold leading-snug text-slate-800 break-words capitalize">
                                                 {truncateWords(
                                                   job.job_title || job.title,
                                                   2,
@@ -417,11 +417,11 @@ export default function CommonEntityListing({
                                                     {/* Title + address stack together; badges sit in a separate column so they never push the address down */}
                                                     <div className="flex min-w-0 flex-1 items-start gap-2">
                                                       <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-                                                        <span className="text-[10px] font-bold leading-snug text-slate-800 break-words">
+                                                        <span className="text-[10px] font-bold leading-snug text-slate-800 break-words capitalize">
                                                           {subJobTitle}
                                                         </span>
                                                         {subJobAddr.length > 0 ? (
-                                                          <p className="text-[9px] font-medium leading-snug text-slate-500">
+                                                          <p className="text-[9px] font-medium leading-snug text-slate-500 capitalize">
                                                             {truncateChars(
                                                               subJobAddr,
                                                               15,
