@@ -132,7 +132,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
     },
     {
       id: "customers",
-      name: "Customers",
+      name: "Customers (Service Based)",
       icon: Users,
       href: "/customers",
       description: "Customer database and interactions",

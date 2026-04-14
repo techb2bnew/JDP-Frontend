@@ -1091,6 +1091,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
     return sum
   }, 0)
 
+
   // Labor, material and overall totals
   const totalLaborLabel = currentBlueSheet.total_labor_hours || null
   const materialTotal = currentBlueSheet.material_entries.reduce(
@@ -1110,14 +1111,19 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
   }
   console.log(blueSheet,"blueeeee");
   
-
+  const hasComparisonInvoice =
+  !!currentSupplierInvoice &&
+  Array.isArray(currentSupplierInvoice.materials) &&
+  currentSupplierInvoice.materials.length > 0;
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="w-screen h-screen max-w-full max-h-full min-w-full min-h-full overflow-hidden p-0 rounded-none border-0">
         <DialogHeader className="p-8 pt-3 pb-3 border-b bg-white">
           <DialogTitle className="flex items-center  ">
             <FileText className="h-6 w-6 text-[#00A1FF]" />
-            <span className="text-xl z-[99999]">BlueSheet Review & Approve</span>
+            <span className="text-xl z-[99999]">
+              BlueSheet Review & Approve
+            </span>
             <Badge className="ml-3 bg-blue-50 text-blue-600 border-blue-200 px-3 py-1">
               BS-{blueSheet.id}
             </Badge>
@@ -2563,62 +2569,68 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                       </Card>
                     )}
 
-                    <Card className="bg-violet-50/80 border border-violet-200 shadow-sm">
-                      <CardContent className="p-5 text-left">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <DollarSign className="h-8 w-8 text-violet-600" />
-                            <h4 className="text-sm font-semibold text-violet-900 tracking-wide uppercase">
-                              Difference
-                            </h4>
-                          </div>
-                        </div>
-                        <p className="text-2xl font-semibold text-violet-700">
-                          {formatCurrency(
-                            currentSupplierInvoice
-                              ? Math.abs(
-                                  currentBlueSheet.total_cost -
-                                    currentSupplierInvoice.amount,
-                                )
-                              : 0,
-                          )}
-                        </p>
-                        <p className="text-xs text-violet-800 mt-1">
-                          {currentSupplierInvoice && currentBlueSheet.total_cost
-                            ? `${(
-                                (Math.abs(
-                                  currentBlueSheet.total_cost -
-                                    currentSupplierInvoice.amount,
-                                ) /
-                                  (currentBlueSheet.total_cost || 1)) *
-                                100
-                              ).toFixed(1)}% variance`
-                            : "No supplier invoice"}
-                        </p>
-                      </CardContent>
-                    </Card>
+                    {hasComparisonInvoice && (
+                      <>
+                        <Card className="bg-violet-50/80 border border-violet-200 shadow-sm">
+                          <CardContent className="p-5 text-left">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <DollarSign className="h-8 w-8 text-violet-600" />
+                                <h4 className="text-sm font-semibold text-violet-900 tracking-wide uppercase">
+                                  Difference
+                                </h4>
+                              </div>
+                            </div>
+                            <p className="text-2xl font-semibold text-violet-700">
+                              {formatCurrency(
+                                currentSupplierInvoice
+                                  ? Math.abs(
+                                      currentBlueSheet.total_cost -
+                                        currentSupplierInvoice.amount,
+                                    )
+                                  : 0,
+                              )}
+                            </p>
+                            <p className="text-xs text-violet-800 mt-1">
+                              {currentSupplierInvoice &&
+                              currentBlueSheet.total_cost
+                                ? `${(
+                                    (Math.abs(
+                                      currentBlueSheet.total_cost -
+                                        currentSupplierInvoice.amount,
+                                    ) /
+                                      (currentBlueSheet.total_cost || 1)) *
+                                    100
+                                  ).toFixed(1)}% variance`
+                                : "No supplier invoice"}
+                            </p>
+                          </CardContent>
+                        </Card>
 
-                    <Card className="bg-amber-50/80 border border-amber-200 shadow-sm">
-                      <CardContent className="p-5 text-left">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <AlertTriangle className="h-8 w-8 text-amber-600" />
-                            <h4 className="text-sm font-semibold text-amber-900 tracking-wide uppercase">
-                              Discrepancies
-                            </h4>
-                          </div>
-                        </div>
-                        <p className="text-2xl font-semibold text-amber-700">
-                          {
-                            comparisons.filter((c) => c.differences.length > 0)
-                              .length
-                          }
-                        </p>
-                        <p className="text-xs text-amber-800 mt-1">
-                          items with price / qty differences
-                        </p>
-                      </CardContent>
-                    </Card>
+                        <Card className="bg-amber-50/80 border border-amber-200 shadow-sm">
+                          <CardContent className="p-5 text-left">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <AlertTriangle className="h-8 w-8 text-amber-600" />
+                                <h4 className="text-sm font-semibold text-amber-900 tracking-wide uppercase">
+                                  Discrepancies
+                                </h4>
+                              </div>
+                            </div>
+                            <p className="text-2xl font-semibold text-amber-700">
+                              {
+                                comparisons.filter(
+                                  (c) => c.differences.length > 0,
+                                ).length
+                              }
+                            </p>
+                            <p className="text-xs text-amber-800 mt-1">
+                              items with price / qty differences
+                            </p>
+                          </CardContent>
+                        </Card>
+                      </>
+                    )}
                   </div>
 
                   {/* Review Summary */}
@@ -2785,7 +2797,9 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                       open={true}
                       invalidHeaderKeys={invalidHeaderKeys}
                       setInvalidHeaderKeys={setInvalidHeaderKeys}
-                      validateHeaderGroupsBeforeSubmit={ validateHeaderGroupsBeforeSubmit}
+                      validateHeaderGroupsBeforeSubmit={
+                        validateHeaderGroupsBeforeSubmit
+                      }
                       onOpenChange={() => setIsCustomInvoiceOpen(false)}
                       blueSheet={currentBlueSheet}
                       // Let CustomInvoiceDialog derive labor cost from labor_entries

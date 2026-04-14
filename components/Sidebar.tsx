@@ -71,7 +71,7 @@ export function Sidebar({ currentPage, onPageChange, onLogout, isSuperAdmin = fa
     },
     {
       id: "customers",
-      name: "Customers",
+      name: "Customers (Service Based)",
       icon: Users,
       description: "Customer database and interactions"
     },
