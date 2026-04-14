@@ -39,6 +39,8 @@ interface CustomInvoiceDialogProps {
   validateHeaderGroupsBeforeSubmit? :()=>void
   /** Notify parent when estimate send/preview pipeline is running (disables sibling actions). */
   onProcessingChange?: (processing: boolean) => void
+  /** Notify parent about current selected invoice type (API format). */
+  onInvoiceTypeChange?: (invoiceType: string) => void
 }
 
 
@@ -125,7 +127,8 @@ export const CustomInvoiceDialog = ({
   invalidHeaderKeys,
   setInvalidHeaderKeys,
   validateHeaderGroupsBeforeSubmit,
-  onProcessingChange
+  onProcessingChange,
+  onInvoiceTypeChange
 }: CustomInvoiceDialogProps) => {
   // Derive viewInvoiceData and job list from blueSheet (custom invoice from bluesheet)
   const viewInvoiceData = useMemo(() => {
@@ -738,6 +741,19 @@ console.log(totalAmount,"amounttt");
     return mapping[uiType] || 'estimate'
   }
 
+  useEffect(() => {
+    const resolvedType = mapInvoiceTypeToAPI(
+      inlineInvoiceData.invoiceType === "Custom"
+        ? inlineInvoiceData.customInvoiceType
+        : inlineInvoiceData.invoiceType,
+    )
+    onInvoiceTypeChange?.(resolvedType)
+  }, [
+    inlineInvoiceData.invoiceType,
+    inlineInvoiceData.customInvoiceType,
+    onInvoiceTypeChange,
+  ])
+
   const getAvailableEstimates = () => {
     return []
   }
@@ -906,6 +922,8 @@ console.log(totalAmount,"amounttt");
       lineItems: latestLineItems,
     };
 
+    console.log(effectiveInlineInvoiceData,"effectiveInlineInvoiceData");
+    
     const validLineItems = latestLineItems.filter((item: any) => {
       return (
         item?.type !== "header" &&

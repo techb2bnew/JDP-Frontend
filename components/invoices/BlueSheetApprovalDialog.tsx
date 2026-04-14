@@ -153,6 +153,7 @@ export function BlueSheetApprovalDialog({
   const [invalidHeaderKeys, setInvalidHeaderKeys] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [customInvoiceProcessing, setCustomInvoiceProcessing] = useState(false);
+  const [selectedInvoiceType, setSelectedInvoiceType] = useState<string>("estimate");
   const estimateActionsDisabled =
     isSaving || isApproving || isApprovingCustomer || customInvoiceProcessing;
 
@@ -173,6 +174,7 @@ export function BlueSheetApprovalDialog({
       setFilteredProducts([])
       setActiveRow(null)
       setCustomInvoiceProcessing(false)
+      setSelectedInvoiceType("estimate")
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }, [isOpen, blueSheet])
@@ -1009,7 +1011,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
         (finalBlueSheet.job.priority as "low" | "medium" | "high") ||
         "medium",
       service_type: isContractBased ? "contract_based" : "service_based",
-      invoice_type: "estimate",
+      invoice_type: selectedInvoiceType || "estimate",
       status: "draft",
       estimate_date: today,
       due_date: thirtyDaysLater,
@@ -2791,6 +2793,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                         previewAndSendRef.current = fn;
                       }}
                       onProcessingChange={setCustomInvoiceProcessing}
+                      onInvoiceTypeChange={setSelectedInvoiceType}
                       onDone={onClose}
                       onLineItemsSync={syncCustomInvoiceLineItemsToBlueSheet}
                     />
