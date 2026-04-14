@@ -344,15 +344,19 @@ export function JobDetailsPage({
     jobData?.title || jobData?.job_title || "";
   const getJobDescription = (jobData: any) =>
     jobData?.description ?? jobData?.job_description ?? "";
+  
 
   // Find the job from your jobs array or use sample data
   const job =
     jobs.find((j) => String(j?.id) === String(jobId)) || {};
 
+
   console.log("Job data:", job);
   console.log("Labor timesheets:", job.labor_timesheets);
   console.log("Bluesheets data:", job.bluesheets);
   console.log(job.subJobs,"job.subJobs");
+
+  
 
   /** Sub-jobs table only for main jobs — hide if `subJobs` wrongly includes current job (siblings from parent). */
   const subJobsForTable = useMemo(() => {
@@ -656,6 +660,8 @@ export function JobDetailsPage({
       year: "numeric",
     });
   };
+
+
 
   const fetchJobDocuments = useCallback(async () => {
     if (!jobId) {
@@ -981,6 +987,123 @@ export function JobDetailsPage({
     return status;
   };
 
+  /**
+   * updateJob / complete responses often return only IDs or strip nested customer/contractor.
+   * Keep display names and stable party refs from the job we had before the API round-trip.
+   */
+  const preserveJobPartyFieldsFromPrevious = (
+    previousJob: any,
+    mergedJob: any,
+  ) => {
+    if (!mergedJob) return mergedJob;
+    const out = { ...mergedJob };
+
+    const copyNameIfLost = (key: "customerName" | "contractorName") => {
+      const prev = previousJob?.[key];
+      const next = out[key];
+      const prevOk =
+        prev !== undefined &&
+        prev !== null &&
+        String(prev).trim() !== "";
+      const nextEmpty =
+        next === undefined ||
+        next === null ||
+        (typeof next === "string" && next.trim() === "");
+      if (prevOk && nextEmpty) {
+        out[key] = prev;
+      }
+    };
+    copyNameIfLost("customerName");
+    copyNameIfLost("contractorName");
+
+    if (out.customer == null && previousJob?.customer != null) {
+      out.customer = previousJob.customer;
+    }
+    if (out.contractor == null && previousJob?.contractor != null) {
+      out.contractor = previousJob.contractor;
+    }
+
+    const cid = out.customer_id ?? out.customerId;
+    const ctid = out.contractor_id ?? out.contractorId;
+    if (out.customer == null && cid != null) {
+      out.customer = String(cid);
+    }
+    if (out.contractor == null && ctid != null) {
+      out.contractor = String(ctid);
+    }
+
+    const restoreObjectIfApiSentOnlyId = (key: "customer" | "contractor") => {
+      const next = out[key];
+      const prev = previousJob?.[key];
+      const prevWasObject =
+        prev && typeof prev === "object" && !Array.isArray(prev);
+      const nextIsPrimitive =
+        next === undefined ||
+        next === null ||
+        typeof next === "string" ||
+        typeof next === "number";
+      if (prevWasObject && nextIsPrimitive) {
+        out[key] = prev;
+      }
+    };
+    restoreObjectIfApiSentOnlyId("customer");
+    restoreObjectIfApiSentOnlyId("contractor");
+
+    const pickCustomerName = (source: any): string =>
+      source?.customer_name || source?.company_name || source?.name || "";
+    const pickContractorName = (source: any): string =>
+      source?.contractor_name ||
+      source?.company_name ||
+      source?.name ||
+      source?.full_name ||
+      source?.users?.full_name ||
+      "";
+
+    if (!out.customerName || String(out.customerName).trim() === "") {
+      out.customerName =
+        pickCustomerName(out.customer) ||
+        pickCustomerName(previousJob?.customer) ||
+        previousJob?.customerName ||
+        out.customerName;
+    }
+
+    if (!out.contractorName || String(out.contractorName).trim() === "") {
+      out.contractorName =
+        pickContractorName(out.contractor) ||
+        pickContractorName(previousJob?.contractor) ||
+        previousJob?.contractorName ||
+        out.contractorName;
+    }
+
+    return out;
+  };
+
+  const resolveJobPartyDisplayName = () => {
+    const normalizedType = String(job?.type || "").toLowerCase();
+    const contractName =
+      job.contractorName ||
+      contractorData?.contractor_name ||
+      job.contractor?.contractor_name ||
+      job.contractor?.company_name ||
+      job.contractor?.name ||
+      job.contractor?.full_name ||
+      job.contractor?.users?.full_name ||
+      "";
+    const customerName =
+      job.customerName ||
+      customerData?.customer_name ||
+      job.customer?.customer_name ||
+      job.customer?.company_name ||
+      job.customer?.name ||
+      job.subJobs?.[0]?.customer?.customer_name ||
+      "";
+
+    if (normalizedType === "contract-based" || normalizedType === "contract_based") {
+      return contractName || customerName || "No customer assigned";
+    }
+    return customerName || contractName || "No customer assigned";
+  };
+
   const [editedJob, setEditedJob] = useState({
     title: getJobTitle(job),
     type: job.type,
@@ -1050,6 +1173,7 @@ export function JobDetailsPage({
   const [selectedEstimateId, setSelectedEstimateId] = useState<string | null>(
     null,
   );
+        console.log(job,editedJob,"jobjob");
 
   // After navigation from send flow: scroll + highlight the created estimate
   useEffect(() => {
@@ -1245,11 +1369,11 @@ const validateLineItems = (lineItems: any[] = []) => {
       const updatePayload = {
         job_title: editedJob.title,
         job_type:
-          editedJob.type === "service_based"
+          editedJob.type === "service_based" || editedJob.type === "service-based"
             ? "service_based"
             : "contract_based",
         // Only send customer_id for service-based jobs, contractor_id for contract-based jobs
-        ...(editedJob.type === "contract_based"
+        ...(editedJob.type === "contract_based" || editedJob.type === "contract-based"
           ? {
               contractor_id: job.contractor
                 ? Number(job.contractor)
@@ -1319,7 +1443,7 @@ const validateLineItems = (lineItems: any[] = []) => {
         editedJob.description;
 
       // Update local job object with normalized keys used across the UI.
-      const updatedJob = {
+      const updatedJob = preserveJobPartyFieldsFromPrevious(job, {
         ...job,
         ...responseJob,
         ...editedJob,
@@ -1331,7 +1455,7 @@ const validateLineItems = (lineItems: any[] = []) => {
         assignedLeadLaborDetails: resolvedAssignments.assignedLeadLaborDetails,
         assigned_labor_ids: resolvedAssignments.assigned_labor_ids,
         assigned_lead_labor_ids: resolvedAssignments.assigned_lead_labor_ids,
-      };
+      });
       console.log(updatedJob,"updatedJob");
       
 
@@ -1365,120 +1489,292 @@ const validateLineItems = (lineItems: any[] = []) => {
     }
   };
   const handleCompleteJob = async () => {
-    if (isEditing) {
-      toast.error("Please save or cancel job edits before completing the job.");
-      return;
-    }
-    if (job.status === "completed") {
-      return;
-    }
+  if (isEditing) {
+    toast.error("Please save or cancel job edits before completing the job.");
+    return;
+  }
 
-    try {
-      setIsSaving(true);
+  if (editedJob.status === "completed") {
+    return;
+  }
 
-      const updatedJob = {
-        ...job,
-        ...editedJob,
-        status: "completed",
-      };
+  try {
+    setIsSaving(true);
 
-      const completionPayload = {
-        job_title: updatedJob.title,
-        job_type:
-          updatedJob.type === "service_based"
-            ? "service_based"
-            : "contract_based",
-        ...(updatedJob.type === "contract_based"
-          ? {
-              contractor_id: job.contractor
-                ? Number(job.contractor)
-                : undefined,
-            }
-          : {
-              customer_id: job.customer
-                ? Number(job.customer?.id || job.customer)
-                : undefined,
-            }),
-        description: updatedJob.description,
-        priority: updatedJob.priority.toLowerCase(),
-        address: updatedJob.address || job.address || "",
-        city_zip: updatedJob.cityZip || job.cityZip || "",
-        phone: job.phone || undefined,
-        email: job.email || undefined,
-        bill_to_address: job.billToAddress || undefined,
-        bill_to_city_zip: job.billToCityZip || undefined,
-        bill_to_phone: job.billToPhone || undefined,
-        bill_to_email: job.billToEmail || undefined,
-        same_as_address: job.sameAsAddress || false,
-        due_date: job.dueDate || "",
-        estimated_hours: job.estimatedHours || undefined,
-        estimated_cost: job.estimatedCost || undefined,
-        // Use current edited selections while completing, so assignments do not revert.
-        assigned_labor_ids: buildAssignedLaborIdsField(
-          editedJob.assignedLabor,
-          job.assigned_labor_ids,
-          isLaborSelectionTouched,
-        ),
-        assigned_lead_labor_ids: buildAssignedLaborIdsField(
-          editedJob.assignedLeadLabor,
-          job.assigned_lead_labor_ids,
-          isLeadLaborSelectionTouched,
-        ),
-        assigned_material_ids:
-          job.materials && job.materials.length > 0
-            ? JSON.stringify(job.materials)
-            : undefined,
-        status: updatedJob.status,
-      };
-      const response = await apiClient.updateJob(jobId, completionPayload);
-      const responseJob = response?.data || {};
+    const updatedJob = {
+      ...job,
+      ...editedJob,
+      status: "completed",
+    };
 
-      const resolvedAssignments = await resolveLaborDetailsFromResponse(
-        responseJob,
-        completionPayload.assigned_labor_ids ?? job.assigned_labor_ids,
-        completionPayload.assigned_lead_labor_ids ?? job.assigned_lead_labor_ids,
-      );
+    const normalizedJobType =
+      updatedJob.type === "service_based" || updatedJob.type === "service-based"
+        ? "service_based"
+        : "contract_based";
 
-      const completedJob = {
-        ...job,
-        ...responseJob,
-        ...updatedJob,
-        title: updatedJob.title,
-        job_title: updatedJob.title,
-        description: updatedJob.description,
-        job_description: updatedJob.description,
-        assignedLaborDetails: resolvedAssignments.assignedLaborDetails,
-        assignedLeadLaborDetails: resolvedAssignments.assignedLeadLaborDetails,
-        assigned_labor_ids: resolvedAssignments.assigned_labor_ids,
-        assigned_lead_labor_ids: resolvedAssignments.assigned_lead_labor_ids,
-        status: "completed",
-      };
+    const completionPayload = {
+      job_title: updatedJob.title,
+      job_type: normalizedJobType,
+      ...(normalizedJobType === "contract_based"
+        ? {
+            contractor_id: job.contractor
+              ? Number(job.contractor?.id || job.contractor)
+              : undefined,
+          }
+        : {
+            customer_id: job.customer
+              ? Number(job.customer?.id || job.customer)
+              : undefined,
+          }),
+      description: updatedJob.description,
+      priority: updatedJob.priority.toLowerCase(),
+      address: updatedJob.address || job.address || "",
+      city_zip: updatedJob.cityZip || job.cityZip || "",
+      phone: job.phone || undefined,
+      email: job.email || undefined,
+      bill_to_address: job.billToAddress || undefined,
+      bill_to_city_zip: job.billToCityZip || undefined,
+      bill_to_phone: job.billToPhone || undefined,
+      bill_to_email: job.billToEmail || undefined,
+      same_as_address: job.sameAsAddress || false,
+      due_date: job.dueDate || "",
+      estimated_hours: job.estimatedHours || undefined,
+      estimated_cost: job.estimatedCost || undefined,
+      assigned_labor_ids: buildAssignedLaborIdsField(
+        editedJob.assignedLabor,
+        job.assigned_labor_ids,
+        isLaborSelectionTouched,
+      ),
+      assigned_lead_labor_ids: buildAssignedLaborIdsField(
+        editedJob.assignedLeadLabor,
+        job.assigned_lead_labor_ids,
+        isLeadLaborSelectionTouched,
+      ),
+      assigned_material_ids:
+        job.materials && job.materials.length > 0
+          ? JSON.stringify(job.materials)
+          : undefined,
+      status: "completed",
+    };
 
-      const updatedJobs = jobs.map((j: any) =>
-        String(j?.id) === String(jobId) ? completedJob : j,
-      );
-      skipNextEditedJobSyncRef.current = true;
-      setJobs(updatedJobs);
-      setEditedJob((prev) => ({
-        ...prev,
-        title: updatedJob.title,
-        description: updatedJob.description,
-        status: "completed",
-        assignedLabor: resolvedAssignments.assignedLaborDetails,
-        assignedLeadLabor: resolvedAssignments.assignedLeadLaborDetails,
-      }));
+    const response = await apiClient.updateJob(jobId, completionPayload);
+    const responseJob = response?.data || {};
+    console.log(responseJob, "responseJob");
+
+    const resolvedAssignments = await resolveLaborDetailsFromResponse(
+      responseJob,
+      completionPayload.assigned_labor_ids ?? job.assigned_labor_ids,
+      completionPayload.assigned_lead_labor_ids ?? job.assigned_lead_labor_ids,
+    );
+
+    const partyFields =
+      normalizedJobType === "service_based"
+        ? {
+            customer: responseJob.customer || job.customer || null,
+            customer_id:
+              responseJob.customer?.id ??
+              responseJob.customer_id ??
+              job.customer?.id ??
+              job.customer_id ??
+              null,
+            contractor: null,
+            contractor_id: null,
+          }
+        : {
+            contractor: responseJob.contractor || job.contractor || null,
+            contractor_id:
+              responseJob.contractor?.id ??
+              responseJob.contractor_id ??
+              job.contractor?.id ??
+              job.contractor_id ??
+              null,
+            customer: null,
+            customer_id: null,
+          };
+
+    const completedJob = preserveJobPartyFieldsFromPrevious(job, {
+      ...job,
+      ...responseJob,
+      ...updatedJob,
+      ...partyFields,
+      title: updatedJob.title,
+      job_title: updatedJob.title,
+      description: updatedJob.description,
+      job_description: updatedJob.description,
+      assignedLaborDetails: resolvedAssignments.assignedLaborDetails,
+      assignedLeadLaborDetails: resolvedAssignments.assignedLeadLaborDetails,
+      assigned_labor_ids: resolvedAssignments.assigned_labor_ids,
+      assigned_lead_labor_ids: resolvedAssignments.assigned_lead_labor_ids,
+      status: "completed",
+    });
+
+    const updatedJobs = jobs.map((j: any) =>
+      String(j?.id) === String(jobId) ? completedJob : j,
+    );
+
+    skipNextEditedJobSyncRef.current = true;
+    setJobs(updatedJobs);
+
+    setEditedJob((prev) => ({
+      ...prev,
+      title: updatedJob.title,
+      description: updatedJob.description,
+      status: "completed",
+      assignedLabor: resolvedAssignments.assignedLaborDetails,
+      assignedLeadLabor: resolvedAssignments.assignedLeadLaborDetails,
+      ...(normalizedJobType === "service_based"
+        ? {
+            customer: responseJob.customer || job.customer || null,
+            customer_id:
+              responseJob.customer?.id ??
+              responseJob.customer_id ??
+              job.customer?.id ??
+              job.customer_id ??
+              null,
+            contractor: null,
+            contractor_id: null,
+          }
+        : {
+            contractor: responseJob.contractor || job.contractor || null,
+            contractor_id:
+              responseJob.contractor?.id ??
+              responseJob.contractor_id ??
+              job.contractor?.id ??
+              job.contractor_id ??
+              null,
+            customer: null,
+            customer_id: null,
+          }),
+    }));
+
+    toast.success("Job marked as completed");
+  } catch (error) {
+    console.error("Error completing job:", error);
+    toast.error("Failed to complete job", {
+      description:
+        error instanceof Error ? error.message : "Failed to complete job",
+    });
+  } finally {
+    setIsSaving(false);
+  }
+};
+  // const handleCompleteJob = async () => {
+  //   if (isEditing) {
+  //     toast.error("Please save or cancel job edits before completing the job.");
+  //     return;
+  //   }
+  //   if (editedJob.status === "completed") {
+  //     return;
+  //   }
+
+  //   try {
+  //     setIsSaving(true);
+
+  //     const updatedJob = {
+  //       ...job,
+  //       ...editedJob,
+  //       status: "completed",
+  //     };
+
+  //     const completionPayload = {
+  //       job_title: updatedJob.title,
+  //       job_type:
+  //         updatedJob.type === "service_based" || updatedJob.type === "service-based"
+  //           ? "service_based"
+  //           : "contract_based",
+  //       ...(updatedJob.type === "contract_based" || updatedJob.type === "contract-based"
+  //         ? {
+  //             contractor_id: job.contractor
+  //               ? Number(job.contractor)
+  //               : undefined,
+  //           }
+  //         : {
+  //             customer_id: job.customer
+  //               ? Number(job.customer?.id || job.customer)
+  //               : undefined,
+  //           }),
+  //       description: updatedJob.description,
+  //       priority: updatedJob.priority.toLowerCase(),
+  //       address: updatedJob.address || job.address || "",
+  //       city_zip: updatedJob.cityZip || job.cityZip || "",
+  //       phone: job.phone || undefined,
+  //       email: job.email || undefined,
+  //       bill_to_address: job.billToAddress || undefined,
+  //       bill_to_city_zip: job.billToCityZip || undefined,
+  //       bill_to_phone: job.billToPhone || undefined,
+  //       bill_to_email: job.billToEmail || undefined,
+  //       same_as_address: job.sameAsAddress || false,
+  //       due_date: job.dueDate || "",
+  //       estimated_hours: job.estimatedHours || undefined,
+  //       estimated_cost: job.estimatedCost || undefined,
+  //       // Use current edited selections while completing, so assignments do not revert.
+  //       assigned_labor_ids: buildAssignedLaborIdsField(
+  //         editedJob.assignedLabor,
+  //         job.assigned_labor_ids,
+  //         isLaborSelectionTouched,
+  //       ),
+  //       assigned_lead_labor_ids: buildAssignedLaborIdsField(
+  //         editedJob.assignedLeadLabor,
+  //         job.assigned_lead_labor_ids,
+  //         isLeadLaborSelectionTouched,
+  //       ),
+  //       assigned_material_ids:
+  //         job.materials && job.materials.length > 0
+  //           ? JSON.stringify(job.materials)
+  //           : undefined,
+  //       status: updatedJob.status,
+  //     };
+  //     const response = await apiClient.updateJob(jobId, completionPayload);
+  //     const responseJob = response?.data || {};
+  //     console.log(responseJob,"responseJob");
+      
+
+  //     const resolvedAssignments = await resolveLaborDetailsFromResponse(
+  //       responseJob,
+  //       completionPayload.assigned_labor_ids ?? job.assigned_labor_ids,
+  //       completionPayload.assigned_lead_labor_ids ?? job.assigned_lead_labor_ids,
+  //     );
+
+  //     const completedJob = preserveJobPartyFieldsFromPrevious(job, {
+  //       ...job,
+  //       ...responseJob,
+  //       ...updatedJob,
+  //       title: updatedJob.title,
+  //       job_title: updatedJob.title,
+  //       description: updatedJob.description,
+  //       job_description: updatedJob.description,
+  //       assignedLaborDetails: resolvedAssignments.assignedLaborDetails,
+  //       assignedLeadLaborDetails: resolvedAssignments.assignedLeadLaborDetails,
+  //       assigned_labor_ids: resolvedAssignments.assigned_labor_ids,
+  //       assigned_lead_labor_ids: resolvedAssignments.assigned_lead_labor_ids,
+  //       status: "completed",
+  //     });
+
+  //     const updatedJobs = jobs.map((j: any) =>
+  //       String(j?.id) === String(jobId) ? completedJob : j,
+  //     );
+  //     skipNextEditedJobSyncRef.current = true;
+  //     setJobs(updatedJobs);
+  //     setEditedJob((prev) => ({
+  //       ...prev,
+  //       title: updatedJob.title,
+  //       description: updatedJob.description,
+  //       status: "completed",
+  //       assignedLabor: resolvedAssignments.assignedLaborDetails,
+  //       assignedLeadLabor: resolvedAssignments.assignedLeadLaborDetails,
+  //     }));
     
-      toast.success("Job marked as completed");
-    } catch (error) {
-      console.error("Error completing job:", error);
-      toast.error("Failed to complete job", {
-        description:
-          error instanceof Error ? error.message : "Failed to complete job",
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  //     toast.success("Job marked as completed");
+  //   } catch (error) {
+  //     console.error("Error completing job:", error);
+  //     toast.error("Failed to complete job", {
+  //       description:
+  //         error instanceof Error ? error.message : "Failed to complete job",
+  //     });
+  //   } finally {
+  //     setIsSaving(false);
+  //   }
+  // };
 
   const currentInvoice =
     selectedInvoiceId == null
@@ -5344,6 +5640,7 @@ const handlePrintInvoice = async (invoice: any) => {
           name: p.product_name,
           description: p.description || "",
           jdpSKU: p.jdp_sku,
+          supplierSKU: p.supplier_sku || "",
           jdpPrice: p.jdp_price || p.unit_cost || 0,
           estimatedPrice: p.estimated_price || 0,
           supplierId: p.supplier_id || 1,
@@ -5360,16 +5657,23 @@ const handlePrintInvoice = async (invoice: any) => {
     fetchSuppliers();
 
     // Fetch data based on job type
-    if (job.type === "contract-based" && job.contractor) {
-      // For contract-based jobs, fetch contractor data
-      fetchContractorData(job.contractor);
-    } else if (job.customer) {
-      // For service-based jobs, or contract-based fallback where only customer id exists
-      fetchCustomerData(job.customer);
+    const contractorRef = job.contractor ?? job.contractor_id;
+    const customerRef = job.customer ?? job.customer_id;
+
+    if (job.type === "contract-based" && contractorRef) {
+      // Contract-based jobs may return only contractor_id after completion.
+      const contractorId =
+        typeof contractorRef === "object" && contractorRef !== null
+          ? contractorRef.id
+          : contractorRef;
+      fetchContractorData(String(contractorId));
+    } else if (customerRef) {
+      // Service-based jobs (and fallback) may return only customer_id.
+      fetchCustomerData(customerRef);
     } else {
       console.log("No customer/contractor ID found in job data");
     }
-  }, [job.customer, job.contractor, job.type, job.id]);
+  }, [job.customer, job.customer_id, job.contractor, job.contractor_id, job.type, job.id]);
 
   // Debug: Log inlineInvoiceData changes
   useEffect(() => {}, [inlineInvoiceData.customerAddress]);
@@ -6749,8 +7053,8 @@ const handlePrintInvoice = async (invoice: any) => {
           {/* Left Column - Job Details */}
           {/* Job Details Card */}
           <div className="w-[70%]">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
+            <Card className="gap-0 overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between bg-gray-100 px-6 py-4 rounded-t-lg">
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
                   Job Details
@@ -6776,7 +7080,7 @@ const handlePrintInvoice = async (invoice: any) => {
                     size="sm"
                     className="gap-2"
                     onClick={handleCompleteJob}
-                    disabled={isSaving || isEditing || job.status === "completed"}
+                    disabled={isSaving || isEditing || editedJob.status === "completed"}
                   >
                     Complete Job
                   </Button>
@@ -6802,8 +7106,8 @@ const handlePrintInvoice = async (invoice: any) => {
                   )}
                 </div>
               </CardHeader>
-              {(isEditing || showJobDetails) && (
-                <CardContent className="space-y-6">
+              {(isEditing || showJobDetails) ? (
+                <CardContent className="space-y-6 px-6 py-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
                       <div
@@ -6828,19 +7132,7 @@ const handlePrintInvoice = async (invoice: any) => {
                               }
                             />
                           ) : (
-                            <p className="font-medium">
-                              {job.customerName ||
-                                customerData?.customer_name ||
-                                job.customer?.customer_name ||
-                                job.customer?.name ||
-                                job.subJobs?.[0]?.customer?.customer_name ||
-                                job.contractorName ||
-                                contractorData?.contractor_name ||
-                                job.contractor?.contractor_name ||
-                                job.contractor?.name ||
-                                job.contractor?.full_name ||
-                                "No customer assigned"}
-                            </p>
+                            <p className="font-medium">{resolveJobPartyDisplayName()}</p>
                           )}
                         </div>
                       </div>
@@ -7302,9 +7594,43 @@ const handlePrintInvoice = async (invoice: any) => {
                   </div>
                 )} */}
                 </CardContent>
+              ) : (
+                <CardContent className="px-6 py-6">
+                  <div className="grid grid-cols-1 gap-2.5 md:grid-cols-3 md:gap-3">
+                    <div className="flex items-start gap-2.5 rounded-md bg-[#f2f0f0] px-3 py-2.5">
+                      <Users className="mt-0.5 h-4 w-4 shrink-0 text-gray-600" />
+                      <div className="min-w-0">
+                        <p className="text-xs text-gray-600">
+                          Customer / Contractor
+                        </p>
+                        <p className="truncate text-sm font-medium text-[#2b2b2b]">
+                          {resolveJobPartyDisplayName()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2.5 rounded-md bg-[#9f6b290d] px-3 py-2.5">
+                      <FileText className="mt-0.5 h-4 w-4 shrink-0 text-gray-600" />
+                      <div className="min-w-0">
+                        <p className="text-xs text-gray-600">Job title</p>
+                        <p className="truncate text-sm font-medium text-[#2b2b2b]">
+                          {editedJob.title || "—"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2.5 rounded-md bg-[#dbdaff30] px-3 py-2.5">
+                      <Clock className="mt-0.5 h-4 w-4 shrink-0 text-gray-600" />
+                      <div className="min-w-0">
+                        <p className="text-xs text-gray-600">Status</p>
+                        <p className="truncate text-sm font-medium capitalize">
+                          {(editedJob.status || "—").replace(/_/g, " ")}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
               )}
-              <CardFooter>
-                {isEditing && (
+              {isEditing && (
+                <CardFooter className="border-t border-gray-100 bg-transparent px-6 pt-4 pb-6">
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
@@ -7331,8 +7657,8 @@ const handlePrintInvoice = async (invoice: any) => {
                       )}
                     </Button>
                   </div>
-                )}
-              </CardFooter>
+                </CardFooter>
+              )}
             </Card>
           </div>
           {/* Right Column - Project Summary */}

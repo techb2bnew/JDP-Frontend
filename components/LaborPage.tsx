@@ -193,7 +193,6 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
   }, [isCreateDialogOpen, isEditDialogOpen]);
   const [totalLabor, setTotalLabor] = useState(0)
   const [filteredLabors, setFilteredLabors] = useState<any[]>([]);
-  const [selectedLabors, setSelectedLabors] = useState<string[]>([])
   const [laborStats, setLaborStats] = useState({
     total_labor: 0,
     active_labor: 0,
@@ -741,10 +740,6 @@ useEffect(() => {
   // Don't fetch data here - let the search/pagination useEffect handle initial fetch
 }, []);
 
-// Clear selected labors when pagination, filters, or search changes
-useEffect(() => {
-  setSelectedLabors([]);
-}, [currentPage, filterTrade, filterAvailability, searchTerm]);
 const fetchRoles = async () => {
   try {
     const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
@@ -786,7 +781,7 @@ const fetchLeadLabourData = async () => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const response = await fetch(`${apiBaseUrl}/lead-labor/getAllLeadLabor`, {
+    const response = await fetch(`${apiBaseUrl}/lead-labor/getAllLeadLabor?page=1&limit=100`, {
       method: 'GET',
       headers
     });
@@ -1429,12 +1424,11 @@ const fetchLaborById = async (id: string) => {
             </DialogContent>
           </Dialog>
           <Button variant="outline" className="gap-2" onClick={() => {
-            if (selectedLabors.length === 0) {
-              toast.error('Please select at least one labor to export');
+            if (filteredLabors.length === 0) {
+              toast.error('No labor available to export');
               return;
             }
-            const selectedLaborData = filteredLabors.filter(labor => selectedLabors.includes(String(labor.id)));
-            downloadCSV(selectedLaborData, `labor-export-${new Date().toISOString().split('T')[0]}.csv`);
+            downloadCSV(filteredLabors, `labor-export-${new Date().toISOString().split('T')[0]}.csv`);
           }}>
             <Upload className="h-4 w-4" />
             Export
@@ -1507,8 +1501,8 @@ const fetchLaborById = async (id: string) => {
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Shield className="h-6 w-6 text-blue-600" />
+              <div className="p-2 bg-red-100 rounded-lg">
+                <Shield className="h-6 w-6 text-red-600" />
               </div>
               <div>
                 <p className="text-sm text-gray-600">Inactive</p>
@@ -1605,30 +1599,7 @@ const fetchLaborById = async (id: string) => {
           <Table>
             <TableHeader>
               <TableRow className="bg-[#162f3d] hover:bg-[#162f3d]">
-                <TableHead className="text-white font-medium w-12">
-                  <Checkbox
-                    checked={paginatedLaborers.length > 0 && paginatedLaborers.every(l => selectedLabors.includes(String(l.id)))}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        const paginatedIds = paginatedLaborers.map(l => String(l.id));
-                        setSelectedLabors(prev => {
-                          const newSelection = [...prev];
-                          paginatedIds.forEach(id => {
-                            if (!newSelection.includes(id)) {
-                              newSelection.push(id);
-                            }
-                          });
-                          return newSelection;
-                        });
-                      } else {
-                        const paginatedIds = paginatedLaborers.map(l => String(l.id));
-                        setSelectedLabors(prev => prev.filter(id => !paginatedIds.includes(id)));
-                      }
-                    }}
-                    className="border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-[#162f3d]"
-                  />
-                </TableHead>
-                <TableHead className="text-white font-medium">ID</TableHead>
+                <TableHead className="text-white font-medium pl-6">ID</TableHead>
                 <TableHead className="text-white font-medium">Name</TableHead>
                 <TableHead className="text-white font-medium">Contact</TableHead>
                 <TableHead className="text-white font-medium">Trade</TableHead>
@@ -1643,7 +1614,7 @@ const fetchLaborById = async (id: string) => {
             <TableBody>
               {isLoadingLabor ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8">
+                  <TableCell colSpan={10} className="text-center py-8">
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                       <span className="ml-2 text-gray-600">Loading labor data...</span>
@@ -1652,7 +1623,7 @@ const fetchLaborById = async (id: string) => {
                 </TableRow>
               ) : paginatedLaborers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8">
+                  <TableCell colSpan={10} className="text-center py-8">
                     <div className="flex flex-col items-center justify-center text-gray-500">
                       <div className="text-lg font-medium mb-2">No data available</div>
                       <div className="text-sm">
@@ -1666,19 +1637,7 @@ const fetchLaborById = async (id: string) => {
               ) : (
                 paginatedLaborers.map((labor, index) => (
                   <TableRow key={labor.id} className={index % 2 === 1 ? "bg-[#eff4fa]" : ""}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedLabors.includes(String(labor.id))}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedLabors(prev => [...prev, String(labor.id)]);
-                          } else {
-                            setSelectedLabors(prev => prev.filter(id => id !== String(labor.id)));
-                          }
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell className="text-sm text-[#2b2b2b]/80">#{labor.laborId}</TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80 pl-6">#{labor.laborId}</TableCell>
                     <TableCell>
                       <div>
                         <div className="text-sm font-medium text-[#2b2b2b]/80">{labor.name}</div>

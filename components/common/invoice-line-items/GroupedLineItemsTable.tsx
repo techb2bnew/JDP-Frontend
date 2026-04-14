@@ -18,6 +18,7 @@ type ProductType = {
   name: string;
   description?: string;
   jdpSKU?: string;
+  supplierSKU?: string;
   jdpPrice?: number;
   estimatedPrice?: number;
   rate?: number;

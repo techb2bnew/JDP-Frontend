@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { ActionButtonsPopup } from './ActionButtonsPopup'
 import { StaffDetailsPage } from './StaffDetailsPage'
 import { AutoSuggestInput } from './ui/auto-suggest-input'
-import { Checkbox } from './ui/checkbox'
 import { toast } from 'sonner'
 import { apiClient } from '../utils/api'
 import { usePermissions } from '../contexts/PermissionContext'
@@ -149,7 +148,6 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
   const [departments, setDepartments] = useState<string[]>([])
   const [positions, setPositions] = useState<string[]>([])
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({})
-  const [selectedStaff, setSelectedStaff] = useState<string[]>([])
   const [showImportDialog, setShowImportDialog] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
   const [isImporting, setIsImporting] = useState(false)
@@ -914,14 +912,10 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
   };
 
   const handleExportStaff = async () => {
-  // Check if any staff is selected
-  if (selectedStaff.length === 0) {
-    toast.error('Please select at least one staff member to export');
+  if (filteredStaff.length === 0) {
+    toast.error('No staff available to export');
     return;
   }
-
-  // Filter staff to only include selected ones
-  const selectedStaffData = staff.filter(member => selectedStaff.includes(member.id));
 
   // Prepare CSV headers
   const headers = [
@@ -937,7 +931,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
   ];
 
   // Prepare CSV rows
-  const rows = selectedStaffData.map(member => [
+  const rows = filteredStaff.map(member => [
     member.id,
     member.name,
     member.email,
@@ -1021,11 +1015,6 @@ useEffect(() => {
 
   return () => clearTimeout(debounceTimeout);
 }, [searchTerm, currentPage, itemsPerPage, filterStatus]);
-
-// Clear selected staff when pagination, filters, or search changes
-useEffect(() => {
-  setSelectedStaff([]);
-}, [currentPage, filterDepartment, filterStatus, searchTerm]);
 
 useEffect(() => {
   const fetchStaffByStatus = async () => {
@@ -1210,30 +1199,7 @@ useEffect(() => {
           <Table>
             <TableHeader>
               <TableRow className="bg-[#162f3d] hover:bg-[#162f3d]">
-                <TableHead className="text-white font-medium w-12">
-                  <Checkbox
-                    checked={paginatedStaff.length > 0 && paginatedStaff.every(m => selectedStaff.includes(m.id))}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        const paginatedIds = paginatedStaff.map(m => m.id);
-                        setSelectedStaff(prev => {
-                          const newSelection = [...prev];
-                          paginatedIds.forEach(id => {
-                            if (!newSelection.includes(id)) {
-                              newSelection.push(id);
-                            }
-                          });
-                          return newSelection;
-                        });
-                      } else {
-                        const paginatedIds = paginatedStaff.map(m => m.id);
-                        setSelectedStaff(prev => prev.filter(id => !paginatedIds.includes(id)));
-                      }
-                    }}
-                    className="border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-[#162f3d]"
-                  />
-                </TableHead>
-                <TableHead className="text-white font-medium">ID</TableHead>
+                <TableHead className="text-white font-medium pl-6">ID</TableHead>
                 <TableHead className="text-white font-medium">Name</TableHead>
                 <TableHead className="text-white font-medium">Phone</TableHead>
                 <TableHead className="text-white font-medium">Email</TableHead>
@@ -1249,7 +1215,7 @@ useEffect(() => {
             <TableBody>
               {isLoadingStaff ? (
                 <TableRow>
-                  <TableCell colSpan={12} className="text-center py-8">
+                  <TableCell colSpan={11} className="text-center py-8">
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                       <span className="ml-2 text-gray-600">Loading staff data...</span>
@@ -1258,7 +1224,7 @@ useEffect(() => {
                 </TableRow>
               ) : paginatedStaff.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={12} className="text-center py-8">
+                  <TableCell colSpan={11} className="text-center py-8">
                     <div className="flex flex-col items-center justify-center text-gray-500">
                       <div className="text-lg font-medium mb-2">No data available</div>
                       <div className="text-sm">
@@ -1272,19 +1238,7 @@ useEffect(() => {
               ) : (
                 paginatedStaff.map((member, index) => (
                 <TableRow key={member.id} className={index % 2 === 1 ? "bg-[#eff4fa]" : ""}>
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedStaff.includes(member.id)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedStaff(prev => [...prev, member.id]);
-                        } else {
-                          setSelectedStaff(prev => prev.filter(id => id !== member.id));
-                        }
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">#{member.id}</TableCell>
+                  <TableCell className="text-sm text-[#2b2b2b]/80 pl-6">#{member.id}</TableCell>
                   <TableCell className="text-sm text-[#2b2b2b]/80 font-medium">{member.name}</TableCell>
                   <TableCell className="text-sm text-[#2b2b2b]/80">{member.phone}</TableCell>
                   <TableCell className="text-sm text-gray-900">{member.email}</TableCell>

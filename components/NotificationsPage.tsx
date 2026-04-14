@@ -784,17 +784,25 @@ export function NotificationsPage() {
 
       if (responseData.success) {
         // Update local state
-        setNotifications(notifications.map(n =>
-          n.id === notificationId
-            ? { ...n, isRead: true, read_at: new Date().toISOString() }
-            : n
-        ))
+        setNotifications(prev =>
+          prev.map(n =>
+            n.id === notificationId
+              ? { ...n, isRead: true, read_at: new Date().toISOString() }
+              : n
+          )
+        )
 
         // Update pagination unread count
+        const nextUnreadCount = Math.max(0, pagination.unread_count - 1)
         setPagination(prev => ({
           ...prev,
-          unread_count: Math.max(0, prev.unread_count - 1)
+          unread_count: nextUnreadCount
         }))
+        window.dispatchEvent(
+          new CustomEvent('notificationsUnreadCountUpdated', {
+            detail: { count: nextUnreadCount }
+          })
+        )
 
         toast.success('Notification marked as read')
       } else {
@@ -933,16 +941,26 @@ export function NotificationsPage() {
 
       if (responseData.success) {
         // Update local state
-        setNotifications(notifications.map(notification => ({
-          ...notification,
-          isRead: true
-        })))
+        setNotifications(prev =>
+          prev.map(notification => ({
+            ...notification,
+            isRead: true
+          }))
+        )
 
         // Update pagination unread count
         setPagination(prev => ({
           ...prev,
           unread_count: 0
         }))
+        window.dispatchEvent(
+          new CustomEvent('notificationsUnreadCountUpdated', {
+            detail: { count: 0 }
+          })
+        )
+
+        // Re-sync from API to avoid any stale counter flash
+        await fetchUserNotifications(currentPage)
 
         toast.success('All notifications marked as read')
       } else {

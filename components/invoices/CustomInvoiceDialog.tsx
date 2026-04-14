@@ -583,6 +583,9 @@ console.log(totalAmount,"amounttt");
       return (
         (product.name || "").toLowerCase().includes(q) ||
         (product.jdpSKU || "").toLowerCase().includes(q) ||
+        (product.supplierSKU || product.supplier_sku || "")
+          .toLowerCase()
+          .includes(q) ||
         (product.description || "").toLowerCase().includes(q)
       );
     });
@@ -798,6 +801,8 @@ console.log(totalAmount,"amounttt");
           description: p.description || "",
           jdpSKU: p.jdp_sku || p.jdpSKU || "",
           jdp_sku: p.jdp_sku || p.jdpSKU || "",
+          supplierSKU: p.supplier_sku || p.supplierSKU || "",
+          supplier_sku: p.supplier_sku || p.supplierSKU || "",
           jdpPrice: Number(p.jdp_price || p.jdpPrice || p.unit_cost || 0),
           rate: Number(p.jdp_price || p.jdpPrice || p.unit_cost || 0),
           estimatedPrice: Number(p.estimated_price || p.estimatedPrice || 0),
@@ -815,6 +820,9 @@ console.log(totalAmount,"amounttt");
               return (
                 (product.name || "").toLowerCase().includes(q) ||
                 (product.jdpSKU || "").toLowerCase().includes(q) ||
+                (product.supplierSKU || product.supplier_sku || "")
+                  .toLowerCase()
+                  .includes(q) ||
                 (product.description || "").toLowerCase().includes(q)
               );
             })

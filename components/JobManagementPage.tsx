@@ -20,7 +20,6 @@ import { apiClient } from '../utils/api'
 import {
   Plus,
   Search,
-  Filter,
   Calendar,
   User,
   MapPin,
@@ -90,6 +89,7 @@ export function JobManagementPage() {
   const [isCompleting, setIsCompleting] = useState(false)
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(true)
   const [isLoadingJobs, setIsLoadingJobs] = useState(false);
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Record<string, boolean>>({})
   const [jobStats, setJobStats] = useState({
     total: 0,
     active: 0,
@@ -104,6 +104,65 @@ export function JobManagementPage() {
   })
   const itemsPerPage = 6
 
+  const normalizeJobType = (rawType: string): 'service-based' | 'contract-based' => {
+    const value = (rawType || '').toLowerCase()
+    if (value === 'service_based' || value === 'service-based') return 'service-based'
+    return 'contract-based'
+  }
+
+  const normalizeJobStatus = (rawStatus: string): string => {
+    const value = (rawStatus || '').toLowerCase()
+    if (value === 'in_progress' || value === 'in-progress') return 'in-progress'
+    if (value === 'active') return 'active'
+    if (value === 'completed') return 'completed'
+    if (value === 'cancelled') return 'cancelled'
+    if (value === 'draft') return 'draft'
+    if (value === 'on_hold') return 'on_hold'
+    return value || 'pending'
+  }
+
+  const mapApiJobToUi = (job: any) => ({
+    id: job.id?.toString() || `JOB-${Date.now()}`,
+    title: job.job_title || job.title || '',
+    type: normalizeJobType(job.job_type || job.type || ''),
+    description: job.description || job.job_description || '',
+    priority: job.priority || '',
+    status: normalizeJobStatus(job.status || 'pending'),
+    address: job.address || '',
+    cityZip: job.city_zip || job.cityZip || '',
+    phone: job.phone || '',
+    email: job.email || '',
+    billToAddress: job.bill_to_address || '',
+    billToCityZip: job.bill_to_city_zip || '',
+    billToPhone: job.bill_to_phone || '',
+    billToEmail: job.bill_to_email || '',
+    dueDate: job.due_date || job.dueDate || '',
+    estimatedHours: Number(job.estimated_hours ?? job.estimatedHours ?? 0),
+    estimatedCost: Number(job.estimated_cost ?? job.estimatedCost ?? 0),
+    createdDate: job.created_at ? new Date(job.created_at).toISOString().split('T')[0] : '',
+    updatedDate: job.updated_at ? new Date(job.updated_at).toISOString().split('T')[0] : '',
+    customer: job.customer?.customer_name || 'Unknown Customer',
+    customerName: job.customer?.customer_name || job.customer?.company_name,
+    contractor: job.contractor?.full_name || 'Unassigned',
+    contractorName: job.contractor?.full_name || job.contractor?.company_name,
+    assignedLeadLabor: job.assigned_lead_labor?.map((l: any) => ({
+      id: l.id,
+      name: l.user?.full_name || '',
+      email: l.user?.email || '',
+      phone: l.user?.phone || '',
+    })) || [],
+    assignedLabor: job.assigned_labor?.map((l: any) => ({
+      id: l.id,
+      name: l.user?.full_name || '',
+      email: l.user?.email || '',
+      phone: l.user?.phone || '',
+      hourlyRate: l.hourly_rate,
+      totalCost: l.total_cost,
+    })) || [],
+    assignedLaborDetails: job.assigned_labor || [],
+    assignedLeadLaborDetails: job.assigned_lead_labor || [],
+  })
+
   // Fetch jobs from API
   const fetchJobs = async (page: number = 1) => {
     try {
@@ -114,47 +173,7 @@ export function JobManagementPage() {
       const jobs = response.data?.jobs || response.data || []
       
       // Transform jobs to match component format
-      const transformedJobs = jobs.map((job: any) => ({
-        id: job.id?.toString() || `JOB-${Date.now()}`,
-        title: job.job_title || '',
-        type: job.job_type || '',
-        description: job.description || '',
-        priority: job.priority || '',
-        status: job.status || 'pending',
-        address: job.address || '',
-        cityZip: job.city_zip || '',
-        phone: job.phone || '',
-        email: job.email || '',
-        billToAddress: job.bill_to_address || '',
-        billToCityZip: job.bill_to_city_zip || '',
-        billToPhone: job.bill_to_phone || '',
-        billToEmail: job.bill_to_email || '',
-        dueDate: job.due_date || '',
-        estimatedHours: job.estimated_hours || 0,
-        estimatedCost: job.estimated_cost || 0,
-        createdDate: job.created_at ? new Date(job.created_at).toISOString().split('T')[0] : '',
-        updatedDate: job.updated_at ? new Date(job.updated_at).toISOString().split('T')[0] : '',
-        customer: job.customer?.customer_name || 'Unknown Customer',
-        customerName: job.customer?.customer_name || job.customer?.company_name,
-        contractor: job.contractor?.full_name || 'Unassigned',
-        contractorName: job.contractor?.full_name || job.contractor?.company_name,
-        assignedLeadLabor: job.assigned_lead_labor?.map((l: any) => ({
-          id: l.id,
-          name: l.user?.full_name || '',
-          email: l.user?.email || '',
-          phone: l.user?.phone || '',
-        })) || [],
-        assignedLabor: job.assigned_labor?.map((l: any) => ({
-          id: l.id,
-          name: l.user?.full_name || '',
-          email: l.user?.email || '',
-          phone: l.user?.phone || '',
-          hourlyRate: l.hourly_rate,
-          totalCost: l.total_cost,
-        })) || [],
-        assignedLaborDetails: job.assigned_labor || [],
-        assignedLeadLaborDetails: job.assigned_lead_labor || [],
-      }))
+      const transformedJobs = jobs.map(mapApiJobToUi)
       
       setJobs(transformedJobs)
       console.log('Jobs????:', transformedJobs)
@@ -210,43 +229,7 @@ export function JobManagementPage() {
     const response = await apiClient.searchJobsByQuery(searchTerm.trim(), currentPage, itemsPerPage);
     const jobs = response.data?.jobs || [];
 
-    const transformedJobs = jobs.map((job: any) => ({
-      id: job.id?.toString() || `JOB-${Date.now()}`,
-      title: job.job_title || '',
-      type: job.job_type || '',
-      description: job.description || '',
-      priority: job.priority || '',
-      status: job.status || 'pending',
-      address: job.address || '',
-      cityZip: job.city_zip || '',
-      phone: job.phone || '',
-      email: job.email || '',
-      billToAddress: job.bill_to_address || '',
-      billToCityZip: job.bill_to_city_zip || '',
-      billToPhone: job.bill_to_phone || '',
-      billToEmail: job.bill_to_email || '',
-      dueDate: job.due_date || '',
-      estimatedHours: job.estimated_hours || 0,
-      estimatedCost: job.estimated_cost || 0,
-      createdDate: job.created_at ? new Date(job.created_at).toISOString().split('T')[0] : '',
-      updatedDate: job.updated_at ? new Date(job.updated_at).toISOString().split('T')[0] : '',
-      customer: job.customer?.customer_name || 'Unknown Customer',
-      contractor: job.contractor?.full_name || 'Unassigned',
-      assignedLeadLabor: job.assigned_lead_labor?.map((l: any) => ({
-        id: l.id,
-        name: l.user?.full_name || '',
-        email: l.user?.email || '',
-        phone: l.user?.phone || '',
-      })) || [],
-      assignedLabor: job.assigned_labor?.map((l: any) => ({
-        id: l.id,
-        name: l.user?.full_name || '',
-        email: l.user?.email || '',
-        phone: l.user?.phone || '',
-        hourlyRate: l.hourly_rate,
-        totalCost: l.total_cost,
-      })) || [],
-    }));
+    const transformedJobs = jobs.map(mapApiJobToUi);
 
 
     setJobs(transformedJobs);
@@ -301,43 +284,7 @@ const fetchJobsWithFilters = async () => {
     const response = await resp.json();
 
     const jobs = response.data?.jobs || [];
-    const transformedJobs = jobs.map((job: any) => ({
-      id: job.id?.toString() || `JOB-${Date.now()}`,
-      title: job.job_title || '',
-      type: job.job_type || '',
-      description: job.description || '',
-      priority: job.priority || '',
-      status: job.status || 'pending',
-      address: job.address || '',
-      cityZip: job.city_zip || '',
-      phone: job.phone || '',
-      email: job.email || '',
-      billToAddress: job.bill_to_address || '',
-      billToCityZip: job.bill_to_city_zip || '',
-      billToPhone: job.bill_to_phone || '',
-      billToEmail: job.bill_to_email || '',
-      dueDate: job.due_date || '',
-      estimatedHours: job.estimated_hours || 0,
-      estimatedCost: job.estimated_cost || 0,
-      createdDate: job.created_at ? new Date(job.created_at).toISOString().split('T')[0] : '',
-      updatedDate: job.updated_at ? new Date(job.updated_at).toISOString().split('T')[0] : '',
-      customer: job.customer?.customer_name || 'Unknown Customer',
-      contractor: job.contractor?.full_name || 'Unassigned',
-      assignedLeadLabor: job.assigned_lead_labor?.map((l: any) => ({
-        id: l.id,
-        name: l.user?.full_name || '',
-        email: l.user?.email || '',
-        phone: l.user?.phone || '',
-      })) || [],
-      assignedLabor: job.assigned_labor?.map((l: any) => ({
-        id: l.id,
-        name: l.user?.full_name || '',
-        email: l.user?.email || '',
-        phone: l.user?.phone || '',
-        hourlyRate: l.hourly_rate,
-        totalCost: l.total_cost,
-      })) || [],
-    }));
+    const transformedJobs = jobs.map(mapApiJobToUi);
 
     setJobs(transformedJobs);
     setTotalJobs(response.data?.pagination?.total ?? transformedJobs.length);
@@ -417,12 +364,12 @@ useEffect(() => {
     setCurrentView('create')
   }
 
-  const handleJobCreated = (newJob: Job) => {
-    // Refresh the jobs list and stats
+  const handleJobCreated = (_newJob: Job) => {
+    // Refresh the jobs list and stats for when the user returns to Jobs
     fetchJobs(currentPage)
     fetchJobStats()
-    setCurrentView('list')
-    toast.success('Job created successfully!')
+    // Do not setCurrentView('list') here: JobCreationPage navigates away (e.g. /customers)
+    // and switching to list first would flash the jobs page before the route change.
   }
 
   const handleEditJob = async (job: Job) => {
@@ -557,9 +504,10 @@ useEffect(() => {
   }
 
   const getTypeBadge = (type: string) => {
+    const normalizedType = normalizeJobType(type)
     return (
       <Badge className="bg-[#E6F6FF] text-[#00A1FF] border-[#00A1FF]/20 hover:bg-[#E6F6FF]">
-        {type === 'service_based' ? 'Service-Based' : 'Contract-Based'}
+        {normalizedType === 'service-based' ? 'Service-Based' : 'Contract-Based'}
       </Badge>
     )
   }
@@ -600,17 +548,19 @@ useEffect(() => {
   }
 
   const formatCurrency = (amount?: number) => {
-    if (!amount) return 'N/A'
+    if (amount === null || amount === undefined || Number.isNaN(Number(amount))) return 'N/A'
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 0
-    }).format(amount)
+    }).format(Number(amount))
   }
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A'
     try {
       const date = new Date(dateString)
+      if (Number.isNaN(date.getTime())) return 'N/A'
       return date.toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
@@ -728,7 +678,7 @@ useEffect(() => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
   {/* Total Jobs */}
   <Card className="bg-white shadow-md border-0">
     <CardContent className="p-6">
@@ -745,27 +695,6 @@ useEffect(() => {
         </div>
         <div className="w-12 h-12 bg-[#E6F6FF] rounded-lg flex items-center justify-center">
           <FileText className="h-6 w-6 text-[#00A1FF]" />
-        </div>
-      </div>
-    </CardContent>
-  </Card>
-
-  {/* Active Jobs */}
-  <Card className="bg-white shadow-md border-0">
-    <CardContent className="p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-gray-600">Active</p>
-          {isLoadingDashboard ? (
-            <div className="flex items-center h-8">
-              <LoadingSpinner />
-            </div>
-          ) : (
-            <p className="text-2xl font-medium text-[#2b2b2b]">{jobStats.active}</p>
-          )}
-        </div>
-        <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
-          <Clock className="h-6 w-6 text-blue-600" />
         </div>
       </div>
     </CardContent>
@@ -882,10 +811,6 @@ useEffect(() => {
               </SelectContent>
             </Select> */}
 
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Filter className="h-4 w-4" />
-              <span>{jobs.length} jobs</span>
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -898,12 +823,12 @@ useEffect(() => {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {jobs.map((job) => (
-            <Card key={job.id} className="bg-white shadow-md border-0 hover:shadow-md transition-shadow">
-              <CardHeader className="pb-4">
+            <Card key={job.id} className="bg-white border border-[#E5E7EB] shadow-sm hover:shadow-md transition-all duration-200">
+              <CardHeader className="pb-3 pt-5">
                 <div className="flex items-start justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-medium text-[#2b2b2b]">{job.title}</h3>
+                  <div className="space-y-2 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <h3 className="font-medium text-[#2b2b2b] truncate">{job.title}</h3>
                       {/* {getPriorityBadge(job.priority)} */}
                     </div>
                     <p className="text-sm text-gray-600">#{job.id}</p>
@@ -926,10 +851,36 @@ useEffect(() => {
                   />
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm leading-relaxed text-gray-700 break-words whitespace-normal overflow-hidden">
-                  {job.description}
-                </p>
+              <CardContent className="space-y-4 pt-0 pb-5">
+                {(() => {
+                  const full = job.description || ''
+                  const threshold = 90
+                  const expanded = !!expandedDescriptions[job.id]
+                  const needsToggle = full.length > threshold
+                  return (
+                    <div>
+                      <p
+                        className={[
+                          'text-sm leading-relaxed text-gray-700 break-words whitespace-pre-wrap',
+                          expanded || !needsToggle ? '' : 'line-clamp-2 min-h-[2.75rem]'
+                        ].join(' ')}
+                      >
+                        {full}
+                      </p>
+                      {needsToggle && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedDescriptions(prev => ({ ...prev, [job.id]: !prev[job.id] }))
+                          }
+                          className="mt-1 text-sm font-medium text-[#00A1FF] hover:underline"
+                        >
+                          {expanded ? 'View Less' : 'View More'}
+                        </button>
+                      )}
+                    </div>
+                  )
+                })()}
 
                 <div className="space-y-3">
                   {job.customerName && (
@@ -964,7 +915,7 @@ useEffect(() => {
                     <DollarSign className="h-4 w-4 text-gray-400" />
                     <span className="text-gray-600">Cost:</span>
                     <span className="font-medium text-[#2b2b2b]">
-                      {formatCurrency(job.actualCost || job.estimatedCost)}
+                      {formatCurrency(job.estimatedCost)}
                     </span>
                   </div>
                 </div>
@@ -1002,7 +953,7 @@ useEffect(() => {
 
 
       {/* Empty State */}
-      {!isLoadingJobs && jobs.length === 0 && (
+      {!isLoadingJobs && !loading && jobs.length === 0 && (
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-12 text-center">
             <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -1024,7 +975,7 @@ useEffect(() => {
       )}
 
       {/* Pagination */}
-      {totalPages > 1 && (
+      {!isLoadingJobs && !loading && totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
           <Button
             variant="outline"

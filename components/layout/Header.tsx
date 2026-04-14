@@ -57,7 +57,7 @@ interface Notification {
   time: string;
   type: "order" | "payment" | "inventory" | "task";
   unread: boolean;
-  onCreateEstimateClick: () => void;
+  onCreateEstimateClick?: () => void;
 }
 
 export function Header({
@@ -93,6 +93,69 @@ export function Header({
   };
 
   const userData = getUserData();
+  
+  const defaultAvatar = "";
+  const resolveUserAvatarSrc = (user: any) =>
+    user?.photo_url ||
+    user?.profile_picture ||
+    user?.profilePicture ||
+    user?.profile_image ||
+    user?.avatar_url ||
+    user?.avatar ||
+    user?.staff?.photo_url ||
+    user?.staff?.profile_image ||
+    user?.staff?.profile_picture ||
+    user?.lead_labour?.photo_url ||
+    user?.lead_labour?.profile_image ||
+    user?.labour?.photo_url ||
+    user?.labour?.profile_image ||
+    defaultAvatar;
+
+  const initialAvatarSrc =
+    resolveUserAvatarSrc(userData);
+  const [profileAvatarSrc, setProfileAvatarSrc] = useState(initialAvatarSrc);
+
+  useEffect(() => {
+    setProfileAvatarSrc(resolveUserAvatarSrc(userData));
+  }, [
+    userData?.photo_url,
+    userData?.profile_picture,
+    userData?.profilePicture,
+    userData?.profile_image,
+    userData?.avatar_url,
+    userData?.avatar,
+    userData?.staff?.photo_url,
+    userData?.staff?.profile_image,
+    userData?.staff?.profile_picture,
+    userData?.lead_labour?.photo_url,
+    userData?.lead_labour?.profile_image,
+    userData?.labour?.photo_url,
+    userData?.labour?.profile_image,
+  ]);
+
+  useEffect(() => {
+    const syncAvatarFromStorage = () => {
+      const latestUser = getUserData();
+      setProfileAvatarSrc(resolveUserAvatarSrc(latestUser));
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (!event.key || event.key === "jdp_auth") {
+        syncAvatarFromStorage();
+      }
+    };
+
+    window.addEventListener("authUserUpdated", syncAvatarFromStorage);
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("focus", syncAvatarFromStorage);
+
+    return () => {
+      window.removeEventListener("authUserUpdated", syncAvatarFromStorage);
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("focus", syncAvatarFromStorage);
+    };
+  }, []);
+  
 
   const handleLogout = async () => {
     let loadingToastId: string | number | undefined;
@@ -352,6 +415,23 @@ export function Header({
       ? realTimeUnreadCount
       : notifications.filter((n) => n.unread).length;
 
+  useEffect(() => {
+    const onUnreadCountUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<{ count?: number }>;
+      const count = customEvent.detail?.count;
+      if (typeof count === "number" && !Number.isNaN(count)) {
+        setRealTimeUnreadCount(Math.max(0, count));
+      }
+    };
+    window.addEventListener("notificationsUnreadCountUpdated", onUnreadCountUpdated);
+    return () => {
+      window.removeEventListener(
+        "notificationsUnreadCountUpdated",
+        onUnreadCountUpdated,
+      );
+    };
+  }, []);
+
   // Fetch jobs for invoice dialog
   useEffect(() => {
     const fetchJobs = async () => {
@@ -553,11 +633,20 @@ export function Header({
                 <Button variant="ghost" size="icon" className="profile-button">
                   <Avatar className="h-8 w-8">
                     <AvatarImage
-                      src="/assets/images/avatars/admin-user.jpg"
-                      alt="Admin"
+                      src={profileAvatarSrc}
+                      alt={userData?.full_name || "User"}
+                      onError={() => {
+                        if (profileAvatarSrc !== defaultAvatar) {
+                          setProfileAvatarSrc(defaultAvatar);
+                        }
+                      }}
                     />
                     <AvatarFallback className="bg-primary text-primary-foreground">
-                      <User className="h-4 w-4" />
+                      {userData?.full_name ? (
+                        userData.full_name.charAt(0).toUpperCase()
+                      ) : (
+                        <User className="h-4 w-4" />
+                      )}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -571,11 +660,13 @@ export function Header({
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10">
                       <AvatarImage
-                        src={
-                          userData?.photo_url ||
-                          "/assets/images/avatars/admin-user.jpg"
-                        }
+                        src={profileAvatarSrc}
                         alt={userData?.full_name || "User"}
+                        onError={() => {
+                          if (profileAvatarSrc !== defaultAvatar) {
+                            setProfileAvatarSrc(defaultAvatar);
+                          }
+                        }}
                       />
                       <AvatarFallback className="bg-primary text-primary-foreground">
                         {userData?.full_name ? (

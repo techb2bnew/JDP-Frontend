@@ -8,6 +8,8 @@ export type ProductType = {
   name: string;
   description?: string;
   jdpSKU?: string;
+  /** Supplier / manufacturer SKU (may come from API as supplier_sku) */
+  supplierSKU?: string;
   jdpPrice?: number;
   estimatedPrice?: number;
   rate?: number;

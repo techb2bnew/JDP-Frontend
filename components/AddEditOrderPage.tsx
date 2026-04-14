@@ -277,7 +277,11 @@ export function AddEditOrderPage() {
     }))
     
     // Auto-populate Customer or Contractor based on job_type
-    if (job.job_type === 'service_based' && job.customer) {
+    const normalizedJobType =
+      String(job.job_type || job.type || '').toLowerCase() === 'service-based'
+        ? 'service_based'
+        : String(job.job_type || job.type || '').toLowerCase()
+    if (normalizedJobType === 'service_based' && job.customer) {
       setSelectedCustomer(job.customer)
       const customerName = job.customer.customer_name || job.customer.customerName || ''
       setCustomerSearch(customerName)
@@ -291,7 +295,7 @@ export function AddEditOrderPage() {
         notes: job.description || '',
         internal_notes: job.description || ''
       }))
-    } else if (job.job_type === 'contract_based' && job.contractor) {
+    } else if (normalizedJobType === 'contract_based' && job.contractor) {
       // Contract based job with contractor
       const contractorData = {
         id: job.contractor.id,
@@ -373,6 +377,32 @@ export function AddEditOrderPage() {
       setProductSearch('')
       setShowProductResults(false)
     }
+  }
+
+  const getJobPartyDisplayName = (job: any): string => {
+    const normalizedJobType =
+      String(job?.job_type || job?.type || '').toLowerCase() === 'service-based'
+        ? 'service_based'
+        : String(job?.job_type || job?.type || '').toLowerCase()
+
+    if (normalizedJobType === 'contract_based') {
+      return (
+        job?.contractor?.contractor_name ||
+        job?.contractor?.company_name ||
+        job?.contractor?.name ||
+        job?.contractor?.users?.full_name ||
+        job?.contractorName ||
+        ''
+      )
+    }
+
+    return (
+      job?.customer?.customer_name ||
+      job?.customer?.company_name ||
+      job?.customer?.name ||
+      job?.customerName ||
+      ''
+    )
   }
 
   const removeProduct = (productId: number) => {
@@ -643,7 +673,7 @@ export function AddEditOrderPage() {
                               className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100"
                             >
                               <div className="font-medium">{job.job_title || job.title}</div>
-                              <div className="text-sm text-muted-foreground">{job.customer?.customer_name || job.customer?.company_name || job.contractor?.company_name}</div>
+                              <div className="text-sm text-muted-foreground">{getJobPartyDisplayName(job)}</div>
                             </div>
                           ))
                         ) : (

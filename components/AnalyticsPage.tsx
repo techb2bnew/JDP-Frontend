@@ -226,6 +226,11 @@ type AnalyticsMetric = {
   change_today_vs_yesterday?: MetricChange
 }
 
+/** `/analytics/overview` — `active_jobs` includes legacy `total` plus `total_jobs` for the real count */
+type ActiveJobsOverviewMetric = AnalyticsMetric & {
+  total_jobs?: number
+}
+
 type OnlineStaffAnalyticsMetric = AnalyticsMetric & {
   breakdown?: {
     staff?: number
@@ -235,7 +240,16 @@ type OnlineStaffAnalyticsMetric = AnalyticsMetric & {
 }
 
 type AnalyticsOverviewData = {
-  active_jobs?: AnalyticsMetric
+  /** Combined total jobs (customer + contractor); preferred for Total Jobs card */
+  total_jobs?: AnalyticsMetric
+  /** Legacy key — backend may still send this; treated as total jobs when total_jobs absent */
+  active_jobs?: ActiveJobsOverviewMetric
+  /** Breakdown: total = service_based + contract_based */
+  job_types?: {
+    total: number
+    service_based?: number
+    contract_based?: number
+  }
   online_staff?: OnlineStaffAnalyticsMetric
   pending_approvals?: AnalyticsMetric
   todays_revenue?: AnalyticsMetric
@@ -253,25 +267,25 @@ type MetricDefinition<K extends keyof AnalyticsOverviewData = keyof AnalyticsOve
 const metricDefinitions: MetricDefinition[] = [
   {
     key: 'active_jobs',
-    title: 'Active Jobs',
+    title: 'Total Jobs',
     icon: Briefcase,
     color: 'text-blue-600',
     bgColor: 'bg-blue-50'
   },
   {
     key: 'online_staff',
-    title: 'Online Staff',
+    title: 'Total Staff',
     icon: Users,
     color: 'text-green-600',
     bgColor: 'bg-green-50'
   },
-  {
-    key: 'pending_approvals',
-    title: 'Pending Approvals',
-    icon: AlertTriangle,
-    color: 'text-orange-600',
-    bgColor: 'bg-orange-50'
-  },
+  // {
+  //   key: 'pending_approvals',
+  //   title: 'Pending Approvals',
+  //   icon: AlertTriangle,
+  //   color: 'text-orange-600',
+  //   bgColor: 'bg-orange-50'
+  // },
   // {
   //   key: 'todays_revenue',
   //   title: "Today's Revenue",
@@ -309,11 +323,10 @@ export function AnalyticsPage() {
   const [selectedRegion, setSelectedRegion] = useState('all')
   const [analyticsOverview, setAnalyticsOverview] = useState<AnalyticsOverviewData | null>(null)
   const [isLoadingOverview, setIsLoadingOverview] = useState(false)
+  const [isLoadingEfficiencyTrends, setIsLoadingEfficiencyTrends] = useState(false)
   const [overviewError, setOverviewError] = useState<string | null>(null)
   const [jobTypeAnalytics, setJobTypeAnalytics] = useState<JobTypeAnalyticsItem[]>(defaultJobTypeAnalytics)
-  const [efficiencyTrends, setEfficiencyTrends] = useState(
-    revenueAnalytics.monthly.map(({ month, jobs }) => ({ month, jobs })),
-  )
+  const [efficiencyTrends, setEfficiencyTrends] = useState<Array<{ month: string; jobs: number }>>([])
   const isMountedRef = useRef(true)
 
   useEffect(() => {
@@ -355,48 +368,60 @@ export function AnalyticsPage() {
     fetchAnalyticsOverview()
   }, [fetchAnalyticsOverview])
 
-  useEffect(() => {
+  const fetchEfficiencyTrends = useCallback(async () => {
     if (!isMountedRef.current) return
+    setIsLoadingEfficiencyTrends(true)
+    setEfficiencyTrends([])
 
-    const fetchEfficiencyTrends = async () => {
-      try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
-        if (!apiBaseUrl) return
+    try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
+      if (!apiBaseUrl) return
 
-        const token = localStorage.getItem('jdp_auth')
-          ? JSON.parse(localStorage.getItem('jdp_auth')!).token
-          : null
+      const token = localStorage.getItem('jdp_auth')
+        ? JSON.parse(localStorage.getItem('jdp_auth')!).token
+        : null
 
-        const res = await fetch(`${apiBaseUrl}/analytics/efficiency-trends`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        })
+      const res = await fetch(`${apiBaseUrl}/analytics/efficiency-trends`, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      })
 
-        const payload = await res.json()
-        if (!payload?.success) return
+      const payload = await res.json()
+      if (!payload?.success) return
 
-        const jobsTrend = payload?.data?.jobs_trend
-        if (!Array.isArray(jobsTrend)) return
+      const jobsTrend = payload?.data?.jobs_trend
+      if (!Array.isArray(jobsTrend)) return
 
-        const normalized = jobsTrend.map((item: any) => {
+      const normalized = jobsTrend
+        .map((item: any) => {
           const month = item?.month ?? item?.month_key ?? ''
           return {
             month,
             jobs: typeof item?.jobs === 'number' ? item.jobs : Number(item?.jobs) || 0,
           }
-        }).filter((x: any) => x.month)
+        })
+        .filter((x: any) => x.month)
 
-        if (normalized.length > 0) setEfficiencyTrends(normalized)
-      } catch (error) {
-        console.error('Error fetching efficiency trends:', error)
-      }
+      if (normalized.length > 0) setEfficiencyTrends(normalized)
+    } catch (error) {
+      console.error('Error fetching efficiency trends:', error)
+    } finally {
+      if (!isMountedRef.current) return
+      setIsLoadingEfficiencyTrends(false)
     }
-
-    fetchEfficiencyTrends()
   }, [])
+
+  useEffect(() => {
+    fetchEfficiencyTrends()
+  }, [fetchEfficiencyTrends])
+
+  const handleRefreshAnalytics = useCallback(() => {
+    void Promise.all([fetchAnalyticsOverview(), fetchEfficiencyTrends()])
+  }, [fetchAnalyticsOverview, fetchEfficiencyTrends])
 
   const formatMetricValue = (value: number | null | undefined, unit?: 'currency') => {
     if (value === null || value === undefined) {
@@ -496,6 +521,26 @@ export function AnalyticsPage() {
     return trend === 'up' ? TrendingUp : TrendingDown
   }
 
+  /** Backend sends `active_jobs.total_jobs` (e.g. 27) while `active_jobs.total` may be 0 */
+  const resolveAnalyticsJobsTotal = (
+    overview: AnalyticsOverviewData | null,
+  ): number | null | undefined => {
+    if (!overview) return undefined
+    const aj = overview.active_jobs
+    if (aj?.total_jobs != null && !Number.isNaN(Number(aj.total_jobs))) {
+      return Number(aj.total_jobs)
+    }
+    if (overview.job_types?.total != null) {
+      return Number(overview.job_types.total)
+    }
+    if (overview.job_types != null) {
+      const sb = overview.job_types.service_based ?? 0
+      const cb = overview.job_types.contract_based ?? 0
+      if (sb !== 0 || cb !== 0) return sb + cb
+    }
+    return aj?.total
+  }
+
   return (
     <div className="space-y-6">
       {/* Header Section */}
@@ -523,11 +568,11 @@ export function AnalyticsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={fetchAnalyticsOverview}
-            disabled={isLoadingOverview}
+            onClick={handleRefreshAnalytics}
+            disabled={isLoadingOverview || isLoadingEfficiencyTrends}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingOverview ? 'animate-spin' : ''}`} />
-            {isLoadingOverview ? 'Refreshing' : 'Refresh'}
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingOverview || isLoadingEfficiencyTrends ? 'animate-spin' : ''}`} />
+            {isLoadingOverview || isLoadingEfficiencyTrends ? 'Refreshing' : 'Refresh'}
           </Button>
         </div>
       </div>
@@ -539,9 +584,16 @@ export function AnalyticsPage() {
       )}
 
       {/* Real-time Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
         {metricDefinitions.map((definition) => {
-          const metricData = analyticsOverview?.[definition.key]
+          const metricData =
+            definition.key === 'active_jobs'
+              ? analyticsOverview?.total_jobs ?? analyticsOverview?.active_jobs
+              : definition.key === 'online_staff'
+                ? analyticsOverview?.online_staff
+                : definition.key === 'pending_approvals'
+                  ? analyticsOverview?.pending_approvals
+                  : undefined
           const difference = metricData?.change_today_vs_yesterday?.difference ?? null
           const yesterdayTotal = metricData?.change_today_vs_yesterday?.yesterday_total ?? null
           const Icon = definition.icon
@@ -552,7 +604,12 @@ export function AnalyticsPage() {
             ? 'Loading...'
             : 'Awaiting data'
           const displayValue = analyticsOverview
-            ? formatMetricValue(metricData?.total, definition.unit)
+            ? formatMetricValue(
+                definition.key === 'active_jobs'
+                  ? resolveAnalyticsJobsTotal(analyticsOverview)
+                  : metricData?.total,
+                definition.unit,
+              )
             : isLoadingOverview
             ? '...'
             : '--'
@@ -561,7 +618,7 @@ export function AnalyticsPage() {
             : undefined
 
           return (
-            <Card key={definition.key} className="relative overflow-hidden border-0 shadow-sm">
+            <Card key={definition.key} className="relative overflow-hidden border border-solid border-[rgb(229,231,235)] shadow-sm">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -591,7 +648,7 @@ export function AnalyticsPage() {
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Revenue Trend */}
-            <Card className="border-0 shadow-sm">
+            <Card className="border border-solid border-[rgb(229,231,235)] shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5 text-primary" />
@@ -600,43 +657,37 @@ export function AnalyticsPage() {
               </CardHeader>
               <CardContent>
                 <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    {/* <ComposedChart data={revenueAnalytics.monthly}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis dataKey="month" stroke="#64748b" />
-                      <YAxis stroke="#64748b" />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: 'white', 
-                          border: '1px solid #e2e8f0', 
-                          borderRadius: '8px',
-                          boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-                        }} 
-                      />
-                      <Bar dataKey="profit" fill="#00CEB6" radius={[2, 2, 0, 0]} />
-                      <Line type="monotone" dataKey="revenue" stroke="#00A1FF" strokeWidth={3} />
-                      <Area type="monotone" dataKey="revenue" fill="#00A1FF" fillOpacity={0.1} />
-                    </ComposedChart> */}
-                    <AreaChart data={efficiencyTrends}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                        <XAxis dataKey="month" stroke="#64748b" />
-                        <YAxis stroke="#64748b" />
-                        <Tooltip />
-                        <Area
-                          type="monotone"
-                          dataKey="jobs"
-                          stroke="#00A1FF"
-                          fill="#00A1FF"
-                          fillOpacity={0.3}
-                        />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  {isLoadingEfficiencyTrends ? (
+                    <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                      Loading revenue trend data...
+                    </div>
+                  ) : efficiencyTrends.length === 0 ? (
+                    <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                      No revenue trend data available.
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={efficiencyTrends}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                          <XAxis dataKey="month" stroke="#64748b" />
+                          <YAxis stroke="#64748b" />
+                          <Tooltip />
+                          <Area
+                            type="monotone"
+                            dataKey="jobs"
+                            stroke="#00A1FF"
+                            fill="#00A1FF"
+                            fillOpacity={0.3}
+                          />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
             {/* Job Type Distribution */}
-            <Card className="border-0 shadow-sm">
+            <Card className="border border-solid border-[rgb(229,231,235)] shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <PieChartIcon className="h-5 w-5 text-primary" />
@@ -662,8 +713,13 @@ export function AnalyticsPage() {
                             cx="50%"
                             cy="50%"
                             outerRadius={100}
-                            paddingAngle={5}
+                            paddingAngle={
+                              jobTypeAnalytics.filter((item) => Number(item.value) > 0).length > 1
+                                ? 5
+                                : 0
+                            }
                             dataKey="value"
+                            stroke="none"
                           >
                             {jobTypeAnalytics.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={entry.color} />

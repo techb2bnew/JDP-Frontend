@@ -7,7 +7,6 @@ import { Badge } from './ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog'
 import { Label } from './ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
-import { Checkbox } from './ui/checkbox'
 import { ActionButtonsPopup } from './ActionButtonsPopup'
 import { SupplierDetailsPage } from './SupplierDetailsPage'
 import { toast } from 'sonner'
@@ -54,7 +53,6 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [filteredSuppliers, setFilteredSuppliers] = useState<any[]>([])
-  const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([])
 
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
@@ -592,10 +590,6 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
     fetchRoles()
   }, [])
 
-  useEffect(() => {
-    setSelectedSuppliers([])
-  }, [currentPage, filterStatus, searchTerm])
-
   const fetchRoles = async () => {
     try {
       const token = localStorage.getItem('jdp_auth')
@@ -903,14 +897,11 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
             variant="outline"
             className="gap-2"
             onClick={() => {
-              if (selectedSuppliers.length === 0) {
-                toast.error('Please select at least one supplier to export')
+              if (filteredSuppliers.length === 0) {
+                toast.error('No suppliers available to export')
                 return
               }
-              const selectedSupplierData = filteredSuppliers.filter((supplier) =>
-                selectedSuppliers.includes(String(supplier.id))
-              )
-              downloadCSV(selectedSupplierData, `suppliers-export-${new Date().toISOString().split('T')[0]}.csv`)
+              downloadCSV(filteredSuppliers, `suppliers-export-${new Date().toISOString().split('T')[0]}.csv`)
               toast.success('CSV export started')
             }}
           >
@@ -950,8 +941,8 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
         <Card className="bg-white shadow-md border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <Package className="h-6 w-6 text-yellow-600" />
+              <div className="p-2 bg-red-100 rounded-lg">
+                <Package className="h-6 w-6 text-red-600" />
               </div>
               <div>
                 <p className="text-sm text-gray-600">Inactive</p>
@@ -1034,31 +1025,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
           <Table>
             <TableHeader>
               <TableRow className="bg-[#162f3d] hover:bg-[#162f3d]">
-                <TableHead className="text-white font-medium w-12">
-                  <Checkbox
-                    checked={
-                      paginatedSuppliers.length > 0 &&
-                      paginatedSuppliers.every((s) => selectedSuppliers.includes(String(s.id)))
-                    }
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        const paginatedIds = paginatedSuppliers.map((s) => String(s.id))
-                        setSelectedSuppliers((prev) => {
-                          const newSelection = [...prev]
-                          paginatedIds.forEach((id) => {
-                            if (!newSelection.includes(id)) newSelection.push(id)
-                          })
-                          return newSelection
-                        })
-                      } else {
-                        const paginatedIds = paginatedSuppliers.map((s) => String(s.id))
-                        setSelectedSuppliers((prev) => prev.filter((id) => !paginatedIds.includes(id)))
-                      }
-                    }}
-                    className="border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-[#162f3d]"
-                  />
-                </TableHead>
-                <TableHead className="text-white font-medium">ID</TableHead>
+                <TableHead className="text-white font-medium pl-6">ID</TableHead>
                 <TableHead className="text-white font-medium">Name</TableHead>
                 <TableHead className="text-white font-medium">Company</TableHead>
                 <TableHead className="text-white font-medium">Contact Person</TableHead>
@@ -1071,7 +1038,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
+                  <TableCell colSpan={7} className="text-center py-8">
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                       <span className="ml-2 text-gray-600">Loading suppliers...</span>
@@ -1080,26 +1047,17 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
                 </TableRow>
               ) : paginatedSuppliers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
+                  <TableCell colSpan={7} className="text-center py-8">
                     <div className="text-gray-500">No suppliers found</div>
                   </TableCell>
                 </TableRow>
               ) : (
-                paginatedSuppliers.map((supplier, index) => (
+                paginatedSuppliers.map((supplier, index) => {
+                  const addressFirstLine = supplier.address?.split(',')[0]?.trim() ?? ''
+                  const hasAddress = addressFirstLine.length > 0
+                  return (
                   <TableRow key={supplier.id} className={index % 2 === 1 ? 'bg-[#eff4fa]' : ''}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedSuppliers.includes(String(supplier.id))}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedSuppliers((prev) => [...prev, String(supplier.id)])
-                          } else {
-                            setSelectedSuppliers((prev) => prev.filter((id) => id !== String(supplier.id)))
-                          }
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell className="text-sm text-[#2b2b2b]/80">#{supplier.supplierId}</TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80 pl-6">#{supplier.supplierId}</TableCell>
                     <TableCell>
                       <div>
                         <div className="text-sm text-[#2b2b2b]/80">{supplier.fullName}</div>
@@ -1110,10 +1068,12 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
                     <TableCell>
                       <div>
                         <div className="text-sm font-medium text-[#2b2b2b]/80">{supplier.companyName}</div>
-                        <div className="text-xs text-gray-500 flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {supplier.address?.split(',')[0]}
-                        </div>
+                        {hasAddress && (
+                          <div className="text-xs text-gray-500 flex items-center gap-1">
+                            <MapPin className="h-3 w-3 shrink-0" />
+                            {addressFirstLine}
+                          </div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -1134,7 +1094,8 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
                       />
                     </TableCell>
                   </TableRow>
-                ))
+                  )
+                })
               )}
             </TableBody>
           </Table>

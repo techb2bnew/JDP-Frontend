@@ -12,6 +12,7 @@ type ProductType = {
   name: string;
   description?: string;
   jdpSKU?: string;
+  supplierSKU?: string;
   jdpPrice?: number;
   estimatedPrice?: number;
   rate?: number;
@@ -259,7 +260,19 @@ const cellClass = isInvalidItem
               {filteredProducts.length > 0 ? (
                 <div className="max-h-[320px] overflow-y-auto p-2">
                   <div className="space-y-2">
-                  {filteredProducts.map((product) => (
+                  {filteredProducts.map((product) => {
+                    const jdpSkuVal = String(
+                      product.jdpSKU ||
+                        (product as { jdp_sku?: string }).jdp_sku ||
+                        "",
+                    ).trim();
+                    const supplierSkuVal = String(
+                      product.supplierSKU ||
+                        (product as { supplier_sku?: string }).supplier_sku ||
+                        "",
+                    ).trim();
+                    const hasSkuBlock = jdpSkuVal || supplierSkuVal;
+                    return (
                     <div
                       key={product.id}
                       onMouseDown={(e) => {
@@ -267,30 +280,52 @@ const cellClass = isInvalidItem
                         e.stopPropagation();
                         onSelectProduct(lineItem.id, product);
                       }}
-                      className="rounded-lg border border-slate-100 px-4 py-3 hover:bg-slate-50 cursor-pointer transition-colors"
+                      className="rounded-lg border border-slate-100 px-3 py-2 hover:bg-slate-50 cursor-pointer transition-colors"
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0 flex-1">
-                          <div className="font-medium text-[14px] text-slate-900 mb-1">
+                          <div
+                            className={
+                              hasSkuBlock
+                                ? "mb-1.5 font-medium text-[14px] text-slate-900"
+                                : "mb-1 font-medium text-[14px] text-slate-900"
+                            }
+                          >
                             {product.name}
                           </div>
 
-                          {product.description && (
-                            <div className="text-[12px] text-slate-500 leading-5 line-clamp-2">
-                              {product.description}
+                          {hasSkuBlock && (
+                            <div className="space-y-0.5 text-[12px] leading-snug text-slate-600">
+                              {jdpSkuVal && (
+                                <div>
+                                  <span className="font-medium text-slate-700">
+                                    JDP SKU
+                                  </span>
+                                  <span className="ml-1 break-all text-slate-800">
+                                    {jdpSkuVal}
+                                  </span>
+                                </div>
+                              )}
+                              {supplierSkuVal && (
+                                <div>
+                                  <span className="font-medium text-slate-700">
+                                    Supplier SKU
+                                  </span>
+                                  <span className="ml-1 break-all text-slate-800">
+                                    {supplierSkuVal}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           )}
 
-                          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px]">
-                            {product.jdpSKU && (
-                              <span className="text-slate-600">
-                                <span className="font-medium text-slate-700">
-                                  SKU:
-                                </span>{" "}
-                                {product.jdpSKU}
-                              </span>
-                            )}
-
+                          <div
+                            className={
+                              hasSkuBlock
+                                ? "mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px]"
+                                : "mt-0 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px]"
+                            }
+                          >
                             <span className="text-slate-600">
                               <span className="font-medium text-slate-700">
                                 Rate:
@@ -314,7 +349,8 @@ const cellClass = isInvalidItem
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                   </div>
                 </div>
               ) : (

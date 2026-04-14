@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -96,6 +96,11 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
   const [selectedContractorName, setSelectedContractorName] = useState('')
   const [selectedLeadLaborNames, setSelectedLeadLaborNames] = useState<string[]>([])
   const [selectedLaborNames, setSelectedLaborNames] = useState<string[]>([])
+  /** Job Review step: expand full description when longer than two lines */
+  const [jobReviewDescriptionExpanded, setJobReviewDescriptionExpanded] = useState(false)
+  const [jobReviewDescriptionNeedsToggle, setJobReviewDescriptionNeedsToggle] = useState(false)
+  const jobReviewDescriptionBoxRef = useRef<HTMLDivElement>(null)
+  const jobReviewDescriptionMeasureRef = useRef<HTMLParagraphElement>(null)
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [isCreatingJob, setIsCreatingJob] = useState(false)
 
@@ -151,6 +156,45 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     { id: 2, title: 'Job Details', icon: User },
     { id: 3, title: 'Review', icon: Check }
   ]
+
+  useEffect(() => {
+    if (currentStep !== 3) {
+      setJobReviewDescriptionExpanded(false)
+    }
+  }, [currentStep])
+
+  const updateJobReviewDescriptionNeedsToggle = useCallback(() => {
+    const el = jobReviewDescriptionMeasureRef.current
+    if (!el || currentStep !== 3) {
+      setJobReviewDescriptionNeedsToggle(false)
+      return
+    }
+    const text = (formData.description || '').trim()
+    if (!text) {
+      setJobReviewDescriptionNeedsToggle(false)
+      return
+    }
+    const lh = parseFloat(window.getComputedStyle(el).lineHeight)
+    if (!Number.isFinite(lh) || lh <= 0) {
+      setJobReviewDescriptionNeedsToggle(false)
+      return
+    }
+    setJobReviewDescriptionNeedsToggle(el.scrollHeight > lh * 2 + 1)
+  }, [formData.description, currentStep])
+
+  useLayoutEffect(() => {
+    updateJobReviewDescriptionNeedsToggle()
+  }, [updateJobReviewDescriptionNeedsToggle])
+
+  useEffect(() => {
+    const box = jobReviewDescriptionBoxRef.current
+    if (!box) return
+    const ro = new ResizeObserver(() => {
+      updateJobReviewDescriptionNeedsToggle()
+    })
+    ro.observe(box)
+    return () => ro.disconnect()
+  }, [updateJobReviewDescriptionNeedsToggle])
 
   const generateJobId = () => {
     const date = new Date()
@@ -517,20 +561,31 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     }
   }
 
+  const laborSelectionDisplayName = (item: any, fallbackId: string) =>
+    item?.name ??
+    item?.full_name ??
+    item?.users?.full_name ??
+    item?.labor_code ??
+    fallbackId
+
   const handleLeadLaborChange = (selectedIds: string[], selectedItems: any[]) => {
-    setFormData({
-      ...formData,
-      assignedLeadLabor: selectedIds
-    })
-    setSelectedLeadLaborNames(selectedItems.map(item => item.name))
+    setFormData(prev => ({ ...prev, assignedLeadLabor: selectedIds }))
+    const byId = new Map(
+      selectedItems.map(it => [String(it?.id ?? it), it])
+    )
+    setSelectedLeadLaborNames(
+      selectedIds.map(id => laborSelectionDisplayName(byId.get(String(id)), id))
+    )
   }
 
   const handleLaborChange = (selectedIds: string[], selectedItems: any[]) => {
-    setFormData({
-      ...formData,
-      assignedLabor: selectedIds
-    })
-    setSelectedLaborNames(selectedItems.map(item => item.name))
+    setFormData(prev => ({ ...prev, assignedLabor: selectedIds }))
+    const byId = new Map(
+      selectedItems.map(it => [String(it?.id ?? it), it])
+    )
+    setSelectedLaborNames(
+      selectedIds.map(id => laborSelectionDisplayName(byId.get(String(id)), id))
+    )
   }
 
   // Load Google Maps script with Places API
@@ -1073,12 +1128,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
           <AutoScrollMultiSelect
             selectedValues={formData.assignedLeadLabor}
-            onSelectionChange={(selectedIds) => {
-              setFormData(prev => ({
-                ...prev,
-                assignedLeadLabor: selectedIds,
-              }))
-            }}
+            onSelectionChange={handleLeadLaborChange}
             placeholder="Select lead labor"
             fetchData={apiClient.getLeadLabor}
             displayField="name"
@@ -1094,12 +1144,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
           <AutoScrollMultiSelect
             selectedValues={formData.assignedLabor}
-            onSelectionChange={(selectedIds) => {
-              setFormData(prev => ({
-                ...prev,
-                assignedLabor: selectedIds,
-              }))
-            }}
+            onSelectionChange={handleLaborChange}
             placeholder="Select labor"
             fetchData={apiClient.getLabor}
             displayField="name"
@@ -1234,11 +1279,42 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               </div>
             </div>
 
-            <div className="min-w-0">
+            <div className="min-w-0 w-full max-w-full">
               <h4 className="font-medium text-[#2b2b2b] mb-2">Description</h4>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
-                {formData.description}
-              </p>
+              <div
+                ref={jobReviewDescriptionBoxRef}
+                className="relative w-full min-w-0 max-w-full"
+              >
+                {/* Invisible full-width copy for measuring whether content exceeds two lines */}
+                <p
+                  ref={jobReviewDescriptionMeasureRef}
+                  className="absolute left-0 right-0 top-0 z-[-1] m-0 max-w-full min-w-0 text-sm whitespace-pre-wrap break-words opacity-0 pointer-events-none select-none"
+                  aria-hidden
+                >
+                  {formData.description || ''}
+                </p>
+                <p
+                  className={[
+                    'm-0 text-sm text-gray-700 w-full min-w-0 max-w-full break-words',
+                    jobReviewDescriptionExpanded || !jobReviewDescriptionNeedsToggle
+                      ? 'whitespace-pre-wrap'
+                      : 'line-clamp-2 overflow-hidden whitespace-pre-wrap',
+                  ].join(' ')}
+                >
+                  {formData.description || ''}
+                </p>
+                {jobReviewDescriptionNeedsToggle && (
+                  <div className="mt-1 min-h-[1.375rem]">
+                    <button
+                      type="button"
+                      onClick={() => setJobReviewDescriptionExpanded(!jobReviewDescriptionExpanded)}
+                      className="text-[#00A1FF] hover:underline text-sm font-medium"
+                    >
+                      {jobReviewDescriptionExpanded ? 'View Less' : 'View More'}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Location Information */}
@@ -1323,9 +1399,9 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               <div>
                 <h4 className="font-medium text-[#2b2b2b] mb-2">Assigned Lead Labor ({formData.assignedLeadLabor.length})</h4>
                 <div className="flex flex-wrap gap-1">
-                  {selectedLeadLaborNames.map((leadLaborName, index) => (
-                    <Badge key={formData.assignedLeadLabor[index]} className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
-                      {leadLaborName}
+                  {formData.assignedLeadLabor.map((id, index) => (
+                    <Badge key={id} className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                      {selectedLeadLaborNames[index] ?? `ID: ${id}`}
                     </Badge>
                   ))}
                 </div>
@@ -1336,9 +1412,9 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               <div>
                 <h4 className="font-medium text-[#2b2b2b] mb-2">Assigned Labor ({formData.assignedLabor.length})</h4>
                 <div className="flex flex-wrap gap-1">
-                  {selectedLaborNames.map((laborName, index) => (
-                    <Badge key={formData.assignedLabor[index]} className="bg-gray-50 text-gray-700 border-gray-200 text-xs">
-                      {laborName}
+                  {formData.assignedLabor.map((id, index) => (
+                    <Badge key={id} className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                      {selectedLaborNames[index] ?? `ID: ${id}`}
                     </Badge>
                   ))}
                 </div>

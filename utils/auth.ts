@@ -312,6 +312,13 @@ export const updateUserPermissions = (newPermissions: any[]): void => {
         if (parsed.user) {
           // Update the user's permissions
           parsed.user.permissions = newPermissions
+          parsed.user.photo_url =
+            parsed.user?.photo_url ||
+            parsed.user?.profile_picture ||
+            parsed.user?.profilePicture ||
+            parsed.user?.avatar_url ||
+            parsed.user?.avatar ||
+            '/assets/images/avatars/admin-user.jpg'
           
           // Save back to localStorage
           localStorage.setItem('jdp_auth', JSON.stringify(parsed))
@@ -356,7 +363,17 @@ export const refreshUserPermissions = async (): Promise<void> => {
       const userData = await response.json()
       if (userData.success && userData.data) {
         // Update user data in localStorage
-        parsed.user = userData.data
+        parsed.user = {
+          ...userData.data,
+          photo_url:
+            userData.data?.photo_url ||
+            userData.data?.profile_picture ||
+            userData.data?.profilePicture ||
+            userData.data?.avatar_url ||
+            userData.data?.avatar ||
+            parsed.user?.photo_url ||
+            '/assets/images/avatars/admin-user.jpg',
+        }
         localStorage.setItem('jdp_auth', JSON.stringify(parsed))
         
         // Notify PermissionContext (only when refreshing from API)

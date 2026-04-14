@@ -836,8 +836,8 @@ export function LiveTrackingPage() {
                     <CardContent className="space-y-3">
                       <div className="grid grid-cols-2 gap-3">
                         <div className="text-center">
-                          <p className="text-2xl font-semibold text-primary">{mockJobs.filter(j => j.status === "In Progress").length}</p>
-                          <p className="text-xs text-muted-foreground">Active Jobs</p>
+                          <p className="text-2xl font-semibold text-primary">{mockJobs.length}</p>
+                          <p className="text-xs text-muted-foreground">Total Jobs</p>
                         </div>
                         <div className="text-center">
                           <p className="text-2xl font-semibold text-green-600">{mockJobs.filter(j => j.status === "Completed").length}</p>

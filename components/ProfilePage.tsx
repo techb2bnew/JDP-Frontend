@@ -127,6 +127,50 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
     return null;
   };
 
+  const syncAuthProfileImage = (profilePayload: any) => {
+    if (typeof window === 'undefined' || !profilePayload) return
+
+    const imageUrl =
+      profilePayload?.profile_image ||
+      profilePayload?.users?.photo_url ||
+      profilePayload?.users?.profile_image ||
+      null
+
+    if (!imageUrl) return
+
+    try {
+      const savedAuth = localStorage.getItem('jdp_auth')
+      if (!savedAuth) return
+
+      const parsedAuth = JSON.parse(savedAuth)
+      if (!parsedAuth?.user) return
+
+      const existingStaff =
+        parsedAuth.user.staff && !Array.isArray(parsedAuth.user.staff)
+          ? parsedAuth.user.staff
+          : {}
+
+      const mergedStaff = {
+        ...existingStaff,
+        ...(profilePayload || {}),
+        profile_image: imageUrl,
+      }
+
+      parsedAuth.user = {
+        ...parsedAuth.user,
+        ...(profilePayload?.users || {}),
+        photo_url: imageUrl,
+        profile_image: imageUrl,
+        staff: mergedStaff,
+      }
+
+      localStorage.setItem('jdp_auth', JSON.stringify(parsedAuth))
+      window.dispatchEvent(new CustomEvent('authUserUpdated'))
+    } catch (error) {
+      console.error('Error syncing profile image to localStorage:', error)
+    }
+  }
+
   // Handle image upload
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -192,6 +236,8 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
       toast.dismiss(loadingToast)
 
       if (response.ok && responseData.success) {
+        const profilePayload = responseData?.data ?? responseData
+        syncAuthProfileImage(profilePayload)
         toast.success('Profile image updated successfully!')
         // Refresh profile data to show new image
         await refreshProfileData()
@@ -429,7 +475,14 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
             ...userData,
             user: {
               ...userData.user,
-              full_name: profileData.fullName
+              full_name: profileData.fullName,
+              photo_url:
+                userData.user?.photo_url ||
+                userData.user?.profile_picture ||
+                userData.user?.profilePicture ||
+                userData.user?.avatar_url ||
+                userData.user?.avatar ||
+                '/assets/images/avatars/admin-user.jpg',
             }
           }
           localStorage.setItem('jdp_auth', JSON.stringify(updatedUserData))

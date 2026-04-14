@@ -878,7 +878,7 @@ export function OrdersPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -899,7 +899,7 @@ export function OrdersPage() {
           </CardHeader>
         </Card>
 
-        <Card>
+        {/* <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
@@ -918,7 +918,7 @@ export function OrdersPage() {
               </div>
             </div>
           </CardHeader>
-        </Card>
+        </Card> */}
 
         {/* <Card>
           <CardHeader className="pb-3">
@@ -978,7 +978,7 @@ export function OrdersPage() {
               </div>
 
               {/* Status Filter */}
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              {/* <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-[160px]">
                   <Filter className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Status" />
@@ -990,7 +990,7 @@ export function OrdersPage() {
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
-              </Select>
+              </Select> */}
 
               {/* Date Range Filter */}
               <Popover>

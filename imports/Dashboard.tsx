@@ -178,7 +178,7 @@ function Group1171276443() {
     <div className="absolute contents left-[762.656px] top-[124.429px]">
       <div className="absolute font-['Inter:Medium',_sans-serif] font-medium leading-[0] left-[762.656px] not-italic text-[#2b2b2b] text-[16.231px] text-left text-nowrap top-[128.036px]">
         <p className="block leading-[normal] whitespace-pre">
-          Total Active Jobs
+          Total Jobs
         </p>
       </div>
       <Group1171276386 />

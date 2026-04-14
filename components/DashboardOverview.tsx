@@ -79,8 +79,8 @@ import {
 
 
 const quickActions = [
-  { title: "Jobs", icon: Plus, color: "bg-blue-500", path: "jobs" },
   { title: "Customer", icon: Users, color: "bg-green-500", path: "customers" },
+  { title: "Contractor", icon: Briefcase, color: "bg-blue-500", path: "contractors" },
   {
     title: "Generate Invoice",
     icon: FileText,
@@ -110,7 +110,12 @@ export function DashboardOverview() {
   const [isKpiLoading, setIsKpiLoading] = useState(true);
   const [summary, setSummary] = useState<{
     total_revenue: number;
+    /** @deprecated Prefer jobs_summary.total / total_jobs for display */
     active_jobs: number;
+    /** When backend sends split counts (optional) */
+    total_jobs?: number;
+    customer_jobs_count?: number;
+    contractor_jobs_count?: number;
     jobs_summary: {
       total: number;
       active: number;
@@ -196,20 +201,43 @@ export function DashboardOverview() {
         setStatusLoading(true);
         const data = await apiClient.getJobStatusDistribution();
         const percentages = data?.percentages || {};
+        const counts = data?.counts || {};
+        const totalJobs = Number(data?.total || 0);
+
+        const inProgressCount = Number(counts.in_progress ?? 0);
+        const pendingCount = Number(counts.pending ?? 0);
+        const activeCount = Number(counts.active ?? 0);
+        const completedCount = Number(counts.completed ?? 0);
+
+        const inProgressCombinedPct =
+          totalJobs > 0
+            ? ((inProgressCount + pendingCount) / totalJobs) * 100
+            : Number(percentages.in_progress ?? 0) + Number(percentages.pending ?? 0);
+
+        const activePct =
+          totalJobs > 0
+            ? (activeCount / totalJobs) * 100
+            : Number(percentages.active ?? 0);
+
+        const completedPct =
+          totalJobs > 0
+            ? (completedCount / totalJobs) * 100
+            : Number(percentages.completed ?? 0);
+
         setProjectStatusData([
           {
             name: "In Progress",
-            value: percentages.in_progress ?? 0,
+            value: inProgressCombinedPct,
             color: "#00A1FF",
           },
           {
             name: "Active",
-            value: percentages.active ?? percentages.in_progress ?? 0,
+            value: activePct,
             color: "#4F46E5",
           },
           {
             name: "Completed",
-            value: percentages.completed ?? 0,
+            value: completedPct,
             color: "#00CEB6",
           },
         ]);
@@ -275,11 +303,35 @@ export function DashboardOverview() {
     }
   };
 
+  /** Total jobs = customer (service) + contractor jobs when API sends parts; else jobs_summary.total / total_jobs / active_jobs */
+  const totalJobsCount = (() => {
+    const s = summary as
+      | (typeof summary & {
+          total_jobs?: number;
+          customer_jobs_count?: number;
+          contractor_jobs_count?: number;
+        })
+      | null;
+    if (!s) return 0;
+    const c = s.customer_jobs_count;
+    const ct = s.contractor_jobs_count;
+    if (c != null && ct != null && !Number.isNaN(Number(c)) && !Number.isNaN(Number(ct))) {
+      return Number(c) + Number(ct);
+    }
+    if (s.total_jobs != null && !Number.isNaN(Number(s.total_jobs))) {
+      return Number(s.total_jobs);
+    }
+    if (s.jobs_summary?.total != null) {
+      return Number(s.jobs_summary.total);
+    }
+    return Number(s.active_jobs ?? 0);
+  })();
+
   const kpiCards = [
    
     {
-      title: "Active Jobs",
-      value: String(summary?.active_jobs ?? 0),
+      title: "Total Jobs",
+      value: String(totalJobsCount),
       change: "",
       trend: "up",
       period: "",
@@ -404,7 +456,7 @@ export function DashboardOverview() {
       </div>
 
       {/* Quick Actions */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-solid border-[rgb(229,231,235)] shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Zap className="h-5 w-5 text-[#00A1FF]" />
@@ -440,7 +492,7 @@ export function DashboardOverview() {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card 
-              className="relative overflow-hidden border-0 shadow-sm hover:shadow-lg transition-all duration-300 hover:scale-105"
+              className="relative overflow-hidden border border-solid border-[rgb(229,231,235)] shadow-sm hover:shadow-lg transition-all duration-300 hover:scale-105"
             >
               <CardContent className="p-6">
                 <div className="flex justify-between items-start">
@@ -467,7 +519,7 @@ export function DashboardOverview() {
           return (
             <Card
               key={index}
-              className="relative overflow-hidden border-0 shadow-sm hover:shadow-lg transition-all duration-300 hover:scale-105"
+              className="relative overflow-hidden border border-solid border-[rgb(229,231,235)] shadow-sm hover:shadow-lg transition-all duration-300 hover:scale-105"
             >
               <CardContent className="p-6">
                 <div className="flex justify-between items-start">
@@ -498,7 +550,7 @@ export function DashboardOverview() {
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Revenue Chart */}
-        <Card className="lg:col-span-2 border-0 shadow-sm">
+        <Card className="lg:col-span-2 border border-solid border-[rgb(229,231,235)] shadow-sm">
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle className="flex items-center gap-2">
@@ -677,7 +729,7 @@ export function DashboardOverview() {
         </Card>
 
         {/* Project Status */}
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-solid border-[rgb(229,231,235)] shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Target className="h-5 w-5 text-[#00A1FF]" />
@@ -694,8 +746,13 @@ export function DashboardOverview() {
                     cy="50%"
                     innerRadius={60}
                     outerRadius={100}
-                    paddingAngle={5}
+                    paddingAngle={
+                      projectStatusData.filter((item) => Number(item.value) > 0).length > 1
+                        ? 5
+                        : 0
+                    }
                     dataKey="value"
+                    stroke="none"
                   >
                     {projectStatusData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
@@ -716,7 +773,11 @@ export function DashboardOverview() {
                     <span className="text-sm">{item.name}</span>
                   </div>
                   <span className="text-sm font-medium">
-                    {statusLoading ? "…" : `${item.value}%`}
+                    {statusLoading
+                      ? "…"
+                      : `${new Intl.NumberFormat("en-US", {
+                          maximumFractionDigits: 2,
+                        }).format(item.value)}%`}
                   </span>
                 </div>
               ))}
@@ -728,7 +789,7 @@ export function DashboardOverview() {
       {/* Activity and Tasks Section */}
       <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
         {/* Recent Activities */}
-        <Card className="border-0 shadow-lg">
+        <Card className="border border-solid border-[rgb(229,231,235)] shadow-lg">
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle className="flex items-center gap-2">
@@ -807,7 +868,7 @@ export function DashboardOverview() {
         </Card>
 
         {/* Upcoming Tasks */}
-        {/* <Card className="border-0 shadow-sm">
+        {/* <Card className="border border-solid border-[rgb(229,231,235)] shadow-sm">
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle className="flex items-center gap-2">
@@ -818,7 +879,7 @@ export function DashboardOverview() {
           </CardHeader>
           <CardContent>
 
-            <Card className="border-0 shadow-sm">
+            <Card className="border border-solid border-[rgb(229,231,235)] shadow-sm">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -836,7 +897,7 @@ export function DashboardOverview() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-sm">
+            <Card className="border border-solid border-[rgb(229,231,235)] shadow-sm">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>

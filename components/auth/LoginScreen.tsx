@@ -93,12 +93,24 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
       if (response.ok) {
         const data = await response.json()
         console.log('Login API response:', data)
-
+         console.log(data.data.user,"data.data.user");
+         
         if (data.success && data.data?.token) {
+          const defaultAvatar = '/assets/images/avatars/admin-user.jpg'
+          const normalizedUser = {
+            ...data.data.user,
+            photo_url:
+              data.data.user?.photo_url ||
+              data.data.user?.profile_picture ||
+              data.data.user?.profilePicture ||
+              data.data.user?.avatar_url ||
+              data.data.user?.avatar ||
+              defaultAvatar,
+          }
           // Store authentication data in localStorage
           const authData = {
             user: {
-              ...data.data.user,
+              ...normalizedUser,
               permissions: data.data.permissions || [] // Store permissions
             },
             token: data.data.token,

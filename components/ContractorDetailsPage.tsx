@@ -492,7 +492,7 @@ export function ContractorDetailsPage({
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardContent className="p-6 text-center">
             <Briefcase className="w-8 h-8 text-primary mx-auto mb-3" />
@@ -523,7 +523,7 @@ export function ContractorDetailsPage({
           </CardContent>
         </Card>
 
-        <Card>
+        {/* <Card>
           <CardContent className="p-6 text-center">
             <DollarSign className="w-8 h-8 text-green-600 mx-auto mb-3" />
             <div className="text-2xl font-bold text-gray-900 mb-1">
@@ -531,7 +531,7 @@ export function ContractorDetailsPage({
             </div>
             <div className="text-sm text-gray-600">Total Revenue</div>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
       {selectedJob ? (

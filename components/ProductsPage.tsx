@@ -11,7 +11,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog'
 import { Label } from './ui/label'
 import { Textarea } from './ui/textarea'
-import { Checkbox } from './ui/checkbox'
 import { Separator } from './ui/separator'
 import { usePermissions } from '../contexts/PermissionContext'
 import {
@@ -136,7 +135,6 @@ const [formMode, setFormMode] = useState<ProductAction>('add') // 'add' | 'edit'
   const [units, setUnits] = useState<string[]>(['piece', 'roll', 'box', 'pack', 'kg', 'meter', 'liter', 'set']);
   const [estimatedPrices, setEstimatedPrices] = useState({});
   const [configurationData, setConfigurationData] = useState<any>(null);
-  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
 
   const [formData, setFormData] = useState<ProductFormData>({
@@ -158,7 +156,7 @@ const [formMode, setFormMode] = useState<ProductAction>('add') // 'add' | 'edit'
     unit_cost:0,
     estimated_price:0
   });
-
+  
   console.log(formData,"formData");
   
   // Auto-generate JDP SKU when supplier SKU changes
@@ -239,12 +237,6 @@ const [formMode, setFormMode] = useState<ProductAction>('add') // 'add' | 'edit'
     fetchProductStats(); // Fetch product statistics
     loadConfiguration(); // Load configuration data
   }, [currentPage, itemsPerPage]);
-
-  // Clear selected products when products list changes (pagination, filters, etc.)
-  useEffect(() => {
-    setSelectedProducts([]);
-  }, [products, currentPage, selectedCategory, selectedStatus, searchTerm]);
-
 
 const fetchBySearch = async () => {
   if (!searchTerm.trim()) return;
@@ -726,15 +718,11 @@ useEffect(() => {
 }, []);
 
  const handleExport = async () => {
-  // Check if any product is selected
-  if (selectedProducts.length === 0) {
+  if (products.length === 0) {
     const { toast } = await import('sonner');
-    toast.error('Please select at least one product to export');
+    toast.error('No products available to export');
     return;
   }
-
-  // Filter products to only include selected ones
-  const selectedProductsData = products.filter(product => selectedProducts.includes(product.id));
 
   // Prepare CSV headers
   const headers = [
@@ -758,7 +746,7 @@ useEffect(() => {
   ];
 
   // Prepare CSV rows
-  const rows = selectedProductsData.map(product => {
+  const rows = products.map(product => {
     console.log('Product:', product);
     const markupPercentage = (product as any).markup_percentage || 0;
     const markupAmount = (product as any).markup_amount || 0;
@@ -1517,19 +1505,7 @@ useEffect(() => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={products.length > 0 && selectedProducts.length === products.length}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedProducts(products.map(p => p.id));
-                        } else {
-                          setSelectedProducts([]);
-                        }
-                      }}
-                    />
-                  </TableHead>
-                  <TableHead>Product</TableHead>
+                  <TableHead className="pl-6">Product</TableHead>
                   <TableHead>Supplier SKU</TableHead>
                   <TableHead>	JDP SKU</TableHead>
                   <TableHead>Unit Cost</TableHead>
@@ -1544,7 +1520,7 @@ useEffect(() => {
               <TableBody>
                 {isLoadingProducts ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8">
+                    <TableCell colSpan={9} className="text-center py-8">
                       <div className="flex items-center justify-center">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                         <span className="ml-2">Loading products...</span>
@@ -1553,7 +1529,7 @@ useEffect(() => {
                   </TableRow>
                 ) : products.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No products found
                     </TableCell>
                   </TableRow>
@@ -1573,19 +1549,7 @@ useEffect(() => {
                     })
                     .map((product) => (
                   <TableRow key={product.id}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedProducts.includes(product.id)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedProducts(prev => [...prev, product.id]);
-                          } else {
-                            setSelectedProducts(prev => prev.filter(id => id !== product.id));
-                          }
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
+                    <TableCell className="pl-6">
                       <div className="flex items-center gap-3">
                         {/* <img
                           src={product.image}
