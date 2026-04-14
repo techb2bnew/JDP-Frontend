@@ -159,7 +159,7 @@ export function Sidebar({ currentPage, onPageChange, onLogout, isSuperAdmin = fa
           </div>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 px-3 py-4 space-y-1">
           {navigation.map((item) => {
             const isActive = currentPage === item.id
             const Icon = item.icon
@@ -171,15 +171,15 @@ export function Sidebar({ currentPage, onPageChange, onLogout, isSuperAdmin = fa
                 size="sm"
                 onClick={() => onPageChange(item.id)}
                 className={cn(
-                  "w-full justify-start text-left sidebar-item h-10",
+                  "w-full justify-start text-left sidebar-item h-10 px-2.5",
                   isActive 
                     ? "bg-primary text-primary-foreground shadow-sm" 
                     : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 )}
                 title={item.description}
               >
-                <Icon className="mr-3 h-4 w-4" />
-                <span className="font-medium">{item.name}</span>
+                <Icon className="mr-2.5 h-4 w-4" />
+                <span className="font-medium text-[13px]">{item.name}</span>
               </Button>
             )
           })}

@@ -353,7 +353,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
           </Button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 px-3 py-4 space-y-1">
           {filteredNavigation.map((item) => {
             const active = isActive(item.href);
             const Icon = item.icon;
@@ -400,15 +400,15 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
                         "w-full sidebar-item h-10",
                         isCollapsed
                           ? "justify-center p-0"
-                          : "justify-start text-left",
+                          : "justify-start text-left px-2.5",
                         active
                           ? "bg-primary text-primary-foreground shadow-sm"
                           : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                       )}
                     >
-                      <Icon className={cn("h-4 w-4", !isCollapsed && "mr-3")} />
+                      <Icon className={cn("h-4 w-4", !isCollapsed && "mr-2.5")} />
                       {!isCollapsed && (
-                        <span className="font-medium">{item.name}</span>
+                        <span className="font-medium text-[13px]">{item.name}</span>
                       )}
                     </Button>
                   </button>
@@ -421,16 +421,16 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
                         "w-full sidebar-item h-10",
                         isCollapsed
                           ? "justify-center p-0"
-                          : "justify-start text-left",
+                          : "justify-start text-left px-2.5",
                         active
                           ? "bg-primary text-primary-foreground shadow-sm"
                           : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                       )}
                       title={isCollapsed ? item.name : item.description}
                     >
-                      <Icon className={cn("h-4 w-4", !isCollapsed && "mr-3")} />
+                      <Icon className={cn("h-4 w-4", !isCollapsed && "mr-2.5")} />
                       {!isCollapsed && (
-                        <span className="font-medium">{item.name}</span>
+                        <span className="font-medium text-[13px]">{item.name}</span>
                       )}
                     </Button>
                   </Link>
