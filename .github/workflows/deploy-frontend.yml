@@ -1,47 +1,58 @@
-name: Deploy JDP Frontend
+name: Deploy Frontend (Build & Push)
 
 on:
   push:
-    branches: ["jdp"] 
+    branches:
+      - jdp   # ✅ yaha change kiya hai
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      # 1. Checkout Code
+      - name: Checkout Code
         uses: actions/checkout@v3
 
+      # 2. Setup Node
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: "20"
-          cache: "npm"
+          node-version: 18
 
-      - name: Install deps
-        run: npm ci
+      # 3. Install Dependencies
+      - name: Install Dependencies
+        run: npm install
 
-      - name: Build Next App
-        run: NODE_OPTIONS='--max-old-space-size=8192' next build
+      # 4. Build Project
+      - name: Build Project
+        run: npm run build
 
-
-      - name: Deploy to EC2
-        uses: easingthemes/ssh-deploy@main
+      # 5. Upload Build to Server
+      - name: Upload Build to Server
+        uses: appleboy/scp-action@v0.1.7
         with:
-          SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY_LIVE }}
-          REMOTE_HOST: ${{ secrets.SERVER_IP }}
-          REMOTE_USER: ${{ secrets.SERVER_USER }}
-          TARGET: /var/www/html/JDP-Frontend
-          EXCLUDE: ".git"
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT }}
+          source: |
+            .next
+            public
+            package.json
+            package-lock.json
+            next.config.js
+          target: "/root/jdp"
 
-      - name: Restart Frontend App
-        uses: appleboy/ssh-action@v1.2.0
+      # 6. Restart Frontend
+      - name: Restart Frontend
+        uses: appleboy/ssh-action@v0.1.10
         with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY_LIVE }}
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT }}
           script: |
-            cd /var/www/html/JDP-Frontend
+            cd /root/jdp
             npm install --production
-            pm2 restart jdp-frontend || pm2 start npm --name "jdp-frontend" -- start
-            pm2 save
+            pm2 restart jdp || pm2 start npm --name jdp -- start
