@@ -508,7 +508,8 @@ const normalizeActorLabel = (raw?: string | null): string | null => {
     lower === "system" ||
     lower === "null" ||
     lower === "undefined" ||
-    lower === "n/a"
+    lower === "n/a" ||
+    lower === "lead"
   ) {
     return null;
   }
@@ -604,7 +605,9 @@ const mapApiResponseToActivities = (
       const assignedBy = resolveActor(
         activityAudit?.lead_labor_assigned_by,
         job.updated_by_user,
+        job.updated_by_name,
         job.created_by_user,
+        job.created_by_name,
       );
       const sortDate = job.updated_at || job.created_at;
 
@@ -630,7 +633,9 @@ const mapApiResponseToActivities = (
       const assignedBy = resolveActor(
         activityAudit?.labor_assigned_by,
         job.updated_by_user,
+        job.updated_by_name,
         job.created_by_user,
+        job.created_by_name,
       );
       const sortDate = job.updated_at || job.created_at;
 
@@ -679,7 +684,9 @@ const mapApiResponseToActivities = (
       const sentBy = resolveActor(
         invoice.sent_by_user,
         job.updated_by_user,
+        job.updated_by_name,
         job.created_by_user,
+        job.created_by_name,
       );
       const sortDate = invoice.invoice_sent_at || job.updated_at || job.created_at;
 
@@ -709,7 +716,9 @@ const mapApiResponseToActivities = (
         sheet.created_by_user,
         sheet.updated_by_user,
         job.updated_by_user,
+        job.updated_by_name,
         job.created_by_user,
+        job.created_by_name,
       );
 
       const sortDate =
@@ -782,10 +791,12 @@ const mapApiResponseToActivities = (
     const dateB = new Date(b.sortDate || "").getTime();
 
     if (dateA === dateB) {
-      return (a.priority || 0) - (b.priority || 0);
+      // If dates are the same, show higher priority (later events in sequence) first
+      return (b.priority || 0) - (a.priority || 0);
     }
 
-    return dateA - dateB;
+    // Newest first
+    return dateB - dateA;
   });
 };
 

@@ -369,10 +369,12 @@ const cellClass = isInvalidItem
                         lineItem.searchQuery || "",
                       );
                     }}
-                    className="w-full h-10"
+                    className="w-full h-10 px-4 flex items-center justify-center gap-2"
                   >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add "{lineItem.searchQuery}"
+                    <Plus className="h-4 w-4 shrink-0" />
+                    <span className="truncate max-w-[calc(100%-24px)]">
+                      Add "{lineItem.searchQuery}"
+                    </span>
                   </Button>
                 </div>
               )}

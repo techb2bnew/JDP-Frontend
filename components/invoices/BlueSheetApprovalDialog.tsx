@@ -12,6 +12,7 @@ import { Textarea } from '../ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { toast } from 'sonner'
 import { CustomInvoiceDialog } from './CustomInvoiceDialog'
+import { useRouter } from 'next/navigation'
 import {
   FileText,
   CheckSquare,
@@ -156,6 +157,7 @@ export function BlueSheetApprovalDialog({
   const [selectedInvoiceType, setSelectedInvoiceType] = useState<string>("estimate");
   const estimateActionsDisabled =
     isSaving || isApproving || isApprovingCustomer || customInvoiceProcessing;
+  const router = useRouter();
 
 
   // ─── Reset when dialog opens ───────────────────────────────────────────────
@@ -177,7 +179,12 @@ export function BlueSheetApprovalDialog({
       setSelectedInvoiceType("estimate")
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
-  }, [isOpen, blueSheet])
+  }, [isOpen, blueSheet]);
+
+  const handleBackClick = () => {
+  onClose();
+};
+
 const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
   setEditedBlueSheet((prev: any) => {
     if (!prev) return prev;
@@ -1117,19 +1124,38 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
   currentSupplierInvoice.materials.length > 0;
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-screen h-screen max-w-full max-h-full min-w-full min-h-full overflow-hidden p-0 rounded-none border-0">
+      <DialogContent  showCloseButton={false} className="w-screen h-screen max-w-full max-h-full min-w-full min-h-full overflow-hidden p-0 rounded-none border-0">
         <DialogHeader className="p-8 pt-3 pb-3 border-b bg-white">
-          <DialogTitle className="flex items-center  ">
+          <DialogTitle className="flex items-center gap-3">
+            {/* Back Button */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleBackClick}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md bg-white hover:bg-gray-50 transition"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+
+            {/* Divider (optional but pro look) */}
+            <div className="h-5 w-px bg-gray-300 mx-1" />
+
+            {/* Title */}
             <FileText className="h-6 w-6 text-[#00A1FF]" />
-            <span className="text-xl z-[99999]">
+
+            <span className="text-xl font-semibold text-[#1a1a2e]">
               BlueSheet Review & Approve
             </span>
-            <Badge className="ml-3 bg-blue-50 text-blue-600 border-blue-200 px-3 py-1">
+
+            {/* Badge */}
+            <Badge className="ml-2 bg-blue-50 text-blue-600 border-blue-200 px-3 py-1">
               BS-{blueSheet.id}
             </Badge>
+
             {(isBlueSheetEditMode || isSupplierEditMode) && (
               <Badge className="ml-2 bg-orange-50 text-orange-600 border-orange-200 animate-pulse px-3 py-1">
-                <Edit className="w-4 h-4 mr-2" />
+                <Edit className="w-4 h-4 mr-1" />
                 Edit Mode Active
               </Badge>
             )}
