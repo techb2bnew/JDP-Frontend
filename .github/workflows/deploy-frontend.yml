@@ -3,7 +3,7 @@ name: Deploy Frontend (JDP)
 on:
   push:
     branches:
-      - jdp   # 👈 tumhari branch
+      - jdp   
 
 jobs:
   build-and-deploy:
