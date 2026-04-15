@@ -911,7 +911,7 @@ console.log(totalAmount,"amounttt");
       lineItemsRef.current?.length > 0
         ? lineItemsRef.current
         : inlineInvoiceData.lineItems;
-
+  
     const effectiveInlineInvoiceData = {
       ...inlineInvoiceData,
       project: effectiveProject,
@@ -920,6 +920,9 @@ console.log(totalAmount,"amounttt");
       rep: latestRep,
       paymentCredits: latestPaymentCredits,
       lineItems: latestLineItems,
+      //  subtotal: materialTotal,
+      total_labor_cost: laborTotal,
+      total: totalAmount,
     };
 
     console.log(effectiveInlineInvoiceData,"effectiveInlineInvoiceData");
@@ -1281,6 +1284,14 @@ console.log(totalAmount,"amounttt");
           }))
         }
       }
+      const materialTotal = lineItemsSource.reduce(
+        (sum, item) => sum + Number(item.total || 0),
+        0,
+      );
+
+      const laborTotal = Number(laborEntriesTotalFromBlueSheet || 0);
+
+      const totalAmount = materialTotal + laborTotal;
 
       const payload: any = {
         // Header details
@@ -1339,8 +1350,10 @@ console.log(totalAmount,"amounttt");
             : effectiveInlineInvoiceData.invoiceType,
       
         // Summary numbers backend ko handle karne do
-        subtotal: 0,
-        total: 0,
+        // subtotal: 0,
+        // total: 0,
+         total_labor_cost: laborTotal,
+         total: totalAmount,
       }
 
       // Add customer_id or contractor_id based on job type
