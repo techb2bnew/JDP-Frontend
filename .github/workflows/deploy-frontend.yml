@@ -1,34 +1,38 @@
-name: Deploy Frontend (Build & Push)
+name: Deploy Frontend (JDP)
 
 on:
   push:
     branches:
-      - jdp   # ✅ yaha change kiya hai
+      - jdp   # 👈 tumhari branch
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout Code
+      # 1️⃣ Checkout Code
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # 2. Setup Node
+      # 2️⃣ Setup Node
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: 20
 
-      # 3. Install Dependencies
+      # 3️⃣ Install Dependencies
       - name: Install Dependencies
         run: npm install
 
-      # 4. Build Project
+      # 4️⃣ Build Project
       - name: Build Project
         run: npm run build
 
-      # 5. Upload Build to Server
+      # 🔍 DEBUG (optional but useful)
+      - name: Check build files
+        run: ls -la
+
+      # 5️⃣ Upload Build to Server (FIXED)
       - name: Upload Build to Server
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -36,15 +40,10 @@ jobs:
           username: ${{ secrets.STAGING_USER }}
           key: ${{ secrets.STAGING_SSH_KEY }}
           port: ${{ secrets.STAGING_PORT }}
-          source: |
-            .next
-            public
-            package.json
-            package-lock.json
-            next.config.js
+          source: ".next,public,package.json,package-lock.json,next.config.js"
           target: "/root/jdp"
 
-      # 6. Restart Frontend
+      # 6️⃣ Restart Frontend
       - name: Restart Frontend
         uses: appleboy/ssh-action@v0.1.10
         with:
