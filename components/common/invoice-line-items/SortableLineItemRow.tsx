@@ -164,9 +164,9 @@ const cellClass = isInvalidItem
       }`}
     >
       <td
-        className={`border border-gray-300 px-2 py-2 align-top h-[92px] max-h-[92] ${cellClass}`}
+        className={`border border-gray-300 px-2 py-1 align-top h-[72px] max-h-[72px] ${cellClass}`}
       >
-        <div className="flex items-center gap-2 h-[100%]">
+        <div className="flex items-center gap-1.5 h-full">
           <button
             type="button"
             {...attributes}
@@ -182,7 +182,7 @@ const cellClass = isInvalidItem
             onChange={(e) =>
               onUpdateRow(lineItem.id, "qty", parseFloat(e.target.value) || 0)
             }
-            className="text-center border-0 p-2"
+            className="text-center border-0 p-1.5 h-8"
             min="0"
           />
         </div>
@@ -190,12 +190,9 @@ const cellClass = isInvalidItem
 
       <td
         ref={containerRef}
-        // className={`w-[400px] border border-gray-300 p-1 relative h-[92px] overflow-visible max-h-[92] ${
-        //   lineItem.showSearchResults ? "z-[9999]" : "z-[1]"
-        // } ${duplicateCellClass}`}
         className={`${
           isJobDetail ? "w-[520px]" : "w-[400px]"
-        } border border-gray-300 px-2 py-2 relative h-[92px] overflow-visible max-h-[92] ${
+        } border border-gray-300 px-2 py-1 relative h-[72px] overflow-visible max-h-[72px] ${
           lineItem.showSearchResults ? "z-[9999]" : "z-[1]"
         } ${cellClass}`}
       >
@@ -203,7 +200,7 @@ const cellClass = isInvalidItem
           <Input
             value={lineItem.item}
             onChange={(e) => onUpdateRow(lineItem.id, "item", e.target.value)}
-            className="border-0 p-2"
+            className="border-0 p-1.5 h-10"
             placeholder="Enter custom item name"
           />
         ) : (
@@ -221,7 +218,7 @@ const cellClass = isInvalidItem
                   onSearchFocus?.(lineItem.id, lineItem.item);
                 }
               }}
-              className="border-0 p-2 pr-10 h-11 text-[14px]"
+              className="border-0 p-1.5 pr-10 h-10 text-[14px]"
               placeholder="Search by name, SKU, description, supplier..."
             />
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -237,15 +234,8 @@ const cellClass = isInvalidItem
                   dropdownPortalRef.current = node;
                 }
               }}
-              //   className={`
-              //   absolute left-0 top-full mt-2
-              //   z-[999999]
-              //   ${isJobDetail ? "w-[320px]" : ""}
-              //   rounded-xl border border-slate-200 bg-white
-              //   shadow-2xl max-h-[320px] overflow-y-auto p-2
-              // `}
               className={`
-                absolute left-0 top-full mt-2
+                absolute left-0 top-full mt-1
                 z-[999999]
                 w-full min-w-full max-w-full
                 rounded-xl border border-slate-200 bg-white
@@ -280,22 +270,22 @@ const cellClass = isInvalidItem
                         e.stopPropagation();
                         onSelectProduct(lineItem.id, product);
                       }}
-                      className="rounded-lg border border-slate-100 px-3 py-2 hover:bg-slate-50 cursor-pointer transition-colors"
+                      className="rounded-lg border border-slate-100 px-3 py-1.5 hover:bg-slate-50 cursor-pointer transition-colors"
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0 flex-1">
                           <div
                             className={
                               hasSkuBlock
-                                ? "mb-1.5 font-medium text-[14px] text-slate-900"
-                                : "mb-1 font-medium text-[14px] text-slate-900"
+                                ? "mb-1 font-medium text-[13px] text-slate-900"
+                                : "mb-0.5 font-medium text-[13px] text-slate-900"
                             }
                           >
                             {product.name}
                           </div>
 
                           {hasSkuBlock && (
-                            <div className="space-y-0.5 text-[12px] leading-snug text-slate-600">
+                            <div className="space-y-0.5 text-[11px] leading-snug text-slate-600">
                               {jdpSkuVal && (
                                 <div>
                                   <span className="font-medium text-slate-700">
@@ -322,8 +312,8 @@ const cellClass = isInvalidItem
                           <div
                             className={
                               hasSkuBlock
-                                ? "mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px]"
-                                : "mt-0 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px]"
+                                ? "mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]"
+                                : "mt-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]"
                             }
                           >
                             <span className="text-slate-600">
@@ -369,7 +359,7 @@ const cellClass = isInvalidItem
                         lineItem.searchQuery || "",
                       );
                     }}
-                    className="w-full h-10 px-4 flex items-center justify-center gap-2"
+                    className="w-full h-9 px-4 flex items-center justify-center gap-2"
                   >
                     <Plus className="h-4 w-4 shrink-0" />
                     <span className="truncate max-w-[calc(100%-24px)]">
@@ -383,20 +373,20 @@ const cellClass = isInvalidItem
       </td>
 
       <td
-        className={`border border-gray-300 px-2 py-2 max-h-[92] ${cellClass}`}
+        className={`border border-gray-300 px-2 py-1 max-h-[72px] ${cellClass}`}
       >
         <Textarea
           value={lineItem.description}
           onChange={(e) =>
             onUpdateRow(lineItem.id, "description", e.target.value)
           }
-          className="border-0 p-2 min-h-[80px] h-[80px] max-h-[80px] resize-none"
+          className="border-0 p-1.5 min-h-[60px] h-[60px] max-h-[60px] resize-none text-xs"
           placeholder="Enter product description"
         />
       </td>
 
       <td
-        className={`border border-gray-300 px-2 py-2 h-[92px] max-h-[92] ${cellClass}`}
+        className={`border border-gray-300 px-2 py-1 h-[72px] max-h-[72px] ${cellClass}`}
       >
         <Input
           type="number"
@@ -404,13 +394,13 @@ const cellClass = isInvalidItem
           onChange={(e) =>
             onUpdateRow(lineItem.id, "rate", parseFloat(e.target.value) || 0)
           }
-          className="text-right border-0 p-2 max-h-[92]"
+          className="text-right border-0 p-1.5 h-8"
           min="0"
         />
       </td>
 
       <td
-        className={`border border-gray-300 px-2 py-2 max-h-[92] ${cellClass}`}
+        className={`border border-gray-300 px-2 py-1 max-h-[72px] ${cellClass}`}
       >
         <Input
           type="number"
@@ -422,19 +412,19 @@ const cellClass = isInvalidItem
               parseFloat(e.target.value) || 0,
             )
           }
-          className="text-right border-0 p-2"
+          className="text-right border-0 p-1.5 h-8"
           min="0"
         />
       </td>
 
       <td
-        className={`border border-gray-300 px-3 py-2 text-right font-medium ${cellClass}`}
+        className={`border border-gray-300 px-3 py-1 text-right font-medium text-xs ${cellClass}`}
       >
         ${(lineItem.total || 0).toFixed(2)}
       </td>
 
       <td
-        className={`border border-gray-300 px-3 py-2 text-center h-[92px] ${cellClass}`}
+        className={`border border-gray-300 px-3 py-1 text-center h-[72px] ${cellClass}`}
       >
         <button
           type="button"

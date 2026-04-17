@@ -93,20 +93,39 @@ export function sortEntitiesByRecentJobActivity<T extends { jobs?: any[] }>(
   });
 }
 
-/** Badge flags: only "Recently Added" when `created_at` is within 48h (not for updates). */
+/** Badge flags: "Recently Added" if `created_at` in last 48h; "Recently Updated" if `updated_at` in last 48h. */
 export function annotateJobsForListing(jobs: any[] | undefined): any[] {
   if (!jobs?.length) return [];
 
   return jobs.map((job: any) => {
     const createdRecent = isRecentTimestamp(createdAtOf(job));
+    const updatedRecent = isRecentTimestamp(updatedAtOf(job));
+
     const subJobs = (job.subJobs || []).map((sj: any) => ({
       ...sj,
       __listingRecentlyAdded: isRecentTimestamp(createdAtOf(sj)),
+      __listingRecentlyUpdated: isRecentTimestamp(updatedAtOf(sj)),
     }));
+
     return {
       ...job,
       subJobs,
       __listingRecentlyAdded: createdRecent,
+      __listingRecentlyUpdated: updatedRecent,
+    };
+  });
+}
+
+/** Annotate entities based on their rank: 2 -> Added, 1 -> Updated. */
+export function annotateEntitiesForListing<T extends { jobs?: any[] }>(
+  list: T[],
+): T[] {
+  return list.map((entity) => {
+    const rank = entityRecentActivityRank(entity);
+    return {
+      ...entity,
+      __listingRecentlyAdded: rank === 2,
+      __listingRecentlyUpdated: rank === 1 || rank === 2,
     };
   });
 }

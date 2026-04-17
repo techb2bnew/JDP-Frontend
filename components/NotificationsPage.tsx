@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -81,6 +82,7 @@ const availableRoles = [
 
 export function NotificationsPage() {
   const { hasPermission } = usePermissions()
+  const searchParams = useSearchParams()
   const notificationsApiClient = apiClient as typeof apiClient & {
     sendNotification: (payload: {
       notification_title: string
@@ -538,7 +540,13 @@ export function NotificationsPage() {
       isInitialMount.current = false
       fetchUserNotifications(1)
     }
-  }, [])
+
+    // Handle tab selection from URL search params
+    const tabParam = searchParams.get('tab')
+    if (tabParam === 'list' || tabParam === 'create') {
+      setMainTab(tabParam as 'create' | 'list')
+    }
+  }, [searchParams])
 
   // Handle status filter changes
   useEffect(() => {
@@ -1194,22 +1202,26 @@ export function NotificationsPage() {
         onValueChange={(value) => setMainTab(value as 'create' | 'list')}
         className="space-y-6"
       >
-        <Card className="bg-white shadow-md border-0">
+        <Card className="bg-white shadow-md border-0 overflow-hidden">
           <CardContent className="p-0">
-            <TabsList className="grid w-full grid-cols-2 rounded-none   bg-transparent p-0">
-              <TabsTrigger
-                value="create"
-                className="rounded-none border-b-2 border-transparent px-6 py-4 text-sm font-medium text-[#2b2b2b] data-[state=active]:border-[#00A1FF] data-[state=active]:bg-white data-[state=active]:text-[#00A1FF]"
-              >
-                Create Notification
-              </TabsTrigger>
-              <TabsTrigger
-                value="list"
-                className="rounded-none border-b-2 border-transparent px-6 py-4 text-sm font-medium text-[#2b2b2b] data-[state=active]:border-[#00A1FF] data-[state=active]:bg-white data-[state=active]:text-[#00A1FF]"
-              >
-                Notification List ({pagination.total_count || filteredNotifications.length})
-              </TabsTrigger>
-            </TabsList>
+            <div className="border-b border-gray-100">
+              <TabsList className="grid w-full grid-cols-2 bg-transparent h-12 p-0 gap-0">
+                <TabsTrigger
+                  value="create"
+                  className="flex items-center gap-2 data-[state=active]:bg-[#00A1FF] data-[state=active]:text-white rounded-none"
+                >
+                  <Send className="h-4 w-4" />
+                  Create Notification
+                </TabsTrigger>
+                <TabsTrigger
+                  value="list"
+                  className="flex items-center gap-2 data-[state=active]:bg-[#00A1FF] data-[state=active]:text-white rounded-none"
+                >
+                  <Bell className="h-4 w-4" />
+                  Notification List ({pagination.total_count || filteredNotifications.length})
+                </TabsTrigger>
+              </TabsList>
+            </div>
           </CardContent>
         </Card>
 

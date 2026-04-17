@@ -104,6 +104,11 @@ export function ContractorDetailsPage({
   const [expandedTableJobs, setExpandedTableJobs] = useState<Set<string>>(
     new Set(),
   );
+  const [contractorActivity, setContractorActivity] = useState<any[]>([]);
+  const [isLoadingContractorActivity, setIsLoadingContractorActivity] =
+    useState(false);
+  const [contractorActivityPage, setContractorActivityPage] = useState(1);
+  const contractorActivityPerPage = 5;
 
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 
@@ -167,9 +172,55 @@ export function ContractorDetailsPage({
     }
   };
 
+  const fetchContractorActivity = async (id: string) => {
+    if (!id) {
+      setContractorActivity([]);
+      return;
+    }
+    try {
+      setIsLoadingContractorActivity(true);
+      const response = await globalApiCall(
+        `${apiBaseUrl}/contractor/getContractorActivity/${id}`,
+        {
+          method: "GET",
+        },
+      );
+      const responseData = await response.json();
+      const payload = responseData?.data ?? responseData ?? {};
+      const jobs = Array.isArray(payload?.jobs) ? payload.jobs : [];
+      const invoiceActivity = Array.isArray(payload?.invoice_activity)
+        ? payload.invoice_activity
+        : [];
+
+      const jobTitleById = new Map<string, string>();
+      jobs.forEach((job: any) => {
+        if (job?.job_id != null) {
+          jobTitleById.set(String(job.job_id), job?.job_title || "N/A");
+        }
+      });
+
+      const activityRows = invoiceActivity.map((activity: any) => ({
+        ...activity,
+        job_title: jobTitleById.get(String(activity?.job_id ?? "")) || "N/A",
+      }));
+
+      setContractorActivity(activityRows);
+      setContractorActivityPage(1);
+    } catch (error) {
+      console.error("Error fetching contractor activity:", error);
+      setContractorActivity([]);
+    } finally {
+      setIsLoadingContractorActivity(false);
+    }
+  };
+
   useEffect(() => {
     if (contractorId) {
       fetchContractorDetails();
+      void fetchContractorActivity(contractorId);
+    } else {
+      setContractorActivity([]);
+      setContractorActivityPage(1);
     }
   }, [contractorId]);
 
@@ -185,12 +236,27 @@ export function ContractorDetailsPage({
     const end = start + jobsPerPage;
     return allJobs.slice(start, end);
   }, [allJobs, jobsPage]);
+  const totalContractorActivityCount = contractorActivity.length;
+  const totalContractorActivityPages = Math.max(
+    1,
+    Math.ceil(totalContractorActivityCount / contractorActivityPerPage),
+  );
+  const paginatedContractorActivity = useMemo(() => {
+    const start = (contractorActivityPage - 1) * contractorActivityPerPage;
+    return contractorActivity.slice(start, start + contractorActivityPerPage);
+  }, [contractorActivity, contractorActivityPage]);
 
   useEffect(() => {
     if (jobsPage > totalJobsPages) {
       setJobsPage(totalJobsPages);
     }
   }, [jobsPage, totalJobsPages]);
+
+  useEffect(() => {
+    if (contractorActivityPage > totalContractorActivityPages) {
+      setContractorActivityPage(totalContractorActivityPages);
+    }
+  }, [contractorActivityPage, totalContractorActivityPages]);
 
   const selectJob = async (jobId: string) => {
     setIsJobDetailsLoading(true);
@@ -337,6 +403,21 @@ export function ContractorDetailsPage({
       currency: "USD",
       minimumFractionDigits: 0,
     }).format(amount || 0);
+  };
+
+  const formatActivityDate = (dateString?: string) => {
+    if (!dateString) return "N/A";
+    try {
+      const date = new Date(dateString);
+      if (Number.isNaN(date.getTime())) return "N/A";
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "2-digit",
+        year: "numeric",
+      });
+    } catch {
+      return "N/A";
+    }
   };
 
   /** Match CustomersPage job statistics: derive from `jobs` when present; else API aggregates */
@@ -814,7 +895,8 @@ export function ContractorDetailsPage({
           )}
         </div>
       ) : (
-        <Card className="mt-8">
+        <>
+          <Card className="mt-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Briefcase className="h-5 w-5 text-primary" />
@@ -1068,7 +1150,133 @@ export function ContractorDetailsPage({
               </div>
             )}
           </CardContent>
-        </Card>
+          </Card>
+
+          <Card className="mt-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-primary" />
+              Transaction History
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingContractorActivity ? (
+              <div className="flex items-center justify-center py-10">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : paginatedContractorActivity.length > 0 ? (
+              <div className="space-y-3">
+                {paginatedContractorActivity.map((item: any, index: number) => {
+                  const status = item?.status || item?.payment_status || "N/A";
+                  const invoiceNumber =
+                    item?.invoice_number ||
+                    item?.estimate_number ||
+                    item?.invoice_no ||
+                    `EST-${item?.estimate_id || index + 1}`;
+                  const sentDate = formatActivityDate(item?.invoice_sent_at);
+                  const sentTo = item?.invoice_sent_to || "N/A";
+                  const sentByName = item?.sent_by_user?.full_name || "N/A";
+                  const sentByRole = item?.sent_by_user?.role || "N/A";
+                  const jobTitle = item?.job_title || "N/A";
+                  const rowKey = `${invoiceNumber}-${index}`;
+
+                  return (
+                    <div
+                      key={rowKey}
+                      className="rounded-lg border border-gray-200 p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-gray-900">
+                              Estimate
+                            </p>
+                            <Badge variant="outline" className="text-xs">
+                              Estimate
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-gray-700 mt-1">
+                            {jobTitle}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-2">
+                            #{invoiceNumber} &nbsp; Sent: {sentDate}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Sent to: {sentTo}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Sent by: {sentByName} ({sentByRole})
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-semibold text-gray-900">
+                            {invoiceNumber}
+                          </p>
+                          <Badge variant="secondary" className="mt-1">
+                            {String(status).replace(/_/g, " ")}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+                  <div className="text-sm text-gray-500">
+                    Showing{" "}
+                    {(contractorActivityPage - 1) * contractorActivityPerPage + 1}{" "}
+                    to{" "}
+                    {Math.min(
+                      contractorActivityPage * contractorActivityPerPage,
+                      totalContractorActivityCount,
+                    )}{" "}
+                    of {totalContractorActivityCount} invoices
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setContractorActivityPage((prev) => Math.max(prev - 1, 1))
+                      }
+                      disabled={contractorActivityPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-gray-600">
+                      Page {contractorActivityPage} of {totalContractorActivityPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setContractorActivityPage((prev) =>
+                          Math.min(prev + 1, totalContractorActivityPages),
+                        )
+                      }
+                      disabled={
+                        contractorActivityPage === totalContractorActivityPages
+                      }
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed p-8 text-center">
+                <p className="text-gray-500 font-medium">
+                  No transaction history found
+                </p>
+                <p className="text-sm text-gray-400 mt-1">
+                  This contractor has no transactions yet.
+                </p>
+              </div>
+            )}
+          </CardContent>
+          </Card>
+        </>
       )}
 
       <AlertDialog

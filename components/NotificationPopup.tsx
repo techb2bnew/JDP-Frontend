@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { X, Bell, DollarSign, Package, CheckCircle, AlertTriangle } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
@@ -31,6 +32,7 @@ export function NotificationPopup({
   onViewAll,
 }: NotificationPopupProps) {
   const [localNotifications, setLocalNotifications] = useState(notifications);
+  const router = useRouter();
 
   const unreadCount = localNotifications.filter(n => n.unread).length;
 
@@ -122,7 +124,8 @@ export function NotificationPopup({
 
   const handleClickNotification = (notificationId: string) => {
     // handleMarkAsRead(notificationId);
-   
+    router.push("/notifications?tab=list");
+    onClose();
   };
 
   return (
@@ -184,7 +187,8 @@ export function NotificationPopup({
               variant="outline" 
               size="sm" 
               onClick={() => {
-                onViewAll();
+                // onViewAll();
+                router.push("/notifications?tab=list");
                 onClose();
               }} 
               className="flex-1 button-bounce"

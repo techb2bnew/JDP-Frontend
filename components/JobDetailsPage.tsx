@@ -11090,6 +11090,7 @@ const handlePrintInvoice = async (invoice: any) => {
           setIsBlueSheetDialogOpen(false);
           setSelectedBlueSheetForReview(null);
         }}
+        selectedBlueSheetIds={selectedBluesheetIds}
         blueSheet={selectedBlueSheetForReview}
         selectedBlueSheets={
           selectedBlueSheetForReview ? [selectedBlueSheetForReview] : []

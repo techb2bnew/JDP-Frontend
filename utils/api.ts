@@ -2626,7 +2626,8 @@ export const apiClient = {
   // Create Invoice
   createEstimate: async (estimateData: {
     estimate_title: string;
-    customer_id: number;
+    customer_id?: number;
+    contractor_id?: number;
     priority: "low" | "medium" | "high";
     valid_until: string;
     location: string;
@@ -2644,6 +2645,7 @@ export const apiClient = {
     job_id: number;
 
     total_amount: number;
+    bluesheet_ids?: number[];
 
     custom_products: {
       product_name: string;
@@ -3218,7 +3220,7 @@ createBulkBluesheetMaterials: async (bulkData: BulkMaterialPayload, bluesheetId:
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${getAuthToken()}`,
       },
-      body: JSON.stringify({ ids, status }),  // { "ids": [66, 65, 67], "status": "approved" }
+      body: JSON.stringify({ ids: ids, status }),
     });
 
     if (!response.ok) {

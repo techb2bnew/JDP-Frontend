@@ -91,6 +91,7 @@ import {
 } from "../components/ui/tooltip";
 import CommonEntityListing from "./common/CommonEntityListing";
 import {
+  annotateEntitiesForListing,
   annotateJobsForListing,
   sortEntitiesByRecentJobActivity,
 } from "@/lib/entityListingRecentActivity";
@@ -186,6 +187,11 @@ export function CustomersPage() {
   const [expandedTableJobs, setExpandedTableJobs] = useState<Set<string>>(
     new Set(),
   );
+  const [customerActivity, setCustomerActivity] = useState<any[]>([]);
+  const [isLoadingCustomerActivity, setIsLoadingCustomerActivity] =
+    useState(false);
+  const [customerActivityPage, setCustomerActivityPage] = useState(1);
+  const customerActivityPerPage = 5;
 
   // Fetch customers data and stats on component mount and when page changes
   useEffect(() => {
@@ -650,6 +656,21 @@ export function CustomersPage() {
     }
   };
 
+  const formatActivityDate = (dateString?: string) => {
+    if (!dateString) return "N/A";
+    try {
+      const date = new Date(dateString);
+      if (Number.isNaN(date.getTime())) return "N/A";
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "2-digit",
+        year: "numeric",
+      });
+    } catch {
+      return "N/A";
+    }
+  };
+
   const selectedCustomerData = selectedCustomer
     ? customersWithJobs.find((c) => c.id.toString() === selectedCustomer)
     : null;
@@ -658,6 +679,21 @@ export function CustomersPage() {
         (j: any) => j.id.toString() === selectedJob,
       )
     : null;
+  const totalCustomerActivityCount = customerActivity.length;
+  const totalCustomerActivityPages = Math.max(
+    1,
+    Math.ceil(totalCustomerActivityCount / customerActivityPerPage),
+  );
+  const paginatedCustomerActivity = useMemo(() => {
+    const start = (customerActivityPage - 1) * customerActivityPerPage;
+    return customerActivity.slice(start, start + customerActivityPerPage);
+  }, [customerActivity, customerActivityPage]);
+
+  useEffect(() => {
+    if (customerActivityPage > totalCustomerActivityPages) {
+      setCustomerActivityPage(totalCustomerActivityPages);
+    }
+  }, [customerActivityPage, totalCustomerActivityPages]);
 
   const clearValidationError = (field: string) => {
     if (validationErrors[field]) {
@@ -668,6 +704,57 @@ export function CustomersPage() {
       });
     }
   };
+
+  const fetchCustomerActivity = async (customerId: string) => {
+    if (!customerId) {
+      setCustomerActivity([]);
+      return;
+    }
+    try {
+      setIsLoadingCustomerActivity(true);
+      const response = await globalApiCall(
+        `${apiBaseUrl}/customer/getCustomerActivity/${customerId}`,
+        {
+          method: "GET",
+        },
+      );
+      const responseData = await response.json();
+      const payload = responseData?.data ?? responseData ?? {};
+      const jobs = Array.isArray(payload?.jobs) ? payload.jobs : [];
+      const invoiceActivity = Array.isArray(payload?.invoice_activity)
+        ? payload.invoice_activity
+        : [];
+
+      const jobTitleById = new Map<string, string>();
+      jobs.forEach((job: any) => {
+        if (job?.job_id != null) {
+          jobTitleById.set(String(job.job_id), job?.job_title || "N/A");
+        }
+      });
+
+      const activityRows = invoiceActivity.map((activity: any) => ({
+        ...activity,
+        job_title: jobTitleById.get(String(activity?.job_id ?? "")) || "N/A",
+      }));
+
+      setCustomerActivity(activityRows);
+      setCustomerActivityPage(1);
+    } catch (error) {
+      console.error("Error fetching customer activity:", error);
+      setCustomerActivity([]);
+    } finally {
+      setIsLoadingCustomerActivity(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedCustomer) {
+      setCustomerActivity([]);
+      setCustomerActivityPage(1);
+      return;
+    }
+    void fetchCustomerActivity(selectedCustomer);
+  }, [selectedCustomer]);
 
   // Normalize phone to E.164 so react-phone-number-input can infer country/flag
   const normalizePhoneToE164 = (rawPhone: string) => {
@@ -933,11 +1020,15 @@ export function CustomersPage() {
           };
         });
 
-        const sortedWithRecent = sortEntitiesByRecentJobActivity(
+        const annotated = annotateEntitiesForListing(
           customersWithJobsArray.map((c: any) => ({
             ...c,
             jobs: annotateJobsForListing(c.jobs || []),
           })),
+        );
+
+        const sortedWithRecent = sortEntitiesByRecentJobActivity(
+          annotated,
           (a: any, b: any) => {
             if (b.total_jobs !== a.total_jobs) {
               return b.total_jobs - a.total_jobs;
@@ -1030,11 +1121,14 @@ export function CustomersPage() {
               .toLowerCase()
               .includes(searchLower),
           );
-          const fallback = sortEntitiesByRecentJobActivity(
+          const annotatedFallback = annotateEntitiesForListing(
             fallbackRaw.map((c: any) => ({
               ...c,
               jobs: annotateJobsForListing(c.jobs || []),
             })),
+          );
+          const fallback = sortEntitiesByRecentJobActivity(
+            annotatedFallback,
             (a: any, b: any) => {
               if (b.total_jobs !== a.total_jobs) {
                 return b.total_jobs - a.total_jobs;
@@ -1047,11 +1141,14 @@ export function CustomersPage() {
           setCustomersWithJobs(fallback);
           setPaginatedCustomers(fallback);
         } else {
-          const searchSorted = sortEntitiesByRecentJobActivity(
+          const annotatedSearch = annotateEntitiesForListing(
             customersFromSearch.map((c: any) => ({
               ...c,
               jobs: annotateJobsForListing(c.jobs || []),
             })),
+          );
+          const searchSorted = sortEntitiesByRecentJobActivity(
+            annotatedSearch,
             (a: any, b: any) =>
               (a.customer_name || "").localeCompare(b.customer_name || ""),
           );
@@ -2242,6 +2339,135 @@ export function CustomersPage() {
                     <p className="text-gray-500 font-medium">No jobs found</p>
                     <p className="text-sm text-gray-400 mt-1">
                       This customer does not have any jobs yet.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="mt-8">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-primary" />
+                  Transaction History
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoadingCustomerActivity ? (
+                  <div className="flex items-center justify-center py-10">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : paginatedCustomerActivity.length > 0 ? (
+                  <div className="space-y-3">
+                    {paginatedCustomerActivity.map((item: any, index: number) => {
+                      const status =
+                        item?.status || item?.payment_status || "N/A";
+                      const invoiceNumber =
+                        item?.invoice_number ||
+                        item?.estimate_number ||
+                        item?.invoice_no ||
+                        `EST-${item?.estimate_id || index + 1}`;
+                      const sentDate = formatActivityDate(item?.invoice_sent_at);
+                      const sentTo = item?.invoice_sent_to || "N/A";
+                      const sentByName = item?.sent_by_user?.full_name || "N/A";
+                      const sentByRole = item?.sent_by_user?.role || "N/A";
+                      const jobTitle = item?.job_title || "N/A";
+                      const rowKey = `${invoiceNumber}-${index}`;
+
+                      return (
+                        <div
+                          key={rowKey}
+                          className="rounded-lg border border-gray-200 p-4"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold text-gray-900">
+                                  Estimate
+                                </p>
+                                <Badge variant="outline" className="text-xs">
+                                  Estimate
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-gray-700 mt-1">
+                                {jobTitle}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-2">
+                                #{invoiceNumber} &nbsp; Sent: {sentDate}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                Sent to: {sentTo}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                Sent by: {sentByName} ({sentByRole})
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-lg font-semibold text-gray-900">
+                                {invoiceNumber}
+                              </p>
+                              <Badge variant="secondary" className="mt-1">
+                                {String(status).replace(/_/g, " ")}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+                      <div className="text-sm text-gray-500">
+                        Showing{" "}
+                        {(customerActivityPage - 1) * customerActivityPerPage + 1}{" "}
+                        to{" "}
+                        {Math.min(
+                          customerActivityPage * customerActivityPerPage,
+                          totalCustomerActivityCount,
+                        )}{" "}
+                        of {totalCustomerActivityCount} invoices
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setCustomerActivityPage((prev) =>
+                              Math.max(prev - 1, 1),
+                            )
+                          }
+                          disabled={customerActivityPage === 1}
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-sm text-gray-600">
+                          Page {customerActivityPage} of{" "}
+                          {totalCustomerActivityPages}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setCustomerActivityPage((prev) =>
+                              Math.min(prev + 1, totalCustomerActivityPages),
+                            )
+                          }
+                          disabled={
+                            customerActivityPage === totalCustomerActivityPages
+                          }
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed p-8 text-center">
+                    <p className="text-gray-500 font-medium">
+                      No transaction history found
+                    </p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      This customer has no transactions yet.
                     </p>
                   </div>
                 )}

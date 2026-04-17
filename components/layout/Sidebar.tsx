@@ -24,6 +24,10 @@ import {
   Clock,
   PanelLeftClose,
   PanelLeftOpen,
+  UserCircle,
+  Truck,
+  History,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { LogoutConfirmationDialog } from "../LogoutConfirmationDialog";
@@ -133,7 +137,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
     {
       id: "customers",
       name: "Customers (Service Based)",
-      icon: Users,
+      icon: UserCircle,
       href: "/customers",
       description: "Customer database and interactions",
       module: "customers",
@@ -178,7 +182,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
     {
       id: "suppliers",
       name: "Suppliers",
-      icon: Clock,
+      icon: Truck,
       href: "/suppliers",
       description: "Manage your suppliers and vendor relationships.",
       module: "suppliers",
@@ -188,7 +192,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
     {
       id: "staff-timeline-admin",
       name: "Staff Timeline",
-      icon: Clock,
+      icon: History,
       href: "/staff-timeline-admin",
       description: "Manage staff timeline and hours (Super Admin)",
       module: "staff",
@@ -207,7 +211,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
     {
       id: "role",
       name: "Role & Permission",
-      icon: Users,
+      icon: ShieldCheck,
       href: "/role",
       description: "Role & Permission",
       module: "role_permission",
@@ -226,7 +230,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
     {
       id: "staff-timeline",
       name: "Staff Timeline",
-      icon: Clock,
+      icon: History,
       href: "/staff-timeline",
       description: "Manage your work timeline and hours",
       module: "staff_timeline",

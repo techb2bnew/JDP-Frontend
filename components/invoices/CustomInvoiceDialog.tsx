@@ -128,7 +128,8 @@ export const CustomInvoiceDialog = ({
   setInvalidHeaderKeys,
   validateHeaderGroupsBeforeSubmit,
   onProcessingChange,
-  onInvoiceTypeChange
+  onInvoiceTypeChange,
+  selectedBluesheetIds=[]
 }: CustomInvoiceDialogProps) => {
   // Derive viewInvoiceData and job list from blueSheet (custom invoice from bluesheet)
   const viewInvoiceData = useMemo(() => {
@@ -1456,17 +1457,17 @@ console.log(totalAmount,"amounttt");
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.4 }}
-    className="mb-4"
+    className="mb-2"
   >
     <Card className="bg-white shadow-lg border-2 border-primary/20 overflow-hidden">
       {/* Invoice Type Selector */}
-      <div className="p-4 border-b border-gray-200 bg-gray-50">
-        <div className="flex items-center gap-3 flex-wrap">
-          <Label className="text-primary font-semibold text-sm">
+      <div className="p-3 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Label className="text-primary font-semibold text-xs">
             Invoice Type:
           </Label>
 
-          <div className="relative w-[220px]">
+          <div className="relative w-[180px]">
             <Select
               value={inlineInvoiceData.invoiceType}
               onValueChange={(value) =>
@@ -1476,7 +1477,7 @@ console.log(totalAmount,"amounttt");
                 }))
               }
             >
-              <SelectTrigger className="h-9 border-primary/30 focus:border-primary">
+              <SelectTrigger className="h-8 border-primary/30 focus:border-primary text-xs">
                 <SelectValue placeholder="Select invoice type..." />
               </SelectTrigger>
               <SelectContent>
@@ -1495,7 +1496,7 @@ console.log(totalAmount,"amounttt");
           </div>
 
           {inlineInvoiceData.invoiceType === "Custom" && (
-            <div className="relative w-[260px]">
+            <div className="relative w-[220px]">
               <Input
                 value={inlineInvoiceData.customInvoiceType}
                 onChange={(e) =>
@@ -1505,7 +1506,7 @@ console.log(totalAmount,"amounttt");
                   }))
                 }
                 placeholder="Enter custom invoice type name..."
-                className="h-9 border-primary/30 focus:border-primary"
+                className="h-8 border-primary/30 focus:border-primary text-xs"
               />
             </div>
           )}
@@ -1513,28 +1514,28 @@ console.log(totalAmount,"amounttt");
       </div>
 
       <div className="max-h-[calc(90vh-132px)] overflow-y-auto">
-        <div className="p-5">
+        <div className="p-4">
           {/* Header */}
-          <div className="flex justify-between items-end gap-4 mb-5">
+          <div className="flex justify-between items-end gap-3 mb-4">
             <div className="flex-shrink-0">
               <Image
                 src="/assets/logos/logo-jdp.png"
                 alt="logo"
                 width={168}
                 height={63}
-                className="w-[120px]"
+                className="w-[100px]"
               />
             </div>
 
             <div className="text-right">
-              <h1 className="text-xl font-bold mb-2">
+              <h1 className="text-lg font-bold mb-1">
                 {inlineInvoiceData.invoiceType === "Custom"
                   ? inlineInvoiceData.customInvoiceType
                   : inlineInvoiceData.invoiceType}
               </h1>
 
               <div className="grid grid-cols-2">
-                <Label className="text-right bg-gray-600 text-white px-3 py-2 text-xs font-semibold">
+                <Label className="text-right bg-gray-600 text-white px-2 py-1.5 text-xs font-bold">
                   Date
                 </Label>
                 <Input
@@ -1545,14 +1546,14 @@ console.log(totalAmount,"amounttt");
                       date: e.target.value,
                     }))
                   }
-                  className="h-9 px-3 py-2 text-sm rounded-none"
+                  className="h-8 px-2 py-1.5 text-xs rounded-none"
                   readOnly={isViewMode}
                 />
               </div>
 
               {isViewMode && (
                 <div className="grid grid-cols-2">
-                  <Label className="text-right bg-gray-600 text-white px-3 py-2 text-xs font-semibold">
+                  <Label className="text-right bg-gray-600 text-white px-2 py-1.5 text-xs font-bold">
                     {inlineInvoiceData.invoiceType === "Estimate"
                       ? "Estimate #"
                       : "Invoice #"}
@@ -1564,7 +1565,7 @@ console.log(totalAmount,"amounttt");
                         viewInvoiceData?.invoice_number ||
                         ""
                       }
-                      className="h-9 px-3 py-2 text-sm rounded-none"
+                      className="h-8 px-2 py-1.5 text-xs rounded-none"
                       disabled={true}
                     />
                   </div>
@@ -1574,17 +1575,18 @@ console.log(totalAmount,"amounttt");
           </div>
 
           {/* Job Selection - auto-selected from blueSheet, disabled */}
-          <div className="mb-4">
-            <Label className="block bg-gray-600 text-white px-3 py-2 text-xs font-semibold">
+          <div className="mb-3">
+            <Label className="block bg-gray-600 text-white px-2 py-1.5 text-xs font-bold">
               Job
             </Label>
-            <div className="border border-gray-300 p-3">
+            
+            <div className="border border-gray-300 p-2">
               <Select
                 value={String(blueSheet?.job_id || "job")}
                 onValueChange={() => {}}
                 disabled={true}
               >
-                <SelectTrigger className="h-9 border-primary/30 focus:border-primary bg-gray-50 cursor-not-allowed opacity-90">
+                <SelectTrigger className="h-8 border-primary/30 focus:border-primary bg-gray-50 cursor-not-allowed opacity-90 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1597,7 +1599,7 @@ console.log(totalAmount,"amounttt");
               </Select>
 
               {validationErrors.jobId && (
-                <p className="text-red-500 text-xs mt-1">
+                <p className="text-red-500 text-xs mt-0.5">
                   {validationErrors.jobId}
                 </p>
               )}
@@ -1605,11 +1607,11 @@ console.log(totalAmount,"amounttt");
           </div>
 
           {/* Bill To Section */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between bg-gray-600 text-white px-3 py-2">
+          <div className="mb-2">
+            <div className="flex items-center justify-between bg-gray-600 text-white px-2 py-1">
               <div className="flex items-center">
                 <svg
-                  className="w-4 h-4 mr-2"
+                  className="w-3.5 h-3.5 mr-1.5"
                   fill="currentColor"
                   viewBox="0 0 20 20"
                 >
@@ -1619,7 +1621,7 @@ console.log(totalAmount,"amounttt");
                     clipRule="evenodd"
                   />
                 </svg>
-                <Label className="text-xs font-semibold">
+                <Label className="text-xs font-bold">
                   Bill To (Billing Address)
                 </Label>
               </div>
@@ -1633,7 +1635,7 @@ console.log(totalAmount,"amounttt");
                       billToAddressEnabled: !prev.billToAddressEnabled,
                     }))
                   }
-                  className={`mr-1 px-3 py-1 rounded text-xs font-medium transition-colors ${
+                  className={`mr-1 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
                     inlineInvoiceData.billToAddressEnabled
                       ? "bg-red-100 text-red-700 hover:bg-red-200"
                       : "bg-green-100 text-green-700 hover:bg-green-200"
@@ -1683,18 +1685,18 @@ console.log(totalAmount,"amounttt");
                     billToAddress: e.target.value,
                   })
                 }
-                className="mt-0 border-0 rounded-none min-h-[76px]"
+                className="mt-0 border-0 rounded-none min-h-[50px] text-sm"
                 placeholder="Enter billing address (defaults to customer/supplier address, can be edited)"
-                rows={3}
+                rows={2}
                 readOnly={isViewMode}
               />
             )}
 
             {!inlineInvoiceData.billToAddressEnabled && (
-              <div className="bg-gray-50 px-3 py-2 text-xs text-gray-600">
+              <div className="bg-gray-50 px-2 py-1.5 text-xs text-gray-600">
                 <div className="flex items-center">
                   <svg
-                    className="w-4 h-4 mr-2 text-yellow-500"
+                    className="w-3.5 h-3.5 mr-1.5 text-yellow-500"
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
@@ -1712,11 +1714,11 @@ console.log(totalAmount,"amounttt");
           </div>
 
           {/* Customer Information */}
-          <div className="mb-4">
-            <Label className="block bg-gray-600 text-white px-3 py-2 text-xs font-semibold">
+          <div className="mb-2">
+            <Label className="block bg-gray-600 text-white px-2 py-1 text-xs font-bold">
               Customer Name / Address
             </Label>
-            <div className="border border-gray-300 p-3 min-h-[92px]">
+            <div className="border border-gray-300 p-2 min-h-[70px]">
               {(() => {
                 const jobType =
                   selectedJob?.type ||
@@ -1801,15 +1803,15 @@ console.log(totalAmount,"amounttt");
           </div>
 
           {/* PO and Project */}
-          <div className="mb-4">
+          <div className="mb-2">
             <div className="grid grid-cols-3 gap-0">
-              <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-xs font-semibold">
+              <Label className="bg-white border border-gray-300 px-2 py-1 text-center text-xs font-bold">
                 P.O. No.
               </Label>
-              <Label className="bg-gray-600 text-white px-3 py-2 text-center text-xs font-semibold">
+              <Label className="bg-gray-600 text-white px-2 py-1 text-center text-xs font-bold">
                 Project
               </Label>
-              <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-xs font-semibold">
+              <Label className="bg-white border border-gray-300 px-2 py-1 text-center text-xs font-bold">
                 Rep
               </Label>
             </div>
@@ -1868,15 +1870,15 @@ console.log(totalAmount,"amounttt");
             </div>
           </div>
 
-          <div className="mb-4">
+          <div className="mb-2">
             <div className="grid grid-cols-3 gap-0">
-              <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-xs font-semibold">
+              <Label className="bg-white border border-gray-300 px-2 py-1 text-center text-xs font-bold">
                 Due Date
               </Label>
-              <Label className="bg-gray-600 text-white px-3 py-2 text-center text-xs font-semibold">
+              <Label className="bg-gray-600 text-white px-2 py-1 text-center text-xs font-bold">
                 Payment / Credits
               </Label>
-              <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-xs font-semibold">
+              <Label className="bg-white border border-gray-300 px-2 py-1 text-center text-xs font-bold">
                 Balance Due
               </Label>
             </div>
@@ -1948,13 +1950,13 @@ console.log(totalAmount,"amounttt");
           </div>
 
           {/* Notes Section */}
-          <div className="mb-4 overflow-x-auto">
+          <div className="mb-1.5 overflow-x-auto">
             <table className="w-full border-collapse">
               <tbody>
                 <tr>
                   <td
-                    className="border border-gray-300 p-3 bg-white text-sm"
-                    style={{ minHeight: "96px" }}
+                    className="border border-gray-300 p-1.5 bg-white text-xs"
+                    style={{ minHeight: "50px" }}
                   >
                     <Textarea
                       value={inlineInvoiceData.notes}
@@ -1964,7 +1966,7 @@ console.log(totalAmount,"amounttt");
                           notes: e.target.value,
                         }));
                       }}
-                      className="w-full min-h-[84px] border-0 p-0 focus-visible:ring-0 resize-none"
+                      className="w-full min-h-[40px] border-0 p-0 focus-visible:ring-0 resize-none text-sm"
                       placeholder="NOTES&#10;JDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE"
                       readOnly={isViewMode}
                     />
@@ -1975,8 +1977,8 @@ console.log(totalAmount,"amounttt");
           </div>
 
           {/* Footer disclaimer and Total */}
-          <div className="mb-4">
-            <div className="border border-gray-300 px-3 py-2.5 text-xs text-center bg-white leading-5">
+          <div className="mb-1.5">
+            <div className="border border-gray-300 px-2 py-1 text-xs text-center bg-white leading-4">
               <p>
                 JDP is not responsible for repair of lamps & landscaping, house
                 owner utilities including cables, sprinkler systems, television
@@ -1986,7 +1988,7 @@ console.log(totalAmount,"amounttt");
               </p>
             </div>
 
-            <div className="text-center text-sm text-blue-500 font-bold mt-3">
+            <div className="text-center text-xs text-blue-500 font-bold mt-1.5">
               <p>
                 1432 Oakpointe Drive Waconia, MN 55387 paul@jdpelectric.us
               </p>
@@ -1994,36 +1996,36 @@ console.log(totalAmount,"amounttt");
           </div>
 
           <div className="secnacher">
-            <div className="mt-5">
-              <div className="border-t border-gray-300 mb-4"></div>
+            <div className="mt-2">
+              <div className="border-t border-gray-300 mb-1.5"></div>
 
-              <div className="flex justify-between items-center mb-3">
+              <div className="flex justify-between items-center mb-1">
                 <div className="flex flex-col">
-                  <div className="text-sm font-medium text-gray-700">
+                  <div className="text-xs font-medium text-gray-700">
                     Customer Acceptance
                   </div>
-                  <div className="text-sm font-medium text-gray-700">
+                  <div className="text-xs font-medium text-gray-700">
                     Authorized Signature
                   </div>
                 </div>
-                <div className="text-sm font-medium text-gray-700">Date</div>
+                <div className="text-xs font-medium text-gray-700">Date</div>
               </div>
 
-              <div className="flex justify-between items-center mb-3">
+              <div className="flex justify-between items-center mb-1.5">
                 <div className="flex flex-col w-3/5">
-                  <div className="border-b border-gray-800 h-0.5 mb-1.5"></div>
+                  <div className="border-b border-gray-800 h-0.5 mb-0.5"></div>
                   <div className="text-xs text-gray-700 text-center">
                     Signature
                   </div>
                 </div>
                 <div className="flex flex-col w-1/3">
-                  <div className="border-b border-gray-800 h-0.5 mb-1.5"></div>
+                  <div className="border-b border-gray-800 h-0.5 mb-0.5"></div>
                   <div className="text-xs text-gray-700 text-center">Date</div>
                 </div>
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-md px-3 py-2.5 mt-3">
-                <div className="text-xs text-gray-700 leading-5">
+              <div className="bg-blue-50 border border-blue-200 rounded-md px-2 py-1 mt-1.5">
+                <div className="text-xs text-gray-700 leading-4">
                   By signing above, you agree to the terms and pricing outlined
                   in this estimate. This becomes a binding agreement upon
                   signature.

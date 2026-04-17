@@ -19,6 +19,8 @@ type JobType = {
   updated_at?: string;
   /** Set by listing pages when job was created in last 48h (optional). */
   __listingRecentlyAdded?: boolean;
+  /** Set by listing pages when job was updated in last 48h (optional). */
+  __listingRecentlyUpdated?: boolean;
   subJobs?: {
     id: string | number;
     job_title?: string;
@@ -33,6 +35,7 @@ type JobType = {
     created_at?: string;
     updated_at?: string;
     __listingRecentlyAdded?: boolean;
+    __listingRecentlyUpdated?: boolean;
     /** API: marks rows created via Change Order flow */
     changes_order?: string;
     changesOrder?: string;
@@ -46,6 +49,10 @@ type EntityType = {
   name?: string;
   total_jobs?: number;
   jobs?: JobType[];
+  /** Set by listing pages when any job was created in last 48h (optional). */
+  __listingRecentlyAdded?: boolean;
+  /** Set by listing pages when any job was updated in last 48h (optional). */
+  __listingRecentlyUpdated?: boolean;
 };
 
 type CommonEntityListingProps = {
@@ -242,8 +249,18 @@ export default function CommonEntityListing({
                                 <div className="text-[13.4px] font-semibold leading-snug text-slate-800 break-words capitalize">
                                   {getParentName(entity)}
                                 </div>
-                                <div className="mt-0.5 text-xs text-slate-500">
-                                  {totalJobs} jobs
+                                <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
+                                  <span>{totalJobs} jobs</span>
+                                  {entity.__listingRecentlyAdded && (
+                                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-1 py-0.5 text-[8px] font-semibold leading-none text-emerald-800">
+                                      Recently Added
+                                    </span>
+                                  )}
+                                  {entity.__listingRecentlyUpdated && !entity.__listingRecentlyAdded && (
+                                    <span className="rounded-full border border-blue-200 bg-blue-50 px-1 py-0.5 text-[8px] font-semibold leading-none text-blue-800">
+                                      Recently Updated
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -362,6 +379,11 @@ export default function CommonEntityListing({
                                                   Recently Added
                                                 </span>
                                               )}
+                                              {job.__listingRecentlyUpdated && !job.__listingRecentlyAdded && (
+                                                <span className="rounded-full border border-blue-200 bg-blue-50 px-1 py-0.5 text-[8px] font-semibold leading-none text-blue-800">
+                                                  Recently Updated
+                                                </span>
+                                              )}
                                             </div>
                                           </div>
                                         </div>
@@ -433,6 +455,11 @@ export default function CommonEntityListing({
                                                         {subJob.__listingRecentlyAdded && (
                                                           <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[8px] font-semibold leading-none text-emerald-800">
                                                             Recently Added
+                                                          </span>
+                                                        )}
+                                                        {subJob.__listingRecentlyUpdated && !subJob.__listingRecentlyAdded && (
+                                                          <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[8px] font-semibold leading-none text-blue-800">
+                                                            Recently Updated
                                                           </span>
                                                         )}
                                                         <span className="rounded-full border border-sky-100 bg-sky-50 px-2 py-1 text-[9px] font-semibold leading-none text-sky-600">

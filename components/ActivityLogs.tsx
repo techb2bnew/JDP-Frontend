@@ -508,8 +508,7 @@ const normalizeActorLabel = (raw?: string | null): string | null => {
     lower === "system" ||
     lower === "null" ||
     lower === "undefined" ||
-    lower === "n/a" ||
-    lower === "lead"
+    lower === "n/a"
   ) {
     return null;
   }
@@ -523,13 +522,32 @@ const nameFromUser = (u?: ApiUser | null): string | null => {
     .filter(Boolean)
     .join(" ")
     .trim();
-  return (
-    normalizeActorLabel(u.full_name) ||
-    normalizeActorLabel(u.name) ||
-    normalizeActorLabel(combined || null) ||
-    normalizeActorLabel(u.email) ||
-    normalizeActorLabel(u.username)
-  );
+
+  const fullName = normalizeActorLabel(u.full_name);
+  const name = normalizeActorLabel(u.name);
+  const combinedName = normalizeActorLabel(combined || null);
+
+  if (fullName) return fullName;
+  if (name) return name;
+  if (combinedName) return combinedName;
+
+  const email = normalizeActorLabel(u.email);
+  if (email && email.includes("@")) {
+    // lead@yopmail.com -> lead, john.doe@example.com -> john doe
+    return email.split("@")[0].replace(/[._]/g, " ");
+  }
+
+  return email || normalizeActorLabel(u.username);
+};
+
+/** Try to format a string if it looks like an email */
+const formatIfEmail = (s?: string | null): string | null => {
+  const n = normalizeActorLabel(s);
+  if (!n) return null;
+  if (n.includes("@")) {
+    return n.split("@")[0].replace(/[._]/g, " ");
+  }
+  return n;
 };
 
 /** Try each user object or plain string; avoid falsely showing "System" when a real actor exists later in the list. */
@@ -539,7 +557,7 @@ const resolveActor = (
   for (const c of candidates) {
     if (c == null) continue;
     if (typeof c === "string") {
-      const n = normalizeActorLabel(c);
+      const n = formatIfEmail(c);
       if (n) return n;
       continue;
     }
@@ -600,7 +618,7 @@ const mapApiResponseToActivities = (
     payload.assigned_lead_labor.forEach((lead) => {
       const assignedLeadName =
         nameFromUser(lead.user) ||
-        normalizeActorLabel(lead.labor_code) ||
+        formatIfEmail(lead.labor_code) ||
         "Lead labor";
       const assignedBy = resolveActor(
         activityAudit?.lead_labor_assigned_by,
@@ -628,7 +646,7 @@ const mapApiResponseToActivities = (
     payload.assigned_labor.forEach((labor) => {
       const assignedLaborName =
         nameFromUser(labor.user) ||
-        normalizeActorLabel(labor.labor_code) ||
+        formatIfEmail(labor.labor_code) ||
         "Labor";
       const assignedBy = resolveActor(
         activityAudit?.labor_assigned_by,
@@ -694,7 +712,7 @@ const mapApiResponseToActivities = (
         id: `invoice-${invoice.estimate_id}-${index}`,
         title: "Invoice Sent",
         description: `${sentBy} sent invoice ${invoice.invoice_number} to ${
-          invoice.invoice_sent_to || "the customer"
+          formatIfEmail(invoice.invoice_sent_to) || "the customer"
         }.`,
         dateLabel: formatDateLabel(sortDate),
         userName: sentBy,

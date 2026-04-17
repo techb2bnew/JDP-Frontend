@@ -124,15 +124,15 @@ const SortableHeaderGroup = ({
             className="p-0 border-0 bg-transparent overflow-visible"
           >
             <div
-              className={`relative z-10 flex items-center justify-between gap-3 px-4 py-3 text-white transform-gpu overflow-visible rounded-[2px] transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              className={`relative z-10 flex items-center justify-between gap-3 px-3 py-2 text-white transform-gpu overflow-visible rounded-[2px] transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
                 isInvalidHeader
                   ? "bg-[#334155] scale-[1.003] shadow-[0px_5px_15px_rgb(210_0_0_/_35%)] border border-[#ff000066]"
                   : isDragging
                     ? "bg-[#334155] scale-[1.002] shadow-[0_6px_18px_rgba(15,23,42,0.18)]"
-                    : "bg-gray-800 hover:shadow-[0_4px_14px_rgba(15,23,42,0.10)]"
+                    : "bg-gray-600 hover:shadow-[0_4px_14px_rgba(15,23,42,0.10)]"
               }`}
             >
-              <div className="flex items-center gap-3 min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
                 <button
                   type="button"
                   {...attributes}
@@ -148,9 +148,9 @@ const SortableHeaderGroup = ({
                     onUpdateRow(group.header.id, "headerName", e.target.value)
                   }
                   className={`
-                      h-9 w-[240px]
+                      h-8 w-[240px]
                       bg-transparent px-2
-                      text-[20px] font-medium text-white
+                      text-[18px] font-medium text-white
                       border rounded-md
                       shadow-none outline-none
                       transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]
@@ -170,13 +170,13 @@ const SortableHeaderGroup = ({
                 />
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() =>
                     onAddLineItemUnderHeader(group.header.headerKey as string)
                   }
-                  className="flex items-center gap-1 rounded-md bg-white/10 hover:bg-white/20 px-3 py-1.5 text-xs transition"
+                  className="flex items-center gap-1 rounded-md bg-white/10 hover:bg-white/20 px-2.5 py-1.5 text-[11px] transition"
                 >
                   <Plus className="h-3 w-3" />
                   Add Line Item
@@ -189,7 +189,7 @@ const SortableHeaderGroup = ({
                       group.header.headerKey as string,
                     )
                   }
-                  className="flex items-center gap-1 rounded-md bg-white/10 hover:bg-white/20 px-3 py-1.5 text-xs transition"
+                  className="flex items-center gap-1 rounded-md bg-white/10 hover:bg-white/20 px-2.5 py-1.5 text-[11px] transition"
                 >
                   <Plus className="h-3 w-3" />
                   Add Custom
@@ -198,7 +198,7 @@ const SortableHeaderGroup = ({
                 <button
                   type="button"
                   onClick={() => onRemoveRow(group.header.id)}
-                  className="flex items-center gap-1 rounded-md bg-red-500/20 hover:bg-red-500/30 px-3 py-1.5 text-xs text-red-200 transition"
+                  className="flex items-center gap-1 rounded-md bg-red-500/20 hover:bg-red-500/30 px-2.5 py-1.5 text-[11px] text-red-200 transition"
                 >
                   Remove
                 </button>

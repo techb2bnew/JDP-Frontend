@@ -901,6 +901,8 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                 valueField="id"
                 refreshKey={customerRefreshKey}
                 className={validationErrors.customer ? 'border-red-500' : ''}
+                onCreateNew={() => openAddEntityModal('customer')}   // ← ADD
+                createNewLabel="+ Create Customer"  
               />
               {validationErrors.customer && (
                 <p className="text-red-500 text-sm">{validationErrors.customer}</p>
@@ -933,6 +935,8 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                 valueField="id"
                 refreshKey={contractorRefreshKey}
                 className={validationErrors.contractor ? 'border-red-500' : ''}
+                onCreateNew={() => openAddEntityModal('contractor')}  // ← ADD
+                createNewLabel="+ Create Contractor" 
               />
               {validationErrors.contractor && (
                 <p className="text-red-500 text-sm">{validationErrors.contractor}</p>

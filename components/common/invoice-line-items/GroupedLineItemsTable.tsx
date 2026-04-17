@@ -172,7 +172,7 @@ const GroupedLineItemsTable = ({
           <div className="overflow-y-visible">
             <table className="table-fixed w-full border-collapse">
               <thead>
-                <tr className="bg-gray-800 text-white">
+                <tr className="bg-gray-600 text-white">
                   <th className="border border-gray-300 px-3 py-2 text-left w-[90px]">
                     Qty
                   </th>

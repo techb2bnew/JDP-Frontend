@@ -62,6 +62,7 @@ import {
 } from 'lucide-react'
 import CommonEntityListing from './common/CommonEntityListing'
 import {
+  annotateEntitiesForListing,
   annotateJobsForListing,
   sortEntitiesByRecentJobActivity,
 } from '@/lib/entityListingRecentActivity'
@@ -1098,12 +1099,14 @@ export function ContractorListingPage() {
 
   // Filter and sort contractors (status + sort only; search is server-side via globalSearch)
   const filteredContractors = useMemo(() => {
-    const withJobs = contractors.map((c) => ({
-      ...c,
-      jobs: annotateJobsForListing(c.jobs || []),
-    }))
+    const annotated = annotateEntitiesForListing(
+      contractors.map((c) => ({
+        ...c,
+        jobs: annotateJobsForListing(c.jobs || []),
+      })),
+    )
     return sortEntitiesByRecentJobActivity(
-      withJobs.filter((contractor) => {
+      annotated.filter((contractor) => {
         const matchesStatus =
           statusFilter === 'all' || contractor.status === statusFilter
         return matchesStatus

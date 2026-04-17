@@ -36,7 +36,8 @@ import {
   Info,
   Check,
   Send,
-  ArrowLeft
+  ArrowLeft,
+  Upload
 } from 'lucide-react'
 import { apiClient } from '@/utils/api'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
@@ -128,7 +129,8 @@ export function BlueSheetApprovalDialog({
   onClose,
   blueSheet,
   selectedBlueSheets = [],
-  onApprovalComplete
+  onApprovalComplete,
+  selectedBlueSheetIds
 }: BlueSheetApprovalDialogProps) {
   console.log('Dialog render', { isOpen, blueSheet })
   const [supplierInvoice, setSupplierInvoice] = useState<SupplierInvoice | null>(null)
@@ -152,6 +154,7 @@ export function BlueSheetApprovalDialog({
   // Reference to CustomInvoiceDialog's "preview & send" handler
   const previewAndSendRef = useRef<(() => Promise<void>) | null>(null);
   const [invalidHeaderKeys, setInvalidHeaderKeys] = useState<string[]>([]);
+  const clearInvalidHeaderKeys = () => setInvalidHeaderKeys([]);
   const [isSaving, setIsSaving] = useState(false);
   const [customInvoiceProcessing, setCustomInvoiceProcessing] = useState(false);
   const [selectedInvoiceType, setSelectedInvoiceType] = useState<string>("estimate");
@@ -159,6 +162,33 @@ export function BlueSheetApprovalDialog({
     isSaving || isApproving || isApprovingCustomer || customInvoiceProcessing;
   const router = useRouter();
 
+  const getBlueSheetId = (bs: any): number | null => {
+    const raw =
+      bs?.id ??
+      bs?.blueSheetId ??
+      bs?.bluesheet_id ??
+      bs?.blue_sheet_id ??
+      null;
+    const n = raw == null ? null : Number(raw);
+    return n == null || Number.isNaN(n) ? null : n;
+  };
+
+  const getSelectedBlueSheetIds = (): number[] => {
+    const idsFromSelection = Array.isArray(selectedBlueSheets)
+      ? selectedBlueSheets
+          .map((bs) => getBlueSheetId(bs))
+          .filter((id): id is number => typeof id === "number")
+      : [];
+
+    const uniqueFromSelection = Array.from(new Set(idsFromSelection));
+    if (uniqueFromSelection.length > 0) return uniqueFromSelection;
+
+    const fallbackId = getBlueSheetId(blueSheet);
+    return fallbackId != null ? Array.from(new Set([fallbackId])) : [];
+  };
+
+  console.log(getSelectedBlueSheetIds(),selectedBlueSheetIds,"getSelectedBlueSheetIds");
+  
 
   // ─── Reset when dialog opens ───────────────────────────────────────────────
   useEffect(() => {
@@ -866,9 +896,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
       toast.error('Please save your changes before proceeding')
       return
     }
-    const ids = selectedBlueSheets?.length
-      ? selectedBlueSheets.map(bs => bs.id)
-      : [blueSheet.id]
+    const ids = getSelectedBlueSheetIds()
     try {
       setIsProceedingToReview(true)
       await apiClient.approveBulkBluesheet(ids, 'approved')
@@ -1001,10 +1029,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
       ).toFixed(2),
     );
 
-    const bluesheetIds =
-      selectedBlueSheets.length > 0
-        ? selectedBlueSheets.map((bs) => bs.id)
-        : [finalBlueSheet.id];
+    const bluesheetIds = getSelectedBlueSheetIds();
 
     const today = new Date().toISOString().split("T")[0];
     const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
@@ -1122,9 +1147,10 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
   !!currentSupplierInvoice &&
   Array.isArray(currentSupplierInvoice.materials) &&
   currentSupplierInvoice.materials.length > 0;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent  showCloseButton={false} className="w-screen h-screen max-w-full max-h-full min-w-full min-h-full overflow-hidden p-0 rounded-none border-0">
+      <DialogContent showCloseButton={false} className="w-screen h-screen max-w-full max-h-full min-w-full min-h-full overflow-hidden p-0 rounded-none border-0">
         <DialogHeader className="p-8 pt-3 pb-3 border-b bg-white">
           <DialogTitle className="flex items-center gap-3">
             {/* Back Button */}
@@ -1132,7 +1158,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
               type="button"
               variant="outline"
               onClick={handleBackClick}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md bg-white hover:bg-gray-50 transition"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md bg-white hover:bg-gray-50 transition cursor-pointer"
             >
               <ArrowLeft className="h-4 w-4" />
               Back
@@ -1177,7 +1203,8 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                 value="upload"
                 className={`gap-2 text-base ${currentStep === "upload" ? "bg-white" : ""}`}
               >
-                <Download className="h-5 w-5" />
+                {/* <Download className="h-5 w-5" /> */}
+                 <Upload className="h-4 w-4 mr-2" />
                 Upload & Compare
               </TabsTrigger>
               <TabsTrigger
@@ -1215,7 +1242,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                           onClick={handleAutoFetch}
                           disabled={isAutoFetching}
                           size="sm"
-                          className="h-9 px-4 gap-2 bg-[#00A1FF] hover:bg-[#0090e6] text-white text-sm"
+                          className="h-9 px-4 gap-2 bg-[#00A1FF] hover:bg-[#0090e6] text-white text-sm cursor-pointer"
                         >
                           {isAutoFetching ? (
                             <RefreshCw className="h-4 w-4 animate-spin" />
@@ -1234,12 +1261,12 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                           disabled={isUploading}
                           variant="outline"
                           size="sm"
-                          className="h-9 px-4 gap-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-[#00A1FF] hover:text-[#00A1FF]"
+                          className="h-9 px-4 gap-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-[#00A1FF] hover:text-[#00A1FF] cursor-pointer"
                         >
                           {isUploading ? (
                             <RefreshCw className="h-4 w-4 animate-spin" />
                           ) : (
-                            <Download className="h-4 w-4" />
+                            <RefreshCw className="h-4 w-4" />
                           )}
                           {isUploading ? "Processing..." : "Choose File"}
                         </Button>
@@ -1288,9 +1315,9 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                         variant={isBlueSheetEditMode ? "default" : "outline"}
                         size="sm"
                         className={
-                          isBlueSheetEditMode
+                          (isBlueSheetEditMode
                             ? "bg-orange-500 hover:bg-orange-600"
-                            : "border-gray-300"
+                            : "border-gray-300") + " cursor-pointer"
                         }
                       >
                         <Edit className="h-3.5 w-3.5 mr-1.5" />
@@ -1306,15 +1333,15 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                     <Card className="border border-gray-200 bg-gray-100/80 shadow-none overflow-hidden rounded-xl">
                       <CardContent className="p-0">
                         {/* Dashboard section on top of tables (same card like invoice) */}
-                        <div className="p-6 bg-gray-100/60 border-b border-gray-200">
+                        <div className="p-4 bg-gray-100/60 border-b border-gray-200">
                           <div className="flex flex-wrap items-start justify-between gap-4">
                             <div className="min-w-[280px]">
                               <div className="flex items-start justify-between gap-3">
                                 <div>
-                                  <h2 className="text-base font-bold uppercase tracking-wider text-gray-700">
+                                  <h2 className="text-sm font-bold uppercase tracking-wider text-gray-700">
                                     Comparison Dashboard
                                   </h2>
-                                  <p className="text-xs text-gray-500 mt-0.5">
+                                  <p className="text-[10px] text-gray-500 mt-0.5">
                                     Invoice Reconciliation · INVREC-
                                     {blueSheet.id}
                                   </p>
@@ -1330,9 +1357,9 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                     }
                                     size="sm"
                                     className={
-                                      isBlueSheetEditMode
+                                      (isBlueSheetEditMode
                                         ? "bg-orange-500 hover:bg-orange-600"
-                                        : "border-gray-300 bg-white"
+                                        : "border-gray-300 bg-white") + " cursor-pointer h-8"
                                     }
                                   >
                                     <Edit className="h-3.5 w-3.5 mr-1.5" />
@@ -1341,27 +1368,27 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                 </div>
                               </div>
 
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 text-sm">
-                                <div className="p-3 rounded-lg bg-white border border-gray-200">
-                                  <p className="text-xs font-semibold uppercase text-gray-400 mb-1">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 text-sm">
+                                <div className="p-2.5 rounded-lg bg-white border border-gray-200">
+                                  <p className="text-[10px] font-semibold uppercase text-gray-400 mb-0.5">
                                     From
                                   </p>
-                                  <p className="font-small text-[#1a1a2e]">
+                                  <p className="text-xs font-medium text-[#1a1a2e]">
                                     Supplier Invoice:{" "}
                                     {currentSupplierInvoice?.invoiceNumber}
                                   </p>
-                                  <p className="text-gray-600">
+                                  <p className="text-[11px] text-gray-600">
                                     ({currentSupplierInvoice?.supplier || "—"})
                                   </p>
                                 </div>
-                                <div className="p-3 rounded-lg bg-white border border-gray-200">
-                                  <p className="text-xs font-semibold uppercase text-gray-400 mb-1">
+                                <div className="p-2.5 rounded-lg bg-white border border-gray-200">
+                                  <p className="text-[10px] font-semibold uppercase text-gray-400 mb-0.5">
                                     Bill To
                                   </p>
-                                  <p className="font-small text-[#1a1a2e]">
+                                  <p className="text-xs font-medium text-[#1a1a2e]">
                                     BlueSheet: PO BS-{blueSheet.id}
                                   </p>
-                                  <p className="text-gray-600">
+                                  <p className="text-[11px] text-gray-600">
                                     (
                                     {blueSheet.job.customer?.customer_name ||
                                       blueSheet.job.contractor
@@ -1376,7 +1403,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                             {/* Right side removed: Total Reconciliation Discrepancy box */}
                           </div>
 
-                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-6">
+                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-4">
                             {[
                               {
                                 label: "Matches",
@@ -1421,14 +1448,14 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                             ].map((stat, i) => (
                               <div
                                 key={i}
-                                className={`${stat.bg} border rounded-lg px-3 py-2 text-center`}
+                                className={`${stat.bg} border rounded-lg px-2 py-1.5 text-center`}
                               >
                                 <p
-                                  className={`text-lg font-bold ${stat.color}`}
+                                  className={`text-base font-bold ${stat.color}`}
                                 >
                                   {stat.value}
                                 </p>
-                                <p className="text-xs text-gray-500">
+                                <p className="text-[10px] text-gray-500">
                                   {stat.label}
                                 </p>
                               </div>
@@ -1437,39 +1464,39 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                         </div>
 
                         {/* Tables inside same invoice card */}
-                        <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto_1fr] gap-0 bg-gray-100/80 p-3">
+                        <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto_1fr] gap-0 bg-gray-100/80 p-2">
                           <Card className="border-0 rounded-none shadow-none">
-                            <CardHeader className="bg-[#0f2d1f] text-white py-3 px-4 rounded-none">
-                              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-emerald-400" />{" "}
+                            <CardHeader className="bg-[#0f2d1f] text-white py-2 px-4 rounded-none">
+                              <CardTitle className="text-xs font-semibold flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />{" "}
                                 Supplier Materials
                               </CardTitle>
                               {/* <p className="text-xs text-white/80 mt-0.5">{currentSupplierInvoice?.invoiceNumber} · {currentSupplierInvoice?.supplier}</p> */}
                             </CardHeader>
                             <CardContent className="p-0">
                               <div className="overflow-x-auto">
-                                <table className="w-full text-sm border-collapse">
+                                <table className="w-full text-[13px] border-collapse">
                                   <thead>
-                                    <tr className="bg-[#134422] text-white text-xs">
-                                      <th className="text-left py-2.5 px-3 font-medium border-r border-white/20">
+                                    <tr className="bg-[#134422] text-white text-[11px]">
+                                      <th className="text-left py-2 px-3 font-medium border-r border-white/20">
                                         #
                                       </th>
-                                      <th className="text-left py-2.5 px-3 font-medium border-r border-white/20">
+                                      <th className="text-left py-2 px-3 font-medium border-r border-white/20">
                                         Description
                                       </th>
-                                      <th className="text-center py-2.5 px-2 w-14 border-r border-white/20">
+                                      <th className="text-center py-2 px-2 w-12 border-r border-white/20">
                                         Qty
                                       </th>
-                                      <th className="text-right py-2.5 px-3 w-28 border-r border-white/20">
+                                      <th className="text-right py-2 px-3 w-24 border-r border-white/20">
                                         Supplier Price
                                       </th>
-                                      <th className="text-right py-2.5 px-3 w-28 border-r border-white/20">
+                                      <th className="text-right py-2 px-3 w-24 border-r border-white/20">
                                         Total Amount
                                       </th>
                                       {isSupplierEditMode &&
                                         currentSupplierInvoice &&
                                         currentSupplierInvoice.materials
-                                          .length > 1 && <th className="w-8" />}
+                                          .length > 1 && <th className="w-6" />}
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -1484,15 +1511,15 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                         return (
                                           <tr
                                             key={rowIdx}
-                                            className="border-t border-gray-200 bg-gray-50 h-11"
+                                            className="border-t border-gray-200 bg-gray-50 h-10"
                                           >
-                                            <td className="py-2 px-3 text-gray-400 border-r border-gray-200 align-middle">
+                                            <td className="py-1.5 px-3 text-gray-400 border-r border-gray-200 align-middle">
                                               —
                                             </td>
-                                            <td className="py-2 px-3 text-gray-400 border-r border-gray-200 align-middle">
+                                            <td className="py-1.5 px-3 text-gray-400 border-r border-gray-200 align-middle">
                                               No Data in Supplier
                                             </td>
-                                            <td className="py-2 px-2 text-center border-r border-gray-200 align-middle">
+                                            <td className="py-1.5 px-2 text-center border-r border-gray-200 align-middle">
                                               —
                                             </td>
                                             <td className="py-2 px-3 text-right border-r border-gray-200 align-middle">
@@ -1757,7 +1784,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                 <table className="w-full text-sm border-collapse">
                                   <thead>
                                     <tr className="bg-[#162f3d] text-white text-xs">
-                                      <th className="text-left py-2.5 px-3 font-medium border-r border-white/20">
+                                      <th className="text-left py-2.5 px-3 font-medium border-r-2 border-gray-400">
                                         BlueSheet
                                       </th>
                                       <th className="text-left py-2.5 px-3 font-medium border-r border-white/20">
@@ -1848,6 +1875,21 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                         }
                                       }
 
+                                      const nextPair =
+                                        rowIdx < comparisonPairs.length - 1
+                                          ? comparisonPairs[rowIdx + 1]
+                                          : null;
+                                      const nextSourceId = nextPair?.bs
+                                        ? nextPair.bs.job_bluesheet_id ||
+                                          nextPair.bs.bluesheet_id ||
+                                          nextPair.bs.bluesheetId ||
+                                          blueSheet.id
+                                        : null;
+                                      const isLastOfGroup =
+                                        nextPair &&
+                                        (!nextPair.bs ||
+                                          bsSourceId !== nextSourceId);
+
                                       return (
                                         <tr
                                           key={rowIdx}
@@ -1856,12 +1898,12 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                           {isFirstOfGroup && (
                                             <td
                                               rowSpan={rowSpan}
-                                              className="py-2 px-3 border-r border-black border-b border-black align-middle text-[11px] font-semibold text-gray-800 w-10"
+                                              className={`py-2 px-3 border-r-2 border-gray-400 align-middle text-[11px] font-bold text-black w-10 bg-gray-50 ${rowIdx + rowSpan < comparisonPairs.length ? "border-b-2 border-gray-400" : "border-b border-gray-200"}`}
                                             >
                                               BS-{bsSourceId}
                                             </td>
                                           )}
-                                          <td className="py-2 px-3 border-r border-gray-200 align-middle">
+                                          <td className={`py-2 px-3 border-r border-gray-200 align-middle ${rowIdx < comparisonPairs.length - 1 && nextSourceId && bsSourceId !== nextSourceId ? "border-b-2 border-gray-400" : ""}`}>
                                             {isBlueSheetEditMode ? (
                                               <div className="relative">
                                                 <Input
@@ -1951,7 +1993,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                               </span>
                                             )}
                                           </td>
-                                          <td className="py-2 px-2 text-center border-r border-gray-200 align-middle">
+                                          <td className={`py-2 px-2 text-center border-r border-gray-200 align-middle ${rowIdx < comparisonPairs.length - 1 && nextSourceId && bsSourceId !== nextSourceId ? "border-b-2 border-gray-400" : ""}`}>
                                             {isBlueSheetEditMode ? (
                                               <Input
                                                 type="number"
@@ -1974,7 +2016,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                               </span>
                                             )}
                                           </td>
-                                          <td className="py-2 px-3 text-right border-r border-gray-200 align-middle">
+                                          <td className={`py-2 px-3 text-right border-r border-gray-200 align-middle ${rowIdx < comparisonPairs.length - 1 && nextSourceId && bsSourceId !== nextSourceId ? "border-b-2 border-gray-400" : ""}`}>
                                             {isBlueSheetEditMode ? (
                                               <Input
                                                 type="number"
@@ -1996,7 +2038,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                               formatCurrency(bs.unit_cost)
                                             )}
                                           </td>
-                                          <td className="py-2 px-3 text-right font-semibold text-[#00A1FF] border-r border-gray-200 align-middle">
+                                          <td className={`py-2 px-3 text-right font-semibold text-[#00A1FF] border-r border-gray-200 align-middle ${rowIdx < comparisonPairs.length - 1 && nextSourceId && bsSourceId !== nextSourceId ? "border-b-2 border-gray-400" : ""}`}>
                                             {formatCurrency(
                                               bs.total_cost ||
                                                 bs.material_used * bs.unit_cost,
@@ -2005,7 +2047,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                           {isBlueSheetEditMode &&
                                             currentBlueSheet.material_entries
                                               .length > 1 && (
-                                              <td className="py-1 border-r border-gray-200 align-middle">
+                                              <td className={`py-1 border-r border-gray-200 align-middle ${rowIdx < comparisonPairs.length - 1 && nextSourceId && bsSourceId !== nextSourceId ? "border-b-2 border-gray-400" : ""}`}>
                                                 <button
                                                   onClick={() =>
                                                     removeBlueSheetMaterial(
@@ -2023,70 +2065,62 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                       );
                                     })}
                                   </tbody>
-                                  <tfoot>
-                                    <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold h-[44px]">
-                                      <td
-                                        colSpan={3}
-                                        className="py-3 px-3 text-right border-r border-gray-200"
-                                      >
-                                        Total
-                                      </td>
-                                      <td
-                                        colSpan={2}
-                                        className="py-3 px-3 text-right text-[#00A1FF] border-r border-gray-200"
-                                      >
-                                        {formatCurrency(materialTotal)}
-                                      </td>
-                                      {isBlueSheetEditMode &&
-                                        currentBlueSheet.material_entries
-                                          .length > 1 && (
-                                          <td className="border-r border-gray-200" />
-                                        )}
-                                    </tr>
-                                    {laborEntriesTotalCost > 0 && (
-                                      <tr className="  text-xs text-gray-700">
-                                        <td
-                                          colSpan={3}
-                                          className="py-2 px-3 text-right font-bold text-[#00A1FF] text-[15px]"
-                                        >
-                                          Labor Total Cost
-                                        </td>
-                                        <td
-                                          colSpan={2}
-                                          className="py-2 px-3 text-right font-bold text-[15px] text-blue-700"
-                                        >
-                                          {formatCurrency(
-                                            laborEntriesTotalCost,
-                                          )}
-                                        </td>
-                                        {isBlueSheetEditMode &&
-                                          currentBlueSheet.material_entries
-                                            .length > 1 && <td />}
-                                      </tr>
-                                    )}
-                                    {laborEntriesTotalCost > 0 && (
-                                      <tr className="  text-xs text-gray-800">
-                                        <td
-                                          colSpan={3}
-                                          className="py-2 px-3 text-right font-bold text-[15px] text-emerald-600"
-                                        >
-                                          Total Material + Labor
-                                        </td>
-                                        <td
-                                          colSpan={2}
-                                          className="py-2 px-3 text-right font-bold text-[15px] text-emerald-700"
-                                        >
-                                          {formatCurrency(
-                                            materialTotal +
-                                              laborEntriesTotalCost,
-                                          )}
-                                        </td>
-                                        {isBlueSheetEditMode &&
-                                          currentBlueSheet.material_entries
-                                            .length > 1 && <td />}
-                                      </tr>
-                                    )}
-                                  </tfoot>
+                                <tfoot>
+  <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
+    <td
+      colSpan={3}
+      className="py-2 px-3 text-right text-black font-bold text-[15px]"
+    >
+      Material total
+    </td>
+    <td
+      colSpan={2}
+      className="py-2 px-3 text-right text-black font-bold text-[15px]"
+    >
+      {formatCurrency(materialTotal)}
+    </td>
+    {isBlueSheetEditMode &&
+      currentBlueSheet.material_entries.length > 1 && <td />}
+  </tr>
+
+  {laborEntriesTotalCost > 0 && (
+    <tr className="text-xs text-black">
+      <td
+        colSpan={3}
+        className="py-2 px-3 text-right font-bold text-[15px]"
+      >
+        Labor Total Cost
+      </td>
+      <td
+        colSpan={2}
+        className="py-2 px-3 text-right font-bold text-[15px]"
+      >
+        {formatCurrency(laborEntriesTotalCost)}
+      </td>
+      {isBlueSheetEditMode &&
+        currentBlueSheet.material_entries.length > 1 && <td />}
+    </tr>
+  )}
+
+  {laborEntriesTotalCost > 0 && (
+    <tr className="text-xs text-black">
+      <td
+        colSpan={3}
+        className="py-2 px-3 text-right font-bold text-[16px]"
+      >
+        Total
+      </td>
+      <td
+        colSpan={2}
+        className="py-2 px-3 text-right font-bold text-[16px]"
+      >
+        {formatCurrency(materialTotal + laborEntriesTotalCost)}
+      </td>
+      {isBlueSheetEditMode &&
+        currentBlueSheet.material_entries.length > 1 && <td />}
+    </tr>
+  )}
+</tfoot>
                                 </table>
                               </div>
                             </CardContent>
@@ -2112,10 +2146,10 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                           <table className="w-full text-sm border-collapse">
                             <thead>
                               <tr className="bg-[#162f3d] text-white text-xs">
-                                <th className="text-left py-2.5 px-3 font-medium">
+                                <th className="text-left py-2.5 px-3 font-medium border-r-2 border-gray-400">
                                   BlueSheet
                                 </th>
-                                <th className="text-left py-2.5 px-3 font-medium">
+                                <th className="text-left py-2.5 px-3 font-medium border-r border-white/20">
                                   Description
                                 </th>
                                 <th className="text-center py-2.5 px-2 w-14">
@@ -2166,6 +2200,23 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                         prevItem.bluesheetId ||
                                         currentBlueSheet.id
                                       : null;
+                                    const nextItem =
+                                      idx <
+                                      currentBlueSheet.material_entries.length -
+                                        1
+                                        ? currentBlueSheet.material_entries[
+                                            idx + 1
+                                          ]
+                                        : null;
+                                    const nextSourceId = nextItem
+                                      ? nextItem.job_bluesheet_id ||
+                                        nextItem.bluesheet_id ||
+                                        nextItem.bluesheetId ||
+                                        currentBlueSheet.id
+                                      : null;
+                                    const isLastOfGroup =
+                                      nextItem && bsSourceId !== nextSourceId;
+
                                     const isFirstOfGroup =
                                       !prevItem || bsSourceId !== prevSourceId;
 
@@ -2197,15 +2248,15 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                       >
                                         {isFirstOfGroup && (
                                           <td
-                                            className="py-2 px-3 border-r border-black border-b border-black w-10"
+                                            className={`py-2 px-3 border-r-2 border-gray-400 w-10 bg-gray-50 ${idx + rowSpan < currentBlueSheet.material_entries.length ? "border-b-2 border-gray-400" : "border-b border-gray-200"}`}
                                             rowSpan={rowSpan}
                                           >
-                                            <span className="text-[11px] font-semibold text-gray-800">
+                                            <span className="text-[11px] font-bold text-black">
                                               BS-{bsSourceId}
                                             </span>
                                           </td>
                                         )}
-                                        <td className="py-2 px-3">
+                                        <td className={`py-2 px-3 ${idx + rowSpan < currentBlueSheet.material_entries.length && nextSourceId && bsSourceId !== nextSourceId ? "border-b-2 border-gray-400" : ""}`}>
                                           {isBlueSheetEditMode ? (
                                             <div className="relative">
                                               <Input
@@ -2287,7 +2338,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                             </span>
                                           )}
                                         </td>
-                                        <td className="py-2 px-2 text-center">
+                                        <td className={`py-2 px-2 text-center ${idx + rowSpan < currentBlueSheet.material_entries.length && nextSourceId && bsSourceId !== nextSourceId ? "border-b-2 border-gray-400" : ""}`}>
                                           {isBlueSheetEditMode ? (
                                             <Input
                                               type="number"
@@ -2309,7 +2360,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                             </span>
                                           )}
                                         </td>
-                                        <td className="py-2 px-3 text-right">
+                                        <td className={`py-2 px-3 text-right ${idx + rowSpan < currentBlueSheet.material_entries.length && nextSourceId && bsSourceId !== nextSourceId ? "border-b-2 border-gray-400" : ""}`}>
                                           {isBlueSheetEditMode ? (
                                             <Input
                                               type="number"
@@ -2330,7 +2381,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                             formatCurrency(item.jdp_price)
                                           )}
                                         </td>
-                                        <td className="py-2 px-3 text-right font-semibold text-[#00A1FF]">
+                                        <td className={`py-2 px-3 text-right font-semibold text-[#00A1FF] ${idx + rowSpan < currentBlueSheet.material_entries.length && nextSourceId && bsSourceId !== nextSourceId ? "border-b-2 border-gray-400" : ""}`}>
                                           {formatCurrency(
                                             item.total_cost ||
                                               item.material_used *
@@ -2340,7 +2391,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                         {isBlueSheetEditMode &&
                                           currentBlueSheet.material_entries
                                             .length > 1 && (
-                                            <td className="py-1">
+                                            <td className={`py-1 ${idx + rowSpan < currentBlueSheet.material_entries.length && nextSourceId && bsSourceId !== nextSourceId ? "border-b-2 border-gray-400" : ""}`}>
                                               <button
                                                 onClick={() =>
                                                   removeBlueSheetMaterial(idx)
@@ -2362,13 +2413,13 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                               <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
                                 <td
                                   colSpan={3}
-                                  className="py-3 px-3 text-right"
+                                  className="py-2 px-3 text-right text-black-600 font-bold text-[15px]"
                                 >
-                                  Total
+                                   Material total
                                 </td>
                                 <td
                                   colSpan={2}
-                                  className="py-3 px-3 text-right text-[#00A1FF]"
+                                  className="py-2 px-3 text-right text-black-600 font-bold text-[15px]"
                                 >
                                   {formatCurrency(materialTotal)}
                                 </td>
@@ -2377,32 +2428,32 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                     1 && <td />}
                               </tr>
                               {laborEntriesTotalCost > 0 && (
-                                <tr className="text-xs text-gray-700">
+                                <tr className="text-xs text-black-700">
                                   <td
                                     colSpan={3}
-                                    className="py-2 px-3 text-right font-bold text-[15px] text-blue-700"
+                                    className="py-2 px-3 text-right font-bold text-[15px]"
                                   >
                                     Labor Total Cost
                                   </td>
                                   <td
                                     colSpan={2}
-                                    className="py-2 px-3 text-right font-bold text-[15px] text-blue-700"
+                                    className="py-2 px-3 text-right font-bold text-[15px]"
                                   >
                                     {formatCurrency(laborEntriesTotalCost)}
                                   </td>
                                 </tr>
                               )}
                               {laborEntriesTotalCost > 0 && (
-                                <tr className=" text-xs text-gray-800">
+                                <tr className=" text-xs text-black-800">
                                   <td
                                     colSpan={3}
-                                    className="py-2 px-3 text-right font-bold text-[15px] text-emerald-600"
+                                    className="py-2 px-3 text-right font-bold text-[16px] "
                                   >
-                                    Total Material + Labor
+                                    Total
                                   </td>
                                   <td
                                     colSpan={2}
-                                    className="py-2 px-3 text-right font-bold text-[15px] text-emerald-700"
+                                    className="py-2 px-3 text-right font-bold text-[16px]"
                                   >
                                     {formatCurrency(
                                       materialTotal + laborEntriesTotalCost,
@@ -2528,315 +2579,317 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
               {/* ── Final Review Tab ──────────────────────────────────────── */}
               <TabsContent
                 value="review"
-                className="h-full overflow-y-auto p-8 pt-0 mt-0 bg-slate-50/60"
+                className="h-full overflow-y-auto p-4 md:p-6 mt-0 bg-slate-50/60"
               >
-                <div className="space-y-8 max-w-7xl mx-auto">
+                <div className="space-y-4 w-full px-2">
                   {/* Header */}
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-2xl font-semibold text-slate-900">
+                      <h3 className="text-xl font-semibold text-slate-900">
                         Final Review &amp; Approval
                       </h3>
-                      <p className="text-sm text-slate-500 mt-1">
+                      <p className="text-xs text-slate-500 mt-0.5">
                         Double‑check BlueSheet vs Supplier totals before sending
                         the invoice.
                       </p>
                     </div>
                   </div>
 
-                  {/* KPI cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 lg:gap-6">
-                    <Card className="bg-blue-50/80 border border-blue-200 shadow-sm">
-                      <CardContent className="p-5 text-left">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <FileText className="h-8 w-8 text-blue-600" />
-                            <h4 className="text-sm font-semibold text-blue-900 tracking-wide uppercase">
-                              BlueSheet
-                            </h4>
-                          </div>
-                          <span className="text-[11px] font-medium text-blue-700 bg-white/70 px-2 py-0.5 rounded-full">
-                            BS-{currentBlueSheet.id}
-                          </span>
-                        </div>
-                        <p className="text-2xl font-semibold text-blue-700">
-                          {formatCurrency(currentBlueSheet.total_cost)}
-                        </p>
-                        <p className="text-xs text-blue-800 mt-1">
-                          {currentBlueSheet.material_entries.length} materials
-                          {totalLaborLabel && (
-                            <span className="ml-2">
-                              · Labor {totalLaborLabel}
-                            </span>
-                          )}
-                        </p>
-                      </CardContent>
-                    </Card>
-
-                    {currentSupplierInvoice && (
-                      <Card className="bg-emerald-50/80 border border-emerald-200 shadow-sm">
-                        <CardContent className="p-5 text-left">
-                          <div className="flex items-center justify-between mb-3">
+                  <div className="flex flex-col xl:flex-row items-start gap-6">
+                    {/* KPI cards - Stacked vertically on the far left */}
+                    <div className="flex flex-col gap-3 w-full xl:w-[280px] shrink-0">
+                      <Card className="bg-blue-50/80 border border-blue-200 shadow-sm">
+                        <CardContent className="p-4 text-left">
+                          <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
-                              <CheckSquare className="h-8 w-8 text-emerald-600" />
-                              <h4 className="text-sm font-semibold text-emerald-900 tracking-wide uppercase">
+                              <FileText className="h-6 w-6 text-blue-600" />
+                              <h4 className="text-xs font-semibold text-blue-900 tracking-wide uppercase">
+                                BlueSheet
+                              </h4>
+                            </div>
+                            <span className="text-xs font-medium text-blue-700 bg-white/70 px-1.5 py-0.5 rounded-full">
+                              BS-{currentBlueSheet.id}
+                            </span>
+                          </div>
+                          <p className="text-xl font-semibold text-blue-700">
+                            {formatCurrency(currentBlueSheet.total_cost)}
+                          </p>
+                          <p className="text-xs text-blue-800 mt-0.5">
+                            {currentBlueSheet.material_entries.length} materials
+                            {totalLaborLabel && (
+                              <span className="ml-1.5">
+                                · Labor {totalLaborLabel}
+                              </span>
+                            )}
+                          </p>
+                        </CardContent>
+                      </Card>
+
+                      {currentSupplierInvoice && (
+                        <Card className="bg-emerald-50/80 border border-emerald-200 shadow-sm">
+                          <CardContent className="p-4 text-left">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                              <CheckSquare className="h-6 w-6 text-emerald-600" />
+                              <h4 className="text-xs font-semibold text-emerald-900 tracking-wide uppercase">
                                 Supplier Materials
                               </h4>
                             </div>
                           </div>
-                          <p className="text-2xl font-semibold text-emerald-700">
+                          <p className="text-xl font-semibold text-emerald-700">
                             {formatCurrency(currentSupplierInvoice.amount)}
                           </p>
-                          <p className="text-xs text-emerald-800 mt-1">
+                          <p className="text-xs text-emerald-800 mt-0.5">
                             {currentSupplierInvoice.materials.length} materials
                             from supplier
                           </p>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {hasComparisonInvoice && (
-                      <>
-                        <Card className="bg-violet-50/80 border border-violet-200 shadow-sm">
-                          <CardContent className="p-5 text-left">
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-2">
-                                <DollarSign className="h-8 w-8 text-violet-600" />
-                                <h4 className="text-sm font-semibold text-violet-900 tracking-wide uppercase">
-                                  Difference
-                                </h4>
-                              </div>
-                            </div>
-                            <p className="text-2xl font-semibold text-violet-700">
-                              {formatCurrency(
-                                currentSupplierInvoice
-                                  ? Math.abs(
-                                      currentBlueSheet.total_cost -
-                                        currentSupplierInvoice.amount,
-                                    )
-                                  : 0,
-                              )}
-                            </p>
-                            <p className="text-xs text-violet-800 mt-1">
-                              {currentSupplierInvoice &&
-                              currentBlueSheet.total_cost
-                                ? `${(
-                                    (Math.abs(
-                                      currentBlueSheet.total_cost -
-                                        currentSupplierInvoice.amount,
-                                    ) /
-                                      (currentBlueSheet.total_cost || 1)) *
-                                    100
-                                  ).toFixed(1)}% variance`
-                                : "No supplier invoice"}
-                            </p>
                           </CardContent>
                         </Card>
+                      )}
 
-                        <Card className="bg-amber-50/80 border border-amber-200 shadow-sm">
-                          <CardContent className="p-5 text-left">
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-2">
-                                <AlertTriangle className="h-8 w-8 text-amber-600" />
-                                <h4 className="text-sm font-semibold text-amber-900 tracking-wide uppercase">
-                                  Discrepancies
-                                </h4>
+                      {hasComparisonInvoice && (
+                        <>
+                          <Card className="bg-violet-50/80 border border-violet-200 shadow-sm">
+                            <CardContent className="p-4 text-left">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <DollarSign className="h-6 w-6 text-violet-600" />
+                                  <h4 className="text-xs font-semibold text-violet-900 tracking-wide uppercase">
+                                    Difference
+                                  </h4>
+                                </div>
                               </div>
-                            </div>
-                            <p className="text-2xl font-semibold text-amber-700">
-                              {
-                                comparisons.filter(
-                                  (c) => c.differences.length > 0,
-                                ).length
-                              }
-                            </p>
-                            <p className="text-xs text-amber-800 mt-1">
-                              items with price / qty differences
-                            </p>
-                          </CardContent>
-                        </Card>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Review Summary */}
-                  <Card className="bg-white shadow-sm border border-slate-200/80">
-                    <CardHeader className="flex items-center justify-between pb-4">
-                      <CardTitle className="text-lg font-semibold text-slate-900">
-                        Review Summary
-                      </CardTitle>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setIsReviewSummaryOpen((prev: any) => !prev)
-                        }
-                        className={`
-                          relative inline-flex h-5 w-9 items-center rounded-full
-                          transition-colors duration-200
-                          ${isReviewSummaryOpen ? "bg-blue-500" : "bg-gray-300"}
-                        `}
-                      >
-                        <span
-                          className={`
-                            inline-block h-4 w-4 transform rounded-full bg-white shadow
-                            transition-transform duration-200
-                            ${isReviewSummaryOpen ? "translate-x-4" : "translate-x-1"}
-                          `}
-                        />
-                      </button>
-                    </CardHeader>
-                    {isReviewSummaryOpen && (
-                      <CardContent className="space-y-8">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                          <div>
-                            <Label className="text-xs font-semibold uppercase text-slate-500">
-                              Customer
-                            </Label>
-                            <p className="text-base font-medium text-[#00A1FF] mt-1">
-                              {currentBlueSheet.job.customer?.customer_name ||
-                                currentBlueSheet.job.contractor
-                                  ?.contractor_name ||
-                                "N/A"}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {currentBlueSheet.job.customer?.email ||
-                                currentBlueSheet.job.contractor?.email ||
-                                currentBlueSheet.job.bill_to_email ||
-                                "—"}
-                            </p>
-                          </div>
-                          <div>
-                            <Label className="text-xs font-semibold uppercase text-slate-500">
-                              Job
-                            </Label>
-                            <p className="text-base font-medium mt-1">
-                              {currentBlueSheet.job.job_title}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {currentBlueSheet.job.job_type ===
-                              "contract_based"
-                                ? "Contract Based"
-                                : "Service Based"}{" "}
-                              · {currentBlueSheet.job.status}
-                            </p>
-                          </div>
-                          <div>
-                            <Label className="text-xs font-semibold uppercase text-slate-500">
-                              PO / BlueSheet
-                            </Label>
-                            <p className="text-base font-mono mt-1">
-                              BS-{currentBlueSheet.id}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              Created on{" "}
-                              {new Date(
-                                currentBlueSheet.created_at,
-                              ).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <div>
-                            <Label className="text-xs font-semibold uppercase text-slate-500">
-                              Submitted By
-                            </Label>
-                            <p className="text-base font-medium mt-1">
-                              {currentBlueSheet.created_by_user.full_name}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {currentBlueSheet.created_by_user.email}
-                            </p>
-                          </div>
-                          <div>
-                            <Label className="text-xs font-semibold uppercase text-slate-500">
-                              Bill To
-                            </Label>
-                            <p className="text-sm mt-1 text-slate-800">
-                              {currentBlueSheet.job.bill_to_address ||
-                                currentBlueSheet.job.customer?.address ||
-                                currentBlueSheet.job.contractor?.address ||
-                                "—"}
-                            </p>
-                            {currentBlueSheet.job.bill_to_city_zip && (
-                              <p className="text-xs text-slate-500">
-                                {currentBlueSheet.job.bill_to_city_zip}
+                              <p className="text-xl font-semibold text-violet-700">
+                                {formatCurrency(
+                                  currentSupplierInvoice
+                                    ? Math.abs(
+                                        currentBlueSheet.total_cost -
+                                          currentSupplierInvoice.amount,
+                                      )
+                                    : 0,
+                                )}
                               </p>
-                            )}
-                          </div>
-                          <div>
-                            <Label className="text-xs font-semibold uppercase text-slate-500">
-                              Labor
-                            </Label>
-                            <p className="text-base font-medium mt-1">
-                              {totalLaborLabel || "No labor hours"}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {currentBlueSheet.labor_entries?.length || 0}{" "}
-                              labor entries
-                            </p>
-                          </div>
-                        </div>
+                              <p className="text-xs text-violet-800 mt-0.5">
+                                {currentSupplierInvoice &&
+                                currentBlueSheet.total_cost
+                                  ? `${(
+                                      (Math.abs(
+                                        currentBlueSheet.total_cost -
+                                          currentSupplierInvoice.amount,
+                                      ) /
+                                        (currentBlueSheet.total_cost || 1)) *
+                                      100
+                                    ).toFixed(1)}% variance`
+                                  : "No supplier invoice"}
+                              </p>
+                            </CardContent>
+                          </Card>
 
-                        <Separator />
+                          <Card className="bg-amber-50/80 border border-amber-200 shadow-sm">
+                            <CardContent className="p-4 text-left">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <AlertTriangle className="h-6 w-6 text-amber-600" />
+                                  <h4 className="text-xs font-semibold text-amber-900 tracking-wide uppercase">
+                                    Discrepancies
+                                  </h4>
+                                </div>
+                              </div>
+                              <p className="text-xl font-semibold text-amber-700">
+                                {
+                                  comparisons.filter(
+                                    (c) => c.differences.length > 0,
+                                  ).length
+                                }
+                              </p>
+                              <p className="text-xs text-amber-800 mt-0.5">
+                                items with price / qty differences
+                              </p>
+                            </CardContent>
+                          </Card>
+                        </>
+                      )}
+                    </div>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                          <div>
-                            <Label className="text-xs font-semibold uppercase text-slate-500">
-                              Notes
-                            </Label>
-                            <Textarea
-                              placeholder="Add any final notes or internal instructions for this approval..."
-                              className="mt-3 h-28 text-sm"
-                              rows={5}
+                    {/* Review Summary & Custom Invoice Content - Now expanded to the right */}
+                    <div className="flex-1 flex flex-col gap-6">
+                      <Card className="bg-white shadow-sm border border-slate-200/80">
+                        <CardHeader className="flex items-center justify-between py-3 px-4">
+                          <CardTitle className="text-base font-semibold text-slate-900">
+                            Review Summary
+                          </CardTitle>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setIsReviewSummaryOpen((prev: any) => !prev)
+                            }
+                            className={`
+                              relative inline-flex h-4 w-8 items-center rounded-full
+                              transition-colors duration-200
+                              ${isReviewSummaryOpen ? "bg-blue-500" : "bg-gray-300"}
+                            `}
+                          >
+                            <span
+                              className={`
+                                inline-block h-3 w-3 transform rounded-full bg-white shadow
+                                transition-transform duration-200
+                                ${isReviewSummaryOpen ? "translate-x-4" : "translate-x-1"}
+                              `}
                             />
-                          </div>
-                          <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 flex flex-col justify-between">
-                            <div>
-                              <h5 className="text-sm font-semibold text-slate-800 mb-2">
-                                Last Minute Edits
-                              </h5>
-                              <p className="text-xs text-slate-500 mb-4">
-                                Need to tweak materials before sending the
-                                invoice? Jump back to the comparison view and
-                                adjust quantities or pricing.
-                              </p>
+                          </button>
+                        </CardHeader>
+                        {isReviewSummaryOpen && (
+                          <CardContent className="space-y-6 pb-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div>
+                                <Label className="text-xs font-semibold uppercase text-slate-500">
+                                  Customer
+                                </Label>
+                                <p className="text-sm font-medium text-[#00A1FF] mt-0.5">
+                                  {currentBlueSheet.job.customer?.customer_name ||
+                                    currentBlueSheet.job.contractor
+                                      ?.contractor_name ||
+                                    "N/A"}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  {currentBlueSheet.job.customer?.email ||
+                                    currentBlueSheet.job.contractor?.email ||
+                                    currentBlueSheet.job.bill_to_email ||
+                                    "—"}
+                                </p>
+                              </div>
+                              <div>
+                                <Label className="text-xs font-semibold uppercase text-slate-500">
+                                  Job
+                                </Label>
+                                <p className="text-sm font-medium mt-0.5">
+                                  {currentBlueSheet.job.job_title}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  {currentBlueSheet.job.job_type ===
+                                  "contract_based"
+                                    ? "Contract Based"
+                                    : "Service Based"}{" "}
+                                  · {currentBlueSheet.job.status}
+                                </p>
+                              </div>
+                              <div>
+                                <Label className="text-xs font-semibold uppercase text-slate-500">
+                                  PO / BlueSheet
+                                </Label>
+                                <p className="text-sm font-mono mt-0.5">
+                                  BS-{currentBlueSheet.id}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  Created on{" "}
+                                  {new Date(
+                                    currentBlueSheet.created_at,
+                                  ).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <div>
+                                <Label className="text-xs font-semibold uppercase text-slate-500">
+                                  Submitted By
+                                </Label>
+                                <p className="text-sm font-medium mt-0.5">
+                                  {currentBlueSheet.created_by_user.full_name}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  {currentBlueSheet.created_by_user.email}
+                                </p>
+                              </div>
+                              <div>
+                                <Label className="text-xs font-semibold uppercase text-slate-500">
+                                  Bill To
+                                </Label>
+                                <p className="text-xs mt-0.5 text-slate-800">
+                                  {currentBlueSheet.job.bill_to_address ||
+                                    currentBlueSheet.job.customer?.address ||
+                                    currentBlueSheet.job.contractor?.address ||
+                                    "—"}
+                                </p>
+                                {currentBlueSheet.job.bill_to_city_zip && (
+                                  <p className="text-xs text-slate-500">
+                                    {currentBlueSheet.job.bill_to_city_zip}
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <Label className="text-xs font-semibold uppercase text-slate-500">
+                                  Labor
+                                </Label>
+                                <p className="text-sm font-medium mt-0.5">
+                                  {totalLaborLabel || "No labor hours"}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  {currentBlueSheet.labor_entries?.length || 0}{" "}
+                                  labor entries
+                                </p>
+                              </div>
                             </div>
-                            <div className="flex gap-3">
-                              <Button
-                                variant="outline"
-                                size="lg"
-                                onClick={() => setCurrentStep("upload")}
-                                className="gap-2 h-10 text-sm border-slate-300"
-                              >
-                                <Edit className="h-4 w-4" />
-                                Edit Materials
-                              </Button>
+
+                            <Separator />
+
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                              <div>
+                                <Label className="text-xs font-semibold uppercase text-slate-500">
+                                  Notes
+                                </Label>
+                                <Textarea
+                                  placeholder="Add any final notes or internal instructions for this approval..."
+                                  className="mt-2 h-20 text-sm"
+                                  rows={3}
+                                />
+                              </div>
+                              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col justify-between">
+                                <div>
+                                  <h5 className="text-sm font-semibold text-slate-800 mb-1">
+                                    Last Minute Edits
+                                  </h5>
+                                  <p className="text-xs text-slate-500 mb-3">
+                                    Need to tweak materials before sending the
+                                    invoice? Jump back to comparison view.
+                                  </p>
+                                </div>
+                                <div className="flex gap-3">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentStep("upload")}
+                                    className="gap-2 h-8 text-sm border-slate-300"
+                                  >
+                                    <Edit className="h-3 w-3" />
+                                    Edit Materials
+                                  </Button>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    )}
-                  </Card>
+                          </CardContent>
+                        )}
+                      </Card>
 
-                  {/* Inline Custom Invoice (uses existing component UI, not modal) */}
-
-                  <div className="mt-6">
-                    <CustomInvoiceDialog
-                      open={true}
-                      invalidHeaderKeys={invalidHeaderKeys}
-                      setInvalidHeaderKeys={setInvalidHeaderKeys}
-                      validateHeaderGroupsBeforeSubmit={
-                        validateHeaderGroupsBeforeSubmit
-                      }
-                      onOpenChange={() => setIsCustomInvoiceOpen(false)}
-                      blueSheet={currentBlueSheet}
-                      // Let CustomInvoiceDialog derive labor cost from labor_entries
-                      registerPreviewAndSend={(fn) => {
-                        previewAndSendRef.current = fn;
-                      }}
-                      onProcessingChange={setCustomInvoiceProcessing}
-                      onInvoiceTypeChange={setSelectedInvoiceType}
-                      onDone={onClose}
-                      onLineItemsSync={syncCustomInvoiceLineItemsToBlueSheet}
-                    />
+                      {/* Custom Invoice Dialog content below Review Summary */}
+                      <div className="mt-0">
+                        <CustomInvoiceDialog
+                          open={true}
+                          invalidHeaderKeys={invalidHeaderKeys}
+                          setInvalidHeaderKeys={clearInvalidHeaderKeys}
+                          validateHeaderGroupsBeforeSubmit={
+                            validateHeaderGroupsBeforeSubmit
+                          }
+                          onOpenChange={() => setIsCustomInvoiceOpen(false)}
+                          blueSheet={currentBlueSheet}
+                          registerPreviewAndSend={(fn) => {
+                            previewAndSendRef.current = fn;
+                          }}
+                          selectedBluesheetIds={selectedBluesheetIds}
+                          onProcessingChange={setCustomInvoiceProcessing}
+                          onInvoiceTypeChange={setSelectedInvoiceType}
+                          onDone={onClose}
+                          onLineItemsSync={syncCustomInvoiceLineItemsToBlueSheet}
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   {/* Footer actions */}
