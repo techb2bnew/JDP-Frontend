@@ -2882,7 +2882,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                           registerPreviewAndSend={(fn) => {
                             previewAndSendRef.current = fn;
                           }}
-                          selectedBluesheetIds={selectedBluesheetIds}
+                          // selectedBluesheetIds={selectedBluesheetIds}
                           onProcessingChange={setCustomInvoiceProcessing}
                           onInvoiceTypeChange={setSelectedInvoiceType}
                           onDone={onClose}
