@@ -3,6 +3,7 @@ import type { BulkMaterialPayload } from '@/types/materials';
 // API utility functions with authentication
 
 const API_BASE_URL = "http://127.0.0.1:3000/api";
+let isUnauthorizedHandlingInProgress = false;
 
 // Helper function to get auth token
 const getAuthToken = (): string | null => {
@@ -39,6 +40,53 @@ const handleTokenRevocation = async () => {
     window.location.href = "/login";
   }
 };
+
+const shouldBypassUnauthorizedHandler = (requestUrl: string) => {
+  return (
+    requestUrl.includes("/api/auth/logout") ||
+    requestUrl.includes("/auth/login") ||
+    requestUrl.includes("/auth/register")
+  );
+};
+
+const triggerGlobalUnauthorizedLogout = () => {
+  if (isUnauthorizedHandlingInProgress) return;
+  isUnauthorizedHandlingInProgress = true;
+  void handleTokenRevocation().finally(() => {
+    isUnauthorizedHandlingInProgress = false;
+  });
+};
+
+const installGlobalUnauthorizedInterceptor = () => {
+  if (typeof window === "undefined") return;
+
+  const windowAny = window as any;
+  if (windowAny.__jdpUnauthorizedInterceptorInstalled) return;
+  windowAny.__jdpUnauthorizedInterceptorInstalled = true;
+
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const response = await originalFetch(input, init);
+
+    const requestUrl =
+      typeof input === "string"
+        ? input
+        : input instanceof Request
+          ? input.url
+          : String(input);
+
+    if (
+      response.status === 401 &&
+      !shouldBypassUnauthorizedHandler(requestUrl)
+    ) {
+      triggerGlobalUnauthorizedLogout();
+    }
+
+    return response;
+  };
+};
+
+installGlobalUnauthorizedInterceptor();
 
 // Helper function to make authenticated API calls with global token handling
 const authenticatedFetch = async (

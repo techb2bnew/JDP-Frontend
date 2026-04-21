@@ -417,7 +417,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
                     </Button>
                   </button>
                 ) : (
-                  <Link key={item.id} href={item.href} prefetch={true}>
+                  <Link key={item.id} href={item.href} prefetch={false}>
                     <Button
                       variant={active ? "default" : "ghost"}
                       size="sm"
@@ -471,7 +471,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
                   const active = isActive(subItem.href)
                   
                   return (
-                    <Link key={subItem.id} href={subItem.href} prefetch={true}>
+                    <Link key={subItem.id} href={subItem.href} prefetch={false}>
                       <Button
                         variant={active ? "default" : "ghost"}
                         size="sm"

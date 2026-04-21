@@ -757,8 +757,10 @@ const fetchTimesheetsByDateRange = async () => {
                 <TableBody>
                   {isLoadingTimesheetView ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8">
-                        <LoadingSpinner />
+                      <TableCell colSpan={6} className="py-8">
+                        <div className="flex w-full items-center justify-center">
+                          <LoadingSpinner />
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : dailyBreakdown.length > 0 ? (
