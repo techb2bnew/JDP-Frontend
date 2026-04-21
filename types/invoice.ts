@@ -100,7 +100,7 @@ export interface CreateEstimatePayload {
   priority: "low" | "medium" | "high";
   valid_until: string;
   location: string;
-  description: string;
+  notes: string;
   service_type: string;
   email_address: string;
   estimate_date: string;

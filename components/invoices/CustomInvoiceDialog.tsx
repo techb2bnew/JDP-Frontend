@@ -15,6 +15,7 @@ import { customersData, jobsData } from '../../data/invoiceData'
 import { toast } from "sonner"
 import { addInvoice } from '@/redux/slices/jobsSlice'
 import { apiClient } from '@/utils/api'
+import { INVOICE_DESCRIPTION } from "@/utils/invoiceConstants";
 import { useDispatch } from 'react-redux'
 import { motion } from 'framer-motion'
 import { Logo } from '../common/Logo'
@@ -41,6 +42,7 @@ interface CustomInvoiceDialogProps {
   onProcessingChange?: (processing: boolean) => void
   /** Notify parent about current selected invoice type (API format). */
   onInvoiceTypeChange?: (invoiceType: string) => void
+  invoiceNotesRef?: React.MutableRefObject<string>
 }
 
 
@@ -52,7 +54,7 @@ export interface CreateEstimatePayload {
   priority: "low" | "medium" | "high";
   valid_until: string;
   location: string;
-  description: string;
+  notes: string;
   service_type: string;
   email_address: string;
   estimate_date: string;
@@ -129,6 +131,7 @@ export const CustomInvoiceDialog = ({
   validateHeaderGroupsBeforeSubmit,
   onProcessingChange,
   onInvoiceTypeChange,
+  invoiceNotesRef,
   selectedBluesheetIds=[]
 }: CustomInvoiceDialogProps) => {
   // Derive viewInvoiceData and job list from blueSheet (custom invoice from bluesheet)
@@ -289,7 +292,6 @@ export const CustomInvoiceDialog = ({
   const hasUserTouchedLineItemsRef = useRef(false)
   // Always keep latest line items (avoid stale state at send-time)
   const lineItemsRef = useRef<any[]>([]);
-  
 
   const currentJob = selectedJob || jobs?.find((j: any) => j.id === jobId)
 
@@ -339,6 +341,18 @@ export const CustomInvoiceDialog = ({
   useEffect(() => {
     lineItemsRef.current = inlineInvoiceData.lineItems
   }, [inlineInvoiceData.lineItems])
+
+  useEffect(() => {
+    if (invoiceNotesRef) {
+      invoiceNotesRef.current = inlineInvoiceData.notes
+    }
+  }, [inlineInvoiceData.notes])
+
+  const getInvoiceNotesForSendPayload = (effectiveNotes?: string | null) =>
+    (invoiceNotesRef?.current ??
+      effectiveNotes ??
+      inlineInvoiceData.notes) ||
+    "";
   // Update form when job is provided
   useEffect(() => {
     if (currentJob) {
@@ -424,7 +438,10 @@ export const CustomInvoiceDialog = ({
               prev.balanceDue !== '' && prev.balanceDue != null
                 ? prev.balanceDue
                 : (viewInvoiceData.balance_due || ''),
-            notes: viewInvoiceData.notes || 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
+            notes:
+              ((viewInvoiceData as any).notes ??
+                (viewInvoiceData as any).description) ||
+              'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
             invoiceType: viewInvoiceData.invoice_type === 'estimate' ? 'Estimate' :
               viewInvoiceData.invoice_type === 'down_payment' ? 'Downpayment Invoice' :
                 viewInvoiceData.invoice_type === 'proposal_invoice' ? 'Rough Invoice' :
@@ -1153,6 +1170,8 @@ console.log(totalAmount,"amounttt");
         total_labor_cost: laborTotal,
         total_amount: materialTotal + laborTotal,
       };
+  
+      
 
       if (isContractBased && contractorId) payload.contractor_id = contractorId;
       if (customerId) payload.customer_id = customerId;
@@ -1343,7 +1362,8 @@ console.log(totalAmount,"amounttt");
           rate: item.rate,
           total: item.total,
         })),
-        notes: effectiveInlineInvoiceData.notes || '',
+        notes: getInvoiceNotesForSendPayload(effectiveInlineInvoiceData.notes),
+        invoice_description: INVOICE_DESCRIPTION,
         signatureText: effectiveInlineInvoiceData.signatureText || '',
         invoiceType:
           effectiveInlineInvoiceData.invoiceType === 'Custom'
@@ -1393,11 +1413,13 @@ console.log(totalAmount,"amounttt");
     }
   }
   // Expose handlePreviewAndSend to parent (e.g. BlueSheetApprovalDialog)
+  // Re-register whenever the handler identity changes so the parent ref does not
+  // keep a stale closure (e.g. notes typed after mount were missing from payload).
   useEffect(() => {
     if (registerPreviewAndSend) {
       registerPreviewAndSend(handlePreviewAndSend)
     }
-  }, [registerPreviewAndSend])
+  }, [registerPreviewAndSend, handlePreviewAndSend])
 
  
 
@@ -1961,9 +1983,13 @@ console.log(totalAmount,"amounttt");
                     <Textarea
                       value={inlineInvoiceData.notes}
                       onChange={(e) => {
+                        const v = e.target.value;
+                        if (invoiceNotesRef) {
+                          invoiceNotesRef.current = v;
+                        }
                         setInlineInvoiceData((prev) => ({
                           ...prev,
-                          notes: e.target.value,
+                          notes: v,
                         }));
                       }}
                       className="w-full min-h-[40px] border-0 p-0 focus-visible:ring-0 resize-none text-sm"

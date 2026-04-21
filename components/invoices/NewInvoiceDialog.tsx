@@ -43,6 +43,7 @@ import { customersData, jobsData } from "../../data/invoiceData";
 import { toast } from "sonner";
 import { addInvoice } from "@/redux/slices/jobsSlice";
 import { apiClient } from "@/utils/api";
+import { INVOICE_DESCRIPTION } from "@/utils/invoiceConstants";
 import { useDispatch } from "react-redux";
 import { motion } from "framer-motion";
 import { Logo } from "../common/Logo";
@@ -71,7 +72,7 @@ export interface CreateEstimatePayload {
   priority: "low" | "medium" | "high";
   valid_until: string;
   location: string;
-  description: string;
+  notes: string;
   service_type: string;
   email_address: string;
   estimate_date: string;
@@ -357,6 +358,8 @@ export const NewInvoiceDialog = ({
   const currentJob = selectedJob || jobs?.find((j: any) => j.id === jobId);
   /** Avoid re-applying bill from job on re-renders after user edits (same job id). */
   const billToSyncedJobIdRef = useRef<string | number | null>(null);
+  /** Latest notes text for API payloads (avoids stale closure if send runs before state flushes). */
+  const invoiceNotesRef = useRef<string | null>(null);
   const [invalidHeaderKeys, setInvalidHeaderKeys] = useState<string[]>([]);
 
   // Inline Invoice Data State
@@ -383,6 +386,13 @@ export const NewInvoiceDialog = ({
     estimateTotal: 0,
     paymentHistory: [] as any[],
   });
+
+  useEffect(() => {
+    invoiceNotesRef.current = inlineInvoiceData.notes;
+  }, [inlineInvoiceData.notes]);
+
+  const getInvoiceNotesForPayload = () =>
+    (invoiceNotesRef.current ?? inlineInvoiceData.notes) || "";
 
   const previewJobId = useMemo(() => {
     const fromInline = (inlineInvoiceData as any)?.jobId;
@@ -600,7 +610,8 @@ export const NewInvoiceDialog = ({
             paymentCredits: viewInvoiceData.payment_credits || 0,
             balanceDue: viewInvoiceData.balance_due || "",
             notes:
-              viewInvoiceData.notes ||
+              ((viewInvoiceData as any).notes ??
+                (viewInvoiceData as any).description) ||
               "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
             invoiceType:
               viewInvoiceData.invoice_type === "estimate"
@@ -880,7 +891,8 @@ export const NewInvoiceDialog = ({
             total: item.total,
             is_custom: item.isCustomProduct === true,
           })),
-        notes: inlineInvoiceData.notes || "",
+        notes: getInvoiceNotesForPayload(),
+        invoice_description: INVOICE_DESCRIPTION,
         signatureText: inlineInvoiceData.signatureText || "",
         invoiceType:
           inlineInvoiceData.invoiceType === "Custom"
@@ -1419,8 +1431,7 @@ export const NewInvoiceDialog = ({
         balance_due: inlineInvoiceData.balanceDue || "",
         bill_to_address: billToForDraft,
         location: locationForDraft,
-        description: inlineInvoiceData.notes || "",
-        notes: inlineInvoiceData.notes || "",
+        notes: getInvoiceNotesForPayload(),
         status: "draft",
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
         total_amount: subtotal,
@@ -1689,8 +1700,7 @@ const validateLineItems = (lineItems: any[] = []) => {
         balance_due: inlineInvoiceData.balanceDue || "",
         bill_to_address: billToForPreview,
         location: locationForPreview,
-        description: inlineInvoiceData.notes || "",
-        notes: inlineInvoiceData.notes || "",
+        notes: getInvoiceNotesForPayload(),
         // Create as draft first; send happens from preview modal confirmation
         status: "draft",
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
@@ -1894,8 +1904,7 @@ const validateLineItems = (lineItems: any[] = []) => {
               isContractBased,
             )
           : "",
-        description: inlineInvoiceData.notes || "",
-        notes: inlineInvoiceData.notes || "",
+        notes: getInvoiceNotesForPayload(),
         total_amount: calculateInvoiceSubtotal(),
         custom_products: customProducts,
         invoice_source: "quickbook",
@@ -2186,7 +2195,7 @@ const validateLineItems = (lineItems: any[] = []) => {
           : "medium",
         valid_until: newInvoice.dueDate || "",
         location: newInvoice.location || "N/A",
-        description: newInvoice.notes || "",
+        notes: newInvoice.notes || "",
         service_type: "service_based",
         email_address: newInvoice.emailAddress || "customer@example.com",
         estimate_date: newInvoice.issueDate || "",
@@ -3097,9 +3106,11 @@ const validateLineItems = (lineItems: any[] = []) => {
                       <Textarea
                         value={inlineInvoiceData.notes}
                         onChange={(e) => {
+                          const v = e.target.value;
+                          invoiceNotesRef.current = v;
                           setInlineInvoiceData((prev) => ({
                             ...prev,
-                            notes: e.target.value,
+                            notes: v,
                           }));
                         }}
                         className="w-full min-h-[84px] border-0 p-0 focus-visible:ring-0 resize-none"

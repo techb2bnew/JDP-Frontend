@@ -118,6 +118,7 @@ import ActivityLogs from "./ActivityLogs";
 import { CheckCircle } from "lucide-react";
 import { invoicesData } from "@/data/invoiceData";
 import InvoiceLineItemsManager from "./common/invoice-line-items/InvoiceLineItemsManager";
+import { INVOICE_DESCRIPTION } from "@/utils/invoiceConstants";
 // Sample data structure - replace with your actual data
 const sampleJobData = {
   job: {
@@ -1261,7 +1262,7 @@ export function JobDetailsPage({
           bill_to_address: estimateData.bill_to_address,
         }),
         invoice_type: estimateData.invoice_type || "estimate",
-        notes: estimateData.notes || "",
+        notes: (estimateData.notes ?? estimateData.description) || "",
         custom_products: customProducts,
         status: "approved",
       };
@@ -1329,6 +1330,15 @@ export function JobDetailsPage({
     estimateTotal: 0,
     paymentHistory: [] as any[],
   });
+
+  /** Latest invoice notes for create/update/send payloads (matches NewInvoiceDialog ref pattern). */
+  const invoiceNotesRef = useRef<string | null>(null);
+  useEffect(() => {
+    invoiceNotesRef.current = inlineInvoiceData.notes;
+  }, [inlineInvoiceData.notes]);
+
+  const getInvoiceNotesForPayload = () =>
+    (invoiceNotesRef.current ?? inlineInvoiceData.notes) || "";
 
 // parent component
 const [invalidLineItemIds, setInvalidLineItemIds] = useState<string[]>([]);
@@ -2629,7 +2639,7 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
           bill_to_address: estimateData.bill_to_address,
         }),
         invoice_type: estimateData.invoice_type || "estimate",
-        notes: estimateData.notes || "",
+        notes: (estimateData.notes ?? estimateData.description) || "",
         custom_products: customProducts,
 
         status: "paid",
@@ -2876,7 +2886,7 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
           : "medium",
         valid_until: newInvoice.dueDate || "",
         location: newInvoice.location || "N/A",
-        description: newInvoice.notes || "",
+        notes: newInvoice.notes || "",
         service_type: "service_based",
         email_address: newInvoice.emailAddress || "customer@example.com",
         estimate_date: newInvoice.issueDate || "",
@@ -3923,7 +3933,7 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
           },
         ],
         notes:
-          invoiceData.notes ||
+          (invoiceData.notes ?? invoiceData.description) ||
           "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
         signatureText:
           invoiceData.signature_text || "ACCEPTED BY________________DATE_____",
@@ -4010,7 +4020,7 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
         },
       ],
       notes:
-        invoice.notes ||
+        (invoice.notes ?? invoice.description) ||
         "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
       signatureText:
         invoice.signature_text || "ACCEPTED BY________________DATE_____",
@@ -5791,7 +5801,7 @@ const handlePrintInvoice = async (invoice: any) => {
             ? inlineInvoiceData.customInvoiceType
             : inlineInvoiceData.invoiceType,
         ),
-        notes: inlineInvoiceData.notes || "",
+        notes: getInvoiceNotesForPayload(),
         total_amount: subtotal,
         custom_products: customProducts,
       };
@@ -5981,7 +5991,7 @@ const handlePrintInvoice = async (invoice: any) => {
             ? inlineInvoiceData.customInvoiceType
             : inlineInvoiceData.invoiceType,
         ),
-        notes: inlineInvoiceData.notes || "",
+        notes: getInvoiceNotesForPayload(),
         custom_products: customProducts,
         estimate_source_type: job?.estimatedCost
           ? "estimate_job"
@@ -6032,6 +6042,7 @@ const handlePrintInvoice = async (invoice: any) => {
       // Prepare API payload
       const subtotal = calculateInvoiceSubtotal();
       const total = subtotal; // You can add tax calculation here if needed
+      const notesTextForEmail = getInvoiceNotesForPayload();
 
       const payload = {
         estimateNumber: inlineInvoiceData.estimateNumber || "Draft",
@@ -6082,9 +6093,10 @@ const handlePrintInvoice = async (invoice: any) => {
         balanceDue: (
           subtotal - (inlineInvoiceData.paymentCredits || 0)
         ).toFixed(2),
-        notes: inlineInvoiceData.notes
-          ? inlineInvoiceData.notes.split("\n").filter((note) => note.trim())
+        notes: notesTextForEmail
+          ? notesTextForEmail.split("\n").filter((note) => note.trim())
           : [],
+        invoice_description: INVOICE_DESCRIPTION,
         email: "jen@jdpelectric.us",
         phone: "952-449-1088",
         status: "sent",
@@ -6171,7 +6183,7 @@ const handlePrintInvoice = async (invoice: any) => {
             ? inlineInvoiceData.customInvoiceType
             : inlineInvoiceData.invoiceType,
         ),
-        notes: inlineInvoiceData.notes || "",
+        notes: getInvoiceNotesForPayload(),
         custom_products: customProducts,
       };
 
@@ -6271,7 +6283,7 @@ const handlePrintInvoice = async (invoice: any) => {
         }),
         status: "draft",
         invoice_type: mapInvoiceTypeToAPI(selectedInvoiceType),
-        notes: inlineInvoiceData.notes || "",
+        notes: getInvoiceNotesForPayload(),
         custom_products: customProducts,
         total_amount: calculateInvoiceSubtotal(),
         invoice_source: "quickbook",
@@ -6571,7 +6583,7 @@ const handlePrintInvoice = async (invoice: any) => {
           estimateData.estimate_title || job.job_title || job.title || "",
         lineItems,
         notes:
-          estimateData.notes ||
+          (estimateData.notes ?? estimateData.description) ||
           "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
         signatureText: "ACCEPTED BY________________DATE_____",
         invoiceType: (() => {
@@ -8319,6 +8331,31 @@ const handlePrintInvoice = async (invoice: any) => {
                         selectProduct(rowId, product);
                       }}
                     />
+
+                    {/* Notes (editable; synced to estimate notes/description on save/preview) */}
+                    <div className="mb-6 overflow-x-auto">
+                      <Label className="block bg-gray-600 text-white px-3 py-2 mb-0 text-sm font-semibold">
+                        NOTES
+                      </Label>
+                      <div className="border border-t-0 border-gray-300 p-3 bg-white">
+                        <Textarea
+                          value={inlineInvoiceData.notes}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            invoiceNotesRef.current = v;
+                            setInlineInvoiceData((prev) => ({
+                              ...prev,
+                              notes: v,
+                            }));
+                          }}
+                          className="w-full min-h-[84px] border-0 p-0 focus-visible:ring-0 resize-none text-sm"
+                          placeholder={
+                            "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE"
+                          }
+                          rows={4}
+                        />
+                      </div>
+                    </div>
 
                     {/* Footer disclaimer and Total */}
                     <div className="mb-6">

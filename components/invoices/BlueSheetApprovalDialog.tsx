@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
@@ -153,14 +153,23 @@ export function BlueSheetApprovalDialog({
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null)
   // Reference to CustomInvoiceDialog's "preview & send" handler
   const previewAndSendRef = useRef<(() => Promise<void>) | null>(null);
+  const registerPreviewAndSendStable = useCallback((fn: () => Promise<void>) => {
+    previewAndSendRef.current = fn;
+  }, []);
   const [invalidHeaderKeys, setInvalidHeaderKeys] = useState<string[]>([]);
   const clearInvalidHeaderKeys = () => setInvalidHeaderKeys([]);
   const [isSaving, setIsSaving] = useState(false);
   const [customInvoiceProcessing, setCustomInvoiceProcessing] = useState(false);
   const [selectedInvoiceType, setSelectedInvoiceType] = useState<string>("estimate");
+  /** Review-step estimate notes (controlled); sent on QuickBooks save/send via handleFinalApproval. */
+  const [invoiceApprovalNotes, setInvoiceApprovalNotes] = useState("");
+  const invoiceApprovalNotesRef = useRef("");
+  
   const estimateActionsDisabled =
     isSaving || isApproving || isApprovingCustomer || customInvoiceProcessing;
   const router = useRouter();
+  console.log(invoiceApprovalNotesRef,"invoiceApprovalNotesRef");
+  
 
   const getBlueSheetId = (bs: any): number | null => {
     const raw =
@@ -207,9 +216,16 @@ export function BlueSheetApprovalDialog({
       setActiveRow(null)
       setCustomInvoiceProcessing(false)
       setSelectedInvoiceType("estimate")
+      const seedNotes = String(blueSheet?.notes ?? "");
+      setInvoiceApprovalNotes(seedNotes)
+      invoiceApprovalNotesRef.current = seedNotes
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }, [isOpen, blueSheet]);
+
+  useEffect(() => {
+    invoiceApprovalNotesRef.current = String(invoiceApprovalNotes ?? "");
+  }, [invoiceApprovalNotes]);
 
   const handleBackClick = () => {
   onClose();
@@ -902,6 +918,9 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
       await apiClient.approveBulkBluesheet(ids, 'approved')
       toast.success('BlueSheet(s) approved')
       setCurrentStep('review')
+      const nextNotes = String((editedBlueSheet ?? blueSheet)?.notes ?? "");
+      setInvoiceApprovalNotes(nextNotes)
+      invoiceApprovalNotesRef.current = nextNotes
     } catch (error: any) {
       toast.error(error?.message || 'Failed to approve BlueSheet(s)')
     } finally {
@@ -920,7 +939,6 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
     } else {
       setIsSaving(true);
     }
-
     const isContractBased = finalBlueSheet.job.job_type === "contract_based";
 
     const customProducts = finalBlueSheet.material_entries.map((item: any) => {
@@ -1031,6 +1049,12 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
 
     const bluesheetIds = getSelectedBlueSheetIds();
 
+    const estimateNotesPayload =
+      String(invoiceApprovalNotesRef.current ?? "") ||
+      String(editedBlueSheet?.notes ?? "") ||
+      String(blueSheet?.notes ?? "") ||
+      "";
+
     const today = new Date().toISOString().split("T")[0];
     const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       .toISOString()
@@ -1074,7 +1098,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
 
       po_number: `BS-${finalBlueSheet.id}`,
       rep: finalBlueSheet.created_by_user?.full_name || "",
-      notes: finalBlueSheet.notes || "",
+      notes: estimateNotesPayload,
       // total_labor_hours: totalLaborHours,
       total_labor_cost: totalLaborCost,
       total_amount: totalAmountForEstimate,
@@ -1089,7 +1113,6 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
 
       bluesheet_ids: bluesheetIds,
       valid_until: thirtyDaysLater,
-      description: finalBlueSheet.notes || "",
       custom_products: customProducts,
       invoice_source: "quickbook",
       quickbook_action:
@@ -2836,6 +2859,20 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                   Notes
                                 </Label>
                                 <Textarea
+                                  value={invoiceApprovalNotes}
+                                  onChange={(e) => {
+                                    const nextNotes = e.target.value;
+                                    invoiceApprovalNotesRef.current = nextNotes;
+                                    setInvoiceApprovalNotes(nextNotes);
+                                    setEditedBlueSheet((prev) =>
+                                      prev
+                                        ? {
+                                            ...prev,
+                                            notes: nextNotes,
+                                          }
+                                        : prev,
+                                    );
+                                  }}
                                   placeholder="Add any final notes or internal instructions for this approval..."
                                   className="mt-2 h-20 text-sm"
                                   rows={3}
@@ -2871,6 +2908,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                       {/* Custom Invoice Dialog content below Review Summary */}
                       <div className="mt-0">
                         <CustomInvoiceDialog
+                          invoiceNotesRef={invoiceApprovalNotesRef}
                           open={true}
                           invalidHeaderKeys={invalidHeaderKeys}
                           setInvalidHeaderKeys={clearInvalidHeaderKeys}
@@ -2879,9 +2917,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                           }
                           onOpenChange={() => setIsCustomInvoiceOpen(false)}
                           blueSheet={currentBlueSheet}
-                          registerPreviewAndSend={(fn) => {
-                            previewAndSendRef.current = fn;
-                          }}
+                          registerPreviewAndSend={registerPreviewAndSendStable}
                           // selectedBluesheetIds={selectedBluesheetIds}
                           onProcessingChange={setCustomInvoiceProcessing}
                           onInvoiceTypeChange={setSelectedInvoiceType}

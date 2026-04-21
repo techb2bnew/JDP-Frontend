@@ -268,9 +268,36 @@ const handleViewTimesheet = async (item: TimesheetItem) => {
   setTimesheetViewData(null);
 
   try {
-    // Get start_date and end_date from period
-    const startDate = timesheets?.period?.start_date || '';
-    const endDate = timesheets?.period?.end_date || '';
+    // Prefer API period; fall back to parsing "MMM d - MMM d" week label.
+    const resolveWeekRange = () => {
+      const periodStart = timesheets?.period?.start_date || "";
+      const periodEnd = timesheets?.period?.end_date || "";
+      if (periodStart && periodEnd) {
+        return { startDate: periodStart, endDate: periodEnd };
+      }
+
+      const weekLabel = String(item.week || "").trim();
+      const weekMatch = weekLabel.match(
+        /^([A-Za-z]{3})\s+(\d{1,2})\s*-\s*([A-Za-z]{3})\s+(\d{1,2})$/,
+      );
+      if (!weekMatch) return { startDate: "", endDate: "" };
+
+      const [, startMon, startDay, endMon, endDay] = weekMatch;
+      const year = new Date().getFullYear();
+      const start = parse(`${startMon} ${startDay} ${year}`, "MMM d yyyy", new Date());
+      const end = parse(`${endMon} ${endDay} ${year}`, "MMM d yyyy", new Date());
+
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+        return { startDate: "", endDate: "" };
+      }
+
+      return {
+        startDate: format(start, "yyyy-MM-dd"),
+        endDate: format(end, "yyyy-MM-dd"),
+      };
+    };
+
+    const { startDate, endDate } = resolveWeekRange();
 
     if (!startDate || !endDate) {
       console.error('Start date or end date is missing');
@@ -289,10 +316,13 @@ const handleViewTimesheet = async (item: TimesheetItem) => {
       end_date: endDate,
     };
 
-    if (item.labor_id) {
-      params.labor_id = item.labor_id;
-    } else if (item.lead_labor_id) {
-      params.lead_labor_id = item.lead_labor_id;
+    const laborId = item.labor_id ?? item.laborId;
+    const leadLaborId = item.lead_labor_id;
+
+    if (laborId) {
+      params.labor_id = laborId;
+    } else if (leadLaborId) {
+      params.lead_labor_id = leadLaborId;
     } else {
       console.error('Neither labor_id nor lead_labor_id is available');
       setIsLoadingTimesheetView(false);
