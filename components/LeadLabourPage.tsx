@@ -1525,10 +1525,10 @@ useEffect(() => {
               value={formData.dob}
               className={`${validationErrors.dob ? 'border-red-500' : ''} pr-12 [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-calendar-picker-indicator]:mr-0 [&::-webkit-calendar-picker-indicator]:p-1 [&::-webkit-calendar-picker-indicator]:cursor-pointer`}
               onChange={(e) => {
-                setFormData({ ...formData, dob: e.target.value })
-                if (validationErrors.dob) {
-                  setValidationErrors({ ...validationErrors, dob: '' })
-                }
+                const dobValue = e.target.value
+                setFormData({ ...formData, dob: dobValue })
+                const dobError = dobValue ? validateDobValue(dobValue) : null
+                setValidationErrors({ ...validationErrors, dob: dobError || '' })
               }}
               max={getYesterdayLocalDateString()}
             />

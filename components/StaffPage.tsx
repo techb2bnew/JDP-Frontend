@@ -750,6 +750,10 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
 
   const handleSubmit = async () => {
      if (!validateForm()) {
+      const dobError = formData.dob.trim() ? validateDobValue(formData.dob) : null
+      if (dobError) {
+        toast.error(dobError)
+      }
       return
     }
     let loadingToastId: string | number | undefined
