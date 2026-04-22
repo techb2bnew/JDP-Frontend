@@ -146,7 +146,7 @@ export function Sidebar({ currentPage, onPageChange, onLogout, isSuperAdmin = fa
 
   return (
     <>
-      <aside className="w-64 bg-sidebar border-r border-sidebar-border flex flex-col animate-fade-in shadow-sm">
+      <aside className="w-64 h-screen max-h-screen bg-sidebar border-r border-sidebar-border flex flex-col overflow-hidden animate-fade-in shadow-sm">
         <div className="p-6 border-b border-sidebar-border bg-gradient-to-r from-sidebar to-sidebar-accent/20">
           <div className="flex items-center space-x-3">
             <div className="h-10 w-10 bg-gradient-to-br from-primary to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
@@ -159,8 +159,9 @@ export function Sidebar({ currentPage, onPageChange, onLogout, isSuperAdmin = fa
           </div>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {navigation.map((item) => {
+        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-scroll">
+            {navigation.map((item) => {
             const isActive = currentPage === item.id
             const Icon = item.icon
 
@@ -182,10 +183,10 @@ export function Sidebar({ currentPage, onPageChange, onLogout, isSuperAdmin = fa
                 <span className="font-medium text-[13px]">{item.name}</span>
               </Button>
             )
-          })}
+            })}
 
           {/* Profiles Section */}
-          <div className="pt-2">
+            <div className="pt-2">
             <Button
               variant="ghost"
               size="sm"
@@ -232,19 +233,20 @@ export function Sidebar({ currentPage, onPageChange, onLogout, isSuperAdmin = fa
                 })}
               </div>
             )}
-          </div>
-        </nav>
+            </div>
+          </nav>
 
-        <div className="p-4 border-t border-sidebar-border bg-sidebar-accent/10">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLogoutClick}
-            className="w-full justify-start text-left logout-button h-10"
-          >
-            <LogOut className="mr-3 h-4 w-4" />
-            <span className="font-medium">Logout</span>
-          </Button>
+          <div className="p-4 border-t border-sidebar-border bg-sidebar-accent/10 mt-auto">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogoutClick}
+              className="w-full justify-start text-left logout-button h-10"
+            >
+              <LogOut className="mr-3 h-4 w-4" />
+              <span className="font-medium">Logout</span>
+            </Button>
+          </div>
         </div>
       </aside>
 

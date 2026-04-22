@@ -14,6 +14,7 @@ import { Textarea } from '../ui/textarea'
 import { toast } from 'sonner'
 import { apiClient } from '../../utils/api'
 import { getUserData, logout } from '../../utils/auth'
+import { getMaxAllowedDobLocalDateString, validateDobValue } from '../../utils/dobValidation'
 import { 
   User, 
   Mail, 
@@ -114,6 +115,11 @@ export function AdminStaffProfilePage() {
   }
 
   const handleSave = () => {
+    const dobError = validateDobValue(editedProfile.dateOfBirth)
+    if (dobError) {
+      toast.error(dobError)
+      return
+    }
     setProfile(editedProfile)
     setIsEditing(false)
     console.log('Saving staff profile:', editedProfile)
@@ -338,6 +344,7 @@ export function AdminStaffProfilePage() {
                       type="date"
                       value={editedProfile.dateOfBirth}
                       onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+                      max={getMaxAllowedDobLocalDateString(15)}
                     />
                   ) : (
                     <div className="p-3 bg-muted/50 rounded-lg">{formatDate(profile.dateOfBirth)}</div>

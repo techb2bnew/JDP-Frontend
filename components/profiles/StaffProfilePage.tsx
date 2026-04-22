@@ -31,6 +31,8 @@ import {
   AlertTriangle
 } from 'lucide-react'
 import { AdminStaffProfile, LeaveRecord, TimesheetEntry, TimesheetSummary, ExtendedPermissions } from '../../types/profiles'
+import { toast } from 'sonner'
+import { getMaxAllowedDobLocalDateString, validateDobValue } from '../../utils/dobValidation'
 
 // Mock data
 const mockStaffProfile: AdminStaffProfile & {
@@ -147,6 +149,11 @@ export function StaffProfilePage() {
   const [searchTerm, setSearchTerm] = useState('')
 
   const handleSave = () => {
+    const dobError = validateDobValue(profile.dateOfBirth)
+    if (dobError) {
+      toast.error(dobError)
+      return
+    }
     setIsEditing(false)
     // Save logic here
   }
@@ -266,6 +273,7 @@ export function StaffProfilePage() {
                       type="date"
                       value={profile.dateOfBirth}
                       onChange={(e) => setProfile(prev => ({ ...prev, dateOfBirth: e.target.value }))}
+                      max={getMaxAllowedDobLocalDateString(15)}
                       disabled={!isEditing}
                     />
                   </div>

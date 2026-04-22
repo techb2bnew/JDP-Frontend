@@ -1424,11 +1424,11 @@ useEffect(() => {
   }
 
   const renderForm = () => (
-    <div className="max-h-[65vh] overflow-y-auto space-y-6 p-2">
+    <div className="max-h-[65vh] overflow-y-auto space-y-6 px-4 py-2">
       {/* Personal Details Section */}
       <div>
         <h3 className="text-lg font-medium text-[#2b2b2b] mb-4">Personal Details</h3>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="role">Role *</Label>
             <Select value={formData.role} onValueChange={(value) => {
@@ -1617,7 +1617,7 @@ useEffect(() => {
       {/* Job Details Section */}
       <div>
         <h3 className="text-lg font-medium text-[#2b2b2b] mb-4">Job Details</h3>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="department">Department *</Label>
             <AutoSuggestInput
@@ -1694,7 +1694,7 @@ useEffect(() => {
       {/* Document Upload Section */}
       <div>
         <h3 className="text-lg font-medium text-[#2b2b2b] mb-4">Document Upload</h3>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FileUploadArea type="idProof" label="Select ID Proof" accept=".pdf,.jpg,.jpeg,.png" error={validationErrors.idProof} />
           <FileUploadArea type="photo" label="Photo Upload" accept=".jpg,.jpeg,.png" />
           <FileUploadArea type="resume" label="Resume Upload" accept=".pdf,.doc,.docx" />
@@ -1788,7 +1788,7 @@ useEffect(() => {
                 </Button>
               </DialogTrigger>
               <DialogContent
-                className="max-w-4xl max-h-[90vh]"
+                className="w-[calc(100vw-2rem)] sm:max-w-[960px] max-h-[90vh]"
                 onInteractOutside={(e) => {
                   const target = e.target as HTMLElement | null;
                   if (target?.closest?.(".pac-container")) e.preventDefault();
@@ -2074,7 +2074,7 @@ useEffect(() => {
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent
-          className="max-w-4xl sm:max-w-[960px] max-h-[90vh]"
+          className="w-[calc(100vw-2rem)] sm:max-w-[960px] max-h-[90vh]"
           onInteractOutside={(e) => {
             const target = e.target as HTMLElement | null;
             if (target?.closest?.(".pac-container")) e.preventDefault();

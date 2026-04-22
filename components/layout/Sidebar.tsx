@@ -357,7 +357,7 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
           </Button>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-scroll">
           {filteredNavigation.map((item) => {
             const active = isActive(item.href);
             const Icon = item.icon;

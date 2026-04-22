@@ -1184,7 +1184,7 @@ const fetchLaborById = async (id: string) => {
   }
 };
   const renderForm = () => (
-    <div className="grid grid-cols-2 gap-4 py-4 max-h-[65vh] overflow-y-auto p-2">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[65vh] overflow-y-auto px-4 py-4">
       <div className="space-y-2">
               <Label htmlFor="role">Role *</Label>
               <Select value={formData.role} onValueChange={(value) => {
@@ -1579,7 +1579,7 @@ const fetchLaborById = async (id: string) => {
                 </Button>
               </DialogTrigger>
               <DialogContent
-                className="max-w-4xl max-h-[90vh]"
+                className="w-[calc(100vw-2rem)] sm:max-w-[960px] max-h-[90vh]"
                 onInteractOutside={(e) => {
                   const target = e.target as HTMLElement | null;
                   if (target?.closest?.(".pac-container")) e.preventDefault();
@@ -1863,7 +1863,7 @@ const fetchLaborById = async (id: string) => {
         }
       }}>
         <DialogContent
-          className="max-w-4xl max-h-[90vh]"
+          className="w-[calc(100vw-2rem)] sm:max-w-[960px] max-h-[90vh]"
           onInteractOutside={(e) => {
             const target = e.target as HTMLElement | null;
             if (target?.closest?.(".pac-container")) e.preventDefault();

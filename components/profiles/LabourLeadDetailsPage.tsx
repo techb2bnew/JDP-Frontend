@@ -28,6 +28,8 @@ import {
   Building
 } from 'lucide-react'
 import { LabourLeadProfile } from '../../types/profiles'
+import { toast } from 'sonner'
+import { getMaxAllowedDobLocalDateString, validateDobValue } from '../../utils/dobValidation'
 
 // Mock data
 const labourLeadData: LabourLeadProfile = {
@@ -100,6 +102,11 @@ export function LabourLeadDetailsPage() {
   }
 
   const handleSave = () => {
+    const dobError = validateDobValue(editedProfile.dateOfBirth)
+    if (dobError) {
+      toast.error(dobError)
+      return
+    }
     setProfile(editedProfile)
     setIsEditing(false)
     console.log('Saving labor lead profile:', editedProfile)
@@ -282,6 +289,7 @@ export function LabourLeadDetailsPage() {
                       type="date"
                       value={editedProfile.dateOfBirth}
                       onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+                      max={getMaxAllowedDobLocalDateString(15)}
                     />
                   ) : (
                     <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">

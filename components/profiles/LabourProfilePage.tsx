@@ -33,6 +33,8 @@ import {
   Eye
 } from 'lucide-react'
 import { LeaveRecord, TimesheetEntry, TimesheetSummary } from '../../types/profiles'
+import { toast } from 'sonner'
+import { getMaxAllowedDobLocalDateString, validateDobValue } from '../../utils/dobValidation'
 
 // Mock Labour Profile interface
 interface LabourProfile {
@@ -184,6 +186,11 @@ export function LabourProfilePage() {
   const [searchTerm, setSearchTerm] = useState('')
 
   const handleSave = () => {
+    const dobError = validateDobValue(profile.dateOfBirth)
+    if (dobError) {
+      toast.error(dobError)
+      return
+    }
     setIsEditing(false)
     // Save logic here
   }
@@ -324,6 +331,7 @@ export function LabourProfilePage() {
                       type="date"
                       value={profile.dateOfBirth}
                       onChange={(e) => setProfile(prev => ({ ...prev, dateOfBirth: e.target.value }))}
+                      max={getMaxAllowedDobLocalDateString(15)}
                       disabled={!isEditing}
                     />
                   </div>
