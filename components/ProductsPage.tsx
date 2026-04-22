@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -135,6 +135,7 @@ const [formMode, setFormMode] = useState<ProductAction>('add') // 'add' | 'edit'
   const [units, setUnits] = useState<string[]>(['piece', 'roll', 'box', 'pack', 'kg', 'meter', 'liter', 'set']);
   const [estimatedPrices, setEstimatedPrices] = useState({});
   const [configurationData, setConfigurationData] = useState<any>(null);
+  const autoOpenedProductRef = useRef<string | null>(null);
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL
 
   const [formData, setFormData] = useState<ProductFormData>({
@@ -422,6 +423,20 @@ useEffect(() => {
     }
   }
 
+  const getViewCategoryLabel = (product: any): string => {
+    const categoryValue =
+      product?.category ??
+      product?.category_name ??
+      product?.categories?.name ??
+      product?.categories?.category_name
+
+    if (typeof categoryValue === 'string' && categoryValue.trim()) {
+      return categoryValue.trim()
+    }
+
+    return 'Not available'
+  }
+
 const handleAction = (action: ProductAction, product?: Product) => {
   setCurrentAction(action);
   setFormMode(action);
@@ -470,6 +485,33 @@ const handleAction = (action: ProductAction, product?: Product) => {
     setIsFormOpen(true);
   }
 };
+
+useEffect(() => {
+  if (typeof window === 'undefined') return;
+
+  const params = new URLSearchParams(window.location.search);
+  const viewProductId = params.get('viewProductId');
+  if (!viewProductId) return;
+  if (autoOpenedProductRef.current === viewProductId) return;
+
+  autoOpenedProductRef.current = viewProductId;
+  setCurrentAction('view');
+  setFormMode('view');
+
+  const selectedFromList = products.find((product) => String(product.id) === String(viewProductId));
+  setSelectedProduct(selectedFromList || ({ id: viewProductId } as Product));
+
+  fetchProductForView(viewProductId)
+    .then(() => setIsFormOpen(true))
+    .catch((error) => {
+      console.error('Failed to open product details from URL:', error);
+    });
+
+  params.delete('viewProductId');
+  const query = params.toString();
+  const cleanUrl = `${window.location.pathname}${query ? `?${query}` : ''}`;
+  window.history.replaceState({}, '', cleanUrl);
+}, [products]);
 
 
   const handleBranchToggle = (branchId: string, checked: boolean) => {
@@ -1097,6 +1139,19 @@ useEffect(() => {
       if (responseData.success && responseData.data) {
         const apiProduct = responseData.data;
         console.log( apiProduct.jdp_sku,"apiProduct");
+
+        let resolvedMarkupPercentage = Number(apiProduct.markup_percentage ?? 0);
+        if (!(resolvedMarkupPercentage > 0)) {
+          let configMarkup = Number(configurationData?.markup_percentage ?? NaN);
+          if (!Number.isFinite(configMarkup)) {
+            const configResponse = await apiClient.getFullConfiguration();
+            if (configResponse?.success && configResponse?.data) {
+              setConfigurationData(configResponse.data);
+              configMarkup = Number(configResponse.data.markup_percentage ?? NaN);
+            }
+          }
+          resolvedMarkupPercentage = Number.isFinite(configMarkup) ? configMarkup : 0;
+        }
         
         
         // Transform API response to match form data format
@@ -1108,7 +1163,7 @@ useEffect(() => {
           supplierSku: apiProduct.supplier_sku || '',
           jdpSku: apiProduct.jdp_sku || '',
           supplierCostPrice: apiProduct.supplier_cost_price || 0,
-          markupPercentage: apiProduct.markup_percentage || 0,
+          markupPercentage: resolvedMarkupPercentage,
           markupAmount: apiProduct.markup_amount || 0,
           jdpPrice: apiProduct.jdp_price || 0,
           profitMargin: apiProduct.profit_margin || 0,
@@ -1199,15 +1254,7 @@ useEffect(() => {
       
       if (response.success && response.data) {
         setConfigurationData(response.data);
-        
-        // Set the markup percentage from configuration to form data
-        if (response.data.markup_percentage) {
-          setFormData(prev => ({
-            ...prev,
-            markupPercentage: response.data.markup_percentage
-          }));
-        }
-        
+
         console.log('Configuration loaded in Products page:', response.data.markup_percentage);
       }
     } catch (error) {
@@ -1711,7 +1758,7 @@ useEffect(() => {
                 <div>
                   <Label className="text-sm font-medium text-gray-700 mb-2 block">Category</Label>
                   <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                    {viewProductData.category}
+                    {getViewCategoryLabel(viewProductData)}
                   </div>
                 </div>
                 <div>

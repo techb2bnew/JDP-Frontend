@@ -160,7 +160,7 @@ export function BlueSheetApprovalDialog({
   const clearInvalidHeaderKeys = () => setInvalidHeaderKeys([]);
   const [isSaving, setIsSaving] = useState(false);
   const [customInvoiceProcessing, setCustomInvoiceProcessing] = useState(false);
-  const [selectedInvoiceType, setSelectedInvoiceType] = useState<string>("estimate");
+  const [selectedInvoiceType, setSelectedInvoiceType] = useState<string>("progressive_invoice");
   /** Review-step estimate notes (controlled); sent on QuickBooks save/send via handleFinalApproval. */
   const [invoiceApprovalNotes, setInvoiceApprovalNotes] = useState("");
   const invoiceApprovalNotesRef = useRef("");
@@ -215,7 +215,7 @@ export function BlueSheetApprovalDialog({
       setFilteredProducts([])
       setActiveRow(null)
       setCustomInvoiceProcessing(false)
-      setSelectedInvoiceType("estimate")
+      setSelectedInvoiceType("progressive_invoice")
       const seedNotes = String(blueSheet?.notes ?? "");
       setInvoiceApprovalNotes(seedNotes)
       invoiceApprovalNotesRef.current = seedNotes
@@ -1007,7 +1007,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
     if (laborEntriesTotalCost > 0) {
       customProducts.push({
         job_id: finalBlueSheet.job_id,
-        product_name: "Labor total cost",
+        product_name: "Labour total cost",
         description: "Total labor cost from BlueSheet labor entries",
         supplier_id: 1,
         supplier_sku: "LABOR_TOTAL",
@@ -1067,7 +1067,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
         (finalBlueSheet.job.priority as "low" | "medium" | "high") ||
         "medium",
       service_type: isContractBased ? "contract_based" : "service_based",
-      invoice_type: selectedInvoiceType || "estimate",
+      invoice_type: selectedInvoiceType || "progressive_invoice",
       status: "draft",
       estimate_date: today,
       due_date: thirtyDaysLater,
@@ -1147,7 +1147,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
   }, 0)
 
 
-  // Labor, material and overall totals
+  // Labour, material and overall totals
   const totalLaborLabel = currentBlueSheet.total_labor_hours || null
   const materialTotal = currentBlueSheet.material_entries.reduce(
     (s: number, i: any) => s + (i.total_cost || i.material_used * i.jdp_price || 0),
@@ -2112,7 +2112,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
         colSpan={3}
         className="py-2 px-3 text-right font-bold text-[15px]"
       >
-        Labor Total Cost
+        Labour Total Cost
       </td>
       <td
         colSpan={2}
@@ -2456,7 +2456,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                     colSpan={3}
                                     className="py-2 px-3 text-right font-bold text-[15px]"
                                   >
-                                    Labor Total Cost
+                                    Labour Total Cost
                                   </td>
                                   <td
                                     colSpan={2}
@@ -2641,7 +2641,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                             {currentBlueSheet.material_entries.length} materials
                             {totalLaborLabel && (
                               <span className="ml-1.5">
-                                · Labor {totalLaborLabel}
+                                · Labour {totalLaborLabel}
                               </span>
                             )}
                           </p>
@@ -2839,7 +2839,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                               </div>
                               <div>
                                 <Label className="text-xs font-semibold uppercase text-slate-500">
-                                  Labor
+                                  Labour
                                 </Label>
                                 <p className="text-sm font-medium mt-0.5">
                                   {totalLaborLabel || "No labor hours"}
@@ -2921,6 +2921,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                           // selectedBluesheetIds={selectedBluesheetIds}
                           onProcessingChange={setCustomInvoiceProcessing}
                           onInvoiceTypeChange={setSelectedInvoiceType}
+                          defaultInvoiceType="Progressive Invoice"
                           onDone={onClose}
                           onLineItemsSync={syncCustomInvoiceLineItemsToBlueSheet}
                         />

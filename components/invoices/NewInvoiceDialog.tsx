@@ -2137,12 +2137,12 @@ const validateLineItems = (lineItems: any[] = []) => {
     if (step === 3 && (newInvoice.labor?.length || 0) > 0) {
       newInvoice.labor!.forEach((labor, i) => {
         if (!labor.laborName)
-          stepErrors[`labor_${i}_name`] = `Labor ${i + 1}: Name required`;
+          stepErrors[`labor_${i}_name`] = `Labour ${i + 1}: Name required`;
         if (labor.hours <= 0)
-          stepErrors[`labor_${i}_hours`] = `Labor ${i + 1}: Hours must be > 0`;
+          stepErrors[`labor_${i}_hours`] = `Labour ${i + 1}: Hours must be > 0`;
         if (labor.hourlyRate <= 0)
           stepErrors[`labor_${i}_rate`] =
-            `Labor ${i + 1}: Hourly rate must be > 0`;
+            `Labour ${i + 1}: Hourly rate must be > 0`;
       });
     }
 

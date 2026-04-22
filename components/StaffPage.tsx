@@ -20,6 +20,7 @@ import {
   Download
 } from 'lucide-react'
 import { globalApiCall, getAuthToken, handleTokenRevocation } from '../utils/globalApiHandler'
+import { getYesterdayLocalDateString, validateDobValue } from '../utils/dobValidation'
 import PhoneInput from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
 import Autocomplete from "react-google-autocomplete";
@@ -95,6 +96,7 @@ const initialStaffData: Staff[] = [
 ]
 
 const positions = ['Electrical Engineer', 'Senior Technician', 'Technician', 'Project Manager', 'Sales Executive', 'HR Manager']
+const normalizeRoleKey = (value: string) => value?.toLowerCase().replace(/[\s_-]/g, '') || ''
 
 interface StaffPageProps {
   onViewDetails?: (id: string) => void
@@ -287,10 +289,13 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       case 'dob':
         if (!value.trim()) {
           errors.dob = 'Date of Birth is required'
-        } else if (new Date(value) > new Date()) {
-          errors.dob = 'Date of Birth cannot be in the future'
         } else {
-          delete errors.dob
+          const dobError = validateDobValue(value)
+          if (dobError) {
+            errors.dob = dobError
+          } else {
+            delete errors.dob
+          }
         }
         break
         
@@ -422,12 +427,28 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
     return s
   }
 
+  const resolveDefaultStaffRoleSelectValue = (roleList: typeof roles) => {
+    if (!roleList.length) return ''
+    const exactMatch = roleList.find((role) => normalizeRoleKey(role.roleName || '') === 'staff')
+    if (exactMatch) return exactMatch.roleName
+
+    const partialMatch = roleList.find((role) => (role.roleName || '').toLowerCase().includes('staff'))
+    return partialMatch?.roleName || ''
+  }
+
   useEffect(() => {
     if (!isStaffDialogOpen || !isEditMode || !editingStaff || roles.length === 0) return
     const resolved = resolveStaffRoleSelectValue(editingStaff.role, roles)
     if (!resolved) return
     setFormData((prev) => (prev.role === resolved ? prev : { ...prev, role: resolved }))
   }, [isStaffDialogOpen, isEditMode, editingStaff, roles])
+
+  useEffect(() => {
+    if (!isStaffDialogOpen || isEditMode || roles.length === 0 || formData.role) return
+    const defaultRole = resolveDefaultStaffRoleSelectValue(roles)
+    if (!defaultRole) return
+    setFormData((prev) => ({ ...prev, role: defaultRole }))
+  }, [isStaffDialogOpen, isEditMode, roles, formData.role])
 
   const fetchStaffData = async (page: number, limit: number) => {
     try {
@@ -688,6 +709,12 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
     if (!formData.dob.trim()) {
       errors.dob = 'Date of Birth is required'
       isValid = false
+    } else {
+      const dobError = validateDobValue(formData.dob)
+      if (dobError) {
+        errors.dob = dobError
+        isValid = false
+      }
     }
 
     if (!formData.dateOfJoining.trim()) {
@@ -1350,7 +1377,7 @@ useEffect(() => {
                 <SelectTrigger className={validationErrors.role ? 'border-red-500' : ''}>
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[min(280px,var(--radix-select-content-available-height))]">
                   {roles.map((role) => (
                     <SelectItem key={role.id} value={role.roleName}>
                       {role.roleName}
@@ -1429,7 +1456,7 @@ useEffect(() => {
                   validateField('dob', e.target.value)
                 }}
                 className={validationErrors.dob ? 'border-red-500' : ''}
-                max={new Date().toISOString().split('T')[0]}
+                max={getYesterdayLocalDateString()}
               />
               {validationErrors.dob && (
                 <p className="text-sm text-red-500 mt-1">{validationErrors.dob}</p>

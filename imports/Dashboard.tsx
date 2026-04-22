@@ -1347,7 +1347,7 @@ function Group1171276498() {
       </div>
       <div className="absolute font-['Inter:Medium',_sans-serif] font-medium leading-[0] left-[548.942px] not-italic text-[#2b2b2b] text-[16.231px] text-left text-nowrap top-[380.525px]">
         <p className="block leading-[normal] whitespace-pre">
-          Labor Assigned Today
+          Labour Assigned Today
         </p>
       </div>
       <div className="absolute font-['Inter:Regular',_sans-serif] font-normal leading-[0] left-[231.526px] not-italic opacity-60 text-[#2b2b2b] text-[12.624px] text-left text-nowrap top-[404.872px]">

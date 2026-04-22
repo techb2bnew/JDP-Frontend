@@ -527,6 +527,12 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
 
       const importFormData = new FormData()
       importFormData.append('file', importFile)
+      // Keep existing suppliers and append imported ones.
+      // Backend may use one of these flags depending on implementation.
+      importFormData.append('mode', 'append')
+      importFormData.append('append', 'true')
+      importFormData.append('replace_existing', 'false')
+      importFormData.append('replaceExisting', 'false')
 
       const response = await fetch(`${apiBaseUrl}/suppliers/import`, {
         method: 'POST',

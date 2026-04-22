@@ -343,7 +343,7 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
           {/* Email Field */}
           <div>
             <label className="text-[18px] font-medium text-gray-900 block mb-2">
-              Email/Phone Number<span className="text-[#e02424]">*</span>
+              Email<span className="text-[#e02424]">*</span>
             </label>
             <div className="relative">
               <div className="absolute left-4 top-1/2 transform -translate-y-1/2 opacity-30">
@@ -370,7 +370,8 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
                 type="email"
                 value={email}
                 onChange={handleEmailChange}
-                placeholder="Enter your email/ phone number"
+                aria-label="Email"
+                placeholder="Email"
                 className={`pl-12 h-[50px] rounded-full border ${errors.email
                     ? 'border-[#e02424] bg-[#fff3f3] text-[#e02424]'
                     : email

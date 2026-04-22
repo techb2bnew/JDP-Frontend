@@ -20,7 +20,7 @@ export function EnhancedLeadLabourDetailsPage({ leadLabourId, onBack }: Enhanced
     dob: '20-10-1994',
     address: '47 W 13th St, New York, NY 10011, USA',
     department: 'abc',
-    position: 'Lead Labor',
+    position: 'Lead Labour',
     dateOfJoining: '18-10-2024',
     documents: {
       idProof: 'Driving License',
@@ -56,7 +56,7 @@ export function EnhancedLeadLabourDetailsPage({ leadLabourId, onBack }: Enhanced
             Back
           </Button>
           <div>
-            <h1 className="text-xl font-semibold text-[#2b2b2b]">Lead Labor Details</h1>
+            <h1 className="text-xl font-semibold text-[#2b2b2b]">Lead Labour Details</h1>
           </div>
         </div>
         
@@ -194,7 +194,7 @@ export function EnhancedLeadLabourDetailsPage({ leadLabourId, onBack }: Enhanced
                         {key === 'invoicePrice' && 'Invoice Price'}
                         {key === 'invoiceGenerate' && 'Invoice Generate'}
                         {key === 'closeJob' && 'Close Job'}
-                        {key === 'changeLaborTime' && 'Change Labor Time'}
+                        {key === 'changeLaborTime' && 'Change Labour Time'}
                       </span>
                     </div>
                   ))}

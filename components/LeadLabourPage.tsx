@@ -15,6 +15,7 @@ import { AutoSuggestInput } from './ui/auto-suggest-input'
 import { toast } from 'sonner'
 import { LeadLabourDetailsPage } from './LeadLabourDetailsPage'
 import { getAuthToken, handleTokenRevocation } from '../utils/globalApiHandler'
+import { getYesterdayLocalDateString, validateDobValue } from '../utils/dobValidation'
 import {
   Plus,
   Search,
@@ -126,10 +127,13 @@ interface LeadLabourPageProps {
   onViewDetails?: (id: string) => void
 }
 
+const normalizeRoleKey = (value: string) => value?.toLowerCase().replace(/[\s_-]/g, '') || ''
+
 export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
   const { hasPermission, permissions } = usePermissions()
   const [leadLabours, setLeadLabours] = useState<LeadLabour[]>([])
   const [isLoadingLeadLabour, setIsLoadingLeadLabour] = useState(false)
+  const [isCreatingLeadLabour, setIsCreatingLeadLabour] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -270,6 +274,124 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     agreeToTerms: false
   })
 
+  const resolveDefaultLeadLabourRole = (roleList: typeof roles) => {
+    if (!roleList.length) return ''
+    const exactMatch = roleList.find((role) => {
+      const normalized = normalizeRoleKey(role.roleName || '')
+      return normalized === 'leadlabor' || normalized === 'leadlabour'
+    })
+    if (exactMatch) return exactMatch.roleName
+
+    const partialMatch = roleList.find((role) => {
+      const lowered = (role.roleName || '').toLowerCase()
+      return lowered.includes('lead') && (lowered.includes('labor') || lowered.includes('labour'))
+    })
+    return partialMatch?.roleName || ''
+  }
+
+  const resolveLeadLabourRoleSelectValue = (stored: string | undefined, roleList: typeof roles) => {
+    if (!stored?.trim() || !roleList.length) return stored?.trim() ?? ''
+    const source = String(stored).trim()
+    const normalizedSource = normalizeRoleKey(source)
+
+    const byId = roleList.find((role) => String(role.id) === source)
+    if (byId) return byId.roleName
+
+    const byExactName = roleList.find((role) => role.roleName === source)
+    if (byExactName) return byExactName.roleName
+
+    const byCaseInsensitiveName = roleList.find(
+      (role) => (role.roleName || '').toLowerCase() === source.toLowerCase(),
+    )
+    if (byCaseInsensitiveName) return byCaseInsensitiveName.roleName
+
+    const byNormalizedName = roleList.find(
+      (role) => normalizeRoleKey(role.roleName || '') === normalizedSource,
+    )
+    if (byNormalizedName) return byNormalizedName.roleName
+
+    const byRoleType = roleList.find(
+      (role) => normalizeRoleKey(role.roleType || '') === normalizedSource,
+    )
+    if (byRoleType) return byRoleType.roleName
+
+    if (normalizedSource === 'leadlabor' || normalizedSource === 'leadlabour') {
+      const leadRole = roleList.find((role) => {
+        const normalizedName = normalizeRoleKey(role.roleName || '')
+        return normalizedName.includes('leadlabor') || normalizedName.includes('leadlabour')
+      })
+      if (leadRole) return leadRole.roleName
+    }
+
+    return source
+  }
+
+  const validateExperienceValue = (value: string): string => {
+    const trimmed = value.trim()
+    if (!trimmed) return 'Experience is required'
+    if (/^-\d/.test(trimmed)) return 'Experience cannot be negative'
+    // Accept formats like: "6 months", "1 month", "3 years", "1 year"
+    if (!/^\d+\s+(month|months|year|years)$/i.test(trimmed)) {
+      return 'Enter experience as number + month/year (e.g., 6 months or 3 years)'
+    }
+    const numericValue = Number.parseInt(trimmed, 10)
+    if (!Number.isFinite(numericValue) || numericValue > 100) {
+      return 'Experience cannot be greater than 100'
+    }
+    return ''
+  }
+
+  const mapLeadLabourApiItem = (item: any): LeadLabour => ({
+    id: item.id,
+    leadLabourId: item.labor_code || item.lead_labour_code || 'N/A',
+    name: item.users?.full_name || item.full_name || 'N/A',
+    email: item.users?.email || item.email || 'N/A',
+    phone: item.users?.phone || item.phone || 'N/A',
+    dob: item.dob || '',
+    address: item.address || '',
+    notes: item.notes || '',
+    department: item.department || '',
+    dateOfJoining: item.date_of_joining || '',
+    specialization: item.specialization || '',
+    experience: item.experience || '',
+    trade: item.trade || '',
+    idProofUrl: item.id_proof_url || '',
+    photoUrl: item.photo_url || '',
+    resumeUrl: item.resume_url || '',
+    agreedTerms: Boolean(item.agreed_terms),
+    status: item.users?.status || item.status || 'active',
+    role: item.users?.role || item.role || 'Lead labor',
+    createdAt: item.created_at || '',
+    jobsCompleted: item.assigned_jobs_count || 0,
+    hourly_rate: item.hourly_rate || 0,
+    availability: item.availability || 'available',
+    certifications: Array.isArray(item.certifications) ? item.certifications : (item.certifications ? [item.certifications] : []),
+    lastAssignment: item.last_assignment || '',
+    skills: Array.isArray(item.skills) ? item.skills : (item.skills ? [item.skills] : []),
+    emergencyContact: item.emergency_contact || '',
+    documents: {
+      idProof: item.id_proof_url
+        ? { name: item.id_proof_url.split('/').pop() || 'ID Proof', url: item.id_proof_url }
+        : null,
+      photo: item.photo_url
+        ? { name: item.photo_url.split('/').pop() || 'Photo', url: item.photo_url }
+        : null,
+      resume: item.resume_url
+        ? { name: item.resume_url.split('/').pop() || 'Resume', url: item.resume_url }
+        : null,
+    },
+    permissions: {
+      createJob: false,
+      addClient: false,
+      orderInventoryPrice: false,
+      invoicePrice: false,
+      invoiceGenerate: false,
+      closeJob: false,
+      changeLaborTime: false,
+    },
+    agreeToTerms: Boolean(item.agreed_terms),
+  })
+
   const generateLeadLabourId = () => {
     const year = new Date().getFullYear()
     const count = leadLabours.length + 1
@@ -323,6 +445,8 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
   const totalPages = Math.ceil(totalLead / itemsPerPage)
 
   const handleCreate = async () => {
+    if (isCreatingLeadLabour) return
+
     // Validation
     if (!formData.role || !formData.name || !formData.email || !formData.phone || !formData.dob || !formData.address || !formData.department || !formData.dateOfJoining || !formData.specialization || !formData.experience || !formData.agreeToTerms) {
       const errors: Record<string, string> = {};
@@ -331,8 +455,9 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       if (!formData.email) errors.email = 'Email is required';
       if (!formData.phone) errors.phone = 'Phone is required';
       if (!formData.dob) errors.dob = 'Date of Birth is required';
-      if (formData.dob && new Date(formData.dob) > new Date()) {
-        errors.dob = 'Date of Birth cannot be in the future';
+      if (formData.dob) {
+        const dobError = validateDobValue(formData.dob)
+        if (dobError) errors.dob = dobError
       }
       if (!formData.address) errors.address = 'Address is required';
       if (!formData.department) errors.department = 'Department is required';
@@ -344,6 +469,20 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       setValidationErrors(errors);
       toast.error('Please fill in all required fields and agree to terms');
       return;
+    }
+
+    const createDobError = validateDobValue(formData.dob)
+    if (createDobError) {
+      setValidationErrors((prev) => ({ ...prev, dob: createDobError }))
+      toast.error(createDobError)
+      return
+    }
+
+    const createExperienceError = validateExperienceValue(formData.experience)
+    if (createExperienceError) {
+      setValidationErrors((prev) => ({ ...prev, experience: createExperienceError }))
+      toast.error(createExperienceError)
+      return
     }
 
     // Email format validation
@@ -358,6 +497,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     let loadingToastId: string | number | undefined;
 
     try {
+      setIsCreatingLeadLabour(true)
       loadingToastId = toast.loading('Creating lead labour...');
       const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
       const headers: Record<string, string> = {};
@@ -429,7 +569,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       if (response.ok) {
         const responseData = await response.json();
         if (responseData.success) {
-          toast.success('Lead Labor created successfully');
+          toast.success('Lead Labour created successfully');
           resetForm();
           setIsCreateDialogOpen(false);
           // Refresh the data
@@ -453,6 +593,8 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       }
       console.error('Error creating lead labour:', error);
       toast.error('Error creating lead labour. Please try again.');
+    } finally {
+      setIsCreatingLeadLabour(false)
     }
   }
 
@@ -471,29 +613,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     setEditingLeadLabour(leadLabour)
     console.log('sadas', leadLabour);
     
-    // Find matching role from roles array
-    // The Select component expects role.roleName, so we need to match leadLabour.role with role.roleName
-    // Handle cases like "lead_labor" from API matching "Lead Labor" in roles array
-    let matchedRole = ''
-    if (leadLabour.role) {
-      // Normalize function to compare strings (remove spaces, underscores, convert to lowercase)
-      const normalize = (str: string) => str?.toLowerCase().replace(/[\s_-]/g, '') || ''
-      
-      const apiRoleNormalized = normalize(leadLabour.role) 
-      
-      const foundRole = roles.find(role => {
-        // Exact match
-        if (role.roleName === leadLabour.role) return true
-        // Case-insensitive match
-        if (role.roleName?.toLowerCase() === leadLabour.role?.toLowerCase()) return true
-        // Normalized match (handles underscores, spaces, case)
-        if (normalize(role.roleName || '') === apiRoleNormalized) return true
-        return false
-      })
-      
-      matchedRole = foundRole?.roleName || leadLabour.role
-      console.log('Matched role:', matchedRole, 'Found:', !!foundRole)
-    }
+    const matchedRole = resolveLeadLabourRoleSelectValue(leadLabour.role, roles)
     
     setFormData({
       role: matchedRole, // Use matched roleName from roles array
@@ -537,8 +657,9 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       if (!formData.email) errors.email = 'Email is required';
       if (!formData.phone) errors.phone = 'Phone is required';
       if (!formData.dob) errors.dob = 'Date of Birth is required';
-      if (formData.dob && new Date(formData.dob) > new Date()) {
-        errors.dob = 'Date of Birth cannot be in the future';
+      if (formData.dob) {
+        const dobError = validateDobValue(formData.dob)
+        if (dobError) errors.dob = dobError
       }
       if (!formData.address) errors.address = 'Address is required';
       if (!formData.department) errors.department = 'Department is required';
@@ -550,6 +671,20 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       setValidationErrors(errors);
       toast.error('Please fill in all required fields and agree to terms');
       return;
+    }
+
+    const updateDobError = validateDobValue(formData.dob)
+    if (updateDobError) {
+      setValidationErrors((prev) => ({ ...prev, dob: updateDobError }))
+      toast.error(updateDobError)
+      return
+    }
+
+    const updateExperienceError = validateExperienceValue(formData.experience)
+    if (updateExperienceError) {
+      setValidationErrors((prev) => ({ ...prev, experience: updateExperienceError }))
+      toast.error(updateExperienceError)
+      return
     }
 
     // Email format validation
@@ -634,7 +769,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       if (response.ok) {
         const responseData = await response.json();
         if (responseData.success) {
-          toast.success('Lead Labor updated successfully');
+          toast.success('Lead Labour updated successfully');
           resetForm();
           setIsEditDialogOpen(false);
           setEditingLeadLabour(null);
@@ -685,7 +820,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       if (response.ok) {
         const responseData = await response.json();
         if (responseData.success) {
-          toast.success('Lead Labor deleted successfully');
+          toast.success('Lead Labour deleted successfully');
           // Refresh the data
           fetchLeadLabourData(currentPage, itemsPerPage);
         } else {
@@ -945,7 +1080,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     // CSV header
     const headers = [
       "ID",
-      "Lead Labor ID",
+      "Lead Labour ID",
       "Name",
       "Email",
       "Phone",
@@ -1005,6 +1140,20 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     fetchRoles();
   }, []);
 
+  useEffect(() => {
+    if (!isEditDialogOpen || !editingLeadLabour || roles.length === 0) return
+    const resolvedRole = resolveLeadLabourRoleSelectValue(editingLeadLabour.role, roles)
+    if (!resolvedRole) return
+    setFormData((prev) => (prev.role === resolvedRole ? prev : { ...prev, role: resolvedRole }))
+  }, [isEditDialogOpen, editingLeadLabour, roles]);
+
+  useEffect(() => {
+    if (!isCreateDialogOpen || roles.length === 0 || formData.role) return
+    const defaultRole = resolveDefaultLeadLabourRole(roles)
+    if (!defaultRole) return
+    setFormData((prev) => ({ ...prev, role: defaultRole }))
+  }, [isCreateDialogOpen, roles, formData.role]);
+
   const fetchRoles = async () => {
     try {
       const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
@@ -1029,7 +1178,15 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
             permissions: apiRole.permissions || []
           }));
 
-          setRoles(transformedRoles);
+          const existingRoleKeys = new Set(
+            transformedRoles.map((role: any) => normalizeRoleKey(role.roleName || '')),
+          )
+          const fallbackRoles = [
+            { id: 'fallback-lead-labor', roleName: 'Lead Labor', roleType: 'system', permissions: [] },
+            { id: 'fallback-labor', roleName: 'Labor', roleType: 'system', permissions: [] },
+          ].filter((role) => !existingRoleKeys.has(normalizeRoleKey(role.roleName)))
+
+          setRoles([...transformedRoles, ...fallbackRoles]);
         } else {
           console.error('Invalid API response structure:', responseData);
         }
@@ -1056,51 +1213,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       if (response.ok) {
         const responseData = await response.json();
         if (responseData.success && responseData.data) {
-          // Map API response to component data structure
-          const mappedData = responseData.data.data.map((item: any) => ({
-            id: item.id,
-            leadLabourId: item.labor_code,
-            name: item.users?.full_name || 'N/A',
-            email: item.users?.email || 'N/A',
-            phone: item.users?.phone || 'N/A',
-            dob: item.dob,
-            address: item.address,
-            notes: item.notes,
-            department: item.department,
-            dateOfJoining: item.date_of_joining,
-            specialization: item.specialization,
-            experience: item.experience,
-            trade: item.trade,
-            idProofUrl: item.id_proof_url,
-            photoUrl: item.photo_url,
-            resumeUrl: item.resume_url,
-            agreedTerms: item.agreed_terms,
-            status: item.users?.status || 'active',
-            role: item.users?.role || 'Lead labor',
-            createdAt: item.created_at,
-            jobsCompleted: item.assigned_jobs_count || 0, // Default value
-            hourly_rate: item.hourly_rate || 0, // Default value
-            availability: 'available', // Default value
-            certifications: [], // Default value
-            lastAssignment: '', // Default value
-            skills: [], // Default value
-            emergencyContact: '', // Default value
-            documents: {
-              idProof: item.id_proof_url ? { name: item.id_proof_url.split('/').pop() || 'ID Proof', url: item.id_proof_url } : null,
-              photo: item.photo_url ? { name: item.photo_url.split('/').pop() || 'Photo', url: item.photo_url } : null,
-              resume: item.resume_url ? { name: item.resume_url.split('/').pop() || 'Resume', url: item.resume_url } : null
-            },
-            permissions: {
-              createJob: false,
-              addClient: false,
-              orderInventoryPrice: false,
-              invoicePrice: false,
-              invoiceGenerate: false,
-              closeJob: false,
-              changeLaborTime: false
-            },
-            agreeToTerms: item.agreed_terms
-          }));          
+          const mappedData = responseData.data.data.map((item: any) => mapLeadLabourApiItem(item))
 
           setLeadLabours(mappedData);
           setFilteredLeadLabours(mappedData); 
@@ -1133,28 +1246,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     const leadLaborData = response.data;
     const leadLaborList = leadLaborData?.leadLabor || [];
 
-    const transformedData = leadLaborList.map((labor: any) => ({
-      id: labor.id,
-      userId: labor.user_id,
-      name: labor.users?.full_name || 'N/A',
-      email: labor.users?.email || 'N/A',
-      phone: labor.users?.phone || 'N/A',
-      role: labor.users?.role || 'N/A',
-      status: labor.users?.status || 'N/A',
-      dob: labor.dob || 'N/A',
-      address: labor.address || 'N/A',
-      department: labor.department || 'N/A',
-      hourly_rate: labor.hourly_rate,
-      dateOfJoining: labor.date_of_joining || 'N/A',
-      specialization: labor.specialization || 'N/A',
-      trade: labor.trade || 'N/A',
-      experience: labor.experience || 'N/A',
-      laborCode: labor.labor_code || 'N/A',
-      idProofUrl: labor.id_proof_url || null,
-      resumeUrl: labor.resume_url || null,
-      photoUrl: labor.photo_url || null,
-      notes: labor.notes || '',
-    }));
+    const transformedData = leadLaborList.map((labor: any) => mapLeadLabourApiItem(labor));
 
    setFilteredLeadLabours(transformedData); 
 setTotalLead(transformedData.length);  
@@ -1191,33 +1283,12 @@ useEffect(() => {
       }
       
       const laborList = res.data?.leadLabor || []; // API returns 'leadLabor'
-      const transformed = laborList.map((item: any) => ({
-        id: item.id,
-        leadLabourId: item.labor_code || item.lead_labour_code || 'N/A',
-        name: item.users?.full_name || 'N/A',
-        email: item.users?.email || 'N/A',
-        phone: item.users?.phone || 'N/A',
-        dob: item.dob || '',
-        address: item.address || '',
-        notes: item.notes || '',
-        department: item.department || '',
-        dateOfJoining: item.date_of_joining || '',
-        specialization: item.specialization || '',
-        experience: item.experience || '',
-        status: item.users?.status || 'inactive',
-        certifications: Array.isArray(item.certifications) ? item.certifications : (item.certifications ? [item.certifications] : []),
-        hourly_rate: item.hourly_rate || 0,
-        availability: item.availability || 'available',
-        jobsCompleted: item.assigned_jobs_count || 0,
-        lastAssignment: item.last_assignment || '',
-        skills: Array.isArray(item.skills) ? item.skills : (item.skills ? [item.skills] : []),
-        emergencyContact: item.emergency_contact || ''
-      }));
+      const transformed = laborList.map((item: any) => mapLeadLabourApiItem(item));
       setLeadLabours(transformed);
       setFilteredLeadLabours(transformed);
       setTotalLead(res.data?.pagination?.total ?? transformed.length ?? 0);
     } catch (err) {
-      console.error("Lead Labor filter error:", err);
+      console.error("Lead Labour filter error:", err);
       setLeadLabours([]);
       setFilteredLeadLabours([]);
       setTotalLead(0);
@@ -1369,7 +1440,7 @@ useEffect(() => {
               <SelectTrigger className={validationErrors.role ? 'border-red-500' : ''}>
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-[min(280px,var(--radix-select-content-available-height))]">
                 {roles.map((role) => (
                   <SelectItem key={role.id} value={role.roleName}>
                     {role.roleName}
@@ -1452,14 +1523,14 @@ useEffect(() => {
               id="dob"
               type="date"
               value={formData.dob}
-              className={validationErrors.dob ? 'border-red-500' : ''}
+              className={`${validationErrors.dob ? 'border-red-500' : ''} pr-12 [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-calendar-picker-indicator]:mr-0 [&::-webkit-calendar-picker-indicator]:p-1 [&::-webkit-calendar-picker-indicator]:cursor-pointer`}
               onChange={(e) => {
                 setFormData({ ...formData, dob: e.target.value })
                 if (validationErrors.dob) {
                   setValidationErrors({ ...validationErrors, dob: '' })
                 }
               }}
-              max={new Date().toISOString().split('T')[0]}
+              max={getYesterdayLocalDateString()}
             />
             {validationErrors.dob && (
               <p className="text-sm text-red-500 mt-1">{validationErrors.dob}</p>
@@ -1591,7 +1662,7 @@ useEffect(() => {
                   setValidationErrors({ ...validationErrors, dateOfJoining: '' })
                 }
               }}
-              className={validationErrors.dateOfJoining ? 'border-red-500' : ''}
+              className={`${validationErrors.dateOfJoining ? 'border-red-500' : ''} pr-12 [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-calendar-picker-indicator]:mr-0 [&::-webkit-calendar-picker-indicator]:p-1 [&::-webkit-calendar-picker-indicator]:cursor-pointer`}
             />
             {validationErrors.dateOfJoining && (
               <p className="text-sm text-red-500 mt-1">{validationErrors.dateOfJoining}</p>
@@ -1606,10 +1677,10 @@ useEffect(() => {
               className={validationErrors.experience ? 'border-red-500' : ''}
 
               onChange={(e) => {
-                setFormData({ ...formData, experience: e.target.value })
-                if (validationErrors.experience) {
-                  setValidationErrors({ ...validationErrors, experience: '' })
-                }
+                const value = e.target.value
+                setFormData({ ...formData, experience: value })
+                const error = validateExperienceValue(value)
+                setValidationErrors({ ...validationErrors, experience: error })
               }}
               placeholder="e.g., 5 years"
             />
@@ -1656,7 +1727,7 @@ useEffect(() => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-medium text-[#2b2b2b]">Lead Labor Management</h1>
+          <h1 className="text-2xl font-medium text-[#2b2b2b]">Lead Labour Management</h1>
           <p className="text-sm text-[#2b2b2b]/60 mt-1">Manage your lead labour workforce and their assignments.</p>
         </div>
 
@@ -1736,14 +1807,14 @@ useEffect(() => {
                 </DialogHeader>
                 {renderForm()}
                 <div className="flex justify-end gap-3 mt-6">
-                  <Button variant="outline" onClick={() => {
+                  <Button variant="outline" disabled={isCreatingLeadLabour} onClick={() => {
                     setIsCreateDialogOpen(false);
                     resetForm();
                   }}>
                     Cancel
                   </Button>
-                  <Button onClick={handleCreate} className="bg-primary text-white hover:bg-[#0090e6]">
-                    Submit
+                  <Button disabled={isCreatingLeadLabour} onClick={handleCreate} className="bg-primary text-white hover:bg-[#0090e6]">
+                    {isCreatingLeadLabour ? 'Submitting...' : 'Submit'}
                   </Button>
                 </div>
               </DialogContent>
@@ -1942,7 +2013,7 @@ useEffect(() => {
                         onEdit={() => handleEdit(labour)}
                         onDelete={() => handleDelete(labour.id)}
                         itemName={labour.name}
-                        itemType="Lead Labor"
+                        itemType="Lead Labour"
                         showView={canViewLeadLabour}
                         showEdit={canEditLeadLabour}
                         showDelete={canDeleteLeadLabour}
@@ -2003,7 +2074,7 @@ useEffect(() => {
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent
-          className="max-w-4xl sm:max-w-[700px] max-h-[90vh]"
+          className="max-w-4xl sm:max-w-[960px] max-h-[90vh]"
           onInteractOutside={(e) => {
             const target = e.target as HTMLElement | null;
             if (target?.closest?.(".pac-container")) e.preventDefault();

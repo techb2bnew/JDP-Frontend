@@ -14,6 +14,7 @@ import { usePermissions } from '../contexts/PermissionContext'
 import { AutoSuggestInput } from './ui/auto-suggest-input'
 import { toast } from 'sonner'
 import { getAuthToken, handleTokenRevocation } from '../utils/globalApiHandler'
+import { getYesterdayLocalDateString, validateDobValue } from '../utils/dobValidation'
 import { 
   Plus, 
   Search, 
@@ -32,7 +33,7 @@ import PhoneInput from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
 import Autocomplete from "react-google-autocomplete";
 
-interface Labor {
+interface Labour {
   id: string
   laborId: string
   name: string
@@ -102,13 +103,15 @@ const skillOptions = [
   'Documentation'
 ]
 
+const normalizeRoleKey = (value: string) => value?.toLowerCase().replace(/[\s_-]/g, '') || ''
+
 export function LaborPage({ onViewDetails }: LaborPageProps) {
   const { hasPermission, permissions } = usePermissions()
-  const [laborers, setLaborers] = useState<Labor[]>([])
+  const [laborers, setLaborers] = useState<Labour[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [editingLabor, setEditingLabor] = useState<Labor | null>(null)
+  const [editingLabor, setEditingLabor] = useState<Labour | null>(null)
   const [filterTrade, setFilterTrade] = useState<string>('all')
   const [filterAvailability, setFilterAvailability] = useState<string>('all')
   const [currentPage, setCurrentPage] = useState(1)
@@ -120,6 +123,7 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
   const [leadLabours, setLeadLabours] = useState<any[]>([])
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [isLoadingLabor, setIsLoadingLabor] = useState(false)
+  const [isCreatingLabor, setIsCreatingLabor] = useState(false)
   const [trades, setTrades] = useState<string[]>([])
 
   // Permission checks for labour module
@@ -223,6 +227,73 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
     notes: '',
   })
 
+  const resolveDefaultLaborRole = (roleList: typeof roles) => {
+    if (!roleList.length) return ''
+    const exactMatch = roleList.find((role) => {
+      const normalized = normalizeRoleKey(role.roleName || '')
+      return normalized === 'labor' || normalized === 'labour'
+    })
+    if (exactMatch) return exactMatch.roleName
+
+    const partialMatch = roleList.find((role) => {
+      const lowered = (role.roleName || '').toLowerCase()
+      return (lowered.includes('labor') || lowered.includes('labour')) && !lowered.includes('lead')
+    })
+    return partialMatch?.roleName || ''
+  }
+
+  const resolveLaborRoleSelectValue = (stored: string | undefined, roleList: typeof roles) => {
+    if (!stored?.trim() || !roleList.length) return stored?.trim() ?? ''
+    const source = String(stored).trim()
+    const normalizedSource = normalizeRoleKey(source)
+
+    const byId = roleList.find((role) => String(role.id) === source)
+    if (byId) return byId.roleName
+
+    const byExactName = roleList.find((role) => role.roleName === source)
+    if (byExactName) return byExactName.roleName
+
+    const byCaseInsensitiveName = roleList.find(
+      (role) => (role.roleName || '').toLowerCase() === source.toLowerCase(),
+    )
+    if (byCaseInsensitiveName) return byCaseInsensitiveName.roleName
+
+    const byNormalizedName = roleList.find(
+      (role) => normalizeRoleKey(role.roleName || '') === normalizedSource,
+    )
+    if (byNormalizedName) return byNormalizedName.roleName
+
+    const byRoleType = roleList.find(
+      (role) => normalizeRoleKey(role.roleType || '') === normalizedSource,
+    )
+    if (byRoleType) return byRoleType.roleName
+
+    if (normalizedSource === 'labor' || normalizedSource === 'labour') {
+      const laborRole = roleList.find((role) => {
+        const normalizedName = normalizeRoleKey(role.roleName || '')
+        return normalizedName === 'labor' || normalizedName === 'labour'
+      })
+      if (laborRole) return laborRole.roleName
+    }
+
+    return source
+  }
+
+  const validateExperienceValue = (value: string): string => {
+    const trimmed = value.trim()
+    if (!trimmed) return 'Experience is required'
+    if (/^-\d/.test(trimmed)) return 'Experience cannot be negative'
+    // Accept formats like: "6 months", "1 month", "3 years", "1 year"
+    if (!/^\d+\s+(month|months|year|years)$/i.test(trimmed)) {
+      return 'Enter experience as number + month/year (e.g., 6 months or 3 years)'
+    }
+    const numericValue = Number.parseInt(trimmed, 10)
+    if (!Number.isFinite(numericValue) || numericValue > 100) {
+      return 'Experience cannot be greater than 100'
+    }
+    return ''
+  }
+
   const generateLaborId = () => {
     const year = new Date().getFullYear()
     const count = laborers.length + 1
@@ -271,6 +342,8 @@ const getAvailabilityBadge = (availability: string) => {
   const totalPages = Math.ceil(totalLabor / itemsPerPage)
 
   const handleCreate = async () => {
+    if (isCreatingLabor) return
+
     // Validation
     if (!formData.role || !formData.full_name || !formData.email || !formData.phone || !formData.dob || 
         !formData.address || !formData.date_of_joining || !formData.trade || 
@@ -281,8 +354,9 @@ const getAvailabilityBadge = (availability: string) => {
       if (!formData.email) errors.email = 'Email is required';
       if (!formData.phone) errors.phone = 'Phone is required';
       if (!formData.dob) errors.dob = 'Date of Birth is required';
-      if (formData.dob && new Date(formData.dob) > new Date()) {
-        errors.dob = 'Date of Birth cannot be in the future';
+      if (formData.dob) {
+        const dobError = validateDobValue(formData.dob)
+        if (dobError) errors.dob = dobError
       }
       if (!formData.address) errors.address = 'Address is required';
       if (!formData.date_of_joining) errors.date_of_joining = 'Date of Joining is required';
@@ -293,6 +367,20 @@ const getAvailabilityBadge = (availability: string) => {
       setValidationErrors(errors);
       toast.error('Please fill in all required fields');
       return;
+    }
+
+    const createDobError = validateDobValue(formData.dob)
+    if (createDobError) {
+      setValidationErrors((prev) => ({ ...prev, dob: createDobError }))
+      toast.error(createDobError)
+      return
+    }
+
+    const experienceError = validateExperienceValue(formData.experience)
+    if (experienceError) {
+      setValidationErrors((prev) => ({ ...prev, experience: experienceError }))
+      toast.error(experienceError)
+      return
     }
 
     // Email format validation
@@ -307,6 +395,7 @@ const getAvailabilityBadge = (availability: string) => {
     let loadingToastId: string | number | undefined;
     
     try {
+      setIsCreatingLabor(true)
       loadingToastId = toast.loading('Creating labor worker...');
       
       const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
@@ -366,7 +455,7 @@ const getAvailabilityBadge = (availability: string) => {
       if (response.ok) {
         const responseData = await response.json();
         if (responseData.success) {
-          toast.success('Labor worker created successfully!');
+          toast.success('Labour worker created successfully!');
           setIsCreateDialogOpen(false);
           resetForm();
           setValidationErrors({});
@@ -384,10 +473,12 @@ const getAvailabilityBadge = (availability: string) => {
       toast.dismiss(loadingToastId);
       console.error('Error creating labor worker:', error);
       toast.error('An error occurred while creating labor worker');
+    } finally {
+      setIsCreatingLabor(false)
     }
   }
 
-  const handleEdit = async (labor: Labor) => {
+  const handleEdit = async (labor: Labour) => {
     setEditingLabor(labor)
     setIsEditDialogOpen(true)
     
@@ -408,8 +499,9 @@ const getAvailabilityBadge = (availability: string) => {
       if (!formData.email) errors.email = 'Email is required';
       if (!formData.phone) errors.phone = 'Phone is required';
       if (!formData.dob) errors.dob = 'Date of Birth is required';
-      if (formData.dob && new Date(formData.dob) > new Date()) {
-        errors.dob = 'Date of Birth cannot be in the future';
+      if (formData.dob) {
+        const dobError = validateDobValue(formData.dob)
+        if (dobError) errors.dob = dobError
       }
       if (!formData.address) errors.address = 'Address is required';
       if (!formData.date_of_joining) errors.date_of_joining = 'Date of Joining is required';
@@ -420,6 +512,20 @@ const getAvailabilityBadge = (availability: string) => {
       setValidationErrors(errors);
       toast.error('Please fill in all required fields');
       return;
+    }
+
+    const updateDobError = validateDobValue(formData.dob)
+    if (updateDobError) {
+      setValidationErrors((prev) => ({ ...prev, dob: updateDobError }))
+      toast.error(updateDobError)
+      return
+    }
+
+    const experienceError = validateExperienceValue(formData.experience)
+    if (experienceError) {
+      setValidationErrors((prev) => ({ ...prev, experience: experienceError }))
+      toast.error(experienceError)
+      return
     }
 
     // Email format validation
@@ -493,7 +599,7 @@ const getAvailabilityBadge = (availability: string) => {
       if (response.ok) {
         const responseData = await response.json();
         if (responseData.success) {
-          toast.success('Labor worker updated successfully!');
+          toast.success('Labour worker updated successfully!');
           setIsEditDialogOpen(false);
           setEditingLabor(null);
           resetForm();
@@ -538,7 +644,7 @@ const getAvailabilityBadge = (availability: string) => {
       if (response.ok) {
         const responseData = await response.json();
         if (responseData.success) {
-          toast.success('Labor worker deleted successfully');
+          toast.success('Labour worker deleted successfully');
           // Refresh the data and stats
           fetchLaborData(currentPage, itemsPerPage);
           fetchLaborStats();
@@ -609,10 +715,10 @@ const getAvailabilityBadge = (availability: string) => {
     }
   }
 
-  function convertToCSV(data: Labor[]) {
+  function convertToCSV(data: Labour[]) {
   const headers = [
     'ID',
-    'Labor ID',
+    'Labour ID',
     'Name',
     'Email',
     'Phone',
@@ -720,7 +826,7 @@ const getAvailabilityBadge = (availability: string) => {
     }
   };
 
-function downloadCSV(data: Labor[], filename: string) {
+function downloadCSV(data: Labour[], filename: string) {
   const csv = convertToCSV(data);
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
@@ -739,6 +845,20 @@ useEffect(() => {
   fetchLeadLabourData();
   // Don't fetch data here - let the search/pagination useEffect handle initial fetch
 }, []);
+
+useEffect(() => {
+  if (!isCreateDialogOpen || roles.length === 0 || formData.role) return
+  const defaultRole = resolveDefaultLaborRole(roles)
+  if (!defaultRole) return
+  setFormData((prev) => ({ ...prev, role: defaultRole }))
+}, [isCreateDialogOpen, roles, formData.role]);
+
+useEffect(() => {
+  if (!isEditDialogOpen || !editingLabor || roles.length === 0 || !formData.role) return
+  const resolvedRole = resolveLaborRoleSelectValue(formData.role, roles)
+  if (!resolvedRole) return
+  setFormData((prev) => (prev.role === resolvedRole ? prev : { ...prev, role: resolvedRole }))
+}, [isEditDialogOpen, editingLabor, roles, formData.role]);
 
 const fetchRoles = async () => {
   try {
@@ -763,8 +883,16 @@ const fetchRoles = async () => {
           roleType: apiRole.role_type || '',
           permissions: apiRole.permissions || []
         }));
-        
-        setRoles(transformedRoles);
+
+        const existingRoleKeys = new Set(
+          transformedRoles.map((role: any) => normalizeRoleKey(role.roleName || '')),
+        )
+        const fallbackRoles = [
+          { id: 'fallback-lead-labor', roleName: 'Lead Labor', roleType: 'system', permissions: [] },
+          { id: 'fallback-labor', roleName: 'Labor', roleType: 'system', permissions: [] },
+        ].filter((role) => !existingRoleKeys.has(normalizeRoleKey(role.roleName)))
+
+        setRoles([...transformedRoles, ...fallbackRoles]);
       } else {
         console.error('Invalid API response structure:', responseData);
       }
@@ -796,7 +924,7 @@ const fetchLeadLabourData = async () => {
           full_name: item.users?.full_name || 'N/A',
           email: item.users?.email || 'N/A',
           phone: item.users?.phone || 'N/A',
-          role: item.users?.role || 'Lead Labor'
+          role: item.users?.role || 'Lead Labour'
         }));
 
         setLeadLabours(mappedData);
@@ -914,7 +1042,7 @@ const fetchBySearchLabor = async () => {
     setFilteredLabors(transformedData);
     setTotalLabor(laborData.pagination.total || transformedData.length);
   } catch (error) {
-    console.error('Labor search error:', error);
+    console.error('Labour search error:', error);
     setFilteredLabors([]);
   } finally {
     setIsLoadingLabor(false);
@@ -969,7 +1097,7 @@ useEffect(() => {
       setFilteredLabors(transformed);
       setTotalLabor(res.data?.pagination?.total ?? transformed.length ?? 0);
     } catch (err) {
-      console.error('Labor filter error:', err);
+      console.error('Labour filter error:', err);
       setFilteredLabors([]);
       setTotalLabor(0);
     } finally {
@@ -1037,7 +1165,7 @@ const fetchLaborById = async (id: string) => {
           skills: Array.isArray(item.skills) ? item.skills : 
                  item.skills ? [item.skills] : [],
           notes: item.notes || '',
-          role: item.users?.role || 'Labor'
+          role: resolveLaborRoleSelectValue(item.users?.role || 'Labour', roles)
         };
 
         setFormData(formData);
@@ -1068,7 +1196,7 @@ const fetchLaborById = async (id: string) => {
                 <SelectTrigger className={validationErrors.role ? 'border-red-500' : ''}>
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[min(280px,var(--radix-select-content-available-height))]">
                   {roles.map((role) => (
                     <SelectItem key={role.id} value={role.roleName}>
                       {role.roleName}
@@ -1155,14 +1283,14 @@ const fetchLaborById = async (id: string) => {
           id="dob"
           type="date"
           value={formData.dob}
-          className={validationErrors.dob ? 'border-red-500' : ''}
+          className={`${validationErrors.dob ? 'border-red-500' : ''} pr-12 [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-calendar-picker-indicator]:mr-0 [&::-webkit-calendar-picker-indicator]:p-1 [&::-webkit-calendar-picker-indicator]:cursor-pointer`}
           onChange={(e) => {
             setFormData({...formData, dob: e.target.value})
             if (validationErrors.dob) {
               setValidationErrors({...validationErrors, dob: ''})
             }
           }}
-          max={new Date().toISOString().split('T')[0]}
+          max={getYesterdayLocalDateString()}
         />
         {validationErrors.dob && (
           <p className="text-sm text-red-500 mt-1">{validationErrors.dob}</p>
@@ -1174,7 +1302,7 @@ const fetchLaborById = async (id: string) => {
         <Input
           id="date_of_joining"
           type="date"
-          className={validationErrors.date_of_joining ? 'border-red-500' : ''}
+          className={`${validationErrors.date_of_joining ? 'border-red-500' : ''} pr-12 [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-calendar-picker-indicator]:mr-0 [&::-webkit-calendar-picker-indicator]:p-1 [&::-webkit-calendar-picker-indicator]:cursor-pointer`}
           value={formData.date_of_joining}
           onChange={(e) => {
             setFormData({...formData, date_of_joining: e.target.value})
@@ -1249,10 +1377,13 @@ const fetchLaborById = async (id: string) => {
           id="experience"
           value={formData.experience}
           onChange={(e) => {
-            setFormData({...formData, experience: e.target.value})
-            if (validationErrors.experience) {
-              setValidationErrors({...validationErrors, experience: ''})
-            }
+            const value = e.target.value
+            setFormData({...formData, experience: value})
+            const error = validateExperienceValue(value)
+            setValidationErrors({
+              ...validationErrors,
+              experience: error
+            })
           }}
           placeholder="e.g., 3 years"
           className={validationErrors.experience ? 'border-red-500' : ''}
@@ -1375,7 +1506,7 @@ const fetchLaborById = async (id: string) => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-medium text-[#2b2b2b]">Labor Management</h2>
+          <h2 className="text-xl font-medium text-[#2b2b2b]">Labour Management</h2>
           <p className="text-sm text-[#2b2b2b]/60 mt-1">Manage your labor workforce and their assignments.</p>
         </div>
         
@@ -1389,7 +1520,7 @@ const fetchLaborById = async (id: string) => {
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
-                <DialogTitle>Import Labor</DialogTitle>
+                <DialogTitle>Import Labour</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
@@ -1444,7 +1575,7 @@ const fetchLaborById = async (id: string) => {
               <DialogTrigger asChild>
                 <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2">
                   <Plus className="h-4 w-4" />
-                  Add Labor Worker
+                  Add Labour Worker
                 </Button>
               </DialogTrigger>
               <DialogContent
@@ -1463,15 +1594,15 @@ const fetchLaborById = async (id: string) => {
                 }}
               >
                 <DialogHeader>
-                  <DialogTitle>Add New Labor Worker</DialogTitle>
+                  <DialogTitle>Add New Labour Worker</DialogTitle>
                 </DialogHeader>
                 {renderForm()}
                 <div className="flex justify-end gap-3 mt-6">
-                  <Button variant="outline" onClick={() => {setIsCreateDialogOpen(false); resetForm();}}>
+                  <Button variant="outline" disabled={isCreatingLabor} onClick={() => {setIsCreateDialogOpen(false); resetForm();}}>
                     Cancel
                   </Button>
-                  <Button onClick={handleCreate} className="bg-primary text-white hover:bg-[#0090e6]">
-                    Create Labor Worker
+                  <Button disabled={isCreatingLabor} onClick={handleCreate} className="bg-primary text-white hover:bg-[#0090e6]">
+                    {isCreatingLabor ? 'Creating...' : 'Create Labour Worker'}
                   </Button>
                 </div>
               </DialogContent>
@@ -1593,7 +1724,7 @@ const fetchLaborById = async (id: string) => {
         </CardContent>
       </Card>
 
-      {/* Labor Table */}
+      {/* Labour Table */}
       <Card className="bg-white shadow-md border-0">
         <CardContent className="p-0">
           <Table>
@@ -1665,7 +1796,7 @@ const fetchLaborById = async (id: string) => {
                         onEdit={() => handleEdit(labor)}
                         onDelete={() => handleDelete(labor.id)}
                         itemName={labor.name}
-                        itemType="Labor Worker"
+                        itemType="Labour Worker"
                         showView={!!onViewDetails && canViewLabour}
                         showEdit={canEditLabour}
                         showDelete={canDeleteLabour}
@@ -1747,7 +1878,7 @@ const fetchLaborById = async (id: string) => {
           }}
         >
           <DialogHeader>
-            <DialogTitle>Edit Labor Worker</DialogTitle>
+            <DialogTitle>Edit Labour Worker</DialogTitle>
           </DialogHeader>
           {renderForm()}
           <div className="flex justify-end gap-3 mt-6">
@@ -1760,7 +1891,7 @@ const fetchLaborById = async (id: string) => {
               Cancel
             </Button>
             <Button onClick={handleUpdate} className="bg-primary text-white hover:bg-[#0090e6]">
-              Update Labor Worker
+              Update Labour Worker
             </Button>
           </div>
         </DialogContent>

@@ -188,8 +188,8 @@ export function SignupScreen({ onStepChange, onAuthSuccess }: SignupScreenProps)
               <option value="">Select your role</option>
               <option value="Staff">Staff</option>
               <option value="Admin">Admin</option>
-              <option value="Labour">Labor</option>
-              <option value="Lead Labour">Lead Labor</option>
+              <option value="Labour">Labour</option>
+              <option value="Lead Labour">Lead Labour</option>
             </select>
             {errors.role && (
               <p className="text-[#e02424] text-[14px] mt-1">{errors.role}</p>

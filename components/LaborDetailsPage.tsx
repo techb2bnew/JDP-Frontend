@@ -170,7 +170,7 @@ export function LaborDetailsPage({ laborId, onBack }: LaborDetailsPageProps) {
             skills: Array.isArray(item.skills) ? item.skills : 
                    item.skills ? [item.skills] : [],
             notes: item.notes || '',
-            role: item.users?.role || 'Labor',
+            role: item.users?.role || 'Labour',
             total_jobs: item.job_summary?.total_jobs ?? item.job_statistics?.total_jobs ?? (assignedJobsRaw?.total ?? initialJobRows.length),
             total_hours: item.hours_worked ?? item.job_statistics?.total_hours ?? item.timesheet_stats?.total_hours ?? 0,
             completed_jobs: item.job_summary?.completed_jobs ?? item.job_statistics?.completed_jobs ?? initialJobRows.filter(job => job.status?.toLowerCase() === 'completed').length,
@@ -262,7 +262,7 @@ export function LaborDetailsPage({ laborId, onBack }: LaborDetailsPageProps) {
               Back
             </Button>
             <div>
-              <h1 className="text-xl font-semibold text-[#2b2b2b]">Labor Details</h1>
+              <h1 className="text-xl font-semibold text-[#2b2b2b]">Labour Details</h1>
             </div>
           </div>
         </div>
@@ -291,7 +291,7 @@ export function LaborDetailsPage({ laborId, onBack }: LaborDetailsPageProps) {
               Back
             </Button>
             <div>
-              <h1 className="text-xl font-semibold text-[#2b2b2b]">Labor Details</h1>
+              <h1 className="text-xl font-semibold text-[#2b2b2b]">Labour Details</h1>
             </div>
           </div>
         </div>
@@ -416,7 +416,7 @@ export function LaborDetailsPage({ laborId, onBack }: LaborDetailsPageProps) {
             Back
           </Button>
           <div>
-            <h1 className="text-2xl font-semibold text-[#2b2b2b]">Labor Details</h1>
+            <h1 className="text-2xl font-semibold text-[#2b2b2b]">Labour Details</h1>
             <p className="text-sm text-gray-500">View and manage labor profile and job history</p>
           </div>
         </div>
@@ -458,7 +458,7 @@ export function LaborDetailsPage({ laborId, onBack }: LaborDetailsPageProps) {
               <User className="h-5 w-5 text-[#00A1FF]" />
               Profile Overview
             </CardTitle>
-            <p className="text-sm text-gray-500">Labor code and personal information</p>
+            <p className="text-sm text-gray-500">Labour code and personal information</p>
           </div>
           <div className="flex items-center gap-3">
             <span className="px-3 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700 border border-blue-100">
@@ -476,8 +476,8 @@ export function LaborDetailsPage({ laborId, onBack }: LaborDetailsPageProps) {
                 </span>
               </div>
               <div>
-                <h2 className="text-2xl font-semibold text-[#2b2b2b]">{laborData.full_name || 'Labor'}</h2>
-                <p className="text-sm text-gray-600">{laborData.role || 'Labor'}</p>
+                <h2 className="text-2xl font-semibold text-[#2b2b2b]">{laborData.full_name || 'Labour'}</h2>
+                <p className="text-sm text-gray-600">{laborData.role || 'Labour'}</p>
                 <p className="text-xs text-gray-500 mt-1">Joined {formatDate(laborData.date_of_joining)}</p>
               </div>
             </div>

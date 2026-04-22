@@ -270,7 +270,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
   }
 }
 
-  const validateStep2 = (): boolean => {
+  const getStep2ValidationErrors = (): Record<string, string> => {
     const errors: Record<string, string> = {}
 
     // Required fields validation
@@ -285,6 +285,9 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     }
     if (!formData.cityZip.trim()) {
       errors.cityZip = 'City & ZIP is required'
+    }
+    if (!Number.isFinite(formData.estimatedCost) || formData.estimatedCost <= 0) {
+      errors.estimatedCost = 'Estimated amount must be greater than 0'
     }
 
     // Job type specific validation
@@ -317,6 +320,11 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
       errors.billToPhone = 'Phone number must be exactly 10 digits'
     }
 
+    return errors
+  }
+
+  const validateStep2 = (): boolean => {
+    const errors = getStep2ValidationErrors()
     setValidationErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -355,7 +363,9 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     
     if (currentStep === 2) {
       if (!validateStep2()) {
-        toast.error('Please fix the validation errors before proceeding')
+        const step2Errors = getStep2ValidationErrors()
+        const firstError = step2Errors.estimatedCost || Object.values(step2Errors)[0]
+        toast.error(firstError || 'Please fix the validation errors before proceeding')
         return
       }
     }
@@ -368,6 +378,15 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
   }
 
   const handleCreate = async () => {
+    if (isCreatingJob) return
+
+    if (!validateStep2()) {
+      const step2Errors = getStep2ValidationErrors()
+      const firstError = step2Errors.estimatedCost || Object.values(step2Errors)[0]
+      toast.error(firstError || 'Please fix the validation errors before submission')
+      return
+    }
+
     setIsCreatingJob(true)
     try {
       // Prepare the API payload
@@ -517,7 +536,12 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
         if (data.data?.id) {
           const newId = String(data.data.id)
           const name = payload.customer_name
-          setFormData(prev => ({ ...prev, customer: newId, customerName: name }))
+          const customerEmail = entityForm.email.toLowerCase()
+          setFormData(prev => {
+            const next = { ...prev, customer: newId, customerName: name, email: customerEmail }
+            if (prev.sameAsAddress) next.billToEmail = customerEmail
+            return next
+          })
           setSelectedCustomerName(name)
         }
         setCustomerRefreshKey(prev => prev + 1)
@@ -546,7 +570,15 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
         if (data.data?.id) {
           const newId = String(data.data.id)
           const name = payload.contractor_name
-          setFormData(prev => ({ ...prev, contractor: newId, contractorName: name }))
+          const contractorEmail = entityForm.email.toLowerCase()
+          setFormData(prev => {
+            const next = { ...prev, contractor: newId, contractorName: name }
+            if (prev.type === 'contract-based') {
+              next.email = contractorEmail
+              if (prev.sameAsAddress) next.billToEmail = contractorEmail
+            }
+            return next
+          })
           setSelectedContractorName(name)
         }
         setContractorRefreshKey(prev => prev + 1)
@@ -586,6 +618,14 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     setSelectedLaborNames(
       selectedIds.map(id => laborSelectionDisplayName(byId.get(String(id)), id))
     )
+  }
+
+  const getCustomerEmail = (customer: any): string => {
+    return customer?.email || customer?.customer_email || customer?.users?.email || ''
+  }
+
+  const getContractorEmail = (contractor: any): string => {
+    return contractor?.email || contractor?.contractor_email || contractor?.users?.email || ''
   }
 
   // Load Google Maps script with Places API
@@ -725,10 +765,18 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
       if (formData.customer && !formData.customerName && !selectedCustomerName) {
         try {
           const response = await apiClient.getCustomers(1, 100) // Get more items to find the selected one
-          const customer = response.data.find((c: any) => c.id === formData.customer)
+          const customer = response.data.find((c: any) => String(c.id) === String(formData.customer))
           if (customer) {
             const customerName = customer.name || customer.customer_name || customer.company_name || ''
-            setFormData(prev => ({ ...prev, customerName }))
+            const customerEmail = getCustomerEmail(customer)
+            setFormData(prev => {
+              const next = { ...prev, customerName }
+              if (!prev.email || prev.customer === String(customer.id)) {
+                next.email = customerEmail
+                if (prev.sameAsAddress) next.billToEmail = customerEmail
+              }
+              return next
+            })
             setSelectedCustomerName(customerName)
           }
         } catch (error) {
@@ -740,10 +788,18 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
       if (formData.contractor && !formData.contractorName && !selectedContractorName) {
         try {
           const response = await apiClient.getContractors(1, 100) // Get more items to find the selected one
-          const contractor = response.data.find((c: any) => c.id === formData.contractor)
+          const contractor = response.data.find((c: any) => String(c.id) === String(formData.contractor))
           if (contractor) {
             const contractorName = contractor.name || contractor.contractor_name || contractor.company_name || ''
-            setFormData(prev => ({ ...prev, contractorName }))
+            const contractorEmail = getContractorEmail(contractor)
+            setFormData(prev => {
+              const next = { ...prev, contractorName }
+              if (prev.type === 'contract-based' && (!prev.email || prev.contractor === String(contractor.id))) {
+                next.email = contractorEmail
+                if (prev.sameAsAddress) next.billToEmail = contractorEmail
+              }
+              return next
+            })
             setSelectedContractorName(contractorName)
           }
         } catch (error) {
@@ -757,14 +813,15 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
 
   const renderStepIndicator = () => (
-    <div className="flex items-center justify-center mb-8">
+    <div className="mb-8 overflow-x-auto">
+      <div className="flex min-w-max items-center justify-center px-4">
       {steps.map((step, index) => {
         const Icon = step.icon
         const isActive = currentStep === step.id
         const isCompleted = currentStep > step.id
         
         return (
-          <div key={step.id} className="flex items-center">
+          <div key={step.id} className="flex shrink-0 items-center">
             <div className={`
               flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all
               ${isActive ? 'bg-[#00A1FF] border-[#00A1FF] text-white' : 
@@ -787,6 +844,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
           </div>
         )
       })}
+      </div>
     </div>
   )
 
@@ -891,9 +949,20 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                 onValueChange={(value, item) => {
                   console.log('Customer selected:', { value, item, name: item?.name })
                   const customerName = item?.name || item?.customer_name || item?.company_name || ''
-                  setFormData({...formData, customer: value, customerName: customerName})
+                  const customerEmail = getCustomerEmail(item)
+                  const nextFormData = {
+                    ...formData,
+                    customer: value,
+                    customerName: customerName,
+                    email: customerEmail
+                  }
+                  if (formData.sameAsAddress) {
+                    nextFormData.billToEmail = customerEmail
+                  }
+                  setFormData(nextFormData)
                   setSelectedCustomerName(customerName)
                   clearValidationError('customer')
+                  clearValidationError('email')
                 }}
                 placeholder="Select customer"
                 fetchData={apiClient.getCustomers}
@@ -925,9 +994,24 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                 onValueChange={(value, item) => {
                   console.log('Contractor selected:', { value, item, name: item?.name })
                   const contractorName = item?.name || item?.contractor_name || item?.company_name || ''
-                  setFormData({...formData, contractor: value, contractorName: contractorName})
+                  const contractorEmail = getContractorEmail(item)
+                  const nextFormData = {
+                    ...formData,
+                    contractor: value,
+                    contractorName: contractorName,
+                  }
+                  if (formData.type === 'contract-based') {
+                    nextFormData.email = contractorEmail
+                    if (formData.sameAsAddress) {
+                      nextFormData.billToEmail = contractorEmail
+                    }
+                  }
+                  setFormData(nextFormData)
                   setSelectedContractorName(contractorName)
                   clearValidationError('contractor')
+                  if (formData.type === 'contract-based') {
+                    clearValidationError('email')
+                  }
                 }}
                 placeholder="Select contractor"
                 fetchData={apiClient.getContractors}
@@ -1111,6 +1195,10 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                   clearValidationError('email')
                 }}
                 placeholder="Email address"
+                disabled={
+                  (formData.type === 'service-based' && !!formData.customer) ||
+                  (formData.type === 'contract-based' && !!formData.contractor)
+                }
                 className={validationErrors.email ? 'border-red-500' : ''}
               />
               {validationErrors.email && (
@@ -1122,12 +1210,12 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
         <div className="space-y-4 bg-white shadow-lg p-3">
           <div className="flex items-center gap-2 mb-4">
             <UserCheck className="h-5 w-5 text-[#00A1FF]" /> 
-            <h3 className="font-bold text-[#2b2b2b]  text-lg">Assigned Lead Labor & Labor</h3>
+            <h3 className="font-bold text-[#2b2b2b]  text-lg">Assigned Lead Labour & Labour</h3>
           </div>
         <div>
           <Label className="flex items-center gap-2 mb-2">
             {/* <UserCheck className="h-4 w-4 text-[#00A1FF]" /> */}
-            Assigned Lead Labor
+            Assigned Lead Labour
           </Label>
 
           <AutoScrollMultiSelect
@@ -1143,7 +1231,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
         <div>
           <Label className="flex items-center gap-2 mb-2">
             {/* <Users className="h-4 w-4 text-[#00A1FF]" /> */}
-            Assigned Labor
+            Assigned Labour
           </Label>
 
           <AutoScrollMultiSelect
@@ -1401,7 +1489,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
             {formData.assignedLeadLabor.length > 0 && (
               <div>
-                <h4 className="font-medium text-[#2b2b2b] mb-2">Assigned Lead Labor ({formData.assignedLeadLabor.length})</h4>
+                <h4 className="font-medium text-[#2b2b2b] mb-2">Assigned Lead Labour ({formData.assignedLeadLabor.length})</h4>
                 <div className="flex flex-wrap gap-1">
                   {formData.assignedLeadLabor.map((id, index) => (
                     <Badge key={id} className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
@@ -1414,7 +1502,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
             {formData.assignedLabor.length > 0 && (
               <div>
-                <h4 className="font-medium text-[#2b2b2b] mb-2">Assigned Labor ({formData.assignedLabor.length})</h4>
+                <h4 className="font-medium text-[#2b2b2b] mb-2">Assigned Labour ({formData.assignedLabor.length})</h4>
                 <div className="flex flex-wrap gap-1">
                   {formData.assignedLabor.map((id, index) => (
                     <Badge key={id} className="bg-blue-50 text-blue-700 border-blue-200 text-xs">

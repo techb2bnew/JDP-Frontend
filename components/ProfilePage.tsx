@@ -10,6 +10,7 @@ import { Textarea } from './ui/textarea'
 import { toast } from 'sonner'
 import { apiClient, globalApiCall } from '../utils/api'
 import { getUserData, logout } from '../utils/auth'
+import { getYesterdayLocalDateString, validateDobValue } from '../utils/dobValidation'
 import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import Autocomplete from "react-google-autocomplete";
@@ -435,6 +436,14 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
       }
     }
 
+    if (profileData.dateOfBirth?.trim()) {
+      const dobError = validateDobValue(profileData.dateOfBirth)
+      if (dobError) {
+        toast.error(dobError)
+        return
+      }
+    }
+
     try {
       const loadingToast = toast.loading('Updating profile...')
       
@@ -822,6 +831,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
                     ...prev,
                     dateOfBirth: e.target.value
                   }))}
+                  max={getYesterdayLocalDateString()}
                   disabled={!isEditingProfile}
                   className={`${!isEditingProfile ? 'bg-gray-50 text-gray-600' : 'bg-white'}`}
                 />

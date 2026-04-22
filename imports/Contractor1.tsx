@@ -2084,7 +2084,7 @@ function Frame1171275929() {
     <div className="absolute box-border content-stretch flex flex-row gap-2.5 items-center justify-center left-0 opacity-80 pl-[30px] pr-[135px] py-3 top-[262px]">
       <Fi1946439 />
       <div className="font-['Public_Sans:Medium',_sans-serif] font-medium leading-[0] relative shrink-0 text-[#ffffff] text-[17px] text-left text-nowrap">
-        <p className="block leading-[normal] whitespace-pre">Labor</p>
+        <p className="block leading-[normal] whitespace-pre">Labour</p>
       </div>
     </div>
   );

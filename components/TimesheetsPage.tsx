@@ -25,6 +25,7 @@ import { useEffect, useState } from 'react'
 import { apiClient } from '@/utils/api'
 import { LoadingSpinner } from './common/LoadingSpinner'
 import { Calendar as MultiDateCalendar, DateObject } from "react-multi-date-picker"
+import { normalizeSingleRangeSelection, sortedDatesFromPickerRange } from '@/utils/dateRangeSelection'
 
 
 
@@ -83,7 +84,7 @@ export function TimesheetsPage() {
     };
   } | null>(null);
    const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined })
-  const [selectedRanges, setSelectedRanges] = useState<DateObject[][]>([])
+  const [selectedRanges, setSelectedRanges] = useState<DateObject[]>([])
   const [statusFilter, setStatusFilter] = useState('all');
   const [employeeFilter, setEmployeeFilter] = useState('all');
   const [allEmployeeOptions, setAllEmployeeOptions] = useState<string[]>([]);
@@ -958,25 +959,13 @@ const fetchTimesheetsByDateRange = async () => {
                     collisionPadding={16}
                   >
                     <MultiDateCalendar
-                      multiple
                       range
                       value={selectedRanges}
                       onChange={(value) => {
-                        const values = (
-                          Array.isArray(value) ? value : value ? [value] : []
-                        ) as unknown as DateObject[][];
+                        const values = normalizeSingleRangeSelection(value);
                         setSelectedRanges(values);
 
-                        const allDates = values
-                          .flat()
-                          .map((d) =>
-                            d instanceof DateObject
-                              ? d.toDate()
-                              : new Date(d as any),
-                          )
-                          .filter(
-                            (d) => d instanceof Date && !Number.isNaN(d.getTime()),
-                          );
+                        const allDates = sortedDatesFromPickerRange(values);
 
                         if (allDates.length === 0) {
                           setDateRange({ from: undefined, to: undefined });

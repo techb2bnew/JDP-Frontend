@@ -82,8 +82,8 @@ interface GroupedLineItemsTableProps {
   invalidHeaderKeys?: string[];
   invalidLineItemIds?: string[];
   /**
-   * When > 0, the table footer shows Material Total, Total Labor Cost, and a
-   * final row that makes the Material + Labor relationship explicit.
+   * When > 0, the table footer shows Material Total, Total Labour Cost, and a
+   * final row that makes the Material + Labour relationship explicit.
    * Omit or pass 0 to keep the default single subtotal row (all other callers).
    */
   summaryLaborTotal?: number;
@@ -255,7 +255,7 @@ const GroupedLineItemsTable = ({
                         colSpan={5}
                         className="border border-gray-300 px-3 py-2 text-right font-medium"
                       >
-                        Total Labor Cost
+                        Total Labour Cost
                       </td>
                       <td className="border border-gray-300 px-3 py-2 text-right font-bold">
                         ${laborAmt.toFixed(2)}
@@ -269,7 +269,7 @@ const GroupedLineItemsTable = ({
                       >
                         <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-sm">
                           <span className="font-semibold text-gray-800">
-                            Total Material + Labor
+                            Total Material + Labour
                           </span>
                         </div>
                       </td>

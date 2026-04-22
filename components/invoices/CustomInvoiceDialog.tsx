@@ -43,6 +43,7 @@ interface CustomInvoiceDialogProps {
   /** Notify parent about current selected invoice type (API format). */
   onInvoiceTypeChange?: (invoiceType: string) => void
   invoiceNotesRef?: React.MutableRefObject<string>
+  defaultInvoiceType?: string
 }
 
 
@@ -132,6 +133,7 @@ export const CustomInvoiceDialog = ({
   onProcessingChange,
   onInvoiceTypeChange,
   invoiceNotesRef,
+  defaultInvoiceType = 'Estimate',
   selectedBluesheetIds=[]
 }: CustomInvoiceDialogProps) => {
   // Derive viewInvoiceData and job list from blueSheet (custom invoice from bluesheet)
@@ -168,9 +170,9 @@ export const CustomInvoiceDialog = ({
       /^0+h0*m*$/.test(normalizedLabor) ||
       /^0+m$/.test(normalizedLabor)
 
-    // NOTE: Labor total cost is handled separately for payloads and
-    // the "Total Material + Labor" display. We deliberately do NOT
-    // push a "Labor total cost" product into the products list here
+    // NOTE: Labour total cost is handled separately for payloads and
+    // the "Total Material + Labour" display. We deliberately do NOT
+    // push a "Labour total cost" product into the products list here
     // so that the main material line items and subtotal only reflect
     // material items, not labor.
     const customerId = job.customer?.id ?? job.customer_id ?? (blueSheet as any).customer_id ?? null
@@ -328,7 +330,7 @@ export const CustomInvoiceDialog = ({
     }],
     notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
     signatureText: 'ACCEPTED BY________________DATE_____',
-    invoiceType: 'Estimate',
+    invoiceType: defaultInvoiceType,
     customInvoiceType: '',
     paymentPercentage: 0,
     estimateTotal: 0,
@@ -446,7 +448,7 @@ export const CustomInvoiceDialog = ({
               viewInvoiceData.invoice_type === 'down_payment' ? 'Downpayment Invoice' :
                 viewInvoiceData.invoice_type === 'proposal_invoice' ? 'Rough Invoice' :
                   viewInvoiceData.invoice_type === 'progressive_invoice' ? 'Progressive Invoice' :
-                    viewInvoiceData.invoice_type === 'final_invoice' ? 'Final Invoice' : 'Estimate',
+                    viewInvoiceData.invoice_type === 'final_invoice' ? 'Final Invoice' : defaultInvoiceType,
             // Prefer custom_products (new API, not typed) and fall back to products (old API).
             // IMPORTANT: don't overwrite user-added/edited line items.
             lineItems: hasUserTouchedLineItemsRef.current
@@ -514,7 +516,7 @@ export const CustomInvoiceDialog = ({
         }));
       }, 200);
     }
-  }, [viewInvoiceData])
+  }, [viewInvoiceData, defaultInvoiceType])
 
   // Seed jobsList and auto-select the only job (CustomInvoice: single job from blueSheet, keep disabled)
   useEffect(() => {

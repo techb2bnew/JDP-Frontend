@@ -663,7 +663,7 @@ function Frame1171275939() {
         </svg>
       </div>
       <div className="font-['Public_Sans:Medium',_sans-serif] font-medium leading-[0] relative shrink-0 text-[#00a1ff] text-[15px] text-left text-nowrap">
-        <p className="block leading-[normal] whitespace-pre">Lead Labor</p>
+        <p className="block leading-[normal] whitespace-pre">Lead Labour</p>
       </div>
     </div>
   );
@@ -695,7 +695,7 @@ function Frame1171275940() {
     <div className="absolute box-border content-stretch flex flex-row gap-2.5 items-center justify-center left-[86px] opacity-80 pl-[15px] pr-[9px] py-3 rounded-[100px] top-[250.435px]">
       <Group4 />
       <div className="font-['Public_Sans:Medium',_sans-serif] font-medium leading-[0] relative shrink-0 text-[15px] text-gray-900 text-left text-nowrap">
-        <p className="block leading-[normal] whitespace-pre">Labor</p>
+        <p className="block leading-[normal] whitespace-pre">Labour</p>
       </div>
     </div>
   );
@@ -1128,7 +1128,7 @@ export default function LeadLaborDetail() {
       <div className="absolute bg-[#ffffff] h-[820px] left-[338px] rounded-[10px] shadow-[0px_4px_15px_0px_rgba(58,121,232,0.05)] top-[136px] w-[1239px]" />
       <div className="absolute font-['Inter:Bold',_sans-serif] font-bold leading-[0] left-[338px] not-italic text-[#2b2b2b] text-[20px] text-left text-nowrap top-[100px]">
         <p className="block leading-[normal] whitespace-pre">
-          Lead Labor Details
+          Lead Labour Details
         </p>
       </div>
       <div className="absolute font-['Inter:Semi_Bold',_sans-serif] font-semibold leading-[0] left-[358px] not-italic text-[#2b2b2b] text-[16px] text-left text-nowrap top-[156px]">
@@ -1191,7 +1191,7 @@ export default function LeadLaborDetail() {
         <p className="block leading-[20px] whitespace-pre">john@gmail.com</p>
       </div>
       <div className="absolute font-['DM_Sans:Medium',_sans-serif] leading-[0] left-[1065px] not-italic text-[#2b2b2b] text-[15px] text-left text-nowrap top-[428px]">
-        <p className="block leading-[20px] whitespace-pre">Lead Labor</p>
+        <p className="block leading-[20px] whitespace-pre">Lead Labour</p>
       </div>
       <div className="absolute font-['DM_Sans:Medium',_sans-serif] leading-[0] left-[1065px] not-italic text-[#2b2b2b] text-[15px] text-left text-nowrap top-[274px]">
         <p className="block leading-[20px] whitespace-pre">20-10-1994</p>

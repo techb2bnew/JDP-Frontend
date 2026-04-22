@@ -836,13 +836,13 @@ const InvoiceTemplate = ({ subJob, job, contractor }: { subJob: SubJob, job: Job
         </Table>
       </div>
 
-      {/* Labor Costs */}
+      {/* Labour Costs */}
       <div className="mb-8">
-        <h3 className="font-semibold mb-4">Labor</h3>
+        <h3 className="font-semibold mb-4">Labour</h3>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Labor Name</TableHead>
+              <TableHead>Labour Name</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Hours</TableHead>
               <TableHead>Rate</TableHead>
@@ -872,7 +872,7 @@ const InvoiceTemplate = ({ subJob, job, contractor }: { subJob: SubJob, job: Job
               <span>{formatCurrency(totalMaterialCost)}</span>
             </div>
             <div className="flex justify-between">
-              <span>Labor Subtotal:</span>
+              <span>Labour Subtotal:</span>
               <span>{formatCurrency(totalLaborCost)}</span>
             </div>
             <Separator />
@@ -1437,6 +1437,10 @@ export function ContractorListingPage() {
 
     if (!contractFormData.phone.trim()) {
       errors.phone = 'Phone number is required'
+    }
+
+    if (!contractFormData.company_name.trim()) {
+      errors.company_name = 'Company name is required'
     }
 
     setValidationErrors(errors)
@@ -2097,13 +2101,13 @@ export function ContractorListingPage() {
           </table>
         </div>
 
-        <!-- Labor -->
+        <!-- Labour -->
         <div class="labor-section">
-          <div class="section-heading">Labor</div>
+          <div class="section-heading">Labour</div>
           <table class="table">
             <thead>
               <tr>
-                <th>Labor Name</th>
+                <th>Labour Name</th>
                 <th>Date</th>
                 <th>Hours</th>
                 <th>Rate</th>
@@ -2132,7 +2136,7 @@ export function ContractorListingPage() {
               <span>${formatCurrency(totalMaterialCost)}</span>
             </div>
             <div class="summary-row">
-              <span>Labor Subtotal:</span>
+              <span>Labour Subtotal:</span>
               <span>${formatCurrency(totalLaborCost)}</span>
             </div>
             <div class="summary-row">
@@ -2273,23 +2277,23 @@ export function ContractorListingPage() {
 
       yPosition += 10
 
-      // Labor section
+      // Labour section
       pdf.setFontSize(12)
-      pdf.text('Labor', 20, yPosition)
+      pdf.text('Labour', 20, yPosition)
       yPosition += 10
 
-      // Labor table header
+      // Labour table header
       pdf.setFillColor(lightGray[0], lightGray[1], lightGray[2])
       pdf.rect(20, yPosition - 5, pageWidth - 40, 8, 'F')
       pdf.setFontSize(10)
-      pdf.text('Labor Name', 22, yPosition)
+      pdf.text('Labour Name', 22, yPosition)
       pdf.text('Date', 80, yPosition)
       pdf.text('Hours', 110, yPosition)
       pdf.text('Rate', 130, yPosition)
       pdf.text('Total', pageWidth - 30, yPosition, { align: 'right' })
       yPosition += 8
 
-      // Labor data
+      // Labour data
       const approvedTimesheets = invoiceSubJob.timesheets.filter(ts => ts.approved)
       let totalLaborCost = 0
 
@@ -2330,7 +2334,7 @@ export function ContractorListingPage() {
       pdf.text(`$${totalMaterialCost.toFixed(2)}`, summaryX + summaryWidth - 5, yPosition, { align: 'right' })
       yPosition += 6
 
-      pdf.text('Labor Subtotal:', summaryX + 5, yPosition)
+      pdf.text('Labour Subtotal:', summaryX + 5, yPosition)
       pdf.text(`$${totalLaborCost.toFixed(2)}`, summaryX + summaryWidth - 5, yPosition, { align: 'right' })
       yPosition += 6
 
@@ -2659,7 +2663,7 @@ export function ContractorListingPage() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div>
-                      <span className="text-sm text-muted-foreground">Lead Labor:</span>
+                      <span className="text-sm text-muted-foreground">Lead Labour:</span>
                       <div className="flex items-center gap-2 mt-1">
                         <UserCheck className="h-3 w-3 text-primary" />
                         <span className="font-medium">{subJob.leadLabour}</span>
@@ -2760,12 +2764,12 @@ export function ContractorListingPage() {
                 </CardContent>
               </Card>
 
-              {/* Labor Timesheet */}
+              {/* Labour Timesheet */}
               <Card className="border-blue-200">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Timer className="h-4 w-4 text-blue-600" />
-                    Labor Timesheet
+                    Labour Timesheet
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -2774,7 +2778,7 @@ export function ContractorListingPage() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Labor Name</TableHead>
+                            <TableHead>Labour Name</TableHead>
                             <TableHead>Date</TableHead>
                             <TableHead>Hours</TableHead>
                             <TableHead>Rate</TableHead>
@@ -3468,34 +3472,45 @@ export function ContractorListingPage() {
                 <Label htmlFor="phone" className="text-sm font-medium">
                   Phone Number *
                 </Label>
-                <PhoneInput
-                  id="phone"
-                  international
-                  withCountryCallingCode
-                  defaultCountry="US"
-                  countryCallingCodeEditable={false}
-                  limitMaxLength
-                  value={contractFormData.phone}
-                  onChange={(value) => handleInputChange('phone', value || '')}
-                  placeholder="Enter phone number"
-                  disabled={isViewMode}
-                  className={validationErrors.phone ? 'border-red-500 focus:border-red-500 rounded-md px-2 py-2' : 'border border-gray-300 rounded-md px-2 py-2'}
-                />
+                <div
+                  className={`mt-1 rounded-md border px-3 py-2 ${
+                    validationErrors.phone
+                      ? 'border-red-500 focus-within:border-red-500'
+                      : 'border-gray-300 focus-within:border-primary'
+                  }`}
+                >
+                  <PhoneInput
+                    id="phone"
+                    international
+                    withCountryCallingCode
+                    defaultCountry="US"
+                    countryCallingCodeEditable={false}
+                    limitMaxLength
+                    value={contractFormData.phone}
+                    onChange={(value) => handleInputChange('phone', value || '')}
+                    placeholder="Enter phone number"
+                    disabled={isViewMode}
+                    className="[&_.PhoneInputInput]:border-0 [&_.PhoneInputInput]:p-0 [&_.PhoneInputInput]:outline-none [&_.PhoneInputInput]:focus:ring-0 [&_.PhoneInputInput]:bg-transparent"
+                  />
+                </div>
                 {validationErrors.phone && (
                   <p className="text-sm text-red-600">{validationErrors.phone}</p>
                 )}
               </div>
 
               <div>
-                <Label className="mb-2" htmlFor="company">Company</Label>
+                <Label className="mb-2" htmlFor="company">Company Name *</Label>
                 <Input
                   id="company"
                   value={contractFormData.company_name}
                   onChange={(e) => handleInputChange('company_name', e.target.value)}
                   placeholder="Enter company name"
                   disabled={isViewMode}
-                  className="mt-1"
+                  className={`mt-1 ${validationErrors.company_name ? 'border-red-500 focus:border-red-500' : ''}`}
                 />
+                {validationErrors.company_name && (
+                  <p className="text-sm text-red-600">{validationErrors.company_name}</p>
+                )}
               </div>
             </div>
             {/* address */}

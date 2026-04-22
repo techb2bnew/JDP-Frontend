@@ -437,7 +437,7 @@ export function LabourProfilePage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="leadLabour">Lead Labor</Label>
+                    <Label htmlFor="leadLabour">Lead Labour</Label>
                     <Input
                       id="leadLabour"
                       value={profile.leadLabour}

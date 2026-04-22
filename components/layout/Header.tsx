@@ -470,8 +470,8 @@ export function Header({
       "/profile": "Profile",
       "/profiles": "Profiles",
       "/profiles/staff": "Staff Profile",
-      "/profiles/lead-labour": "Lead Labor Profile",
-      "/profiles/labour": "Labor Profile",
+      "/profiles/lead-labour": "Lead Labour Profile",
+      "/profiles/labour": "Labour Profile",
     };
     return titles[path] || "Dashboard";
   };

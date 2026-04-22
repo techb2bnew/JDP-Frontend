@@ -40,6 +40,7 @@ import {
 import { format } from 'date-fns'
 import { apiClient, globalApiCall } from '@/utils/api'
 import { LoadingSpinner } from './common/LoadingSpinner'
+import { normalizeSingleRangeSelection, sortedDatesFromPickerRange } from '@/utils/dateRangeSelection'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 import { toast } from 'sonner'
@@ -161,7 +162,7 @@ export function OrdersPage() {
   const [dateTo, setDateTo] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all')
   // react-multi-date-picker: multiple + range => array of ranges (each range is [from, to?])
-  const [selectedRanges, setSelectedRanges] = useState<DateObject[][]>([])
+  const [selectedRanges, setSelectedRanges] = useState<DateObject[]>([])
   const [sortBy, setSortBy] = useState('all')
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<OrderFormData | null>(null)
@@ -1040,17 +1041,13 @@ export function OrdersPage() {
                 >
                   <MultiDateCalendar
                     // Multiple date ranges (pick start/end, then another range)
-                    multiple
                     range
                     value={selectedRanges}
                     onChange={(value) => {
-                      const values = (Array.isArray(value) ? value : value ? [value] : []) as unknown as DateObject[][];
+                      const values = normalizeSingleRangeSelection(value);
                       setSelectedRanges(values);
 
-                      const allDates = values
-                        .flat()
-                        .map((d) => (d instanceof DateObject ? d.toDate() : new Date(d as any)))
-                        .filter((d) => d instanceof Date && !Number.isNaN(d.getTime()));
+                      const allDates = sortedDatesFromPickerRange(values);
 
                       if (allDates.length === 0) {
                         setDateFrom("");

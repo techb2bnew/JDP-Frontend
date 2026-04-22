@@ -805,6 +805,9 @@ export function CustomersPage() {
     if (!customerFormData.address.trim()) {
       errors.address = "Address is required";
     }
+    if (!customerFormData.company.trim()) {
+      errors.company = "Company name is required";
+    }
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -2836,20 +2839,26 @@ export function CustomersPage() {
                 {/* Company */}
                 <div>
                   <Label className="mb-2" htmlFor="company">
-                    Company
+                    Company Name *
                   </Label>
                   <Input
                     id="company"
                     value={customerFormData.company}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       setCustomerFormData({
                         ...customerFormData,
                         company: e.target.value,
-                      })
-                    }
+                      });
+                      clearValidationError("company");
+                    }}
                     placeholder="Enter company name"
-                    className="mt-1"
+                    className={`mt-1 ${validationErrors.company ? "border-red-500" : ""}`}
                   />
+                  {validationErrors.company && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {validationErrors.company}
+                    </p>
+                  )}
                 </div>
 
                 {/* Status */}

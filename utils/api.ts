@@ -2491,7 +2491,7 @@ export const apiClient = {
     return transformedData;
   },
 
-  // Lead Labor
+  // Lead Labour
   getLeadLabor: async (page: number = 1, limit: number = 10) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
     const token = getAuthToken();
@@ -2537,7 +2537,7 @@ export const apiClient = {
     };
   },
 
-  // Labor
+  // Labour
   getLabor: async (page: number = 1, limit: number = 10) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
     const token = getAuthToken();
@@ -2839,7 +2839,7 @@ export const apiClient = {
     return transformedRoles;
   },
 
-  // Labor Time Log APIs
+  // Labour Time Log APIs
   createLaborTimeLog: async (timeLogData: {
     job_id: string;
     labor_id: string;
@@ -2954,10 +2954,10 @@ export const apiClient = {
       throw new Error(errorData.message || "Failed to fetch labor details");
     }
     const result = await response.json();
-    console.log("Labor Details API Response:", result);
+    console.log("Labour Details API Response:", result);
     if (!result.success || !result.data) {
       console.error(
-        "Labor Details API: Unexpected response structure:",
+        "Labour Details API: Unexpected response structure:",
         result
       );
       throw new Error("Invalid labor data received");
@@ -3071,7 +3071,7 @@ export const apiClient = {
     return response.json();
   },
 
-  // Bluesheet Labor Management APIs
+  // Bluesheet Labour Management APIs
   addLaborToBluesheet: async (bluesheetId: number, laborData: any) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
     const response = await fetch(`${apiBaseUrl}/bluesheet/bluesheet/${bluesheetId}/labor`, {

@@ -622,8 +622,8 @@ const LABOUR_HIDDEN_PERMISSIONS: Record<string, string[]> = {
 
   const formatModuleName = (module: string): string => {
     // Handle virtual modules display name
-    if (module === ASSIGNED_LABOUR_MODULE) return 'Assigned Labor';
-    if (module === ASSIGNED_LEAD_LABOUR_MODULE) return 'Assigned Lead Labor';
+    if (module === ASSIGNED_LABOUR_MODULE) return 'Assigned Labour';
+    if (module === ASSIGNED_LEAD_LABOUR_MODULE) return 'Assigned Lead Labour';
     return module
       .split('_')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
@@ -1764,7 +1764,7 @@ const LABOUR_HIDDEN_PERMISSIONS: Record<string, string[]> = {
             >
               <span className="text-4xl">📱</span>
               <span className="font-semibold text-gray-700 group-hover:text-green-700">Mobile</span>
-              <span className="text-xs text-gray-400 text-center">Labor / Lead Labor permissions</span>
+              <span className="text-xs text-gray-400 text-center">Labour / Lead Labour permissions</span>
             </button>
             <button
               type="button"

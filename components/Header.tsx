@@ -92,8 +92,8 @@ export function Header({
       profile: "Profile",
       profiles: "Profiles",
       "staff-profile": "Staff Profile",
-      "lead-labour-profile": "Lead Labor Profile",
-      "labour-profile": "Labor Profile"
+      "lead-labour-profile": "Lead Labour Profile",
+      "labour-profile": "Labour Profile"
     }
     return titles[page] || "Dashboard"
   }

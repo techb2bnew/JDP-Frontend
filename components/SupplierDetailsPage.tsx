@@ -205,8 +205,11 @@ export function SupplierDetailsPage({
 
   const hasPermission = () => true;
 
-  const handleAction = (action: string, product: any) => {
-    console.log(action, product);
+  const handleViewProduct = (product: any) => {
+    if (!product?.id) return;
+    if (typeof window !== "undefined") {
+      window.location.href = `/products?viewProductId=${product.id}`;
+    }
   };
 
   const rawDocuments = Array.isArray(data.documents)
@@ -793,14 +796,14 @@ export function SupplierDetailsPage({
                   <TableHead>Estimated Price</TableHead>
                   <TableHead>Stock</TableHead>
                   <TableHead>Status</TableHead>
-                  {/* <TableHead>Actions</TableHead> */}
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
 
               <TableBody>
                 {isLoadingProducts ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-8">
+                    <TableCell colSpan={10} className="text-center py-8">
                       <div className="flex items-center justify-center">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                         <span className="ml-2">Loading products...</span>
@@ -810,7 +813,7 @@ export function SupplierDetailsPage({
                 ) : paginatedProducts.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={11}
+                      colSpan={10}
                       className="text-center py-8 text-muted-foreground"
                     >
                       No products found
@@ -884,40 +887,20 @@ export function SupplierDetailsPage({
                         </Badge>
                       </TableCell>
 
-                      {/* <TableCell>
+                      <TableCell>
                         <div className="flex gap-1">
                           {hasPermission() && (
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleAction("view", product)}
+                              onClick={() => handleViewProduct(product)}
+                              title="View product details"
                             >
                               <Eye className="h-3 w-3" />
                             </Button>
                           )}
-
-                          {hasPermission() && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleAction("edit", product)}
-                            >
-                              <Edit className="h-3 w-3" />
-                            </Button>
-                          )}
-
-                          {hasPermission() && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                              onClick={() => handleAction("delete", product)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          )}
                         </div>
-                      </TableCell> */}
+                      </TableCell>
                     </TableRow>
                   ))
                 )}

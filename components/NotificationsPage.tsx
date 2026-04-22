@@ -60,6 +60,8 @@ interface Notification {
   userRole: 'admin' | 'staff' | 'lead-labor' | 'labor' | 'contractor'
   category: 'job-management' | 'invoicing' | 'materials' | 'timesheets' | 'system'
   recipient_id?: number
+  recipient_roles?: string[]
+  send_to_all?: boolean
   created_at?: string
   read_at?: string | null
 }
@@ -76,8 +78,8 @@ interface Role {
 const availableRoles = [
   { value: 'admin', label: 'Admin' },
   { value: 'staff', label: 'Staff' },
-  { value: 'lead-labor', label: 'Lead Labor' },
-  { value: 'labor', label: 'Labor' }
+  { value: 'lead-labor', label: 'Lead Labour' },
+  { value: 'labor', label: 'Labour' }
 ]
 
 export function NotificationsPage() {
@@ -378,6 +380,24 @@ export function NotificationsPage() {
     return items.map((apiNotification: any) => {
       // Access nested notification data if it exists
       const notificationData = apiNotification.notification || {}
+      const rawRecipientRoles =
+        notificationData.recipient_roles ??
+        apiNotification.recipient_roles ??
+        []
+
+      let recipientRoles: string[] = []
+      if (Array.isArray(rawRecipientRoles)) {
+        recipientRoles = rawRecipientRoles.map((role) => String(role || '').trim()).filter(Boolean)
+      } else if (typeof rawRecipientRoles === 'string') {
+        try {
+          const parsed = JSON.parse(rawRecipientRoles)
+          recipientRoles = Array.isArray(parsed)
+            ? parsed.map((role) => String(role || '').trim()).filter(Boolean)
+            : rawRecipientRoles.split(',').map((role) => role.trim()).filter(Boolean)
+        } catch {
+          recipientRoles = rawRecipientRoles.split(',').map((role) => role.trim()).filter(Boolean)
+        }
+      }
 
       return {
         id: apiNotification.notification_id?.toString() || apiNotification.id?.toString() || Date.now().toString(),
@@ -391,10 +411,31 @@ export function NotificationsPage() {
         userRole: (notificationData.user_role || apiNotification.user_role || 'admin') as Notification['userRole'],
         category: (notificationData.category || apiNotification.category || 'system') as Notification['category'],
         recipient_id: apiNotification.recipient_id,
+        recipient_roles: recipientRoles,
+        send_to_all: Boolean(notificationData.send_to_all ?? apiNotification.send_to_all),
         created_at: notificationData.created_at || apiNotification.created_at,
         read_at: apiNotification.read_at
       }
     })
+  }
+
+  const normalizeRoleKey = (value: string): string => {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/[_\s-]/g, '')
+      .trim()
+  }
+
+  const isVisibleForCurrentUser = (notification: Notification, userId: number, userRole: string): boolean => {
+    if (notification.send_to_all) return true
+    if (Number(notification.recipient_id) === Number(userId)) return true
+
+    const normalizedCurrentRole = normalizeRoleKey(userRole)
+    if (!normalizedCurrentRole) return false
+
+    return (notification.recipient_roles || []).some(
+      (role) => normalizeRoleKey(role) === normalizedCurrentRole
+    )
   }
 
   // Fetch notifications for the logged-in user
@@ -445,7 +486,35 @@ export function NotificationsPage() {
 
       if (responseData.success && responseData.data?.items) {
         const transformedNotifications = transformNotifications(responseData.data.items)
-        setNotifications(transformedNotifications)
+
+        // Fallback merge for role-based notifications in case user endpoint omits them.
+        let mergedNotifications = [...transformedNotifications]
+        const userRole = String(parsedAuth?.user?.role || '')
+
+        try {
+          const roleResponse = await fetch(`${apiBaseUrl}/notifications/search?${queryParams}`, {
+            method: 'GET',
+            headers
+          })
+
+          if (roleResponse.ok) {
+            const roleData = await roleResponse.json()
+            if (roleData?.success && roleData?.data?.items) {
+              const transformedRoleItems = transformNotifications(roleData.data.items)
+                .filter((item) => isVisibleForCurrentUser(item, Number(userId), userRole))
+
+              const uniqueById = new Map<string, Notification>()
+              ;[...transformedNotifications, ...transformedRoleItems].forEach((item) => {
+                uniqueById.set(String(item.id), item)
+              })
+              mergedNotifications = Array.from(uniqueById.values())
+            }
+          }
+        } catch (mergeError) {
+          console.warn('Role-notification merge fallback failed:', mergeError)
+        }
+
+        setNotifications(mergedNotifications)
 
         // Update pagination state
         if (responseData.data?.pagination) {
@@ -514,7 +583,12 @@ export function NotificationsPage() {
 
       if (responseData.success && responseData.data?.items) {
         const transformedNotifications = transformNotifications(responseData.data.items)
-        setNotifications(transformedNotifications)
+        const currentUserId = Number(parsedAuth?.user?.id || 0)
+        const currentUserRole = String(parsedAuth?.user?.role || '')
+        const visibleNotifications = transformedNotifications.filter((item) =>
+          isVisibleForCurrentUser(item, currentUserId, currentUserRole)
+        )
+        setNotifications(visibleNotifications)
 
         // Update pagination state
         if (responseData.data?.pagination) {

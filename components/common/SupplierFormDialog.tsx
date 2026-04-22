@@ -53,24 +53,63 @@ export function SupplierFormDialog({
   isLoading = false
 }: SupplierFormDialogProps) {
     console.log(formData,"formData");
+
+  const resolveAutocompleteAddress = (place: any): string => {
+    const formattedAddress = String(place?.formatted_address || '').trim()
+    if (formattedAddress) return formattedAddress
+
+    const placeName = String(place?.name || '').trim()
+    const vicinity = String(place?.vicinity || '').trim()
+    if (placeName && vicinity) return `${placeName}, ${vicinity}`
+    if (placeName) return placeName
+    if (vicinity) return vicinity
+
+    const components = Array.isArray(place?.address_components)
+      ? place.address_components
+      : []
+    const fromComponents = components
+      .map((component: any) => component?.long_name)
+      .filter((part: unknown): part is string => typeof part === 'string' && part.trim().length > 0)
+      .join(', ')
+
+    return fromComponents.trim()
+  }
+
+  const isPacInteraction = (target: EventTarget | null): boolean => {
+    const element = target as HTMLElement | null
+    if (element?.closest?.('.pac-container')) return true
+    if (element?.classList?.contains('pac-item')) return true
+    if (element?.classList?.contains('pac-item-query')) return true
+    return false
+  }
     
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="max-w-4xl max-h-[90vh]"
-        onInteractOutside={(e: { target: HTMLElement | null; preventDefault: () => void }) => {
-          const target = e.target as HTMLElement | null
-          if (target?.closest?.('.pac-container')) e.preventDefault()
+        onInteractOutside={(e) => {
+          if (isPacInteraction(e.target)) e.preventDefault()
         }}
-        onPointerDownOutside={(e: { target: HTMLElement | null; preventDefault: () => void }) => {
-          const target = e.target as HTMLElement | null
-          if (target?.closest?.('.pac-container')) e.preventDefault()
+        onPointerDownOutside={(e) => {
+          if (isPacInteraction(e.target)) e.preventDefault()
         }}
-        onFocusOutside={(e: { target: HTMLElement | null; preventDefault: () => void }) => {
-          const target = e.target as HTMLElement | null
-          if (target?.closest?.('.pac-container')) e.preventDefault()
+        onFocusOutside={(e) => {
+          if (isPacInteraction(e.target)) e.preventDefault()
         }}
       >
+        <style jsx global>{`
+          .pac-container {
+            z-index: 999999 !important;
+            pointer-events: auto !important;
+          }
+          .pac-item {
+            cursor: pointer !important;
+            pointer-events: auto !important;
+          }
+          body:has(.pac-container:not([style*='display: none'])) [data-radix-dialog-overlay] {
+            pointer-events: none !important;
+          }
+        `}</style>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
@@ -249,22 +288,21 @@ export function SupplierFormDialog({
                     'AIzaSyBEQp-ZFMYZjsTNyximu2pAifQ9EWA4W3M'
                   }
                   onPlaceSelected={(place: any) => {
-                    const address = place?.formatted_address || place?.name || ''
+                    const address = resolveAutocompleteAddress(place)
                     if (address) {
-                      setFormData({ ...formData, address })
+                      setFormData((prev) => ({ ...prev, address }))
                       if (validationErrors.address) {
                         setValidationErrors({ ...validationErrors, address: '' })
                       }
                     }
                   }}
                   options={{
-                    types: ['address'],
-                    componentRestrictions: { country: 'us' }
+                    types: ['address']
                   }}
                   value={formData.address}
                   onChange={(e: any) => {
                     const value = e.target.value
-                    setFormData({ ...formData, address: value })
+                    setFormData((prev) => ({ ...prev, address: value }))
                     if (validationErrors.address) {
                       setValidationErrors({ ...validationErrors, address: '' })
                     }

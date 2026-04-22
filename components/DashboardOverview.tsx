@@ -74,6 +74,7 @@ import {
   Calendar as MultiDateCalendar,
   DateObject,
 } from "react-multi-date-picker";
+import { normalizeSingleRangeSelection, sortedDatesFromPickerRange } from "@/utils/dateRangeSelection";
 
 
 
@@ -152,7 +153,13 @@ export function DashboardOverview() {
   const [activitiesPage, setActivitiesPage] = useState(1);
   const activitiesPageSize = 5;
   const [userName, setUserName] = useState("Admin");
-  const [selectedRanges, setSelectedRanges] = useState<any[]>([]);
+  const formatDisplayName = (value: string) => {
+    const normalized = String(value || "").trim();
+    if (!normalized) return "Admin";
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  };
+
+  const [selectedRanges, setSelectedRanges] = useState<DateObject[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [totalRevenue, settotalRevenue] = useState("");
@@ -187,7 +194,7 @@ export function DashboardOverview() {
             parsed?.user?.full_name ||
             parsed?.user?.name ||
             parsed?.user?.email;
-          if (name) setUserName(name);
+          if (name) setUserName(formatDisplayName(name));
         }
       }
     } catch (e) {
@@ -613,23 +620,13 @@ export function DashboardOverview() {
                   className="w-auto overflow-hidden rounded-xl border border-slate-200 bg-white p-3 shadow-[0_12px_32px_-12px_rgba(15,23,42,0.35)]"
                 >
                   <MultiDateCalendar
-                    multiple
                     range
                     value={selectedRanges}
                     onChange={(value) => {
-                      const values = Array.isArray(value)
-                        ? value
-                        : value
-                          ? [value]
-                          : [];
+                      const values = normalizeSingleRangeSelection(value);
                       setSelectedRanges(values);
 
-                      const allDates = values
-                        .flat()
-                        .map((d) =>
-                          d instanceof DateObject ? d.toDate() : new Date(d),
-                        )
-                        .filter((d) => !Number.isNaN(d.getTime()));
+                      const allDates = sortedDatesFromPickerRange(values);
 
                       if (allDates.length === 0) {
                         setDateFrom("");

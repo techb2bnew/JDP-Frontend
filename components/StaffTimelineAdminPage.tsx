@@ -25,6 +25,7 @@ import { useEffect, useState } from 'react'
 import { apiClient } from '@/utils/api'
 import { LoadingSpinner } from './common/LoadingSpinner'
 import { Calendar as MultiDateCalendar, DateObject } from "react-multi-date-picker";
+import { normalizeSingleRangeSelection, sortedDatesFromPickerRange } from '@/utils/dateRangeSelection'
 
 interface StaffTimesheetItem {
   employee: string;
@@ -62,8 +63,7 @@ export function StaffTimelineAdminPage() {
     };
   } | null>(null);
   const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({ from: undefined, to: undefined })
-  // Multiple date ranges selection (used by multi-date calendar UI)
-  const [selectedRanges, setSelectedRanges] = useState<DateObject[][]>([])
+  const [selectedRanges, setSelectedRanges] = useState<DateObject[]>([])
   const [statusFilter, setStatusFilter] = useState('all');
   const [employeeFilter, setEmployeeFilter] = useState('all');
   const [allEmployeeOptions, setAllEmployeeOptions] = useState<string[]>([]);
@@ -642,17 +642,13 @@ export function StaffTimelineAdminPage() {
                   </PopoverTrigger>
                   <PopoverContent className="w-auto rounded-md border bg-background p-3 shadow-lg" align="start">
                     <MultiDateCalendar
-                      multiple
                       range
                       value={selectedRanges}
                       onChange={(value) => {
-                        const values = (Array.isArray(value) ? value : value ? [value] : []) as unknown as DateObject[][];
+                        const values = normalizeSingleRangeSelection(value);
                         setSelectedRanges(values);
 
-                        const allDates = values
-                          .flat()
-                          .map((d) => (d instanceof DateObject ? d.toDate() : new Date(d as any)))
-                          .filter((d) => d instanceof Date && !Number.isNaN(d.getTime()));
+                        const allDates = sortedDatesFromPickerRange(values);
 
                         if (allDates.length === 0) {
                           setDateRange({ from: undefined, to: undefined });

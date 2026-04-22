@@ -663,7 +663,7 @@ function Frame1171275939() {
         </svg>
       </div>
       <div className="font-['Public_Sans:Medium',_sans-serif] font-medium leading-[0] relative shrink-0 text-[#00a1ff] text-[15px] text-left text-nowrap">
-        <p className="block leading-[normal] whitespace-pre">Lead Labor</p>
+        <p className="block leading-[normal] whitespace-pre">Lead Labour</p>
       </div>
     </div>
   );
@@ -695,7 +695,7 @@ function Frame1171275940() {
     <div className="absolute box-border content-stretch flex flex-row gap-2.5 items-center justify-center left-[86px] opacity-80 pl-[15px] pr-[9px] py-3 rounded-[100px] top-[250.435px]">
       <Group4 />
       <div className="font-['Public_Sans:Medium',_sans-serif] font-medium leading-[0] relative shrink-0 text-[15px] text-gray-900 text-left text-nowrap">
-        <p className="block leading-[normal] whitespace-pre">Labor</p>
+        <p className="block leading-[normal] whitespace-pre">Labour</p>
       </div>
     </div>
   );

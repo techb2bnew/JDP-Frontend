@@ -54,7 +54,7 @@ export const profileTypeConfigs: ProfileTypeConfig[] = [
   },
   {
     id: 'labour_lead',
-    title: 'Labor Lead Details',
+    title: 'Labour Lead Details',
     description: 'Lead supervisors managing construction teams',
     icon: 'HardHat',
     stats: profileStats.labourLead

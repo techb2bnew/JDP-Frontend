@@ -584,9 +584,9 @@ export function AddEditOrderPage() {
         <Card className="shadow-md">
           <CardContent className="p-6">
             <div className="space-y-6">
-              {/* Lead Labor, Customer, Job, Supplier */}
+              {/* Lead Labour, Customer, Job, Supplier */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Lead Labor Selection */}
+                {/* Lead Labour Selection */}
                   {/* Job Selection */}
                   <div className="space-y-2">
                   <Label htmlFor="job">Job *</Label>
@@ -687,7 +687,7 @@ export function AddEditOrderPage() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lead-labor">Lead Labor *</Label>
+                  <Label htmlFor="lead-labor">Lead Labour *</Label>
                   <div className="relative">
                     <Input
                       id="lead-labor"
