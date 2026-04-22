@@ -1440,7 +1440,7 @@ useEffect(() => {
               <SelectTrigger className={validationErrors.role ? 'border-red-500' : ''}>
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
-              <SelectContent className="max-h-[min(280px,var(--radix-select-content-available-height))]">
+              <SelectContent className="max-h-72 overflow-y-auto [&_[data-slot=select-scroll-up-button]]:hidden [&_[data-slot=select-scroll-down-button]]:hidden">
                 {roles.map((role) => (
                   <SelectItem key={role.id} value={role.roleName}>
                     {role.roleName}

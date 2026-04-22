@@ -1080,8 +1080,19 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               step="0.01"
               value={formData.estimatedCost || ''}
               onChange={(e) => {
-                setFormData({...formData, estimatedCost: Number(e.target.value)})
-                clearValidationError('estimatedCost')
+                const rawValue = e.target.value
+                const numericValue = Number(rawValue)
+                setFormData({ ...formData, estimatedCost: rawValue === '' ? 0 : numericValue })
+
+                setValidationErrors(prev => {
+                  const next = { ...prev }
+                  if (rawValue !== '' && (!Number.isFinite(numericValue) || numericValue <= 0)) {
+                    next.estimatedCost = 'Estimated amount must be greater than 0'
+                  } else {
+                    delete next.estimatedCost
+                  }
+                  return next
+                })
               }}
               placeholder="0.00"
               className={validationErrors.estimatedCost ? 'border-red-500' : ''}
@@ -1371,7 +1382,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               </div>
             </div>
 
-            <div className="min-w-0 w-full max-w-full">
+            <div>
               <h4 className="font-medium text-[#2b2b2b] mb-2">Description</h4>
               <div
                 ref={jobReviewDescriptionBoxRef}

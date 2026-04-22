@@ -25,8 +25,7 @@ import {
   ResponsiveContainer,
   RadialBarChart,
   RadialBar,
-  ComposedChart,
-  Legend
+  ComposedChart
 } from "recharts";
 import {
   TrendingUp,
@@ -677,49 +676,34 @@ export function DashboardOverview() {
 
                            
 
-                          {/* T&M Job Section */}
                           <p style={{ fontSize: 11, color: "#64748b", marginBottom: 4, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                             Total Revenue
                           </p>
                           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
                             <span style={{ fontSize: 13, color: "#00A1FF" }}>● Revenue</span>
                             <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>
-                              ${(payload.find(p => p.dataKey === "tm_revenue")?.value ?? 0).toLocaleString()}
+                              ${(payload.find((p) => p.dataKey === "tm_revenue")?.value ?? 0).toLocaleString()}
                             </span>
                           </div>
                           <div style={{ display: "flex", justifyContent: "space-between" }}>
                             <span style={{ fontSize: 13, color: "#0070CC" }}>● Profit</span>
                             <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b" }}>
-                              ${(payload.find(p => p.dataKey === "tm_profit")?.value ?? 0).toLocaleString()}
+                              ${(payload[0]?.payload?.tm_profit ?? 0).toLocaleString()}
                             </span>
                           </div>
                         </div>
                       );
                     }}
                   />
-                  <Legend
-                    iconType="circle"
-                    iconSize={8}
-                    wrapperStyle={{ paddingTop: "16px" }}
+                  <Bar
+                    dataKey="tm_revenue"
+                    name="Revenue"
+                    fill="#00A1FF"
+                    radius={[6, 6, 0, 0]}
+                    maxBarSize={40}
                   />
- 
-
-                  {/* Time & Material Job */}
-                  <Bar dataKey="tm_revenue" name="T&M Revenue" fill="#00A1FF" radius={[6, 6, 0, 0]} maxBarSize={40} />
-                  <Bar dataKey="tm_profit" name="T&M Profit" fill="#0070CC" radius={[6, 6, 0, 0]} maxBarSize={40} />
   
                 </ComposedChart>
-
-                {/* 🔥 ONLY PAID JOBS DATA */}
-                <Bar dataKey="revenue" fill="#00A1FF" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="profit" fill="#00CEB6" radius={[4, 4, 0, 0]} />
-
-                <Line
-                  type="monotone"
-                  dataKey="jobs"
-                  stroke="#FF6692"
-                  strokeWidth={3}
-                />
               </ResponsiveContainer>
             </div>
           </CardContent>
