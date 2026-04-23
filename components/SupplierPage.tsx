@@ -1,4 +1,4 @@
-import { useState, useEffect, ChangeEvent } from 'react'
+import { useState, useEffect, ChangeEvent, useMemo, useRef } from 'react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Card, CardContent } from './ui/card'
@@ -53,6 +53,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [filteredSuppliers, setFilteredSuppliers] = useState<any[]>([])
+  const [selectedSupplierIds, setSelectedSupplierIds] = useState<string[]>([])
 
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
@@ -197,6 +198,47 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
 
   const paginatedSuppliers = filteredSuppliers
   const totalPages = Math.ceil(totalSuppliers / itemsPerPage)
+
+  const selectedSupplierIdSet = useMemo(() => new Set(selectedSupplierIds), [selectedSupplierIds])
+  const visibleSupplierIds = useMemo(
+    () => paginatedSuppliers.map((s: Supplier) => s.id),
+    [paginatedSuppliers]
+  )
+
+  const allVisibleSelected = useMemo(() => {
+    if (visibleSupplierIds.length === 0) return false
+    return visibleSupplierIds.every((id) => selectedSupplierIdSet.has(id))
+  }, [visibleSupplierIds, selectedSupplierIdSet])
+
+  const someVisibleSelected = useMemo(() => {
+    if (visibleSupplierIds.length === 0) return false
+    return visibleSupplierIds.some((id) => selectedSupplierIdSet.has(id))
+  }, [visibleSupplierIds, selectedSupplierIdSet])
+
+  const selectAllRef = useRef<HTMLInputElement | null>(null)
+  useEffect(() => {
+    if (!selectAllRef.current) return
+    selectAllRef.current.indeterminate = someVisibleSelected && !allVisibleSelected
+  }, [someVisibleSelected, allVisibleSelected])
+
+  const toggleSupplierSelection = (supplierId: string) => {
+    setSelectedSupplierIds((prev) => {
+      if (prev.includes(supplierId)) return prev.filter((id) => id !== supplierId)
+      return [...prev, supplierId]
+    })
+  }
+
+  const toggleSelectAllVisible = () => {
+    setSelectedSupplierIds((prev) => {
+      const next = new Set(prev)
+      if (allVisibleSelected) {
+        visibleSupplierIds.forEach((id) => next.delete(id))
+      } else {
+        visibleSupplierIds.forEach((id) => next.add(id))
+      }
+      return Array.from(next)
+    })
+  }
 
   const handleCreate = async () => {
     if (!validateForm()) return
@@ -907,7 +949,19 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
                 toast.error('No suppliers available to export')
                 return
               }
-              downloadCSV(filteredSuppliers, `suppliers-export-${new Date().toISOString().split('T')[0]}.csv`)
+
+              if (selectedSupplierIds.length === 0) {
+                toast.error('Please select at least one supplier to export')
+                return
+              }
+
+              const suppliersToExport = filteredSuppliers.filter((s: Supplier) => selectedSupplierIdSet.has(s.id))
+              if (suppliersToExport.length === 0) {
+                toast.error('No selected suppliers available to export')
+                return
+              }
+
+              downloadCSV(suppliersToExport, `suppliers-export-${new Date().toISOString().split('T')[0]}.csv`)
               toast.success('CSV export started')
             }}
           >
@@ -1031,6 +1085,17 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
           <Table>
             <TableHeader>
               <TableRow className="bg-[#162f3d] hover:bg-[#162f3d]">
+                <TableHead className="text-white font-medium pl-6 w-[48px]">
+                  <input
+                    ref={selectAllRef}
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={toggleSelectAllVisible}
+                    disabled={paginatedSuppliers.length === 0}
+                    aria-label="Select all suppliers on this page"
+                    className="h-4 w-4 accent-white"
+                  />
+                </TableHead>
                 <TableHead className="text-white font-medium pl-6">ID</TableHead>
                 <TableHead className="text-white font-medium">Name</TableHead>
                 <TableHead className="text-white font-medium">Company</TableHead>
@@ -1044,7 +1109,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
+                  <TableCell colSpan={8} className="text-center py-8">
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                       <span className="ml-2 text-gray-600">Loading suppliers...</span>
@@ -1053,7 +1118,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
                 </TableRow>
               ) : paginatedSuppliers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
+                  <TableCell colSpan={8} className="text-center py-8">
                     <div className="text-gray-500">No suppliers found</div>
                   </TableCell>
                 </TableRow>
@@ -1063,6 +1128,15 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
                   const hasAddress = addressFirstLine.length > 0
                   return (
                   <TableRow key={supplier.id} className={index % 2 === 1 ? 'bg-[#eff4fa]' : ''}>
+                    <TableCell className="pl-6">
+                      <input
+                        type="checkbox"
+                        checked={selectedSupplierIdSet.has(supplier.id)}
+                        onChange={() => toggleSupplierSelection(supplier.id)}
+                        aria-label={`Select supplier ${supplier.companyName || supplier.fullName || supplier.supplierId}`}
+                        className="h-4 w-4 accent-primary"
+                      />
+                    </TableCell>
                     <TableCell className="text-sm text-[#2b2b2b]/80 pl-6">#{supplier.supplierId}</TableCell>
                     <TableCell>
                       <div>

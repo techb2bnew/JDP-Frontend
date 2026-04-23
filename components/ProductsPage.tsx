@@ -1752,7 +1752,7 @@ useEffect(() => {
                 <div>
                   <Label className="text-sm font-medium text-gray-700 mb-2 block">Product Name</Label>
                   <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                    {viewProductData.product_name}
+                    {viewProductData.product_name || 'Not available'}
                   </div>
                 </div>
                 <div>
@@ -1764,13 +1764,13 @@ useEffect(() => {
                 <div>
                   <Label className="text-sm font-medium text-gray-700 mb-2 block">Supplier SKU</Label>
                   <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 font-mono">
-                    {viewProductData.supplier_sku}
+                    {viewProductData.supplier_sku || 'Not available'}
                   </div>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-700 mb-2 block">JDP SKU</Label>
                   <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 font-mono">
-                    {viewProductData.jdp_sku}
+                    {viewProductData.jdp_sku || 'Not available'}
                   </div>
                 </div>
               </div>
@@ -1792,7 +1792,7 @@ useEffect(() => {
                 <div>
                   <Label className="text-sm font-medium text-gray-700 mb-2 block">Markup Percentage</Label>
                   <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                    {viewProductData.markup_percentage}%
+                    {viewProductData.markup_percentage != null ? `${viewProductData.markup_percentage}%` : 'Not available'}
                   </div>
                 </div>
                 <div>
@@ -1805,19 +1805,19 @@ useEffect(() => {
                 <div>
                   <Label className="text-sm font-medium text-gray-700 mb-2 block">Stock Quantity</Label>
                   <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                    {viewProductData.stock_quantity}
+                    {viewProductData.stock_quantity != null ? viewProductData.stock_quantity : 'Not available'}
                   </div>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-700 mb-2 block">Unit</Label>
                   <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 capitalize">
-                    {viewProductData.unit}
+                    {viewProductData.unit || 'Not available'}
                   </div>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-700 mb-2 block">Unit Cost</Label>
                   <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 capitalize">
-                    {viewProductData.unit_cost}
+                    {viewProductData.unit_cost != null && viewProductData.unit_cost !== '' ? viewProductData.unit_cost : 'Not available'}
                   </div>
                 </div>
               </div>
@@ -1838,13 +1838,13 @@ useEffect(() => {
                     <div>
                       <Label className="text-sm font-medium text-gray-700 mb-2 block">Company Name</Label>
                       <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                        {viewProductData.suppliers.company_name}
+                        {viewProductData.suppliers.company_name || 'Not available'}
                       </div>
                     </div>
                     <div>
                       <Label className="text-sm font-medium text-gray-700 mb-2 block">Contact Person</Label>
                       <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                        {viewProductData.suppliers.contact_person}
+                        {viewProductData.suppliers.contact_person || 'Not available'}
                       </div>
                     </div>
                     {viewProductData.suppliers.users && (
@@ -1852,13 +1852,13 @@ useEffect(() => {
                         <div>
                           <Label className="text-sm font-medium text-gray-700 mb-2 block">Email</Label>
                           <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                            {viewProductData.suppliers.users.email}
+                            {viewProductData.suppliers.users.email || 'Not available'}
                           </div>
                         </div>
                         <div>
                           <Label className="text-sm font-medium text-gray-700 mb-2 block">Phone</Label>
                           <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                            {viewProductData.suppliers.users.phone}
+                            {viewProductData.suppliers.users.phone || 'Not available'}
                           </div>
                         </div>
                       </>
@@ -1872,13 +1872,13 @@ useEffect(() => {
                 <div>
                   <Label className="text-sm font-medium text-gray-700 mb-2 block">Created At</Label>
                   <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                    {new Date(viewProductData.created_at).toLocaleDateString()}
+                    {viewProductData.created_at ? new Date(viewProductData.created_at).toLocaleDateString() : 'Not available'}
                   </div>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-700 mb-2 block">Last Updated</Label>
                   <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                    {new Date(viewProductData.updated_at).toLocaleDateString()}
+                    {viewProductData.updated_at ? new Date(viewProductData.updated_at).toLocaleDateString() : 'Not available'}
                   </div>
                 </div>
               </div>

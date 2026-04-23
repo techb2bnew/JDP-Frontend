@@ -4,7 +4,7 @@ import { Input } from '../ui/input'
 import { AuthStep } from '../AuthFlow'
 import { toast } from 'sonner'
 // import img4541 from "figma:asset/a3e40afe539df138ee43712dc0bf65b14d1b7224.png"
-import { EyeOff } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
 import Image from 'next/image'
 
 interface NewPasswordScreenProps {
@@ -19,6 +19,8 @@ export function NewPasswordScreen({ email, onStepChange, onAuthSuccess }: NewPas
   const [isLoading, setIsLoading] = useState(false)
   const [showPasswordHelp, setShowPasswordHelp] = useState(false)
   const [errors, setErrors] = useState<{ confirm?: string }>({})
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const validatePassword = (password: string) => {
     const minLength = password.length >= 8
@@ -143,14 +145,20 @@ export function NewPasswordScreen({ email, onStepChange, onAuthSuccess }: NewPas
             </label>
             <div className="relative">
               <Input
-                type="password"
+                type={showNewPassword ? 'text' : 'password'}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 onFocus={() => setShowPasswordHelp(true)}
                 placeholder="********"
                 className="h-[50px] rounded-full border border-[#00a1ff] pl-4 pr-12"
               />
-              <EyeOff className="absolute right-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword((v) => !v)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showNewPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 
@@ -161,14 +169,20 @@ export function NewPasswordScreen({ email, onStepChange, onAuthSuccess }: NewPas
             </label>
             <div className="relative">
               <Input
-                type="password"
+                type={showConfirmPassword ? 'text' : 'password'}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="********"
                 className={`h-[50px] rounded-full border pl-4 pr-12 ${errors.confirm ? 'border-[#e02424] bg-[#fff3f3]' : 'border-[#00a1ff]'
                   }`}
               />
-              <EyeOff className="absolute right-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword((v) => !v)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showConfirmPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              </button>
             </div>
             {errors.confirm && (
               <p className="text-[#e02424] text-[14px] mt-1">{errors.confirm}</p>
