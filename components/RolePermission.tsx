@@ -137,6 +137,52 @@ const LABOUR_MODULE_ACTION_OVERRIDES: Record<string, string[]> = {
 const ASSIGNED_LABOUR_MODULE = 'assigned_labour';
 const ASSIGNED_LEAD_LABOUR_MODULE = 'assigned_lead_labour';
 
+// When a permission is checked, these related permissions auto-check (one-way only).
+// User can still manually uncheck any of them afterwards.
+const PERMISSION_AUTO_DEPS: Record<string, Array<{ module: string; action: string }>> = {
+  'jobs:create': [
+    { module: 'jobs', action: 'view' },
+    { module: 'jobs', action: 'edit' },
+    { module: 'sub_jobs', action: 'create' },
+    { module: 'sub_jobs', action: 'view' },
+    { module: 'customers', action: 'view' },
+    { module: 'contractors', action: 'view' },
+    { module: ASSIGNED_LEAD_LABOUR_MODULE, action: 'assign' },
+    { module: ASSIGNED_LABOUR_MODULE, action: 'assign' },
+  ],
+  'jobs:view': [
+    { module: 'sub_jobs', action: 'view' },
+    { module: 'customers', action: 'view' },
+    { module: 'contractors', action: 'view' },
+    { module: ASSIGNED_LEAD_LABOUR_MODULE, action: 'assign' },
+    { module: ASSIGNED_LABOUR_MODULE, action: 'assign' },
+  ],
+  'products:view': [{ module: 'suppliers', action: 'view' }],
+  'products:create': [{ module: 'suppliers', action: 'view' }],
+};
+
+// Resolves transitive deps so checking jobs:create also pulls in jobs:view's deps
+const getTransitiveDeps = (
+  modName: string,
+  act: string,
+): Array<{ module: string; action: string }> => {
+  const visited = new Set<string>();
+  const result: Array<{ module: string; action: string }> = [];
+  const collect = (m: string, a: string) => {
+    const key = `${m}:${a}`;
+    if (visited.has(key)) return;
+    visited.add(key);
+    for (const dep of PERMISSION_AUTO_DEPS[key] ?? []) {
+      if (!result.some((r) => r.module === dep.module && r.action === dep.action)) {
+        result.push(dep);
+      }
+      collect(dep.module, dep.action);
+    }
+  };
+  collect(modName, act);
+  return result;
+};
+
 export default function RolePermission() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [isLoadingRoles, setIsLoadingRoles] = useState(false);
@@ -681,53 +727,43 @@ const LABOUR_HIDDEN_PERMISSIONS: Record<string, string[]> = {
   };
 
   const handlePermissionChange = (modName: string, act: string, allowed: boolean) => {
-    if (editingRole) {
-      setRoles(prevRoles => {
-        return prevRoles.map(role => {
-          if (role.id === editingRole.id) {
-            const existingPermission = role.permissions.find(p =>
-              p.module === modName && p.action === act
-            );
-            let updatedPermissions: Permission[];
-            if (existingPermission) {
-              updatedPermissions = role.permissions.map(p =>
-                p.module === modName && p.action === act ? { ...p, allowed } : p
-              );
-            } else {
-              updatedPermissions = [...role.permissions, { module: modName, action: act, allowed }];
-            }
-            return { ...role, permissions: updatedPermissions };
-          }
-          return role;
-        });
-      });
+    // Applies the direct change + cascades related permissions on check (not on uncheck)
+    const applyChange = (perms: Permission[]): Permission[] => {
+      let updated = perms.find((p) => p.module === modName && p.action === act)
+        ? perms.map((p) => (p.module === modName && p.action === act ? { ...p, allowed } : p))
+        : [...perms, { module: modName, action: act, allowed }];
 
-      setEditingRole(prev => {
-        if (!prev) return prev;
-        const existingPermission = prev.permissions.find(p =>
-          p.module === modName && p.action === act
-        );
-        let updatedPermissions: Permission[];
-        if (existingPermission) {
-          updatedPermissions = prev.permissions.map(p =>
-            p.module === modName && p.action === act ? { ...p, allowed } : p
-          );
-        } else {
-          updatedPermissions = [...prev.permissions, { module: modName, action: act, allowed }];
-        }
-        return { ...prev, permissions: updatedPermissions };
-      });
-    } else {
-      setNewRolePermissions(prev => {
-        const existing = prev.find(p => p.module === modName && p.action === act);
+      if (!allowed) return updated;
+
+      const activeModules = getActiveModulesForRole(formData.roleName, currentRolePlatform);
+      for (const dep of getTransitiveDeps(modName, act)) {
+        if (!activeModules.includes(dep.module)) continue;
+        if (!getActionsForModule(dep.module, formData.roleName, currentRolePlatform).includes(dep.action)) continue;
+        if (isPermissionHidden(dep.module, dep.action, formData.roleName)) continue;
+
+        const existing = updated.find((p) => p.module === dep.module && p.action === dep.action);
         if (existing) {
-          return prev.map(p =>
-            p.module === modName && p.action === act ? { ...p, allowed } : p
-          );
+          if (!existing.allowed) {
+            updated = updated.map((p) =>
+              p.module === dep.module && p.action === dep.action ? { ...p, allowed: true } : p
+            );
+          }
         } else {
-          return [...prev, { module: modName, action: act, allowed }];
+          updated = [...updated, { module: dep.module, action: dep.action, allowed: true }];
         }
-      });
+      }
+      return updated;
+    };
+
+    if (editingRole) {
+      setRoles((prevRoles) =>
+        prevRoles.map((role) =>
+          role.id === editingRole.id ? { ...role, permissions: applyChange(role.permissions) } : role
+        )
+      );
+      setEditingRole((prev) => (prev ? { ...prev, permissions: applyChange(prev.permissions) } : prev));
+    } else {
+      setNewRolePermissions((prev) => applyChange(prev));
     }
   };
 

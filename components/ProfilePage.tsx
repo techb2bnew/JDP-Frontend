@@ -467,7 +467,7 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
         position: profileData.position,
         department: profileData.department,
         address: profileData.address,
-        date_of_birth: profileData.dateOfBirth,
+        dob: profileData.dateOfBirth,
         employee_id: "EMP-001", // This could be dynamic based on user data
         system_role: profileData.position // Using position as system_role for now
       }

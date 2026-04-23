@@ -44,6 +44,7 @@ interface CustomInvoiceDialogProps {
   onInvoiceTypeChange?: (invoiceType: string) => void
   invoiceNotesRef?: React.MutableRefObject<string>
   defaultInvoiceType?: string
+  selectedBluesheetIds?: number[]
 }
 
 
@@ -1102,17 +1103,20 @@ console.log(totalAmount,"amounttt");
               : null;
       }
 
-      const bluesheetIds = Array.isArray(blueSheet)
-        ? blueSheet.map(
-            (bs: any) =>
-              bs.job_bluesheet_id || bs.bluesheet_id || bs.bluesheetId || bs.id,
-          )
-        : [
-            blueSheet.job_bluesheet_id ||
-              blueSheet.bluesheet_id ||
-              blueSheet.bluesheetId ||
-              blueSheet.id,
-          ];
+      const bluesheetIds =
+        selectedBluesheetIds && selectedBluesheetIds.length > 0
+          ? selectedBluesheetIds
+          : Array.isArray(blueSheet)
+          ? blueSheet.map(
+              (bs: any) =>
+                bs.job_bluesheet_id || bs.bluesheet_id || bs.bluesheetId || bs.id,
+            )
+          : [
+              blueSheet.job_bluesheet_id ||
+                blueSheet.bluesheet_id ||
+                blueSheet.bluesheetId ||
+                blueSheet.id,
+            ];
 
       const emailAddress =
         viewInvoiceData?.contractor?.email ||

@@ -122,6 +122,7 @@ interface BlueSheetApprovalDialogProps {
   blueSheet: BlueSheetItem | null
   selectedBlueSheets?: BlueSheetItem[]
   onApprovalComplete: (approvedItem: BlueSheetItem) => void
+  selectedBlueSheetIds?: number[]
 }
 
 export function BlueSheetApprovalDialog({
@@ -2918,7 +2919,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                           onOpenChange={() => setIsCustomInvoiceOpen(false)}
                           blueSheet={currentBlueSheet}
                           registerPreviewAndSend={registerPreviewAndSendStable}
-                          // selectedBluesheetIds={selectedBluesheetIds}
+                          selectedBluesheetIds={getSelectedBlueSheetIds()}
                           onProcessingChange={setCustomInvoiceProcessing}
                           onInvoiceTypeChange={setSelectedInvoiceType}
                           defaultInvoiceType="Progressive Invoice"

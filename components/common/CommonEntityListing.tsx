@@ -304,7 +304,14 @@ export default function CommonEntityListing({
                     {hasJobs && (
                       <CollapsibleContent className="px-1.5 pb-2.5 pt-1.5">
                         <div className="relative ml-1.5 min-w-0 border-l-2 border-sky-100 pl-2">
-                          {entityJobs.map((job) => {
+                          {[...entityJobs].sort((a, b) => {
+                            const ts = (j: JobType) =>
+                              Math.max(
+                                j.updated_at ? new Date(j.updated_at).getTime() : 0,
+                                j.created_at ? new Date(j.created_at).getTime() : 0,
+                              );
+                            return ts(b) - ts(a);
+                          }).map((job) => {
                             const jobId = job.id.toString();
                             const hasSubJobs =
                               job.subJobs && job.subJobs.length > 0;

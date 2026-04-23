@@ -935,7 +935,7 @@ export const apiClient = {
       address: string;
       bio?: string;
       emergency_contact?: string;
-      date_of_birth: string;
+      dob: string;
       employee_id: string;
       system_role: string;
     }
