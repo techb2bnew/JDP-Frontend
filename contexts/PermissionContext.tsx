@@ -38,6 +38,12 @@ interface PermissionProviderProps {
 export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children }) => {
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAdminRole, setIsAdminRole] = useState(false);
+
+  const checkIsAdmin = (parsed: any): boolean => {
+    const role = (parsed.user?.role ?? parsed.user?.role_type ?? '').toLowerCase().trim();
+    return role === 'admin' || role === 'super admin';
+  };
 
   // Load permissions from localStorage on mount
   useEffect(() => {
@@ -46,6 +52,7 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
       if (authData) {
         try {
           const parsed = JSON.parse(authData);
+          setIsAdminRole(checkIsAdmin(parsed));
           if (parsed.user?.permissions) {
             setPermissions(parsed.user.permissions);
             setIsLoading(false);
@@ -100,6 +107,7 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
   }, []);
 
   const hasPermission = (module: string, action: string): boolean => {
+    if (isAdminRole) return true;
     return permissions.some(
       permission => permission.module === module && permission.action === action
     );
@@ -120,6 +128,7 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
     if (authData) {
       try {
         const parsed = JSON.parse(authData);
+        setIsAdminRole(checkIsAdmin(parsed));
         if (parsed.user?.permissions) {
           setPermissions(parsed.user.permissions);
         }
@@ -135,6 +144,7 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
     if (authData) {
       try {
         const parsed = JSON.parse(authData);
+        setIsAdminRole(checkIsAdmin(parsed));
         if (parsed.user?.permissions) {
           setPermissions(parsed.user.permissions);
           // Dispatch custom event to notify other components

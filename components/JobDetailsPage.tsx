@@ -6,6 +6,7 @@ import React, {
   useMemo,
 } from "react";
 import { apiClient } from "../utils/api";
+import { usePermissions } from '../contexts/PermissionContext';
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -346,6 +347,8 @@ export function JobDetailsPage({
   const getJobDescription = (jobData: any) =>
     jobData?.description ?? jobData?.job_description ?? "";
   
+
+  const { hasPermission } = usePermissions();
 
   // Find the job from your jobs array or use sample data
   const job =
@@ -7847,6 +7850,7 @@ const handlePrintInvoice = async (invoice: any) => {
         )}
 
         {/* Transaction History Section */}
+        {hasPermission('invoices', 'view') && (
         <Card className="bg-white shadow-sm border border-primary/10">
           <CardHeader className="bg-gradient-to-r from-primary/5 to-blue-50/50 border-b border-primary/10">
             <div className="flex items-center justify-between">
@@ -8790,8 +8794,10 @@ const handlePrintInvoice = async (invoice: any) => {
             )}
           </CardContent>
         </Card>
+        )}
 
         {/* Bluesheets Data */}
+        {hasPermission('bluesheet', 'view') && (<>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
             <CardTitle className="flex items-center gap-2">
@@ -9057,6 +9063,7 @@ const handlePrintInvoice = async (invoice: any) => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        </>)}
         {/* Material Usage */}
         {/* <Card>
           <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
@@ -11252,7 +11259,7 @@ const handlePrintInvoice = async (invoice: any) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <ActivityLogs jobId={jobId} />
+      {hasPermission('activity_logs', 'view') && <ActivityLogs jobId={jobId} />}
     </div>
   );
 }

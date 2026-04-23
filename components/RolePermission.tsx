@@ -145,6 +145,7 @@ const PERMISSION_AUTO_DEPS: Record<string, Array<{ module: string; action: strin
     { module: 'jobs', action: 'edit' },
     { module: 'sub_jobs', action: 'create' },
     { module: 'sub_jobs', action: 'view' },
+    { module: 'sub_jobs', action: 'edit' },
     { module: 'customers', action: 'view' },
     { module: 'contractors', action: 'view' },
     { module: ASSIGNED_LEAD_LABOUR_MODULE, action: 'assign' },
@@ -158,7 +159,7 @@ const PERMISSION_AUTO_DEPS: Record<string, Array<{ module: string; action: strin
     { module: ASSIGNED_LABOUR_MODULE, action: 'assign' },
   ],
   'products:view': [{ module: 'suppliers', action: 'view' }],
-  'products:create': [{ module: 'suppliers', action: 'view' }],
+  'products:create': [{ module: 'products', action: 'view' }, { module: 'suppliers', action: 'view' }],
 };
 
 // Resolves transitive deps so checking jobs:create also pulls in jobs:view's deps
@@ -320,6 +321,20 @@ export default function RolePermission() {
               }
             }
           });
+
+          // Admin/Super Admin: if the backend never seeded activity_logs permissions,
+          // default them all to true (admin has everything by definition).
+          const cleanedRoleName = stripPlatformSuffix(roleNameForPermissions).toLowerCase().trim();
+          if (cleanedRoleName === 'admin' || cleanedRoleName === 'super admin') {
+            const apiHasActivityLogs = apiPermissions.some(
+              (p: any) => p.permission?.module === 'activity_logs'
+            );
+            if (!apiHasActivityLogs) {
+              transformedPermissions
+                .filter(p => p.module === 'activity_logs')
+                .forEach(p => { p.allowed = true; });
+            }
+          }
 
           const transformedRole: Role = {
             id: apiRole.id.toString(),
