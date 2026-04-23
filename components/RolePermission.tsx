@@ -614,13 +614,22 @@ const LABOUR_HIDDEN_PERMISSIONS: Record<string, string[]> = {
     setNewRolePermissions(initialPermissions);
   };
 
+  const currentUserIsSuperAdmin = (() => {
+    try {
+      const authData = localStorage.getItem('jdp_auth');
+      if (!authData) return false;
+      const parsed = JSON.parse(authData);
+      return (parsed.user?.role ?? '').toLowerCase().trim().replace(/\s+/g, ' ') === 'super admin';
+    } catch { return false; }
+  })();
+
   const isProtectedRoleName = (roleName: string) => {
     const normalized = roleName.trim().toLowerCase().replace(/\s+/g, ' ');
     return normalized === 'admin' || normalized === 'super admin';
   };
 
   const handleEditRole = (role: Role) => {
-    if (isProtectedRoleName(role.roleName)) return;
+    if (!currentUserIsSuperAdmin && isProtectedRoleName(role.roleName)) return;
     setShowAddForm(true);
 
     // 1. Check if user already added this role with a platform suffix in this session
@@ -1275,20 +1284,20 @@ const LABOUR_HIDDEN_PERMISSIONS: Record<string, string[]> = {
                                 <Button onClick={() => handleViewRole(role)} variant="ghost" size="sm" className="h-8 w-8 p-0">
                                   <Eye className="h-4 w-4" />
                                 </Button>
+                                {(!isProtectedRole || currentUserIsSuperAdmin) && (
+                                  <Button onClick={() => handleEditRole(role)} variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                )}
                                 {!isProtectedRole && (
-                                  <>
-                                    <Button onClick={() => handleEditRole(role)} variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      onClick={() => handleDeleteRole(role)}
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </>
+                                  <Button
+                                    onClick={() => handleDeleteRole(role)}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
                                 )}
                               </div>
                             </td>
