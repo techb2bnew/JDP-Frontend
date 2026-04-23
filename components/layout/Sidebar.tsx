@@ -152,15 +152,15 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
     //   module: "jobs",
     //   requiredActions: ["view", "create", "edit", "delete"]
     // },
-    {
-      id: "tracking",
-      name: "Live Tracking",
-      icon: MapPin,
-      href: "/tracking",
-      description: "Real-time job progress and resource tracking",
-      module: "tracking",
-      requiredActions: ["view"],
-    },
+    // {
+    //   id: "tracking",
+    //   name: "Live Tracking",
+    //   icon: MapPin,
+    //   href: "/tracking",
+    //   description: "Real-time job progress and resource tracking",
+    //   module: "tracking",
+    //   requiredActions: ["view"],
+    // },
     {
       id: "contractors",
       name: "Contractor Listing",

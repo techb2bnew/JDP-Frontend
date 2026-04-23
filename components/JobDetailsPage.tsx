@@ -349,6 +349,13 @@ export function JobDetailsPage({
   
 
   const { hasPermission } = usePermissions();
+  const canAssignLeadLabor =
+    hasPermission("jobs", "assign") ||
+    hasPermission("jobs", "assigned leader") ||
+    hasPermission("jobs", "assigned lead labor");
+  const canAssignLabor =
+    hasPermission("jobs", "assign") ||
+    hasPermission("jobs", "assigned labor");
 
   // Find the job from your jobs array or use sample data
   const job =
@@ -7075,7 +7082,7 @@ const handlePrintInvoice = async (invoice: any) => {
                   Job Details
                 </CardTitle>
                 <div className="flex items-center gap-3">
-                  {!isEditing && (
+                  {!isEditing && hasPermission("jobs", "edit") && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -7403,7 +7410,8 @@ const handlePrintInvoice = async (invoice: any) => {
                     )}
                   </div>
 
-                  <div>
+                  {canAssignLeadLabor && (
+                    <div>
                     <Label className="flex items-center gap-2 mb-2">
                       <UserCheck className="h-4 w-4 text-[#00A1FF]" />
                       Assigned Lead Labour
@@ -7480,8 +7488,10 @@ const handlePrintInvoice = async (invoice: any) => {
                       </div>
                     )}
                   </div>
+                  )}
 
-                  <div>
+                  {canAssignLabor && (
+                    <div>
                     <Label className="flex items-center gap-2 mb-2">
                       <Users className="h-4 w-4 text-[#00A1FF]" />
                       Assigned Labour
@@ -7560,6 +7570,7 @@ const handlePrintInvoice = async (invoice: any) => {
                       </div>
                     )}
                   </div>
+                  )}
 
                   {/* Assigned Labour Section */}
                   {/* {job.assignedLaborDetails && job.assignedLaborDetails.length > 0 && (
@@ -7858,45 +7869,47 @@ const handlePrintInvoice = async (invoice: any) => {
                 <Receipt className="h-5 w-5" />
                 Transaction History
               </CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-primary/30 text-primary hover:bg-primary hover:text-white"
-                onClick={() => {
-                  if (!showInlineInvoiceForm) {
-                    // Reset form and auto-fill when opening invoice form
-                    setInlineInvoiceData({
-                      date: new Date().toISOString().split("T")[0],
-                      estimateNumber: "",
-                      customerName: job.customerName || "",
-                      customerAddress: job.address || "",
-                      billToAddress: job.billToAddress || "",
-                      billToAddressEnabled: true,
-                      poNumber: "",
-                      project: job.title || "",
-                      rep: "",
-                      dueDate: "",
-                      paymentCredits: 0,
-                      balanceDue: "",
-                      lineItems: [],
-                      notes:
-                        "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
-                      signatureText: "ACCEPTED BY________________DATE_____",
-                      invoiceType: "Estimate",
-                      customInvoiceType: "",
-                      paymentPercentage: 0,
-                      estimateTotal: 0,
-                      paymentHistory: [] as any[],
-                    });
-                    setEditingInvoiceId(null);
-                    setInvoiceValidationErrors({});
-                  }
-                  setShowInlineInvoiceForm(!showInlineInvoiceForm);
-                }}
-              >
-                <PlusCircle className="h-4 w-4 mr-2" />
-                {showInlineInvoiceForm ? "Cancel" : "Create Invoice"}
-              </Button>
+              {hasPermission("invoices", "create") && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-primary/30 text-primary hover:bg-primary hover:text-white"
+                  onClick={() => {
+                    if (!showInlineInvoiceForm) {
+                      // Reset form and auto-fill when opening invoice form
+                      setInlineInvoiceData({
+                        date: new Date().toISOString().split("T")[0],
+                        estimateNumber: "",
+                        customerName: job.customerName || "",
+                        customerAddress: job.address || "",
+                        billToAddress: job.billToAddress || "",
+                        billToAddressEnabled: true,
+                        poNumber: "",
+                        project: job.title || "",
+                        rep: "",
+                        dueDate: "",
+                        paymentCredits: 0,
+                        balanceDue: "",
+                        lineItems: [],
+                        notes:
+                          "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
+                        signatureText: "ACCEPTED BY________________DATE_____",
+                        invoiceType: "Estimate",
+                        customInvoiceType: "",
+                        paymentPercentage: 0,
+                        estimateTotal: 0,
+                        paymentHistory: [] as any[],
+                      });
+                      setEditingInvoiceId(null);
+                      setInvoiceValidationErrors({});
+                    }
+                    setShowInlineInvoiceForm(!showInlineInvoiceForm);
+                  }}
+                >
+                  <PlusCircle className="h-4 w-4 mr-2" />
+                  {showInlineInvoiceForm ? "Cancel" : "Create Invoice"}
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent className="p-6">

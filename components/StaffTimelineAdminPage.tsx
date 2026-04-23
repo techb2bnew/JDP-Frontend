@@ -607,7 +607,7 @@ export function StaffTimelineAdminPage() {
               <div className="flex items-center gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-[240px] justify-start text-left font-normal relative pr-10">
+                    <Button variant="outline" className="w-[280px] justify-start text-left font-normal relative pr-10">
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       <span className="flex-1 truncate">
                         {dateRange?.from ? (

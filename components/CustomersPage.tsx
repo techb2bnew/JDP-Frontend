@@ -118,6 +118,7 @@ const getInitials = (name: string) => {
 
 export function CustomersPage() {
   const { hasPermission } = usePermissions();
+  const canDeleteJob = hasPermission("jobs", "delete");
   const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
@@ -556,6 +557,10 @@ export function CustomersPage() {
   };
 
   const handleConfirmDeleteJob = async () => {
+    if (!canDeleteJob) {
+      toast.error("You do not have permission to delete jobs.");
+      return;
+    }
     if (!jobDeleteTarget) return;
     setIsDeletingJob(true);
     try {
@@ -1946,13 +1951,14 @@ export function CustomersPage() {
                 <p className="text-lg text-gray-600">Customer Details</p>
               </div>
               <div className="flex items-center gap-2">
-                <Link
+                {/* `/jobs` route disabled */}
+                {/* <Link
                   href={"/jobs?create=true"}
                   className="flex items-center w-[120px] p-2 justify-center border rounded gap-2"
                 >
                   <Briefcase className="h-4 w-4" />
                   Add Jobs
-                </Link>
+                </Link> */}
                 <Badge
                   variant="default"
                   className="p-2 bg-green-100 text-green-800 border-green-200"
@@ -2194,23 +2200,25 @@ export function CustomersPage() {
                                       <Eye className="h-4 w-4 " />
                                       
                                     </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      title="Delete job"
-                                      className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                                      onClick={() =>
-                                        setJobDeleteTarget({
-                                          id: jobId,
-                                          title:
-                                            job.job_title ||
-                                            job.title ||
-                                            "this job",
-                                        })
-                                      }
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
+                                    {canDeleteJob && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        title="Delete job"
+                                        className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                        onClick={() =>
+                                          setJobDeleteTarget({
+                                            id: jobId,
+                                            title:
+                                              job.job_title ||
+                                              job.title ||
+                                              "this job",
+                                          })
+                                        }
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    )}
                                   </div>
                                 </TableCell>
                               </TableRow>
@@ -2299,23 +2307,25 @@ export function CustomersPage() {
                                                             <Eye className="h-4 w-4" />
                                                             
                                                           </Button>
-                                                          <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            title="Delete sub-job"
-                                                            className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                                                            onClick={() =>
-                                                              setJobDeleteTarget({
-                                                                id: subJob.id.toString(),
-                                                                title:
-                                                                  subJob.job_title ||
-                                                                  subJob.title ||
-                                                                  "this sub-job",
-                                                              })
-                                                            }
-                                                          >
-                                                            <Trash2 className="h-4 w-4" />
-                                                          </Button>
+                                                          {canDeleteJob && (
+                                                            <Button
+                                                              variant="outline"
+                                                              size="sm"
+                                                              title="Delete sub-job"
+                                                              className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                              onClick={() =>
+                                                                setJobDeleteTarget({
+                                                                  id: subJob.id.toString(),
+                                                                  title:
+                                                                    subJob.job_title ||
+                                                                    subJob.title ||
+                                                                    "this sub-job",
+                                                                })
+                                                              }
+                                                            >
+                                                              <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                          )}
                                                         </div>
                                                       </TableCell>
                                                     </TableRow>

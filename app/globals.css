@@ -189,3 +189,7 @@ body{
 :focus-visible {
   outline: none !important;
 }
+.timeline-staff-new .fc-media-screen {
+  z-index: 0;
+  position: relative;
+}

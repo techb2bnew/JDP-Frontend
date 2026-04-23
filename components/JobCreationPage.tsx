@@ -14,6 +14,7 @@ import { AutoScrollSelect } from './ui/AutoScrollSelect'
 import { AutoScrollMultiSelect } from './ui/AutoScrollMultiSelect'
 import { apiClient } from '../utils/api'
 import { globalApiCall } from '../utils/globalApiHandler'
+import { usePermissions } from '../contexts/PermissionContext'
 import PhoneInput, { isValidPhoneNumber, parsePhoneNumber } from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
 import Autocomplete from 'react-google-autocomplete'
@@ -91,6 +92,15 @@ interface JobCreationPageProps {
 
 export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) {
   const router = useRouter()
+  const { hasPermission } = usePermissions()
+  const canAssignLeadLabor =
+    hasPermission('jobs', 'assign') ||
+    hasPermission('jobs', 'assigned leader') ||
+    hasPermission('jobs', 'assigned lead labor')
+  const canAssignLabor =
+    hasPermission('jobs', 'assign') ||
+    hasPermission('jobs', 'assigned labor')
+  const showAssignedSection = canAssignLeadLabor || canAssignLabor
   const [currentStep, setCurrentStep] = useState(1)
   const [selectedCustomerName, setSelectedCustomerName] = useState('')
   const [selectedContractorName, setSelectedContractorName] = useState('')
@@ -1218,43 +1228,49 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             </div>
           </div>
         </div>
-        <div className="space-y-4 bg-white shadow-lg p-3">
-          <div className="flex items-center gap-2 mb-4">
-            <UserCheck className="h-5 w-5 text-[#00A1FF]" /> 
-            <h3 className="font-bold text-[#2b2b2b]  text-lg">Assigned Lead Labour & Labour</h3>
+        {showAssignedSection && (
+          <div className="space-y-4 bg-white shadow-lg p-3">
+            <div className="flex items-center gap-2 mb-4">
+              <UserCheck className="h-5 w-5 text-[#00A1FF]" /> 
+              <h3 className="font-bold text-[#2b2b2b]  text-lg">Assigned Lead Labour & Labour</h3>
+            </div>
+            {canAssignLeadLabor && (
+              <div>
+                <Label className="flex items-center gap-2 mb-2">
+                  {/* <UserCheck className="h-4 w-4 text-[#00A1FF]" /> */}
+                  Assigned Lead Labour
+                </Label>
+
+                <AutoScrollMultiSelect
+                  selectedValues={formData.assignedLeadLabor}
+                  onSelectionChange={handleLeadLaborChange}
+                  placeholder="Select lead labor"
+                  fetchData={apiClient.getLeadLabor}
+                  displayField="name"
+                  valueField="id"
+                />
+              </div>
+            )}
+
+            {canAssignLabor && (
+              <div>
+                <Label className="flex items-center gap-2 mb-2">
+                  {/* <Users className="h-4 w-4 text-[#00A1FF]" /> */}
+                  Assigned Labour
+                </Label>
+
+                <AutoScrollMultiSelect
+                  selectedValues={formData.assignedLabor}
+                  onSelectionChange={handleLaborChange}
+                  placeholder="Select labor"
+                  fetchData={apiClient.getLabor}
+                  displayField="name"
+                  valueField="id"
+                />
+              </div>
+            )}
           </div>
-        <div>
-          <Label className="flex items-center gap-2 mb-2">
-            {/* <UserCheck className="h-4 w-4 text-[#00A1FF]" /> */}
-            Assigned Lead Labour
-          </Label>
-
-          <AutoScrollMultiSelect
-            selectedValues={formData.assignedLeadLabor}
-            onSelectionChange={handleLeadLaborChange}
-            placeholder="Select lead labor"
-            fetchData={apiClient.getLeadLabor}
-            displayField="name"
-            valueField="id"
-          />
-        </div>
-
-        <div>
-          <Label className="flex items-center gap-2 mb-2">
-            {/* <Users className="h-4 w-4 text-[#00A1FF]" /> */}
-            Assigned Labour
-          </Label>
-
-          <AutoScrollMultiSelect
-            selectedValues={formData.assignedLabor}
-            onSelectionChange={handleLaborChange}
-            placeholder="Select labor"
-            fetchData={apiClient.getLabor}
-            displayField="name"
-            valueField="id"
-          />
-        </div>
-        </div>
+        )}
         {/* Bill To Section */}
         <div className="space-y-4 bg-white shadow-lg p-3">
           <div className="flex items-center gap-2 mb-4">

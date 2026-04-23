@@ -918,7 +918,7 @@ const fetchTimesheetsByDateRange = async () => {
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className="relative h-10 w-[260px] justify-start border-sky-300 bg-sky-50/90 pr-10 text-left font-normal text-sky-900 shadow-sm hover:bg-sky-100/90 hover:text-sky-950"
+                      className="relative h-10 w-[300px] justify-start border-sky-300 bg-sky-50/90 pr-10 text-left font-normal text-sky-900 shadow-sm hover:bg-sky-100/90 hover:text-sky-950"
                     >
                       <CalendarIcon className="mr-2 h-4 w-4 shrink-0 text-sky-600" />
                       <span className="flex-1 truncate">

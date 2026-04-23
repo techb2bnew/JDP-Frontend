@@ -1,5 +1,7 @@
-import { LiveTrackingPage } from '../../../components/LiveTrackingPage'
+// import { LiveTrackingPage } from '../../../components/LiveTrackingPage'
 
 export default function Tracking() {
-  return <LiveTrackingPage />
+  // NOTE: `/tracking` route is intentionally disabled.
+  // return <LiveTrackingPage />
+  return null
 }

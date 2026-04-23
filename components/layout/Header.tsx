@@ -461,7 +461,7 @@ export function Header({
       "/invoices": "Invoices & Billing",
       "/customers": "Customers",
       "/jobs": "Job Management",
-      "/tracking": "Live Tracking",
+      // "/tracking": "Live Tracking",
       "/contractors": "Contractor Listing",
       "/configuration": "Configuration",
       "/role": "Role & Permission",

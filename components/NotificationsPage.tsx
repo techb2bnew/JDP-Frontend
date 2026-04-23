@@ -84,6 +84,7 @@ const availableRoles = [
 
 export function NotificationsPage() {
   const { hasPermission } = usePermissions()
+  const canCreateNotification = hasPermission('notification', 'create')
   const searchParams = useSearchParams()
   const notificationsApiClient = apiClient as typeof apiClient & {
     sendNotification: (payload: {
@@ -141,6 +142,12 @@ export function NotificationsPage() {
   const jobDropdownRef = useRef<HTMLDivElement>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [notificationToDelete, setNotificationToDelete] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!canCreateNotification && mainTab === 'create') {
+      setMainTab('list')
+    }
+  }, [canCreateNotification, mainTab])
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -1279,14 +1286,16 @@ export function NotificationsPage() {
         <Card className="bg-white shadow-md border-0 overflow-hidden">
           <CardContent className="p-0">
             <div className="border-b border-gray-100">
-              <TabsList className="grid w-full grid-cols-2 bg-transparent h-12 p-0 gap-0">
-                <TabsTrigger
-                  value="create"
-                  className="flex items-center gap-2 data-[state=active]:bg-[#00A1FF] data-[state=active]:text-white rounded-none"
-                >
-                  <Send className="h-4 w-4" />
-                  Create Notification
-                </TabsTrigger>
+              <TabsList className={`grid w-full ${canCreateNotification ? 'grid-cols-2' : 'grid-cols-1'} bg-transparent h-12 p-0 gap-0`}>
+                {canCreateNotification && (
+                  <TabsTrigger
+                    value="create"
+                    className="flex items-center gap-2 data-[state=active]:bg-[#00A1FF] data-[state=active]:text-white rounded-none"
+                  >
+                    <Send className="h-4 w-4" />
+                    Create Notification
+                  </TabsTrigger>
+                )}
                 <TabsTrigger
                   value="list"
                   className="flex items-center gap-2 data-[state=active]:bg-[#00A1FF] data-[state=active]:text-white rounded-none"
@@ -1299,9 +1308,10 @@ export function NotificationsPage() {
           </CardContent>
         </Card>
 
-        <TabsContent value="create" className="focus:outline-none">
-          <Card className="bg-white shadow-md border-0 w-[70%] mx-auto">
-            <CardContent className="space-y-6 p-8">
+        {canCreateNotification && (
+          <TabsContent value="create" className="focus:outline-none">
+            <Card className="bg-white shadow-md border-0 w-[70%] mx-auto">
+              <CardContent className="space-y-6 p-8">
               <div className="space-y-2">
                 <label htmlFor="notification-title" className="text-sm font-medium text-[#2b2b2b]">
                   Notification Title <span className="text-red-500">*</span>
@@ -1543,15 +1553,15 @@ export function NotificationsPage() {
                 </div>
               )}
 
-              <div className="flex items-center justify-end">
-                <Button
-                  onClick={handleSendNotification}
-                  className="gap-2 text-white"
-                  disabled={isSending}
-                >
-                  <Send className="h-4 w-4" />
-                  {isSending ? 'Sending...' : 'Send Notification'}
-                </Button>
+                <div className="flex items-center justify-end">
+                  <Button
+                    onClick={handleSendNotification}
+                    className="gap-2 text-white"
+                    disabled={isSending}
+                  >
+                    <Send className="h-4 w-4" />
+                    {isSending ? 'Sending...' : 'Send Notification'}
+                  </Button>
                 {/* <Button
                   onClick={sendNotifications}
                   className="gap-2 text-white"
@@ -1560,10 +1570,11 @@ export function NotificationsPage() {
                   <Send className="h-4 w-4" />
                   Send 
                 </Button> */}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         <TabsContent value="list" className="space-y-6 focus:outline-none">
 

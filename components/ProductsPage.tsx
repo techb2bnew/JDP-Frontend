@@ -55,6 +55,7 @@ import { Product, Branch } from '../types/product'
 import { globalApiCall, getAuthToken, handleTokenRevocation } from '../utils/globalApiHandler'
 import { AutoSuggestInput } from './ui/auto-suggest-input'
 import { apiClient } from '@/utils/api'
+import { ProductDetailsView } from './products/ProductDetailsView'
 
 interface ProductFormData {
   name: string;
@@ -1439,7 +1440,7 @@ useEffect(() => {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Inventory Value</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Inventory Cost</CardTitle>
                 <div className="text-2xl font-semibold text-gray-600">
                   {isLoadingStats ? (
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-600"></div>
@@ -1746,142 +1747,7 @@ useEffect(() => {
             </div>
           ) : (
             <>
-              {/* ---- copy the exact VIEW markup from your Dialog (kept same) ---- */}
-              {/* Product Information */}
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Product Name</Label>
-                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                    {viewProductData.product_name || 'Not available'}
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Category</Label>
-                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                    {getViewCategoryLabel(viewProductData)}
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Supplier SKU</Label>
-                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 font-mono">
-                    {viewProductData.supplier_sku || 'Not available'}
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">JDP SKU</Label>
-                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 font-mono">
-                    {viewProductData.jdp_sku || 'Not available'}
-                  </div>
-                </div>
-              </div>
-
-              {/* Pricing */}
-              <div className="grid grid-cols-2 gap-6">
-                {/* <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Supplier Cost Price</Label>
-                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                    {formatCurrency(viewProductData.supplier_cost_price || 0)}
-                  </div>
-                </div> */}
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">JDP Price</Label>
-                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                    {formatCurrency(viewProductData.jdp_price || 0)}
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Markup Percentage</Label>
-                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                    {viewProductData.markup_percentage != null ? `${viewProductData.markup_percentage}%` : 'Not available'}
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Markup Amount</Label>
-                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                    {formatCurrency(viewProductData.markup_amount || 0)}
-                  </div>
-                </div>
-               
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Stock Quantity</Label>
-                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                    {viewProductData.stock_quantity != null ? viewProductData.stock_quantity : 'Not available'}
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Unit</Label>
-                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 capitalize">
-                    {viewProductData.unit || 'Not available'}
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Unit Cost</Label>
-                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 capitalize">
-                    {viewProductData.unit_cost != null && viewProductData.unit_cost !== '' ? viewProductData.unit_cost : 'Not available'}
-                  </div>
-                </div>
-              </div>
-
-              {/* Description */}
-              <div>
-                <Label className="text-sm font-medium text-gray-700 mb-2 block">Description</Label>
-                <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900 min-h-[60px]">
-                  {viewProductData.description || 'No description provided'}
-                </div>
-              </div>
-
-              {/* Supplier Info */}
-              {viewProductData.suppliers && (
-                <div className="space-y-4">
-                  <h4 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">Supplier Information</h4>
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700 mb-2 block">Company Name</Label>
-                      <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                        {viewProductData.suppliers.company_name || 'Not available'}
-                      </div>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700 mb-2 block">Contact Person</Label>
-                      <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                        {viewProductData.suppliers.contact_person || 'Not available'}
-                      </div>
-                    </div>
-                    {viewProductData.suppliers.users && (
-                      <>
-                        <div>
-                          <Label className="text-sm font-medium text-gray-700 mb-2 block">Email</Label>
-                          <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                            {viewProductData.suppliers.users.email || 'Not available'}
-                          </div>
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium text-gray-700 mb-2 block">Phone</Label>
-                          <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                            {viewProductData.suppliers.users.phone || 'Not available'}
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Timestamps */}
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Created At</Label>
-                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                    {viewProductData.created_at ? new Date(viewProductData.created_at).toLocaleDateString() : 'Not available'}
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Last Updated</Label>
-                  <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-                    {viewProductData.updated_at ? new Date(viewProductData.updated_at).toLocaleDateString() : 'Not available'}
-                  </div>
-                </div>
-              </div>
+              <ProductDetailsView product={viewProductData} />
             </>
           )}
         </div>

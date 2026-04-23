@@ -998,7 +998,7 @@ export function OrdersPage() {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="w-[260px] justify-start text-left font-normal relative pr-10"
+                    className="w-[300px] justify-start text-left font-normal relative pr-10"
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     <span className="flex-1 truncate">
@@ -1089,10 +1089,12 @@ export function OrdersPage() {
                 <Button variant="outline" onClick={() => handleExport('pdf')}>PDF</Button>
               )} */}
 
-              <Button variant="default" onClick={handleOpenAddOrderModal} className="bg-primary text-primary-foreground hover:bg-primary/90">
-                <PlusCircle className="h-4 w-4 mr-1" />
-                Add Order
-              </Button>
+              {hasPermission('orders', 'create') && (
+                <Button variant="default" onClick={handleOpenAddOrderModal} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                  <PlusCircle className="h-4 w-4 mr-1" />
+                  Add Order
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>

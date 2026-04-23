@@ -194,18 +194,20 @@ export function LoginScreen({ onStepChange, onAuthSuccess }: LoginScreenProps) {
                 module: "customers",
                 requiredActions: ["view", "create", "edit", "delete"]
               },
-              {
-                id: "jobs",
-                href: "/jobs",
-                module: "jobs",
-                requiredActions: ["view", "create", "edit", "delete"]
-              },
-              {
-                id: "tracking",
-                href: "/tracking",
-                module: "tracking",
-                requiredActions: ["view"]
-              },
+              // `/jobs` route disabled
+              // {
+              //   id: "jobs",
+              //   href: "/jobs",
+              //   module: "jobs",
+              //   requiredActions: ["view", "create", "edit", "delete"]
+              // },
+              // `/tracking` route disabled
+              // {
+              //   id: "tracking",
+              //   href: "/tracking",
+              //   module: "tracking",
+              //   requiredActions: ["view"]
+              // },
               {
                 id: "contractors",
                 href: "/contractors",

@@ -25,6 +25,8 @@ import {
 import { toast } from "sonner";
 import { Eye, Trash2, Tag, Building } from "lucide-react";
 import { Checkbox } from "./ui/checkbox";
+import { ProductDetailsView } from "./products/ProductDetailsView";
+import { usePermissions } from "../contexts/PermissionContext";
 
 type SupplierDocument = {
   label: string;
@@ -68,6 +70,7 @@ export function SupplierDetailsPage({
   supplierData,
   onEdit,
 }: SupplierDetailsPageProps) {
+  const { hasPermission } = usePermissions();
   const data = supplierData || {};
   const userData = data.users || {};
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -87,6 +90,9 @@ export function SupplierDetailsPage({
   const [products, setProducts] = useState<any[]>([]);
   const [productsTotal, setProductsTotal] = useState(0);
   const [productsTotalPages, setProductsTotalPages] = useState(1);
+  const [viewProductId, setViewProductId] = useState<string | null>(null);
+  const [viewProductData, setViewProductData] = useState<any>(null);
+  const [isLoadingViewProduct, setIsLoadingViewProduct] = useState(false);
 
   const itemsPerPage = 10;
 
@@ -203,13 +209,54 @@ export function SupplierDetailsPage({
     return null;
   };
 
-  const hasPermission = () => true;
+  const fetchProductForView = async (productId: string | number) => {
+    if (!apiBaseUrl) return;
+    setIsLoadingViewProduct(true);
+    try {
+      const token =
+        typeof window !== "undefined" && localStorage.getItem("jdp_auth")
+          ? JSON.parse(localStorage.getItem("jdp_auth")!).token
+          : null;
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${apiBaseUrl}/products/getProductById/${productId}`, {
+        method: "GET",
+        headers,
+      });
+
+      const responseData = await response.json().catch(() => ({}));
+      if (!response.ok || !responseData?.success) {
+        throw new Error(responseData?.message || "Failed to fetch product details");
+      }
+
+      setViewProductData(responseData.data);
+    } catch (error) {
+      console.error("Error fetching product details:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to fetch product details");
+      setViewProductData(null);
+      setViewProductId(null);
+    } finally {
+      setIsLoadingViewProduct(false);
+    }
+  };
 
   const handleViewProduct = (product: any) => {
     if (!product?.id) return;
-    if (typeof window !== "undefined") {
-      window.location.href = `/products?viewProductId=${product.id}`;
-    }
+    setViewProductId(String(product.id));
+    fetchProductForView(product.id);
+  };
+
+  const handleCloseProductView = () => {
+    setViewProductId(null);
+    setViewProductData(null);
+    setIsLoadingViewProduct(false);
   };
 
   const rawDocuments = Array.isArray(data.documents)
@@ -446,6 +493,50 @@ export function SupplierDetailsPage({
     [fetchOrdersPage, orderPage, orderTotalPages],
   );
 
+  if (viewProductId) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              onClick={handleCloseProductView}
+              className="gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <div>
+              <h1 className="text-2xl font-semibold text-[#2b2b2b]">
+                Product Details
+              </h1>
+              <p className="text-sm text-gray-500">
+                View complete product information
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <Card className="bg-white shadow-md border-0">
+          <CardContent className="p-6">
+            {isLoadingViewProduct ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <span className="ml-2">Loading product details...</span>
+              </div>
+            ) : viewProductData ? (
+              <ProductDetailsView product={viewProductData} />
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                No product details available.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -464,12 +555,14 @@ export function SupplierDetailsPage({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Button variant="outline" className="gap-2" onClick={onEdit}>
-            <Edit className="h-4 w-4" />
-            Edit
-          </Button>
-        </div>
+        {hasPermission("suppliers", "edit") && (
+          <div className="flex items-center gap-3">
+            <Button variant="outline" className="gap-2" onClick={onEdit}>
+              <Edit className="h-4 w-4" />
+              Edit
+            </Button>
+          </div>
+        )}
       </div>
 
       <Card className="bg-white shadow-md border-0">
@@ -889,16 +982,14 @@ export function SupplierDetailsPage({
 
                       <TableCell>
                         <div className="flex gap-1">
-                          {hasPermission() && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleViewProduct(product)}
-                              title="View product details"
-                            >
-                              <Eye className="h-3 w-3" />
-                            </Button>
-                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewProduct(product)}
+                            title="View product details"
+                          >
+                            <Eye className="h-3 w-3" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>

@@ -214,7 +214,7 @@ export default function DashboardLayout({
           ) : (
             <div
               className={
-                pathname === "/contractor-listing" || pathname === "/tracking"
+                pathname === "/contractor-listing"
                   ? ""
                   : "p-6"
               }
