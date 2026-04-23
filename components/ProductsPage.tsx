@@ -1950,7 +1950,7 @@ useEffect(() => {
             placeholder="0"
             className={`pr-8 ${validationErrors.markupPercentage ? 'border-red-500' : ''}`}
             required
-            readOnly
+            // readOnly
           />
         </div>
         {validationErrors.markupPercentage && (

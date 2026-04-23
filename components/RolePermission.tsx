@@ -749,47 +749,161 @@ const LABOUR_HIDDEN_PERMISSIONS: Record<string, string[]> = {
       setRoleToDelete(null);
     }
   };
+const handlePermissionChange = (modName: string, act: string, allowed: boolean) => {
+  const applyChange = (perms: Permission[]): Permission[] => {
+    let updated = perms.find((p) => p.module === modName && p.action === act)
+      ? perms.map((p) =>
+          p.module === modName && p.action === act ? { ...p, allowed } : p
+        )
+      : [...perms, { module: modName, action: act, allowed }];
 
-  const handlePermissionChange = (modName: string, act: string, allowed: boolean) => {
-    // Applies the direct change + cascades related permissions on check (not on uncheck)
-    const applyChange = (perms: Permission[]): Permission[] => {
-      let updated = perms.find((p) => p.module === modName && p.action === act)
-        ? perms.map((p) => (p.module === modName && p.action === act ? { ...p, allowed } : p))
-        : [...perms, { module: modName, action: act, allowed }];
+    if (!allowed) return updated;
 
-      if (!allowed) return updated;
+    const activeModules = getActiveModulesForRole(
+      formData.roleName,
+      currentRolePlatform
+    );
 
-      const activeModules = getActiveModulesForRole(formData.roleName, currentRolePlatform);
-      for (const dep of getTransitiveDeps(modName, act)) {
-        if (!activeModules.includes(dep.module)) continue;
-        if (!getActionsForModule(dep.module, formData.roleName, currentRolePlatform).includes(dep.action)) continue;
-        if (isPermissionHidden(dep.module, dep.action, formData.roleName)) continue;
+    const autoCheck = (mod: string, depAct: string) => {
+      if (!activeModules.includes(mod)) return;
+      if (!getActionsForModule(mod, formData.roleName, currentRolePlatform).includes(depAct)) return;
+      if (isPermissionHidden(mod, depAct, formData.roleName)) return;
 
-        const existing = updated.find((p) => p.module === dep.module && p.action === dep.action);
-        if (existing) {
-          if (!existing.allowed) {
-            updated = updated.map((p) =>
-              p.module === dep.module && p.action === dep.action ? { ...p, allowed: true } : p
-            );
-          }
-        } else {
-          updated = [...updated, { module: dep.module, action: dep.action, allowed: true }];
+      const existing = updated.find((p) => p.module === mod && p.action === depAct);
+
+      if (existing) {
+        if (!existing.allowed) {
+          updated = updated.map((p) =>
+            p.module === mod && p.action === depAct
+              ? { ...p, allowed: true }
+              : p
+          );
         }
+      } else {
+        updated = [...updated, { module: mod, action: depAct, allowed: true }];
       }
-      return updated;
     };
 
-    if (editingRole) {
-      setRoles((prevRoles) =>
-        prevRoles.map((role) =>
-          role.id === editingRole.id ? { ...role, permissions: applyChange(role.permissions) } : role
-        )
-      );
-      setEditingRole((prev) => (prev ? { ...prev, permissions: applyChange(prev.permissions) } : prev));
-    } else {
-      setNewRolePermissions((prev) => applyChange(prev));
+    const applyDeps = (moduleName: string, actionName: string) => {
+      for (const dep of getTransitiveDeps(moduleName, actionName)) {
+        autoCheck(dep.module, dep.action);
+      }
+    };
+
+    // selected action ki direct dependencies
+    applyDeps(modName, act);
+
+    // create -> view + edit auto check
+    if (act === 'create') {
+      autoCheck(modName, 'view');
+      autoCheck(modName, 'edit');
     }
+
+    // edit -> only view auto check
+    if (act === 'edit') {
+      autoCheck(modName, 'view');
+    }
+
+    // agar edit par view ki dependencies bhi chahiye
+    if (act === 'edit') {
+      applyDeps(modName, 'view');
+    }
+
+    // jobs special handling
+    if (act === 'edit' && modName === 'jobs') {
+      autoCheck(modName, 'view');
+
+      for (const dep of getTransitiveDeps(modName, 'view')) {
+        autoCheck(dep.module, dep.action);
+      }
+    }
+
+    return updated;
   };
+
+  if (editingRole) {
+    setRoles((prevRoles) =>
+      prevRoles.map((role) =>
+        role.id === editingRole.id
+          ? { ...role, permissions: applyChange(role.permissions) }
+          : role
+      )
+    );
+
+    setEditingRole((prev) =>
+      prev ? { ...prev, permissions: applyChange(prev.permissions) } : prev
+    );
+  } else {
+    setNewRolePermissions((prev) => applyChange(prev));
+  }
+};
+  // const handlePermissionChange = (modName: string, act: string, allowed: boolean) => {
+  //   // Applies the direct change + cascades related permissions on check (not on uncheck)
+  //   const applyChange = (perms: Permission[]): Permission[] => {
+  //     let updated = perms.find((p) => p.module === modName && p.action === act)
+  //       ? perms.map((p) => (p.module === modName && p.action === act ? { ...p, allowed } : p))
+  //       : [...perms, { module: modName, action: act, allowed }];
+
+  //     if (!allowed) return updated;
+
+  //     const activeModules = getActiveModulesForRole(formData.roleName, currentRolePlatform);
+
+  //     const autoCheck = (mod: string, depAct: string) => {
+  //       if (!activeModules.includes(mod)) return;
+  //       if (!getActionsForModule(mod, formData.roleName, currentRolePlatform).includes(depAct)) return;
+  //       if (isPermissionHidden(mod, depAct, formData.roleName)) return;
+  //       const existing = updated.find((p) => p.module === mod && p.action === depAct);
+  //       if (existing) {
+  //         if (!existing.allowed) {
+  //           updated = updated.map((p) =>
+  //             p.module === mod && p.action === depAct ? { ...p, allowed: true } : p
+  //           );
+  //         }
+  //       } else {
+  //         updated = [...updated, { module: mod, action: depAct, allowed: true }];
+  //       }
+  //     };
+
+  //     // Cross-module deps from PERMISSION_AUTO_DEPS
+  //     for (const dep of getTransitiveDeps(modName, act)) {
+  //       autoCheck(dep.module, dep.action);
+  //     }
+
+  //     // create → also check view and edit for the same module (all modules)
+  //     if (act === 'create') {
+  //       autoCheck(modName, 'view');
+  //       autoCheck(modName, 'edit');
+  //     }
+  //      if (act === 'edit') {
+  //       autoCheck(modName, 'view');
+  //       autoCheck(modName, 'create');
+  //     }
+
+  //     // jobs:edit → check view for same module + apply cross-module deps from jobs:create and jobs:view
+  //     if (act === 'edit' && modName === 'jobs') {
+  //       autoCheck(modName, 'view');
+  //       for (const dep of getTransitiveDeps(modName, 'create')) {
+  //         autoCheck(dep.module, dep.action);
+  //       }
+  //       for (const dep of getTransitiveDeps(modName, 'view')) {
+  //         autoCheck(dep.module, dep.action);
+  //       }
+  //     }
+
+  //     return updated;
+  //   };
+
+  //   if (editingRole) {
+  //     setRoles((prevRoles) =>
+  //       prevRoles.map((role) =>
+  //         role.id === editingRole.id ? { ...role, permissions: applyChange(role.permissions) } : role
+  //       )
+  //     );
+  //     setEditingRole((prev) => (prev ? { ...prev, permissions: applyChange(prev.permissions) } : prev));
+  //   } else {
+  //     setNewRolePermissions((prev) => applyChange(prev));
+  //   }
+  // };
 
   const handleSelectAll = (act: string, checked: boolean) => {
     if (editingRole) {
