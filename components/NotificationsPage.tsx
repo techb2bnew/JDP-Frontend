@@ -1264,7 +1264,7 @@ export function NotificationsPage() {
           <Badge className="bg-[#E6F6FF] text-[#00A1FF] border-[#00A1FF]/20 hover:bg-[#E6F6FF]">
             {unreadCount} unread
           </Badge>
-          {hasPermission('notification', 'edit') && (
+          {hasPermission("notification", "edit") && (
             <Button
               onClick={handleMarkAllAsRead}
               variant="outline"
@@ -1280,13 +1280,15 @@ export function NotificationsPage() {
 
       <Tabs
         value={mainTab}
-        onValueChange={(value) => setMainTab(value as 'create' | 'list')}
+        onValueChange={(value) => setMainTab(value as "create" | "list")}
         className="space-y-6"
       >
         <Card className="bg-white shadow-md border-0 overflow-hidden">
           <CardContent className="p-0">
             <div className="border-b border-gray-100">
-              <TabsList className={`grid w-full ${canCreateNotification ? 'grid-cols-2' : 'grid-cols-1'} bg-transparent h-12 p-0 gap-0`}>
+              <TabsList
+                className={`grid w-full ${canCreateNotification ? "grid-cols-2" : "grid-cols-1"} bg-transparent h-12 p-0 gap-0`}
+              >
                 {canCreateNotification && (
                   <TabsTrigger
                     value="create"
@@ -1301,7 +1303,8 @@ export function NotificationsPage() {
                   className="flex items-center gap-2 data-[state=active]:bg-[#00A1FF] data-[state=active]:text-white rounded-none"
                 >
                   <Bell className="h-4 w-4" />
-                  Notification List ({pagination.total_count || filteredNotifications.length})
+                  Notification List (
+                  {pagination.total_count || filteredNotifications.length})
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -1312,246 +1315,314 @@ export function NotificationsPage() {
           <TabsContent value="create" className="focus:outline-none">
             <Card className="bg-white shadow-md border-0 w-[70%] mx-auto">
               <CardContent className="space-y-6 p-8">
-              <div className="space-y-2">
-                <label htmlFor="notification-title" className="text-sm font-medium text-[#2b2b2b]">
-                  Notification Title <span className="text-red-500">*</span>
-                </label>
-                <Input
-                  id="notification-title"
-                  placeholder="Enter notification title"
-                  value={notificationForm.title}
-                  onChange={(e) => {
-                    const value = e.target.value
-                    setNotificationForm(prev => ({ ...prev, title: value }))
-                    setFormErrors(prev => ({ ...prev, title: undefined }))
-                  }}
-                />
-                {formErrors.title && (
-                  <p className="text-sm text-red-500">{formErrors.title}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="notification-message" className="text-sm font-medium text-[#2b2b2b]">
-                  Message <span className="text-red-500">*</span>
-                </label>
-                <Textarea
-                  id="notification-message"
-                  placeholder="Enter notification message"
-                  rows={4}
-                  value={notificationForm.message}
-                  onChange={(e) => {
-                    const value = e.target.value
-                    setNotificationForm(prev => ({ ...prev, message: value }))
-                    setFormErrors(prev => ({ ...prev, message: undefined }))
-                  }}
-                />
-                {formErrors.message && (
-                  <p className="text-sm text-red-500">{formErrors.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="notification-link" className="text-sm font-medium text-[#2b2b2b]">
-                  Custom Link (Optional)
-                </label>
-                <Input
-                  id="notification-link"
-                  placeholder="Enter a custom URL or path (e.g., /jobs/JOB-2025-001)"
-                  value={notificationForm.link}
-                  onChange={(e) => setNotificationForm(prev => ({ ...prev, link: e.target.value }))}
-                />
-              </div>
-
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-[#2b2b2b]">Recipients</p>
                 <div className="space-y-2">
-                  <label className="flex items-center gap-3 text-sm text-[#2b2b2b]">
-                    <input
-                      type="radio"
-                      name="recipient-type"
-                      className="h-4 w-4"
-                      checked={notificationForm.recipientType === 'all'}
-                      onChange={() => {
-                        setNotificationForm(prev => ({ ...prev, recipientType: 'all' }))
-                        setFormErrors(prev => ({ ...prev, roles: undefined }))
-                      }}
-                    />
-                    Send to all users
+                  <label
+                    htmlFor="notification-title"
+                    className="text-sm font-medium text-[#2b2b2b]"
+                  >
+                    Notification Title <span className="text-red-500">*</span>
                   </label>
-                  <label className="flex items-center gap-3 text-sm text-[#2b2b2b]">
-                    <input
-                      type="radio"
-                      name="recipient-type"
-                      className="h-4 w-4"
-                      checked={notificationForm.recipientType === 'roles'}
-                      onChange={() => {
-                        setNotificationForm(prev => ({ ...prev, recipientType: 'roles' }))
-                        setFormErrors(prev => ({
-                          ...prev,
-                          roles: notificationForm.selectedRoles.length === 0
-                            ? 'Select at least one role'
-                            : undefined
-                        }))
-                        setShowJobDropdown(false)
-                      }}
-                    />
-                    Send to specific roles
-                  </label>
-                  <label className="flex items-center gap-3 text-sm text-[#2b2b2b]">
-                    <input
-                      type="radio"
-                      name="recipient-type"
-                      className="h-4 w-4"
-                      checked={notificationForm.recipientType === 'job'}
-                      onChange={() => {
-                        setNotificationForm(prev => ({ ...prev, recipientType: 'job' }))
-                        setFormErrors(prev => ({ ...prev, roles: undefined }))
-                        setShowJobDropdown(true)
-                        if (jobResults.length === 0) {
-                          fetchJobsForNotification('')
-                        }
-                      }}
-                    />
-                    Send to specific job
-                  </label>
+                  <Input
+                    id="notification-title"
+                    placeholder="Enter notification title"
+                    value={notificationForm.title}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setNotificationForm((prev) => ({
+                        ...prev,
+                        title: value,
+                      }));
+                      setFormErrors((prev) => ({ ...prev, title: undefined }));
+                    }}
+                  />
+                  {formErrors.title && (
+                    <p className="text-sm text-red-500">{formErrors.title}</p>
+                  )}
                 </div>
 
-                {notificationForm.recipientType === 'roles' && (
-                  <div className="space-y-3">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {isLoadingRoles ? (
-                        <p>Loading roles...</p>
-                      ) : roles.length === 0 ? (
-                        <p>No roles available</p>
-                      ) : (
-                        roles.map(role => (
-                          <label
-                            key={role.id}
-                            className="flex items-center gap-3 rounded-lg border border-gray-200 bg-[#F9FAFB] p-3 text-sm text-[#2b2b2b]"
-                          >
-                            <Checkbox
-                              checked={notificationForm.selectedRoles.includes(role.id)}
-                              onCheckedChange={() => handleToggleRecipientRole(role.id)}
-                            />
-                            {role.roleName}
-                          </label>
-                        ))
-                      )}
-                    </div>
-                    {formErrors.roles && (
-                      <p className="text-sm text-red-500">{formErrors.roles}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Job Selection - Show only when "Send to specific job" is selected */}
-              {notificationForm.recipientType === 'job' && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-[#2b2b2b]">
-                    Select Jobs
+                  <label
+                    htmlFor="notification-message"
+                    className="text-sm font-medium text-[#2b2b2b]"
+                  >
+                    Message <span className="text-red-500">*</span>
                   </label>
-                  <div className="relative" ref={jobDropdownRef}>
-                    <Input
-                      placeholder="Search jobs..."
-                      value={jobSearchTerm}
-                      onChange={(e) => {
-                        setJobSearchTerm(e.target.value)
-                        setShowJobDropdown(true)
-                      }}
-                      onFocus={() => {
-                        setShowJobDropdown(true)
-                        if (jobResults.length === 0) {
-                          fetchJobsForNotification('')
-                        }
-                      }}
-                      className="pl-8"
-                    />
-                    <Search className="absolute left-2.5 top-[20px] h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <Textarea
+                    id="notification-message"
+                    placeholder="Enter notification message"
+                    rows={4}
+                    value={notificationForm.message}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setNotificationForm((prev) => ({
+                        ...prev,
+                        message: value,
+                      }));
+                      setFormErrors((prev) => ({
+                        ...prev,
+                        message: undefined,
+                      }));
+                    }}
+                  />
+                  {formErrors.message && (
+                    <p className="text-sm text-red-500">{formErrors.message}</p>
+                  )}
+                </div>
 
-                    {showJobDropdown && (
-                      <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
-                        {isLoadingJobs ? (
-                          <div className="p-3 text-sm text-gray-500">Searching jobs...</div>
-                        ) : jobResults.length === 0 ? (
-                          <div className="p-3 text-sm text-gray-500">No jobs found</div>
+                <div className="space-y-2">
+                  <label
+                    htmlFor="notification-link"
+                    className="text-sm font-medium text-[#2b2b2b]"
+                  >
+                    Custom Link (Optional)
+                  </label>
+                  <Input
+                    id="notification-link"
+                    placeholder="Enter a custom URL or path (e.g., /jobs/JOB-2025-001)"
+                    value={notificationForm.link}
+                    onChange={(e) =>
+                      setNotificationForm((prev) => ({
+                        ...prev,
+                        link: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-[#2b2b2b]">
+                    Recipients
+                  </p>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-3 text-sm text-[#2b2b2b]">
+                      <input
+                        type="radio"
+                        name="recipient-type"
+                        className="h-4 w-4"
+                        checked={notificationForm.recipientType === "all"}
+                        onChange={() => {
+                          setNotificationForm((prev) => ({
+                            ...prev,
+                            recipientType: "all",
+                          }));
+                          setFormErrors((prev) => ({
+                            ...prev,
+                            roles: undefined,
+                          }));
+                        }}
+                      />
+                      Send to all users
+                    </label>
+                    <label className="flex items-center gap-3 text-sm text-[#2b2b2b]">
+                      <input
+                        type="radio"
+                        name="recipient-type"
+                        className="h-4 w-4"
+                        checked={notificationForm.recipientType === "roles"}
+                        onChange={() => {
+                          setNotificationForm((prev) => ({
+                            ...prev,
+                            recipientType: "roles",
+                          }));
+                          setFormErrors((prev) => ({
+                            ...prev,
+                            roles:
+                              notificationForm.selectedRoles.length === 0
+                                ? "Select at least one role"
+                                : undefined,
+                          }));
+                          setShowJobDropdown(false);
+                        }}
+                      />
+                      Send to specific roles
+                    </label>
+                    <label className="flex items-center gap-3 text-sm text-[#2b2b2b]">
+                      <input
+                        type="radio"
+                        name="recipient-type"
+                        className="h-4 w-4"
+                        checked={notificationForm.recipientType === "job"}
+                        onChange={() => {
+                          setNotificationForm((prev) => ({
+                            ...prev,
+                            recipientType: "job",
+                          }));
+                          setFormErrors((prev) => ({
+                            ...prev,
+                            roles: undefined,
+                          }));
+                          setShowJobDropdown(true);
+                          if (jobResults.length === 0) {
+                            fetchJobsForNotification("");
+                          }
+                        }}
+                      />
+                      Send to specific job
+                    </label>
+                  </div>
+
+                  {notificationForm.recipientType === "roles" && (
+                    <div className="space-y-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {isLoadingRoles ? (
+                          <p>Loading roles...</p>
+                        ) : roles.length === 0 ? (
+                          <p>No roles available</p>
                         ) : (
-                          jobResults.map((job) => {
-                            const isSelected = selectedJobs.some(j => j.id === job.id)
-                            return (
-                              <button
-                                key={job.id}
-                                type="button"
-                                onClick={() => {
-                                  if (isSelected) {
-                                    setSelectedJobs(prev => prev.filter(j => j.id !== job.id))
-                                  } else {
-                                    setSelectedJobs(prev => [...prev, job])
-                                  }
-                                }}
-                                className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
-                              >
-                                <Checkbox
-                                  checked={isSelected}
-                                  onCheckedChange={() => {
-                                    if (isSelected) {
-                                      setSelectedJobs(prev => prev.filter(j => j.id !== job.id))
-                                    } else {
-                                      setSelectedJobs(prev => [...prev, job])
-                                    }
-                                  }}
-                                />
-                                <Briefcase className="mt-0.5 h-4 w-4 text-gray-500" />
-                                <div className="flex-1">
-                                  <p className="font-medium text-[#2b2b2b]">
-                                    {job.title || 'Untitled Job'}
-                                  </p>
-                                  {(job.customerName || job.address) && (
-                                    <p className="text-xs text-gray-500">
-                                      {[job.customerName, job.address].filter(Boolean).join(' • ')}
-                                    </p>
-                                  )}
-                                </div>
-                              </button>
-                            )
-                          })
+                          roles.map((role) => (
+                            <label
+                              key={role.id}
+                              className="flex items-center gap-3 rounded-lg border border-gray-200 bg-[#F9FAFB] p-3 text-sm text-[#2b2b2b]"
+                            >
+                              <Checkbox
+                                checked={notificationForm.selectedRoles.includes(
+                                  role.id,
+                                )}
+                                onCheckedChange={() =>
+                                  handleToggleRecipientRole(role.id)
+                                }
+                              />
+                              {role.roleName}
+                            </label>
+                          ))
                         )}
                       </div>
-                    )}
-                  </div>
-                  {selectedJobs.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      <p className="text-xs text-gray-500">
-                        Selected {selectedJobs.length} job{selectedJobs.length > 1 ? 's' : ''}:
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedJobs.map((job) => (
-                          <Badge
-                            key={job.id}
-                            variant="secondary"
-                            className="flex items-center gap-1"
-                          >
-                            {job.title || `Job ${job.id}`}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedJobs(prev => prev.filter(j => j.id !== job.id))
-                              }}
-                              className="ml-1 hover:text-red-500"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
+                      {formErrors.roles && (
+                        <p className="text-sm text-red-500">
+                          {formErrors.roles}
+                        </p>
+                      )}
                     </div>
                   )}
-                  {formErrors.roles && notificationForm.recipientType === 'job' && (
-                    <p className="mt-1 text-sm text-red-500">{formErrors.roles}</p>
-                  )}
                 </div>
-              )}
+
+                {/* Job Selection - Show only when "Send to specific job" is selected */}
+                {notificationForm.recipientType === "job" && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-[#2b2b2b]">
+                      Select Jobs
+                    </label>
+                    <div className="relative" ref={jobDropdownRef}>
+                      <Input
+                        placeholder="Search jobs..."
+                        value={jobSearchTerm}
+                        onChange={(e) => {
+                          setJobSearchTerm(e.target.value);
+                          setShowJobDropdown(true);
+                        }}
+                        onFocus={() => {
+                          setShowJobDropdown(true);
+                          if (jobResults.length === 0) {
+                            fetchJobsForNotification("");
+                          }
+                        }}
+                        className="pl-8"
+                      />
+                      <Search className="absolute left-2.5 top-[20px] h-4 w-4 -translate-y-1/2 text-gray-400" />
+
+                      {showJobDropdown && (
+                        <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                          {isLoadingJobs ? (
+                            <div className="p-3 text-sm text-gray-500">
+                              Searching jobs...
+                            </div>
+                          ) : jobResults.length === 0 ? (
+                            <div className="p-3 text-sm text-gray-500">
+                              No jobs found
+                            </div>
+                          ) : (
+                            jobResults.map((job) => {
+                              const isSelected = selectedJobs.some(
+                                (j) => j.id === job.id,
+                              );
+                              return (
+                                <button
+                                  key={job.id}
+                                  type="button"
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      setSelectedJobs((prev) =>
+                                        prev.filter((j) => j.id !== job.id),
+                                      );
+                                    } else {
+                                      setSelectedJobs((prev) => [...prev, job]);
+                                    }
+                                  }}
+                                  className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
+                                >
+                                  <Checkbox
+                                    checked={isSelected}
+                                    onCheckedChange={() => {
+                                      if (isSelected) {
+                                        setSelectedJobs((prev) =>
+                                          prev.filter((j) => j.id !== job.id),
+                                        );
+                                      } else {
+                                        setSelectedJobs((prev) => [
+                                          ...prev,
+                                          job,
+                                        ]);
+                                      }
+                                    }}
+                                  />
+                                  <Briefcase className="mt-0.5 h-4 w-4 text-gray-500" />
+                                  <div className="flex-1">
+                                    <p className="font-medium text-[#2b2b2b]">
+                                      {job.title || "Untitled Job"}
+                                    </p>
+                                    {(job.customerName || job.address) && (
+                                      <p className="text-xs text-gray-500">
+                                        {[job.customerName, job.address]
+                                          .filter(Boolean)
+                                          .join(" • ")}
+                                      </p>
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {selectedJobs.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        <p className="text-xs text-gray-500">
+                          Selected {selectedJobs.length} job
+                          {selectedJobs.length > 1 ? "s" : ""}:
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedJobs.map((job) => (
+                            <Badge
+                              key={job.id}
+                              variant="secondary"
+                              className="flex items-center gap-1"
+                            >
+                              {job.title || `Job ${job.id}`}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedJobs((prev) =>
+                                    prev.filter((j) => j.id !== job.id),
+                                  );
+                                }}
+                                className="ml-1 hover:text-red-500"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {formErrors.roles &&
+                      notificationForm.recipientType === "job" && (
+                        <p className="mt-1 text-sm text-red-500">
+                          {formErrors.roles}
+                        </p>
+                      )}
+                  </div>
+                )}
 
                 <div className="flex items-center justify-end">
                   <Button
@@ -1560,9 +1631,9 @@ export function NotificationsPage() {
                     disabled={isSending}
                   >
                     <Send className="h-4 w-4" />
-                    {isSending ? 'Sending...' : 'Send Notification'}
+                    {isSending ? "Sending..." : "Send Notification"}
                   </Button>
-                {/* <Button
+                  {/* <Button
                   onClick={sendNotifications}
                   className="gap-2 text-white"
                   
@@ -1577,8 +1648,6 @@ export function NotificationsPage() {
         )}
 
         <TabsContent value="list" className="space-y-6 focus:outline-none">
-
-
           <Card className="bg-white shadow-md border-0">
             <CardContent className="p-6">
               <div className="flex flex-wrap items-center gap-4">
@@ -1592,10 +1661,13 @@ export function NotificationsPage() {
                   />
                 </div>
 
-                <Select value={filterStatus} onValueChange={(value) => {
-                  setFilterStatus(value)
-                  setCurrentPage(1) // Reset to page 1 when filter changes
-                }}>
+                <Select
+                  value={filterStatus}
+                  onValueChange={(value) => {
+                    setFilterStatus(value);
+                    setCurrentPage(1); // Reset to page 1 when filter changes
+                  }}
+                >
                   <SelectTrigger className="w-40">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
@@ -1606,10 +1678,12 @@ export function NotificationsPage() {
                   </SelectContent>
                 </Select>
 
-
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Filter className="h-4 w-4" />
-                  <span>{pagination.total_count || filteredNotifications.length} notifications</span>
+                  <span>
+                    {pagination.total_count || filteredNotifications.length}{" "}
+                    notifications
+                  </span>
                   {pagination.unread_count > 0 && (
                     <Badge variant="destructive" className="ml-2">
                       {pagination.unread_count} unread
@@ -1625,93 +1699,146 @@ export function NotificationsPage() {
               {isLoadingNotifications ? (
                 <div className="p-12 text-center">
                   <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-[#00A1FF]"></div>
-                  <h3 className="mb-2 text-lg font-medium text-[#2b2b2b]">Loading notifications...</h3>
-                  <p className="text-gray-600">Please wait while we fetch your notifications</p>
+                  <h3 className="mb-2 text-lg font-medium text-[#2b2b2b]">
+                    Loading notifications...
+                  </h3>
+                  <p className="text-gray-600">
+                    Please wait while we fetch your notifications
+                  </p>
                 </div>
               ) : paginatedNotifications.length === 0 ? (
                 <div className="p-12 text-center">
                   <Bell className="mx-auto mb-4 h-12 w-12 text-gray-300" />
-                  <h3 className="mb-2 text-lg font-medium text-[#2b2b2b]">No notifications found</h3>
+                  <h3 className="mb-2 text-lg font-medium text-[#2b2b2b]">
+                    No notifications found
+                  </h3>
                   <p className="text-gray-600">
-                    {searchTerm || filterCategory !== 'all' || filterPriority !== 'all' || filterStatus !== 'all'
-                      ? 'Try adjusting your search criteria or filters'
-                      : 'You\'re all caught up! No notifications to display.'}
+                    {searchTerm ||
+                    filterCategory !== "all" ||
+                    filterPriority !== "all" ||
+                    filterStatus !== "all"
+                      ? "Try adjusting your search criteria or filters"
+                      : "You're all caught up! No notifications to display."}
                   </p>
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">
-                  {paginatedNotifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className={`p-6 transition-colors hover:bg-gray-50 ${!notification.isRead ? 'bg-blue-50 border-l-4 border-[#00A1FF]' : ''}`}
-                    >
-                      <div className="flex items-start gap-4">
-                        <div className="mt-1">
-                          {getNotificationIcon(notification.type)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1">
-                              <h3 className={`font-medium ${!notification.isRead ? 'text-[#2b2b2b]' : 'text-gray-900'}`}>
-                                {notification.title}
-                              </h3>
-                              <p className="mt-1 text-sm text-gray-600 leading-relaxed">{notification.message}</p>
-                              <div className="mt-3 flex items-center gap-3 text-xs">
+                  {paginatedNotifications.map((notification) => {
+                    const recipientTags =
+                      notification.send_to_all ||
+                      !notification.recipient_roles?.length
+                        ? ["All Users"]
+                        : notification.recipient_roles;
+                   return (
+  <div
+    key={notification.id}
+    className={`p-6 transition-colors hover:bg-gray-50 ${
+      !notification.isRead ? "bg-blue-50 border-l-4 border-[#00A1FF]" : ""
+    }`}
+  >
+    <div className="flex items-start gap-4">
+      
+      {/* ICON */}
+      <div className="mt-1">
+        {getNotificationIcon(notification.type)}
+      </div>
 
-                                {notification.relatedId && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {notification.relatedId}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-sm text-gray-500">
-                                {formatTimestamp(
-                                  notification.isRead && notification.read_at
-                                    ? notification.read_at
-                                    : notification.created_at || notification.timestamp
-                                )}
-                              </span>
-                              <div className="flex items-center gap-1">
-                                {hasPermission('notification', 'edit') && (
-                                  notification.isRead ? (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-auto p-1"
-                                    >
-                                      <EyeOff className="h-4 w-4 text-gray-400" />
-                                    </Button>
-                                  ) : (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleMarkAsRead(notification.id)}
-                                      className="h-auto p-1"
-                                    >
-                                      <Eye className="h-4 w-4 text-gray-400" />
-                                    </Button>
-                                  )
-                                )}
-                                {hasPermission('notification', 'delete') && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeleteClick(notification.id)}
-                                    className="h-auto p-1 text-red-500 hover:text-red-700"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                )}
-                              </div>
-                              {!notification.isRead && <div className="h-3 w-3 rounded-full bg-[#00A1FF]" />}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-4">
+          
+          {/* LEFT CONTENT */}
+          <div className="flex-1">
+            
+            {/* TITLE */}
+            <h3
+              className={`font-medium ${
+                !notification.isRead ? "text-[#2b2b2b]" : "text-gray-900"
+              }`}
+            >
+              {notification.title}
+            </h3>
+
+            {/* DESCRIPTION */}
+            <p className="mt-1 text-sm text-gray-600 leading-relaxed">
+              {notification.message}
+            </p>
+
+            {/* ✅ RECIPIENT TAGS (FIXED POSITION) */}
+            <div className="mt-2 flex flex-wrap gap-2">
+              {(notification.send_to_all ||
+              !notification.recipient_roles ||
+              notification.recipient_roles.length === 0
+                ? ["All Users"]
+                : notification.recipient_roles
+              ).map((role, index) => (
+                <Badge
+                  key={`${role}-${index}`}
+                  className="bg-gray-100 text-gray-700 border border-gray-200 text-xs"
+                >
+                  {role}
+                </Badge>
+              ))}
+            </div>
+
+            {/* RELATED ID */}
+            <div className="mt-3 flex items-center gap-3 text-xs">
+              {notification.relatedId && (
+                <Badge variant="outline" className="text-xs">
+                  {notification.relatedId}
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          {/* RIGHT SIDE (TIME + ACTIONS) */}
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-500">
+              {formatTimestamp(
+                notification.isRead && notification.read_at
+                  ? notification.read_at
+                  : notification.created_at || notification.timestamp
+              )}
+            </span>
+
+            <div className="flex items-center gap-1">
+              {hasPermission("notification", "edit") &&
+                (notification.isRead ? (
+                  <Button variant="ghost" size="sm" className="h-auto p-1">
+                    <EyeOff className="h-4 w-4 text-gray-400" />
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleMarkAsRead(notification.id)}
+                    className="h-auto p-1"
+                  >
+                    <Eye className="h-4 w-4 text-gray-400" />
+                  </Button>
+                ))}
+
+              {hasPermission("notification", "delete") && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDeleteClick(notification.id)}
+                  className="h-auto p-1 text-red-500 hover:text-red-700"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+
+            {!notification.isRead && (
+              <div className="h-3 w-3 rounded-full bg-[#00A1FF]" />
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+                  })}
                 </div>
               )}
             </CardContent>
@@ -1721,24 +1848,32 @@ export function NotificationsPage() {
             <div className="flex items-center justify-center gap-2">
               <Button
                 variant="outline"
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1 || isLoadingNotifications}
               >
                 Previous
               </Button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                <Button
-                  key={page}
-                  variant={currentPage === page ? 'default' : 'outline'}
-                  onClick={() => setCurrentPage(page)}
-                  className={currentPage === page ? 'bg-primary text-white hover:bg-[#0090e6]' : ''}
-                >
-                  {page}
-                </Button>
-              ))}
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                (page) => (
+                  <Button
+                    key={page}
+                    variant={currentPage === page ? "default" : "outline"}
+                    onClick={() => setCurrentPage(page)}
+                    className={
+                      currentPage === page
+                        ? "bg-primary text-white hover:bg-[#0090e6]"
+                        : ""
+                    }
+                  >
+                    {page}
+                  </Button>
+                ),
+              )}
               <Button
                 variant="outline"
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                }
                 disabled={currentPage === totalPages || isLoadingNotifications}
               >
                 Next
@@ -1754,14 +1889,17 @@ export function NotificationsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Notification</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this notification? This action cannot be undone.
+              Are you sure you want to delete this notification? This action
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => {
-              setDeleteDialogOpen(false)
-              setNotificationToDelete(null)
-            }}>
+            <AlertDialogCancel
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setNotificationToDelete(null);
+              }}
+            >
               No
             </AlertDialogCancel>
             <AlertDialogAction
@@ -1774,5 +1912,5 @@ export function NotificationsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  )
+  );
 }

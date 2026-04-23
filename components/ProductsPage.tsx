@@ -92,6 +92,7 @@ interface Supplier {
   contractEnd: string;
   totalOrders: number;
   notes: string;
+  jdp_supplier?: string;
 }
 
 type ProductAction = 'add' | 'edit' | 'view' | 'delete';
@@ -1032,7 +1033,8 @@ useEffect(() => {
           totalOrders: apiSupplier.total_orders || 0,
           unit_cost:apiSupplier.unit_cost || 0,
           estimated_price:apiSupplier.estimated_price || 0,
-          notes: apiSupplier.notes || ''
+          notes: apiSupplier.notes || '',
+          jdp_supplier: apiSupplier.jdp_supplier || ''
 
         }));
 
@@ -1175,6 +1177,13 @@ useEffect(() => {
           unit_cost:apiProduct.unit_cost || 0,
           estimated_price:apiProduct.estimated_price|| 0
         };
+
+        if (apiProduct.is_custom === true) {
+          const customSupplier = suppliers.find(s => s.jdp_supplier === 'custom_product');
+          if (customSupplier) {
+            productData.supplier = customSupplier.id;
+          }
+        }
 
         setFormData(productData);
         return productData;

@@ -39,6 +39,7 @@ interface Supplier {
   contractStart: string
   contractEnd: string
   totalOrders: number
+  totalProducts: number
   notes?: string
   supplier:string
 }
@@ -696,6 +697,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
           contractStart: apiSupplier.contract_start || '',
           contractEnd: apiSupplier.contract_end || '',
           totalOrders: apiSupplier.total_orders || 0,
+          totalProducts: apiSupplier.total_products || 0,
           notes: apiSupplier.notes || ''
         }))
 
@@ -744,7 +746,8 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
         status: supplier.users?.status?.toLowerCase() || 'N/A',
         fullName: supplier.users?.full_name || 'N/A',
         role: supplier.users?.role || 'N/A',
-        totalOrders: supplier.total_orders || 0
+        totalOrders: supplier.total_orders || 0,
+        totalProducts: supplier.total_products || 0
       }))
 
       setFilteredSuppliers(transformedData)
@@ -778,7 +781,9 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
       setIsLoading(true)
       try {
         const res = await apiClient.searchSuppliersByStatus(filterStatus, 1, itemsPerPage)
-        const supplierList = res.data?.suppliers || []
+        const supplierList = res.data?.suppliers || [];
+        console.log(supplierList,"supplierList");
+        
         const transformed = supplierList.map((apiSupplier: any) => ({
           id: apiSupplier.id.toString(),
           supplierId: apiSupplier.supplier_code || '',
@@ -793,6 +798,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
           contractStart: apiSupplier.contract_start || '',
           contractEnd: apiSupplier.contract_end || '',
           totalOrders: apiSupplier.total_orders || 0,
+          totalProducts: apiSupplier.total_products || 0,
           notes: apiSupplier.notes || ''
         }))
         setSuppliers(transformed)
@@ -1102,6 +1108,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
                 <TableHead className="text-white font-medium">Contact Person</TableHead>
                 <TableHead className="text-white font-medium">Orders</TableHead>
                 <TableHead className="text-white font-medium">Status</TableHead>
+                <TableHead className="text-white font-medium">Total Products</TableHead>
                 <TableHead className="text-white font-medium">Action</TableHead>
               </TableRow>
             </TableHeader>
@@ -1161,6 +1168,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
                     </TableCell>
                     <TableCell className="text-sm text-[#2b2b2b]/80">{supplier.totalOrders}</TableCell>
                     <TableCell>{getStatusBadge(supplier.status)}</TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80">{supplier.totalProducts}</TableCell>
                     <TableCell>
                       <ActionButtonsPopup
                         onView={() => handleView(supplier)}
