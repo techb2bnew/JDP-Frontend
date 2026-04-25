@@ -184,6 +184,12 @@ export function BlueSheetApprovalDialog({
   };
 
   const getSelectedBlueSheetIds = (): number[] => {
+    // Priority 1: explicit IDs array passed by caller (e.g. JobDetailsPage)
+    if (Array.isArray(selectedBlueSheetIds) && selectedBlueSheetIds.length > 0) {
+      return Array.from(new Set(selectedBlueSheetIds));
+    }
+
+    // Priority 2: extract IDs from selectedBlueSheets objects (e.g. ApprovalsPage)
     const idsFromSelection = Array.isArray(selectedBlueSheets)
       ? selectedBlueSheets
           .map((bs) => getBlueSheetId(bs))
@@ -193,6 +199,7 @@ export function BlueSheetApprovalDialog({
     const uniqueFromSelection = Array.from(new Set(idsFromSelection));
     if (uniqueFromSelection.length > 0) return uniqueFromSelection;
 
+    // Fallback: single blueSheet prop
     const fallbackId = getBlueSheetId(blueSheet);
     return fallbackId != null ? Array.from(new Set([fallbackId])) : [];
   };
@@ -1410,7 +1417,13 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                     Bill To
                                   </p>
                                   <p className="text-xs font-medium text-[#1a1a2e]">
-                                    BlueSheet: PO BS-{blueSheet.id}
+                                    BlueSheet: PO{" "}
+                                    {(() => {
+                                      const ids = getSelectedBlueSheetIds();
+                                      return getSelectedBlueSheetIds().length > 0
+                                        ? getSelectedBlueSheetIds().map((id) => `BS-${id}`).join(", ")
+                                        : `BS-${blueSheet.id}`;
+                                    })()}
                                   </p>
                                   <p className="text-[11px] text-gray-600">
                                     (
@@ -2802,7 +2815,13 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                   PO / BlueSheet
                                 </Label>
                                 <p className="text-sm font-mono mt-0.5">
-                                  BS-{currentBlueSheet.id}
+                                  {/* BS-{currentBlueSheet.id} */}
+                                  {(() => {
+                                      const ids = getSelectedBlueSheetIds();
+                                      return getSelectedBlueSheetIds().length > 0
+                                        ? getSelectedBlueSheetIds().map((id) => `BS-${id}`).join(", ")
+                                        : `BS-${currentBlueSheet.id}`;
+                                    })()}
                                 </p>
                                 <p className="text-xs text-slate-500">
                                   Created on{" "}
@@ -2851,6 +2870,70 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                 </p>
                               </div>
                             </div>
+
+                            <Separator />
+
+                            {/* BlueSheet uploaded images */}
+                            {(() => {
+                              const sources =
+                                selectedBlueSheets && selectedBlueSheets.length > 0
+                                  ? selectedBlueSheets
+                                  : blueSheet
+                                  ? [blueSheet]
+                                  : [];
+                              const sheetsWithImages = sources
+                                .map((bs: any) => ({
+                                  id: bs.id ?? bs.blueSheetId ?? bs.bluesheet_id,
+                                  images: Array.isArray(bs.images)
+                                    ? (bs.images as string[]).filter(Boolean)
+                                    : bs.images
+                                    ? [bs.images as string]
+                                    : [],
+                                }))
+                                .filter((bs) => bs.images.length > 0);
+
+                              if (sheetsWithImages.length === 0) return null;
+
+                              const isMultiple = sheetsWithImages.length > 1;
+                              return (
+                                <div>
+                                  <Label className="text-xs font-semibold uppercase text-slate-500 mb-3 block">
+                                    Uploaded Images
+                                  </Label>
+                                  <div
+                                    className="space-y-4 overflow-y-auto pr-1"
+                                    style={{ maxHeight: 250 }}
+                                  >
+                                    {sheetsWithImages.map((bs) => (
+                                      <div key={bs.id}>
+                                        {isMultiple && (
+                                          <p className="text-xs font-semibold text-slate-600 mb-2">
+                                            BlueSheet #{bs.id} Images
+                                          </p>
+                                        )}
+                                        <div className="flex flex-wrap gap-2">
+                                          {bs.images.map((url, idx) => (
+                                            <a
+                                              key={idx}
+                                              href={url}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              title={`BlueSheet #${bs.id} — image ${idx + 1}`}
+                                            >
+                                              <img
+                                                src={url}
+                                                alt={`BlueSheet #${bs.id} image ${idx + 1}`}
+                                                className="w-20 h-20 object-cover rounded-lg border border-slate-200 hover:opacity-75 transition-opacity cursor-pointer"
+                                              />
+                                            </a>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })()}
 
                             <Separator />
 
