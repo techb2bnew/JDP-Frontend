@@ -17,7 +17,8 @@ import {
   X,
   Eye,
   DollarSign,
-  Briefcase
+  Briefcase,
+  Upload
 } from 'lucide-react'
 import { format, parse, startOfWeek, addDays } from 'date-fns'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
@@ -26,6 +27,7 @@ import { apiClient } from '@/utils/api'
 import { LoadingSpinner } from './common/LoadingSpinner'
 import { Calendar as MultiDateCalendar, DateObject } from "react-multi-date-picker"
 import { normalizeSingleRangeSelection, sortedDatesFromPickerRange } from '@/utils/dateRangeSelection'
+import { Checkbox } from './ui/checkbox'
 
 
 
@@ -97,6 +99,7 @@ const [selectedTimesheet, setSelectedTimesheet] = useState<TimesheetItem | null>
 const [showTimesheetDetail, setShowTimesheetDetail] = useState(false);
 const [timesheetViewData, setTimesheetViewData] = useState<any>(null);
 const [isLoadingTimesheetView, setIsLoadingTimesheetView] = useState(false);
+const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
 
 
   const [dashboardStats, setDashboardStats] = useState({
@@ -625,6 +628,62 @@ const fetchTimesheetsByDateRange = async () => {
 
 
 
+useEffect(() => {
+  setSelectedRows(new Set());
+}, [filteredTimesheets]);
+
+const handleExportTimesheets = async () => {
+  if (selectedRows.size === 0) {
+    const { toast } = await import('sonner');
+    toast.error('Please select at least one timesheet to export.');
+    return;
+  }
+
+  const headers = [
+    'Employee', 'Week Period',
+    'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun',
+    'Total Hours', 'Hourly Rate', 'Total Pay', 'Payment Status', 'Payment Date'
+  ];
+
+  const selectedItems = filteredTimesheets.filter((_, idx) => selectedRows.has(idx));
+
+  const rows = selectedItems.map((item: any) => {
+    const totalHours = parseHours(item.total);
+    const hourlyRate = item.hourly_rate;
+    const totalPay = item.weekly_payment || (totalHours * hourlyRate);
+    const isPaid = item.status.toLowerCase() === 'approved';
+    const paymentDate = isPaid ? format(new Date(), 'MMM d, yyyy') : '-';
+    return [
+      item.employee,
+      item.week,
+      item.mon, item.tue, item.wed, item.thu, item.fri, item.sat, item.sun,
+      item.total,
+      `${formatCurrency(hourlyRate)}/hr`,
+      formatCurrency(totalPay),
+      isPaid ? 'Paid' : 'Pending',
+      paymentDate
+    ];
+  });
+
+  let csvContent = headers.join(',') + '\n';
+  rows.forEach(row => {
+    csvContent += row.map((field: any) => {
+      const value = field === null || field === undefined ? '' : String(field);
+      return `"${value.replace(/"/g, '""')}"`;
+    }).join(',') + '\n';
+  });
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `timesheets_export_${new Date().toISOString().split('T')[0]}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
   console.log('TimesheetsPage render - filteredTimesheets:', filteredTimesheets.length, 'items');
   
   // Render timesheet detail view if selected
@@ -990,6 +1049,10 @@ const fetchTimesheetsByDateRange = async () => {
               </div>
 
               <span className="text-sm text-muted-foreground">{filteredTimesheets.length} timesheets</span>
+              <Button variant="outline" className="gap-2" onClick={handleExportTimesheets}>
+                <Upload className="h-4 w-4" />
+                Export
+              </Button>
             </div>
 
           </div>
@@ -1004,6 +1067,25 @@ const fetchTimesheetsByDateRange = async () => {
             <Table>
               <TableHeader className="bg-slate-800 text-slate-50">
                 <TableRow>
+                  <TableHead className="text-white w-10">
+                    <Checkbox
+                      checked={
+                        filteredTimesheets.length > 0 && selectedRows.size === filteredTimesheets.length
+                          ? true
+                          : selectedRows.size > 0
+                          ? 'indeterminate'
+                          : false
+                      }
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedRows(new Set(filteredTimesheets.map((_, i) => i)));
+                        } else {
+                          setSelectedRows(new Set());
+                        }
+                      }}
+                      className="border-white data-[state=checked]:bg-white data-[state=checked]:text-slate-800 data-[state=indeterminate]:bg-white data-[state=indeterminate]:text-slate-800"
+                    />
+                  </TableHead>
                   <TableHead className="text-white">Employee</TableHead>
                   <TableHead className="text-white">Week Period</TableHead>
                   {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => <TableHead key={day} className="text-white text-center">{day}</TableHead>)}
@@ -1026,6 +1108,19 @@ const fetchTimesheetsByDateRange = async () => {
                     
                     return (
                       <TableRow key={`timesheet-${index}-${item.employee}-${item.job}-${item.week}`} className="odd:bg-white even:bg-slate-50">
+                        <TableCell className="w-10">
+                          <Checkbox
+                            checked={selectedRows.has(index)}
+                            onCheckedChange={(checked) => {
+                              setSelectedRows(prev => {
+                                const next = new Set(prev);
+                                if (checked) next.add(index);
+                                else next.delete(index);
+                                return next;
+                              });
+                            }}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">
                           {item.employee}
                           {/* {item.laborId && <span className="text-xs text-muted-foreground ml-1">(EMP-{String(item.laborId).padStart(3, '0')})</span>} */}
@@ -1101,7 +1196,7 @@ const fetchTimesheetsByDateRange = async () => {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={15} className="text-center py-6 text-muted-foreground">
+                    <TableCell colSpan={16} className="text-center py-6 text-muted-foreground">
                       No matching timesheets found.
                     </TableCell>
                   </TableRow>
