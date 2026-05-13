@@ -22,6 +22,7 @@ import {
   Shield
 } from 'lucide-react'
 import { apiClient } from '@/utils/api'
+import { getCompactPaginationItems } from '@/utils/pagination'
 import { usePermissions } from '../contexts/PermissionContext'
 import { SupplierFormData, SupplierFormDialog } from './common/SupplierFormDialog'
 
@@ -1191,7 +1192,7 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
       </Card>
 
       {totalSuppliers > itemsPerPage && (
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-2">
           <Button
             variant="outline"
             onClick={() => {
@@ -1204,19 +1205,29 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
             Previous
           </Button>
 
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-            <Button
-              key={page}
-              variant={currentPage === page ? 'default' : 'outline'}
-              onClick={() => {
-                setCurrentPage(page)
-                fetchSuppliersData(page, itemsPerPage)
-              }}
-              className={currentPage === page ? 'bg-primary text-white hover:bg-[#0090e6]' : ''}
-            >
-              {page}
-            </Button>
-          ))}
+          {getCompactPaginationItems(currentPage, totalPages).map((item, idx) =>
+            item === 'ellipsis' ? (
+              <span
+                key={`ellipsis-${idx}`}
+                className="flex min-w-9 items-center justify-center px-1 text-muted-foreground select-none"
+                aria-hidden
+              >
+                …
+              </span>
+            ) : (
+              <Button
+                key={item}
+                variant={currentPage === item ? 'default' : 'outline'}
+                onClick={() => {
+                  setCurrentPage(item)
+                  fetchSuppliersData(item, itemsPerPage)
+                }}
+                className={currentPage === item ? 'bg-primary text-white hover:bg-[#0090e6]' : ''}
+              >
+                {item}
+              </Button>
+            ),
+          )}
 
           <Button
             variant="outline"

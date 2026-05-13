@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { JobDetailsPage } from './JobDetailsPage'
 import { apiClient } from '../utils/api'
@@ -998,6 +998,11 @@ export function ContractorListingPage() {
   const [itemsPerPage] = useState(10)
   const [isLoadingContractors, setIsLoadingContractors] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const hadNonEmptySearchRef = useRef(false)
+  const contractorsListFetchRef = useRef<{
+    key: string
+    promise: Promise<void>
+  } | null>(null)
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
@@ -1067,34 +1072,53 @@ export function ContractorListingPage() {
   }, [showCreateContractModal]);
 
   // Fetch contractors data
-  const fetchContractorsData = async () => {
-    try {
-      setIsLoadingContractors(true)
-
-      const response = await globalApiCall(`${apiBaseUrl}/contractor/getContractors?include_jobs=true&page=${currentPage}&limit=${itemsPerPage}`, {
-        method: 'GET'
-      })
-
-      const responseData = await response.json()
-      console.log('Contractors with Jobs API Response:', responseData)
-
-      if (responseData.success && responseData.data) {
-        setContractors(responseData.data.contractors || [])
-        setTotalContractors(responseData.data.pagination?.total || 0)
-      } else {
-        console.error('Invalid contractors API response structure:', responseData)
-        setContractors([])
-        setTotalContractors(0)
-      }
-    } catch (error) {
-      console.error('Error fetching contractors:', error)
-      if (!(error instanceof Error && error.message?.includes('Session expired'))) {
-        setContractors([])
-        setTotalContractors(0)
-      }
-    } finally {
-      setIsLoadingContractors(false)
+  const fetchContractorsData = async (options?: { force?: boolean }) => {
+    const key = `${currentPage}|${itemsPerPage}`
+    if (options?.force) {
+      contractorsListFetchRef.current = null
     }
+    if (!options?.force) {
+      const existing = contractorsListFetchRef.current
+      if (existing?.key === key) {
+        return existing.promise
+      }
+    }
+
+    const promise = (async () => {
+      try {
+        setIsLoadingContractors(true)
+
+        const response = await globalApiCall(`${apiBaseUrl}/contractor/getContractors?include_jobs=true&page=${currentPage}&limit=${itemsPerPage}`, {
+          method: 'GET'
+        })
+
+        const responseData = await response.json()
+        console.log('Contractors with Jobs API Response:', responseData)
+
+        if (responseData.success && responseData.data) {
+          setContractors(responseData.data.contractors || [])
+          setTotalContractors(responseData.data.pagination?.total || 0)
+        } else {
+          console.error('Invalid contractors API response structure:', responseData)
+          setContractors([])
+          setTotalContractors(0)
+        }
+      } catch (error) {
+        console.error('Error fetching contractors:', error)
+        if (!(error instanceof Error && error.message?.includes('Session expired'))) {
+          setContractors([])
+          setTotalContractors(0)
+        }
+      } finally {
+        setIsLoadingContractors(false)
+        if (contractorsListFetchRef.current?.key === key) {
+          contractorsListFetchRef.current = null
+        }
+      }
+    })()
+
+    contractorsListFetchRef.current = { key, promise }
+    return promise
   }
 
   // Filter and sort contractors (status + sort only; search is server-side via globalSearch)
@@ -1139,22 +1163,26 @@ export function ContractorListingPage() {
   const totalPages = Math.ceil(totalContractors / itemsPerPage)
   const displayContractors = filteredContractors
 
-  // Fetch contractors when page changes
+  // Fetch contractors when page or page size changes (single effect — duplicate [currentPage] blocks were removed)
   useEffect(() => {
-    fetchContractorsData()
-  }, [currentPage])
+    void fetchContractorsData()
+  }, [currentPage, itemsPerPage])
 
   // Server-side search for contractors or their jobs using globalSearch API
   useEffect(() => {
     const runSearch = async () => {
       const term = searchTerm.trim()
 
-      // If search cleared, reload current page contractors
+      // Empty search: avoid duplicate getContractors on mount (pagination effect loads). Refetch only after user clears a real search.
       if (!term) {
-        fetchContractorsData()
+        if (hadNonEmptySearchRef.current) {
+          hadNonEmptySearchRef.current = false
+          void fetchContractorsData({ force: true })
+        }
         return
       }
 
+      hadNonEmptySearchRef.current = true
       try {
         setIsLoadingContractors(true)
 
@@ -1351,7 +1379,7 @@ export function ContractorListingPage() {
         setShowDeleteAlert(false)
         setContractorToDelete(null)
         // Refresh contractors list
-        await fetchContractorsData()
+        await fetchContractorsData({ force: true })
       } else {
         toast.error(responseData.message || 'Failed to delete contractor')
       }
@@ -1374,11 +1402,6 @@ export function ContractorListingPage() {
   useEffect(() => {
     setCurrentPage(1)
   }, [searchTerm, statusFilter])
-
-  // Fetch data on component mount and page changes
-  useEffect(() => {
-    fetchContractorsData()
-  }, [currentPage])
 
   // Expand all contractors, jobs, and sub-jobs when data is loaded
   useEffect(() => {
@@ -1526,7 +1549,7 @@ export function ContractorListingPage() {
         setEditingContractor(null)
         setIsEditMode(false)
         // Refresh contractors list
-        await fetchContractorsData()
+        await fetchContractorsData({ force: true })
       } else {
         const errorMessage = isEditMode ? 'Failed to update contractor' : 'Failed to create contractor'
         toast.error(responseData.message || errorMessage)
@@ -3022,7 +3045,7 @@ export function ContractorListingPage() {
               <ContractorDetailsPage
                 contractorId={selectedContractor}
                 onBack={handleBackFromContractorDetails}
-                onJobsMutated={fetchContractorsData}
+                onJobsMutated={() => void fetchContractorsData({ force: true })}
               />
             </div>
           ) : null}
@@ -3241,7 +3264,7 @@ export function ContractorListingPage() {
                         onBack={() => setSelectedSubJob(null)}
                         jobs={allJobs}
                         setJobs={handleSetJobs}
-                        onJobsRefresh={fetchContractorsData}
+                        onJobsRefresh={() => void fetchContractorsData({ force: true })}
                         onViewSubJob={(subJobId) =>
                           selectSubJob(subJobId, selectedJob!, selectedContractor!)
                         }
@@ -3338,7 +3361,7 @@ export function ContractorListingPage() {
                         onBack={() => setSelectedJob(null)}
                         jobs={allJobs}
                         setJobs={handleSetJobs}
-                        onJobsRefresh={fetchContractorsData}
+                        onJobsRefresh={() => void fetchContractorsData({ force: true })}
                         onViewSubJob={(subJobId) =>
                           selectSubJob(
                             subJobId,

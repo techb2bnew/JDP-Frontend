@@ -15,6 +15,7 @@ import { AutoSuggestInput } from './ui/auto-suggest-input'
 import { toast } from 'sonner'
 import { getAuthToken, handleTokenRevocation } from '../utils/globalApiHandler'
 import { getYesterdayLocalDateString, validateDobValue } from '../utils/dobValidation'
+import { getCompactPaginationItems } from '@/utils/pagination'
 import { 
   Plus, 
   Search, 
@@ -396,7 +397,7 @@ const getAvailabilityBadge = (availability: string) => {
     
     try {
       setIsCreatingLabor(true)
-      loadingToastId = toast.loading('Creating labor worker...');
+      loadingToastId = toast.loading('Creating labour worker...');
       
       const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -1812,7 +1813,8 @@ const fetchLaborById = async (id: string) => {
 
       {/* Pagination */}
     
-        {(totalLabor > itemsPerPage) &&  <div className="flex items-center justify-center gap-2">
+        {(totalLabor > itemsPerPage) && (
+        <div className="flex flex-wrap items-center justify-center gap-2">
           <Button
             variant="outline"
             onClick={() => {
@@ -1824,20 +1826,30 @@ const fetchLaborById = async (id: string) => {
           >
             Previous
           </Button>
-          
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-            <Button
-              key={page}
-              variant={currentPage === page ? "default" : "outline"}
-              onClick={() => {
-                setCurrentPage(page);
-                fetchLaborData(page, itemsPerPage);
-              }}
-              className={currentPage === page ? "bg-primary text-white hover:bg-[#0090e6]" : ""}
-            >
-              {page}
-            </Button>
-          ))}
+
+          {getCompactPaginationItems(currentPage, totalPages).map((item, idx) =>
+            item === "ellipsis" ? (
+              <span
+                key={`ellipsis-${idx}`}
+                className="flex min-w-9 items-center justify-center px-1 text-muted-foreground select-none"
+                aria-hidden
+              >
+                …
+              </span>
+            ) : (
+              <Button
+                key={item}
+                variant={currentPage === item ? "default" : "outline"}
+                onClick={() => {
+                  setCurrentPage(item);
+                  fetchLaborData(item, itemsPerPage);
+                }}
+                className={currentPage === item ? "bg-primary text-white hover:bg-[#0090e6]" : ""}
+              >
+                {item}
+              </Button>
+            ),
+          )}
           
           <Button
             variant="outline"
@@ -1850,7 +1862,8 @@ const fetchLaborById = async (id: string) => {
           >
             Next
           </Button>
-        </div>}
+        </div>
+        )}
     
 
       {/* Edit Dialog */}

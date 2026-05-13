@@ -130,6 +130,22 @@ export default function CommonEntityListing({
     return `${words.slice(0, maxWords).join(" ")}...`;
   };
 
+  /** Parent row title: up to 4 words + …; long single tokens (no spaces) get a character cap. */
+  const formatListingParentName = (
+    value?: string,
+    maxWords = 2,
+    maxCharsSingleToken = 15,
+  ) => {
+    if (!value) return "";
+    const trimmed = value.trim();
+    const words = trimmed.split(/\s+/);
+    if (words.length > maxWords) return truncateWords(trimmed, maxWords);
+    if (words.length === 1 && trimmed.length > maxCharsSingleToken) {
+      return truncateChars(trimmed, maxCharsSingleToken);
+    }
+    return trimmed;
+  };
+
   const truncateChars = (value?: string, maxChars = 15) => {
     if (!value) return "";
     const text = value.trim();
@@ -247,7 +263,7 @@ export default function CommonEntityListing({
 
                               <div className="min-w-0 flex-1">
                                 <div className="text-[13.4px] font-semibold leading-snug text-slate-800 break-words capitalize">
-                                  {getParentName(entity)}
+                                  {formatListingParentName(getParentName(entity))}
                                 </div>
                                 <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
                                   <span>{totalJobs} jobs</span>

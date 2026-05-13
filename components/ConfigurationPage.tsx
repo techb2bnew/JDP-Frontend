@@ -45,13 +45,17 @@ export function ConfigurationPage() {
     return basePrice * (1 + markupPercentage / 100);
   };
 
-  // Load configuration data on component mount
+  // Load configuration once per mount; duplicate in-flight GETs are deduped in apiClient.
   useEffect(() => {
+    let cancelled = false;
+
     const loadConfiguration = async () => {
       try {
         setIsLoading(true);
         const response = await apiClient.getFullConfiguration();
-        
+
+        if (cancelled) return;
+
         if (response.success && response.data) {
           // Transform API data to match our component format
           const loadedTiers = response.data.hourly_rates.map((rate: any) => {
@@ -84,8 +88,6 @@ export function ConfigurationPage() {
           // Store original loaded data for reset functionality
           setOriginalLoadedTiers(finalTiers);
           setOriginalLoadedMarkup(response.data.markup_percentage);
-          
-          console.log('Configuration loaded:', response.data);
         } else {
           // If no data from API, set default 2 empty tiers
           const defaultTiers = [
@@ -96,15 +98,22 @@ export function ConfigurationPage() {
           setOriginalLoadedTiers(defaultTiers);
         }
       } catch (error) {
-        console.error('Error loading configuration:', error);
-        toast.error('Failed to load configuration data');
+        if (!cancelled) {
+          console.error('Error loading configuration:', error);
+          toast.error('Failed to load configuration data');
+        }
         // Keep default values if loading fails
       } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
     loadConfiguration();
+    return () => {
+      cancelled = true;
+    };
   }, []);
  
   // Fixed 2 tiers - no add/remove functionality

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
@@ -210,6 +210,11 @@ export default function RolePermission() {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+  const rolesListFetchRef = useRef<{
+    gen: number;
+    promise: Promise<void>;
+  } | null>(null);
+  const rolesLoadGenRef = useRef(0);
   // State to track permissions for new roles
   const [newRolePermissions, setNewRolePermissions] = useState<Permission[]>([]);
 
@@ -220,48 +225,70 @@ export default function RolePermission() {
   const [viewingRole, setViewingRole] = useState<Role | null>(null);
   const [isLoadingViewRole, setIsLoadingViewRole] = useState(false);
 
-  const fetchRoles = useCallback(async () => {
-    setIsLoadingRoles(true);
-    try {
-      const token = localStorage.getItem('jdp_auth')
-        ? JSON.parse(localStorage.getItem('jdp_auth')!).token
-        : null;
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+  const fetchRoles = useCallback(async (options?: { force?: boolean }) => {
+    if (options?.force) {
+      rolesListFetchRef.current = null;
+    }
+    if (!options?.force && rolesListFetchRef.current) {
+      return rolesListFetchRef.current.promise;
+    }
 
-      const response = await fetch(`${apiBaseUrl}/permissions/roles-with-permissions`, {
-        method: 'GET',
-        headers
-      });
+    const gen = ++rolesLoadGenRef.current;
 
-      if (response.ok) {
-        const responseData = await response.json();
+    const promise = (async () => {
+      setIsLoadingRoles(true);
+      try {
+        const token = localStorage.getItem('jdp_auth')
+          ? JSON.parse(localStorage.getItem('jdp_auth')!).token
+          : null;
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        if (responseData.success && responseData.data) {
-          const transformedRoles = responseData.data.map((apiRole: any) => ({
-            id: apiRole.id.toString(),
-            roleName: apiRole.role_name || '',
-            description: apiRole.description || '',
-            allowedPermissions: apiRole.allowedPermissions ?? apiRole.allowed_permissions ?? 0,
-            roleType: apiRole.role_type || '',
-            platform: apiRole.platform || '',
-            permissions: apiRole.permissions || [],
-            createdAt: apiRole.created_at ? apiRole.created_at.split('T')[0] : '',
-            updatedAt: apiRole.updated_at ? apiRole.updated_at.split('T')[0] : ''
-          }));
-          setRoles(transformedRoles);
+        const base = process.env.NEXT_PUBLIC_API_URL;
+        if (!base) {
+          setRoles([]);
+          return;
+        }
+        const response = await fetch(`${base}/permissions/roles-with-permissions`, {
+          method: 'GET',
+          headers
+        });
+
+        if (response.ok) {
+          const responseData = await response.json();
+
+          if (responseData.success && responseData.data) {
+            const transformedRoles = responseData.data.map((apiRole: any) => ({
+              id: apiRole.id.toString(),
+              roleName: apiRole.role_name || '',
+              description: apiRole.description || '',
+              allowedPermissions: apiRole.allowedPermissions ?? apiRole.allowed_permissions ?? 0,
+              roleType: apiRole.role_type || '',
+              platform: apiRole.platform || '',
+              permissions: apiRole.permissions || [],
+              createdAt: apiRole.created_at ? apiRole.created_at.split('T')[0] : '',
+              updatedAt: apiRole.updated_at ? apiRole.updated_at.split('T')[0] : ''
+            }));
+            setRoles(transformedRoles);
+          } else {
+            setRoles([]);
+          }
         } else {
           setRoles([]);
         }
-      } else {
+      } catch (error) {
         setRoles([]);
+      } finally {
+        setIsLoadingRoles(false);
+        if (rolesListFetchRef.current?.gen === gen) {
+          rolesListFetchRef.current = null;
+        }
       }
-    } catch (error) {
-      setRoles([]);
-    } finally {
-      setIsLoadingRoles(false);
-    }
-  }, [apiBaseUrl]);
+    })();
+
+    rolesListFetchRef.current = { gen, promise };
+    return promise;
+  }, []);
 
 
 
@@ -736,7 +763,7 @@ const LABOUR_HIDDEN_PERMISSIONS: Record<string, string[]> = {
 
       if (response.ok) {
         toast.success('Role deleted successfully!');
-        await fetchRoles();
+        await fetchRoles({ force: true });
       } else {
         const errorData = await response.json().catch(() => ({}));
         toast.error(`${errorData.message || 'Unknown error'}`);
@@ -1141,7 +1168,7 @@ const handlePermissionChange = (modName: string, act: string, allowed: boolean) 
               updateUserPermissions(updatedPermissions);
               toast.success('Your permissions have been updated!');
             }
-            fetchRoles();
+            void fetchRoles({ force: true });
           } else {
             toast.error(`Failed to update role: ${responseData.message || 'Unknown error'}`);
           }
@@ -1164,7 +1191,7 @@ const handlePermissionChange = (modName: string, act: string, allowed: boolean) 
           const responseData = await response.json();
           if (responseData.success) {
             toast.success('Role created successfully!');
-            fetchRoles();
+            void fetchRoles({ force: true });
           } else {
             toast.error(`Failed to create role: ${responseData.message || 'Unknown error'}`);
           }

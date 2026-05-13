@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { globalApiCall, getAuthToken, handleTokenRevocation } from '../utils/globalApiHandler'
 import { getYesterdayLocalDateString, validateDobValue } from '../utils/dobValidation'
+import { getCompactPaginationItems } from '../utils/pagination'
 import PhoneInput from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
 import Autocomplete from "react-google-autocomplete";
@@ -1301,7 +1302,7 @@ useEffect(() => {
 
       {/* Pagination */}
       {totalStaff > itemsPerPage  && (
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-2">
           <Button
             variant="outline"
             onClick={() => {
@@ -1313,20 +1314,30 @@ useEffect(() => {
           >
             Previous
           </Button>
-          
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-            <Button
-              key={page}
-              variant={currentPage === page ? "default" : "outline"}
-              onClick={() => {
-                setCurrentPage(page);
-                fetchStaffData(page, itemsPerPage);
-              }}
-              className={currentPage === page ? "bg-primary text-white hover:bg-[#0090e6]" : ""}
-            >
-              {page}
-            </Button>
-          ))}
+
+          {getCompactPaginationItems(currentPage, totalPages).map((item, idx) =>
+            item === "ellipsis" ? (
+              <span
+                key={`ellipsis-${idx}`}
+                className="flex min-w-9 items-center justify-center px-1 text-muted-foreground select-none"
+                aria-hidden
+              >
+                …
+              </span>
+            ) : (
+              <Button
+                key={item}
+                variant={currentPage === item ? "default" : "outline"}
+                onClick={() => {
+                  setCurrentPage(item);
+                  fetchStaffData(item, itemsPerPage);
+                }}
+                className={currentPage === item ? "bg-primary text-white hover:bg-[#0090e6]" : ""}
+              >
+                {item}
+              </Button>
+            ),
+          )}
           
           <Button
             variant="outline"

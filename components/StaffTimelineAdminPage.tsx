@@ -138,10 +138,6 @@ export function StaffTimelineAdminPage() {
     }
   };
 
-  useEffect(() => {
-    fetchAllStaffTimesheets();
-  }, []);
-
   const handleViewTimesheet = async (item: StaffTimesheetItem) => {
     setSelectedTimesheet(item);
     setShowTimesheetDetail(true);
@@ -341,7 +337,16 @@ export function StaffTimelineAdminPage() {
   };
 
   useEffect(() => {
+    let cancelled = false;
+
+    const idle =
+      !searchTerm.trim() &&
+      !dateRange.from &&
+      !dateRange.to;
+    const debounceMs = idle ? 0 : 500;
+
     const debounceTimeout = setTimeout(() => {
+      if (cancelled) return;
       if (!searchTerm.trim()) {
         if (dateRange.from && dateRange.to) {
           fetchTimesheetsByDateRange();
@@ -349,11 +354,14 @@ export function StaffTimelineAdminPage() {
           fetchAllStaffTimesheets();
         }
       } else {
-        fetchBySearchStaffTimesheets(); 
+        fetchBySearchStaffTimesheets();
       }
-    }, 500); 
+    }, debounceMs);
 
-    return () => clearTimeout(debounceTimeout);
+    return () => {
+      cancelled = true;
+      clearTimeout(debounceTimeout);
+    };
   }, [searchTerm, dateRange]);
 
   // Render timesheet detail view if selected

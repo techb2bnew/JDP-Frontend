@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -110,66 +110,92 @@ export function ContractorDetailsPage({
   const [contractorActivityPage, setContractorActivityPage] = useState(1);
   const contractorActivityPerPage = 5;
 
+  const contractorDetailsFetchRef = useRef<{
+    id: string;
+    promise: Promise<void>;
+  } | null>(null);
+
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 
-  const fetchContractorDetails = async () => {
-    try {
-      setIsLoading(true);
+  const fetchContractorDetails = async (options?: { force?: boolean }) => {
+    if (!contractorId) return;
 
-      const response = await globalApiCall(
-        `${apiBaseUrl}/contractor/getContractorById/${contractorId}?include_jobs=true`,
-        {
-          method: "GET",
-        },
-      );
-
-      const responseData = await response.json();
-      console.log("Contractor Details API Response:", responseData);
-
-      if (responseData.success && responseData.data) {
-        const contractorData = responseData.data;
-
-        setContractor({
-          id: contractorData.id,
-          contractor_name: contractorData.contractor_name || "N/A",
-          company_name: contractorData.company_name || "N/A",
-          email: contractorData.email || "N/A",
-          phone: contractorData.phone || "N/A",
-          address: contractorData.address || "N/A",
-          status: contractorData.status || "inactive",
-          created_at: contractorData.created_at || new Date().toISOString(),
-          total_jobs:
-            contractorData.statistics?.total_jobs ??
-            contractorData.total_jobs ??
-            contractorData.jobs?.length ??
-            0,
-          completed_jobs:
-            contractorData.statistics?.completed_jobs ??
-            contractorData.completed_jobs ??
-            0,
-          ongoing_jobs:
-            contractorData.statistics?.ongoing_jobs ??
-            contractorData.ongoing_jobs ??
-            0,
-          total_revenue:
-            contractorData.statistics?.total_estimated_cost ??
-            contractorData.total_revenue ??
-            0,
-          jobs: contractorData.jobs || [],
-        });
-
-        // Reset to first page whenever fresh contractor data loads
-        setJobsPage(1);
-      } else {
-        console.error("Invalid contractor details API response:", responseData);
-        setContractor(null);
-      }
-    } catch (error) {
-      console.error("Error fetching contractor details:", error);
-      setContractor(null);
-    } finally {
-      setIsLoading(false);
+    if (options?.force) {
+      contractorDetailsFetchRef.current = null;
     }
+    if (!options?.force) {
+      const existing = contractorDetailsFetchRef.current;
+      if (existing?.id === contractorId) {
+        return existing.promise;
+      }
+    }
+
+    const id = contractorId;
+    const promise = (async () => {
+      try {
+        setIsLoading(true);
+
+        const response = await globalApiCall(
+          `${apiBaseUrl}/contractor/getContractorById/${id}?include_jobs=true`,
+          {
+            method: "GET",
+          },
+        );
+
+        const responseData = await response.json();
+        console.log("Contractor Details API Response:", responseData);
+
+        if (responseData.success && responseData.data) {
+          const contractorData = responseData.data;
+
+          setContractor({
+            id: contractorData.id,
+            contractor_name: contractorData.contractor_name || "N/A",
+            company_name: contractorData.company_name || "N/A",
+            email: contractorData.email || "N/A",
+            phone: contractorData.phone || "N/A",
+            address: contractorData.address || "N/A",
+            status: contractorData.status || "inactive",
+            created_at: contractorData.created_at || new Date().toISOString(),
+            total_jobs:
+              contractorData.statistics?.total_jobs ??
+              contractorData.total_jobs ??
+              contractorData.jobs?.length ??
+              0,
+            completed_jobs:
+              contractorData.statistics?.completed_jobs ??
+              contractorData.completed_jobs ??
+              0,
+            ongoing_jobs:
+              contractorData.statistics?.ongoing_jobs ??
+              contractorData.ongoing_jobs ??
+              0,
+            total_revenue:
+              contractorData.statistics?.total_estimated_cost ??
+              contractorData.total_revenue ??
+              0,
+            jobs: contractorData.jobs || [],
+          });
+
+          // Reset to first page whenever fresh contractor data loads
+          setJobsPage(1);
+        } else {
+          console.error("Invalid contractor details API response:", responseData);
+          setContractor(null);
+        }
+      } catch (error) {
+        console.error("Error fetching contractor details:", error);
+        setContractor(null);
+      } finally {
+        setIsLoading(false);
+        if (contractorDetailsFetchRef.current?.id === id) {
+          contractorDetailsFetchRef.current = null;
+        }
+      }
+    })();
+
+    contractorDetailsFetchRef.current = { id, promise };
+    return promise;
   };
 
   const fetchContractorActivity = async (id: string) => {
@@ -328,7 +354,7 @@ export function ContractorDetailsPage({
         setSelectedSubJob(null);
         setEnhancedJobData(null);
       }
-      await fetchContractorDetails();
+      await fetchContractorDetails({ force: true });
       onJobsMutated?.();
     } catch (error) {
       console.error("Error deleting job:", error);
@@ -765,7 +791,7 @@ export function ContractorDetailsPage({
                     onBack={() => setSelectedSubJob(null)}
                     jobs={allJobs}
                     setJobs={handleSetJobs}
-                    onJobsRefresh={fetchContractorDetails}
+                    onJobsRefresh={() => void fetchContractorDetails({ force: true })}
                     onViewSubJob={(id) =>
                       void selectSubJob(id, selectedJob ?? undefined)
                     }
@@ -867,7 +893,7 @@ export function ContractorDetailsPage({
                     onBack={handleBackFromJobDetails}
                     jobs={allJobs}
                     setJobs={handleSetJobs}
-                    onJobsRefresh={fetchContractorDetails}
+                    onJobsRefresh={() => void fetchContractorDetails({ force: true })}
                     onViewSubJob={(id) =>
                       void selectSubJob(id, selectedJob ?? undefined)
                     }

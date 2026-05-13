@@ -5,6 +5,30 @@ import type { BulkMaterialPayload } from '@/types/materials';
 const API_BASE_URL = "http://127.0.0.1:3000/api";
 let isUnauthorizedHandlingInProgress = false;
 
+/** Collapse overlapping / back-to-back getFullConfiguration calls (e.g. React Strict Mode dev double-mount). */
+let fullConfigurationInFlight: Promise<any> | null = null;
+let fullConfigurationFresh: { at: number; payload: any } | null = null;
+const FULL_CONFIGURATION_CACHE_MS = 5000;
+
+const invalidateFullConfigurationCache = () => {
+  fullConfigurationFresh = null;
+};
+
+/** Dedupe + short cache for getAllStaffWeeklyTimesheetSummary (same query string). */
+const staffWeeklySummaryCacheKey = (start?: string, end?: string) =>
+  `${start ?? ""}\u0000${end ?? ""}`;
+
+const staffWeeklySummaryInFlight = new Map<string, Promise<any>>();
+const staffWeeklySummaryFresh = new Map<
+  string,
+  { at: number; payload: any }
+>();
+const STAFF_WEEKLY_SUMMARY_CACHE_MS = 4000;
+
+const invalidateStaffWeeklySummaryCache = () => {
+  staffWeeklySummaryFresh.clear();
+};
+
 // Helper function to get auth token
 const getAuthToken = (): string | null => {
   if (typeof window !== "undefined") {
@@ -2981,30 +3005,51 @@ export const apiClient = {
 
   // Configuration
   getFullConfiguration: async () => {
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-    const token = getAuthToken();
-
-    if (!token) {
-      throw new Error("No authentication token found");
+    const now = Date.now();
+    if (
+      fullConfigurationFresh &&
+      now - fullConfigurationFresh.at < FULL_CONFIGURATION_CACHE_MS
+    ) {
+      return fullConfigurationFresh.payload;
+    }
+    if (fullConfigurationInFlight) {
+      return fullConfigurationInFlight;
     }
 
-    const response = await fetch(
-      `${apiBaseUrl}/configuration/getFullConfiguration`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+    fullConfigurationInFlight = (async () => {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+      const token = getAuthToken();
+
+      if (!token) {
+        throw new Error("No authentication token found");
       }
-    );
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || "Failed to fetch configuration");
-    }
+      try {
+        const response = await fetch(
+          `${apiBaseUrl}/configuration/getFullConfiguration`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
 
-    return response.json();
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || "Failed to fetch configuration");
+        }
+
+        const payload = await response.json();
+        fullConfigurationFresh = { at: Date.now(), payload };
+        return payload;
+      } finally {
+        fullConfigurationInFlight = null;
+      }
+    })();
+
+    return fullConfigurationInFlight;
   },
 
   createOrUpdateConfiguration: async (configurationData: {
@@ -3040,6 +3085,7 @@ export const apiClient = {
       throw new Error(errorData.message || "Failed to save configuration");
     }
 
+    invalidateFullConfigurationCache();
     return response.json();
   },
 
@@ -3068,6 +3114,7 @@ export const apiClient = {
       throw new Error(errorData.message || "Failed to remove hourly rates");
     }
 
+    invalidateFullConfigurationCache();
     return response.json();
   },
 
@@ -3411,6 +3458,7 @@ createBulkBluesheetMaterials: async (bulkData: BulkMaterialPayload, bluesheetId:
       throw new Error(errorData.message || "Failed to create staff timesheet");
     }
 
+    invalidateStaffWeeklySummaryCache();
     return response.json();
   },
 
@@ -3475,6 +3523,7 @@ createBulkBluesheetMaterials: async (bulkData: BulkMaterialPayload, bluesheetId:
       throw new Error(errorData.message || "Failed to update staff timesheet");
     }
 
+    invalidateStaffWeeklySummaryCache();
     return response.json();
   },
 
@@ -3493,39 +3542,64 @@ createBulkBluesheetMaterials: async (bulkData: BulkMaterialPayload, bluesheetId:
       throw new Error(errorData.message || "Failed to delete staff timesheet");
     }
 
+    invalidateStaffWeeklySummaryCache();
     return response.json();
   },
 
   // Staff Timeline Admin APIs
   getAllStaffWeeklyTimesheetSummary: async (startDate?: string, endDate?: string) => {
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-    const token = getAuthToken();
-
-    if (!token) {
-      throw new Error("No authentication token found");
+    const key = staffWeeklySummaryCacheKey(startDate, endDate);
+    const now = Date.now();
+    const cached = staffWeeklySummaryFresh.get(key);
+    if (cached && now - cached.at < STAFF_WEEKLY_SUMMARY_CACHE_MS) {
+      return cached.payload;
     }
 
-    // Build query params
-    const params = new URLSearchParams();
-    if (startDate) params.append('start_date', startDate);
-    if (endDate) params.append('end_date', endDate);
-
-    const url = `${apiBaseUrl}/staff-timesheet/getAllStaffWeeklyTimesheetSummary${params.toString() ? '?' + params.toString() : ''}`;
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || "Failed to fetch staff weekly timesheet summary");
+    const existing = staffWeeklySummaryInFlight.get(key);
+    if (existing) {
+      return existing;
     }
 
-    return response.json();
+    const promise = (async () => {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+      const token = getAuthToken();
+
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
+
+      const params = new URLSearchParams();
+      if (startDate) params.append("start_date", startDate);
+      if (endDate) params.append("end_date", endDate);
+
+      const url = `${apiBaseUrl}/staff-timesheet/getAllStaffWeeklyTimesheetSummary${params.toString() ? "?" + params.toString() : ""}`;
+
+      try {
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(
+            errorData.message || "Failed to fetch staff weekly timesheet summary",
+          );
+        }
+
+        const payload = await response.json();
+        staffWeeklySummaryFresh.set(key, { at: Date.now(), payload });
+        return payload;
+      } finally {
+        staffWeeklySummaryInFlight.delete(key);
+      }
+    })();
+
+    staffWeeklySummaryInFlight.set(key, promise);
+    return promise;
   },
 
   searchStaffTimesheets: async (query: string) => {
