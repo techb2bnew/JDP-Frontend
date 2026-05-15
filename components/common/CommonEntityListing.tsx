@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -88,7 +88,14 @@ type CommonEntityListingProps = {
   footer?: React.ReactNode;
   itemsPerPage?: number;
   totalItems?: number;
+
+  /** Debounced server-side search (Customer / Contractor listings). */
+  searchPlaceholder?: string;
+  onSearchChange?: (term: string) => void;
+  searchDebounceMs?: number;
 };
+
+const DEFAULT_SEARCH_DEBOUNCE_MS = 500;
 
 export default function CommonEntityListing({
   data,
@@ -122,7 +129,22 @@ export default function CommonEntityListing({
   footer,
   itemsPerPage,
   totalItems,
+  searchPlaceholder,
+  onSearchChange,
+  searchDebounceMs = DEFAULT_SEARCH_DEBOUNCE_MS,
 }: CommonEntityListingProps) {
+  const [searchInput, setSearchInput] = useState("");
+
+  useEffect(() => {
+    if (!onSearchChange) return;
+
+    const debounceTimeout = setTimeout(() => {
+      onSearchChange(searchInput.trim());
+    }, searchDebounceMs);
+
+    return () => clearTimeout(debounceTimeout);
+  }, [searchInput, searchDebounceMs, onSearchChange]);
+
   const truncateWords = (value?: string, maxWords = 2) => {
     if (!value) return "";
     const words = value.trim().split(/\s+/);
@@ -194,6 +216,17 @@ export default function CommonEntityListing({
 
   return (
     <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-sky-100 bg-gradient-to-b from-white via-sky-50/40 to-blue-50/40 shadow-[0_8px_22px_rgba(59,130,246,0.08)]">
+      {onSearchChange && (
+        <div className="shrink-0 border-b border-gray-200 bg-white p-4">
+          <input
+            type="text"
+            placeholder={searchPlaceholder ?? "Search..."}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
+        </div>
+      )}
       <ScrollArea className="min-h-0 flex-1">
         <div className={`px-2.5 pt-2.5 pb-2 ${shouldShowFooter ? "pb-16" : ""}`}>
           {isLoading ? (

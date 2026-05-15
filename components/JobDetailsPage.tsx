@@ -119,6 +119,7 @@ import ActivityLogs from "./ActivityLogs";
 import { CheckCircle } from "lucide-react";
 import { invoicesData } from "@/data/invoiceData";
 import InvoiceLineItemsManager from "./common/invoice-line-items/InvoiceLineItemsManager";
+import { createDefaultEmptyLineItems } from "./common/invoice-line-items/lineItemHelpers";
 import { INVOICE_DESCRIPTION } from "@/utils/invoiceConstants";
 // Sample data structure - replace with your actual data
 const sampleJobData = {
@@ -378,6 +379,7 @@ export function JobDetailsPage({
     return list;
   }, [job, jobId]);
 
+  
   
   // Use real job data for materials, timeLogs, and invoices
   // const materials = job.assignedMaterialsDetails || sampleJobData.materials
@@ -3924,24 +3926,7 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
           isCustomProduct: true,
           estimate_product_id: product.estimate_product_id || null,
           parent_header_name: product.parent_header_name,
-        })) || [
-          {
-            id: Math.random().toString(36).substring(2, 9),
-            productId: null,
-            qty: 1,
-            item: "",
-            description: "",
-            rate: 0,
-            estimatedPrice: 0,
-            total: 0,
-            searchQuery: "",
-            showSearchResults: false,
-            supplierId: 1,
-            isCustomProduct: false,
-            estimate_product_id: null,
-            parent_header_name: "",
-          },
-        ],
+        })) || createDefaultEmptyLineItems(5),
         notes:
           (invoiceData.notes ?? invoiceData.description) ||
           "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
@@ -4013,22 +3998,7 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
         supplierId: product.supplier_id || 1,
         isCustomProduct: true,
         estimate_product_id: product.estimate_product_id || null,
-      })) || [
-        {
-          id: Math.random().toString(36).substring(2, 9),
-          productId: null,
-          qty: 1,
-          item: "",
-          description: "",
-          rate: 0,
-          estimatedPrice: 0,
-          total: 0,
-          searchQuery: "",
-          showSearchResults: false,
-          supplierId: 1,
-          isCustomProduct: false,
-        },
-      ],
+      })) || createDefaultEmptyLineItems(5),
       notes:
         (invoice.notes ?? invoice.description) ||
         "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
@@ -5624,6 +5594,46 @@ const handlePrintInvoice = async (invoice: any) => {
     return inlineInvoiceData.invoiceType || "Invoice";
   };
 
+  /**
+   * Edit-Invoice: update only the prefix before the first `-` in `estimateNumber`,
+   * while keeping the rest (year/sequence) exactly the same.
+   *
+   * Example: `EST-2026-035` => `FINAL-2026-035`
+   */
+  const getInvoiceNumberPrefixFromUIType = (
+    uiInvoiceType: string,
+    customPrefix?: string,
+  ): string => {
+    if (uiInvoiceType === "Estimate") return "EST";
+    if (uiInvoiceType === "Downpayment Invoice") return "DOWN";
+    if (uiInvoiceType === "Rough Invoice") return "PRO";
+    if (uiInvoiceType === "Progressive Invoice") return "PRG";
+    if (uiInvoiceType === "Final Invoice") return "FINAL";
+    if (uiInvoiceType === "Custom") return String(customPrefix || "").trim();
+    return "";
+  };
+
+  const replaceInvoiceNumberPrefix = (
+    currentInvoiceNumber: string,
+    nextUiInvoiceType: string,
+    nextCustomPrefix?: string,
+  ): string => {
+    const current = String(currentInvoiceNumber || "");
+    if (!current) return current;
+
+    const hyphenIndex = current.indexOf("-");
+    if (hyphenIndex === -1) return current; // invalid format; keep as-is
+
+    const nextPrefix = getInvoiceNumberPrefixFromUIType(
+      nextUiInvoiceType,
+      nextCustomPrefix,
+    );
+    if (!nextPrefix) return current;
+
+    const suffix = current.slice(hyphenIndex); // includes leading hyphen
+    return `${nextPrefix}${suffix}`;
+  };
+
   // Fetch suppliers with search
   const fetchSuppliers = async (searchQuery: string = "") => {
     try {
@@ -5755,7 +5765,7 @@ const handlePrintInvoice = async (invoice: any) => {
           product_name: item.item,
           description: item.description || "",
           jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          stock_quantity: item.qty,
+          stock_quantity: Number(item.qty) || 0,
           unit: "unit",
           job_id: Number(jobId),
           unit_cost: item.rate,
@@ -5947,7 +5957,7 @@ const handlePrintInvoice = async (invoice: any) => {
           product_name: item.item,
           description: item.description || "",
           jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          stock_quantity: item.qty,
+          stock_quantity: Number(item.qty) || 0,
           unit: "unit",
           job_id: Number(jobId),
           unit_cost: item.rate,
@@ -6544,28 +6554,7 @@ const handlePrintInvoice = async (invoice: any) => {
       const lineItems =
         estimateData.products && estimateData.products.length > 0
           ? buildLineItemsFromProducts(estimateData.products)
-          : [
-              {
-                id: createRowKey(),
-                type: "item",
-                headerKey: null,
-                headerName: "",
-                parentHeaderKey: null,
-                parentHeaderName: null,
-                qty: 1,
-                item: "",
-                description: "",
-                rate: 0,
-                estimatedPrice: 0,
-                total: 0,
-                searchQuery: "",
-                showSearchResults: false,
-                supplierId: 1,
-                isCustomProduct: false,
-                productId: null,
-                estimate_product_id: null,
-              },
-            ];
+          : createDefaultEmptyLineItems(5);
       console.log(lineItems, "lineItemslineItems");
       setInlineInvoiceData({
         date:
@@ -7890,7 +7879,7 @@ const handlePrintInvoice = async (invoice: any) => {
                         dueDate: "",
                         paymentCredits: 0,
                         balanceDue: "",
-                        lineItems: [],
+                        lineItems: createDefaultEmptyLineItems(5),
                         notes:
                           "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
                         signatureText: "ACCEPTED BY________________DATE_____",
@@ -7931,12 +7920,26 @@ const handlePrintInvoice = async (invoice: any) => {
                       <div className="relative w-[250px]">
                         <Select
                           value={inlineInvoiceData.invoiceType}
-                          onValueChange={(value) =>
-                            setInlineInvoiceData((prev) => ({
-                              ...prev,
-                              invoiceType: value,
-                            }))
-                          }
+                          onValueChange={(value) => {
+                            setInlineInvoiceData((prev) => {
+                              const nextState = {
+                                ...prev,
+                                invoiceType: value,
+                              };
+
+                              // Only update invoice number prefix in Edit mode.
+                              if (editingInvoiceId) {
+                                nextState.estimateNumber =
+                                  replaceInvoiceNumberPrefix(
+                                    prev.estimateNumber,
+                                    value,
+                                    prev.customInvoiceType,
+                                  );
+                              }
+
+                              return nextState;
+                            });
+                          }}
                         >
                           <SelectTrigger className="border-primary/30 focus:border-primary">
                             <SelectValue placeholder="Select invoice type..." />
@@ -7977,12 +7980,30 @@ const handlePrintInvoice = async (invoice: any) => {
                         <div className="relative w-[300px]">
                           <Input
                             value={inlineInvoiceData.customInvoiceType}
-                            onChange={(e) =>
-                              setInlineInvoiceData((prev) => ({
-                                ...prev,
-                                customInvoiceType: e.target.value,
-                              }))
-                            }
+                            onChange={(e) => {
+                              const nextCustomInvoiceType = e.target.value;
+                              setInlineInvoiceData((prev) => {
+                                const nextState = {
+                                  ...prev,
+                                  customInvoiceType: nextCustomInvoiceType,
+                                };
+
+                                // Only update invoice number when the selected type is Custom.
+                                if (
+                                  editingInvoiceId &&
+                                  prev.invoiceType === "Custom"
+                                ) {
+                                  nextState.estimateNumber =
+                                    replaceInvoiceNumberPrefix(
+                                      prev.estimateNumber,
+                                      "Custom",
+                                      nextCustomInvoiceType,
+                                    );
+                                }
+
+                                return nextState;
+                              });
+                            }}
                             onBlur={() => {
                               if (inlineInvoiceData.customInvoiceType) {
                                 addCustomInvoiceType(
@@ -8410,6 +8431,7 @@ const handlePrintInvoice = async (invoice: any) => {
                         </p>
                       </div>
                     </div>
+                    {inlineInvoiceData.invoiceType === "Estimate" && (
                     <div className="secnacher">
                       {/* Customer Acceptance Section */}
                       <div className="mt-8">
@@ -8457,6 +8479,7 @@ const handlePrintInvoice = async (invoice: any) => {
                         </div>
                       </div>
                     </div>
+                    )}
                   </div>
 
                   {/* Action Buttons */}
@@ -11002,6 +11025,7 @@ const handlePrintInvoice = async (invoice: any) => {
           </div>
         </div>
 
+        {inlineInvoiceData.invoiceType === "Estimate" && (
         <div className="secnacher">
           {/* Customer Acceptance Section */}
           <div className="mt-5">
@@ -11041,6 +11065,7 @@ const handlePrintInvoice = async (invoice: any) => {
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
 
@@ -11068,25 +11093,7 @@ const handlePrintInvoice = async (invoice: any) => {
               dueDate: "",
               paymentCredits: 0,
               balanceDue: "",
-              lineItems: [
-                {
-                  id: Math.random().toString(36).substring(2, 9),
-                  productId: null,
-                  headerName: "",
-                  type: "",
-                  qty: 1,
-                  item: "",
-                  description: "",
-                  rate: 0,
-                  estimatedPrice: 0,
-                  total: 0,
-                  searchQuery: "",
-                  showSearchResults: false,
-                  supplierId: 1,
-                  isCustomProduct: false,
-                  estimate_product_id: null,
-                },
-              ],
+              lineItems: createDefaultEmptyLineItems(5),
               notes:
                 "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
               signatureText: "ACCEPTED BY________________DATE_____",

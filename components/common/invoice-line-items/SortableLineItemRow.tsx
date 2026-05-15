@@ -178,6 +178,8 @@ const cellClass = isInvalidItem
 
           <Input
             type="number"
+            inputMode="decimal"
+            step="0.01"
             value={lineItem.qty}
             onChange={(e) =>
               onUpdateRow(lineItem.id, "qty", parseFloat(e.target.value) || 0)

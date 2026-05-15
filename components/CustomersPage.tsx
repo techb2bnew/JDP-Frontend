@@ -90,6 +90,7 @@ import {
   TooltipTrigger,
 } from "../components/ui/tooltip";
 import CommonEntityListing from "./common/CommonEntityListing";
+import { TableListPagination } from "./common/TableListPagination";
 import {
   annotateEntitiesForListing,
   annotateJobsForListing,
@@ -188,6 +189,12 @@ export function CustomersPage() {
   const [expandedTableJobs, setExpandedTableJobs] = useState<Set<string>>(
     new Set(),
   );
+  const [customerJobsPage, setCustomerJobsPage] = useState(1);
+  const [subJobsPageByJobId, setSubJobsPageByJobId] = useState<
+    Record<string, number>
+  >({});
+  const jobsTablePerPage = 10;
+  const subJobsTablePerPage = 10;
   const [customerActivity, setCustomerActivity] = useState<any[]>([]);
   const [isLoadingCustomerActivity, setIsLoadingCustomerActivity] =
     useState(false);
@@ -482,6 +489,8 @@ export function CustomersPage() {
     setSelectedSubJob(null);
     setEnhancedJobData(null);
     setExpandedTableJobs(new Set());
+    setCustomerJobsPage(1);
+    setSubJobsPageByJobId({});
     // Jobs are already loaded in fetchCustomersWithJobs, no need to fetch again
   };
 
@@ -684,6 +693,47 @@ export function CustomersPage() {
         (j: any) => j.id.toString() === selectedJob,
       )
     : null;
+
+  const customerJobsList = selectedCustomerData?.jobs || [];
+  const totalCustomerJobsCount = customerJobsList.length;
+  const totalCustomerJobsPages = Math.max(
+    1,
+    Math.ceil(totalCustomerJobsCount / jobsTablePerPage),
+  );
+  const paginatedCustomerJobs = useMemo(() => {
+    const start = (customerJobsPage - 1) * jobsTablePerPage;
+    return customerJobsList.slice(start, start + jobsTablePerPage);
+  }, [customerJobsList, customerJobsPage, jobsTablePerPage]);
+
+  const getPaginatedSubJobs = (subJobs: any[], jobId: string) => {
+    const total = subJobs.length;
+    const totalPages = Math.max(1, Math.ceil(total / subJobsTablePerPage));
+    const page = Math.min(subJobsPageByJobId[jobId] ?? 1, totalPages);
+    const start = (page - 1) * subJobsTablePerPage;
+    return {
+      items: subJobs.slice(start, start + subJobsTablePerPage),
+      page,
+      totalPages,
+      total,
+    };
+  };
+
+  const setSubJobsPageForJob = (jobId: string, page: number) => {
+    setSubJobsPageByJobId((prev) => ({ ...prev, [jobId]: page }));
+  };
+
+  useEffect(() => {
+    if (customerJobsPage > totalCustomerJobsPages) {
+      setCustomerJobsPage(totalCustomerJobsPages);
+    }
+  }, [customerJobsPage, totalCustomerJobsPages]);
+
+  useEffect(() => {
+    setCustomerJobsPage(1);
+    setSubJobsPageByJobId({});
+    setExpandedTableJobs(new Set());
+  }, [selectedCustomer]);
+
   const totalCustomerActivityCount = customerActivity.length;
   const totalCustomerActivityPages = Math.max(
     1,
@@ -1571,23 +1621,14 @@ export function CustomersPage() {
           </div>
         </div>
 
-        {/* Search */}
-        <div className="p-4 bg-white border-b border-gray-200">
-          <input
-            type="text"
-            placeholder="Search customers or jobs..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-transparent"
-          />
-        </div>
-
         {/* Customer Listings */}
         <div className="min-w-0 flex-1 min-h-0">
             <CommonEntityListing
               data={paginatedCustomers}
               isLoading={isLoadingCustomers}
               emptyText="No customers found"
+              searchPlaceholder="Search customers or jobs..."
+              onSearchChange={setSearchTerm}
               expandedParents={expandedCustomers}
               expandedJobs={expandedJobs}
               selectedParent={selectedCustomer}
@@ -2158,17 +2199,25 @@ export function CustomersPage() {
                       </TableHeader>
 
                       <TableBody>
-                        {selectedCustomerData.jobs.map((job: any) => {
+                        {paginatedCustomerJobs.map((job: any) => {
                           const jobId = job.id.toString();
                           const hasSubJobs =
                             Array.isArray(job.subJobs) && job.subJobs.length > 0;
                           const isExpanded = expandedTableJobs.has(jobId);
+                          const subJobsPagination = hasSubJobs
+                            ? getPaginatedSubJobs(job.subJobs, jobId)
+                            : null;
 
                           return (
                             <React.Fragment key={jobId}>
                               <TableRow key={jobId}>
-                                <TableCell className="font-medium">
-                                  {job.job_title || "N/A"}
+                                <TableCell className="max-w-[240px] font-medium">
+                                  <span
+                                    className="block truncate"
+                                    title={job.job_title || "N/A"}
+                                  >
+                                    {job.job_title || "N/A"}
+                                  </span>
                                 </TableCell>
 
                                 <TableCell className="capitalize">
@@ -2277,14 +2326,24 @@ export function CustomersPage() {
                                                 </TableRow>
                                               </TableHeader>
                                               <TableBody>
-                                                {job.subJobs.map(
-                                                  (subJob: any) => (
+                                                {(
+                                                  subJobsPagination?.items ??
+                                                  []
+                                                ).map((subJob: any) => (
                                                     <TableRow
                                                       key={`${jobId}-${subJob.id}`}
                                                     >
-                                                      <TableCell className="font-medium">
-                                                        {subJob.job_title ||
-                                                          "N/A"}
+                                                      <TableCell className="max-w-[200px] font-medium">
+                                                        <span
+                                                          className="block truncate"
+                                                          title={
+                                                            subJob.job_title ||
+                                                            "N/A"
+                                                          }
+                                                        >
+                                                          {subJob.job_title ||
+                                                            "N/A"}
+                                                        </span>
                                                       </TableCell>
                                                       <TableCell className="capitalize">
                                                         {(
@@ -2352,10 +2411,24 @@ export function CustomersPage() {
                                                         </div>
                                                       </TableCell>
                                                     </TableRow>
-                                                  ),
-                                                )}
+                                                  ))}
                                               </TableBody>
                                             </Table>
+                                            {subJobsPagination && (
+                                              <TableListPagination
+                                                compact
+                                                page={subJobsPagination.page}
+                                                totalPages={
+                                                  subJobsPagination.totalPages
+                                                }
+                                                totalItems={subJobsPagination.total}
+                                                itemsPerPage={subJobsTablePerPage}
+                                                itemLabel="sub-jobs"
+                                                onPageChange={(page) =>
+                                                  setSubJobsPageForJob(jobId, page)
+                                                }
+                                              />
+                                            )}
                                           </div>
                                         </div>
                                       </div>
@@ -2368,6 +2441,14 @@ export function CustomersPage() {
                         })}
                       </TableBody>
                     </Table>
+                    <TableListPagination
+                      page={customerJobsPage}
+                      totalPages={totalCustomerJobsPages}
+                      totalItems={totalCustomerJobsCount}
+                      itemsPerPage={jobsTablePerPage}
+                      itemLabel="jobs"
+                      onPageChange={setCustomerJobsPage}
+                    />
                   </div>
                 ) : (
                   <div className="rounded-lg border border-dashed p-8 text-center">

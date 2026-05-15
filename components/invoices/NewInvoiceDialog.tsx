@@ -460,11 +460,17 @@ export const NewInvoiceDialog = ({
   const [jobSearch, setJobSearch] = useState("");
   const [showJobResults, setShowJobResults] = useState(false);
   const [isLoadingJobs, setIsLoadingJobs] = useState(false);
+  const [isLoadingMoreJobs, setIsLoadingMoreJobs] = useState(false);
+  const [jobsPage, setJobsPage] = useState(1);
+  const [jobsTotalPages, setJobsTotalPages] = useState(1);
+  const [jobsHasMore, setJobsHasMore] = useState(false);
 
   const JOB_SEARCH_DEBOUNCE_MS = 800;
+  const JOBS_PAGE_LIMIT = 10;
   const jobSearchFetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+  const jobsSearchQueryRef = useRef("");
 
   useEffect(() => {
     return () => {
@@ -475,28 +481,107 @@ export const NewInvoiceDialog = ({
     };
   }, []);
 
-  const fetchJobsList = useCallback(async (searchQuery: string = "") => {
-    try {
-      setIsLoadingJobs(true);
-
-      const response = searchQuery
-        ? await apiClient.searchJobsByQuery(searchQuery, 1, 10)
-        : await apiClient.getJobs(1, 10);
-
-      const jobsData =
-        response.data?.jobs ||
-        response.data?.data ||
-        response.data ||
-        [];
-
-      setJobsList(jobsData);
-    } catch (error) {
-      console.error("Error fetching jobs:", error);
-      setJobsList([]);
-    } finally {
-      setIsLoadingJobs(false);
+  const parseJobsListResponse = (response: any) => {
+    let jobs: any[] = [];
+    if (Array.isArray(response?.data?.jobs)) {
+      jobs = response.data.jobs;
+    } else if (Array.isArray(response?.data)) {
+      jobs = response.data;
+    } else if (Array.isArray(response?.data?.data)) {
+      jobs = response.data.data;
     }
-  }, []);
+
+    const pagination = response?.data?.pagination;
+    const totalPages =
+      Number(pagination?.totalPages ?? response?.totalPages ?? 1) || 1;
+    const currentPage =
+      Number(pagination?.page ?? response?.currentPage ?? 1) || 1;
+
+    return { jobs, totalPages, currentPage };
+  };
+
+  const fetchJobsList = useCallback(
+    async (searchQuery: string = "", page: number = 1, append = false) => {
+      const normalizedQuery = searchQuery.trim();
+      jobsSearchQueryRef.current = normalizedQuery;
+
+      try {
+        if (page === 1) {
+          setIsLoadingJobs(true);
+        } else {
+          setIsLoadingMoreJobs(true);
+        }
+
+        const response = normalizedQuery
+          ? await apiClient.searchJobsByQuery(
+              normalizedQuery,
+              page,
+              JOBS_PAGE_LIMIT,
+            )
+          : await apiClient.getJobs(page, JOBS_PAGE_LIMIT);
+
+        const { jobs, totalPages, currentPage } =
+          parseJobsListResponse(response);
+
+        setJobsList((prev) => {
+          const merged = append ? [...prev, ...jobs] : jobs;
+          const seen = new Set<string>();
+          return merged.filter((job) => {
+            const id = String(job?.id ?? "");
+            if (!id || seen.has(id)) return false;
+            seen.add(id);
+            return true;
+          });
+        });
+        setJobsPage(currentPage);
+        setJobsTotalPages(totalPages);
+        setJobsHasMore(currentPage < totalPages);
+      } catch (error) {
+        console.error("Error fetching jobs:", error);
+        if (!append) {
+          setJobsList([]);
+        }
+        setJobsPage(1);
+        setJobsTotalPages(1);
+        setJobsHasMore(false);
+      } finally {
+        setIsLoadingJobs(false);
+        setIsLoadingMoreJobs(false);
+      }
+    },
+    [],
+  );
+
+  const handleJobsDropdownScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+      const nearBottom = scrollHeight - scrollTop - clientHeight < 50;
+
+      if (
+        !nearBottom ||
+        !jobsHasMore ||
+        isLoadingJobs ||
+        isLoadingMoreJobs ||
+        jobsPage >= jobsTotalPages
+      ) {
+        return;
+      }
+
+      void fetchJobsList(
+        jobsSearchQueryRef.current,
+        jobsPage + 1,
+        true,
+      );
+    },
+    [
+      jobsHasMore,
+      isLoadingJobs,
+      isLoadingMoreJobs,
+      jobsPage,
+      jobsTotalPages,
+      fetchJobsList,
+    ],
+  );
 
   // Update form when job is provided
   useEffect(() => {
@@ -2330,7 +2415,7 @@ const validateLineItems = (lineItems: any[] = []) => {
     fetchProducts();
     fetchProductsList();
     fetchSuppliersList();
-    fetchJobsList();
+    fetchJobsList("", 1, false);
   }, [fetchJobsList]);
   console.log(renderInline, "renderInline");
 
@@ -2493,11 +2578,7 @@ const validateLineItems = (lineItems: any[] = []) => {
                           }
                           jobSearchFetchTimeoutRef.current = setTimeout(() => {
                             jobSearchFetchTimeoutRef.current = null;
-                            if (value.trim().length > 0) {
-                              void fetchJobsList(value);
-                            } else {
-                              void fetchJobsList("");
-                            }
+                            void fetchJobsList(value, 1, false);
                           }, JOB_SEARCH_DEBOUNCE_MS);
 
                           if (validationErrors.jobId) {
@@ -2513,9 +2594,20 @@ const validateLineItems = (lineItems: any[] = []) => {
                             setJobSearch(
                               selectedJob.title || selectedJob.job_title || "",
                             );
-                          } else {
-                            fetchJobsList("");
                             setShowJobResults(true);
+                            return;
+                          }
+
+                          setShowJobResults(true);
+                          const query = jobSearch.trim();
+                          const hasCachedJobsForQuery =
+                            jobsList.length > 0 &&
+                            jobsSearchQueryRef.current === query &&
+                            !isLoadingJobs;
+
+                          // Reuse pages already loaded; fetch only if cache missing or query changed
+                          if (!hasCachedJobsForQuery) {
+                            void fetchJobsList(query, 1, false);
                           }
                         }}
                         onBlur={() => {
@@ -2531,8 +2623,11 @@ const validateLineItems = (lineItems: any[] = []) => {
                       <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
 
                       {showJobResults && !isViewMode && (
-                        <div className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1 rounded-md">
-                          {isLoadingJobs ? (
+                        <div
+                          className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1 rounded-md"
+                          onScroll={handleJobsDropdownScroll}
+                        >
+                          {isLoadingJobs && jobsList.length === 0 ? (
                             <div className="p-3 flex items-center justify-center">
                               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mr-2"></div>
                               <span className="text-sm text-muted-foreground">
@@ -2540,23 +2635,33 @@ const validateLineItems = (lineItems: any[] = []) => {
                               </span>
                             </div>
                           ) : jobsList.length > 0 ? (
-                            jobsList.map((job: any) => (
-                              <div
-                                key={job.id}
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  handleJobSelection(job);
-                                }}
-                                className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100 last:border-b-0"
-                              >
-                                <div className="font-medium">
-                                  {job.title || job.job_title}
+                            <>
+                              {jobsList.map((job: any) => (
+                                <div
+                                  key={job.id}
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    handleJobSelection(job);
+                                  }}
+                                  className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                >
+                                  <div className="font-medium">
+                                    {job.title || job.job_title}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {resolveJobListSubLabel(job)}
+                                  </div>
                                 </div>
-                                <div className="text-sm text-muted-foreground">
-                                  {resolveJobListSubLabel(job)}
+                              ))}
+                              {isLoadingMoreJobs && (
+                                <div className="p-3 flex items-center justify-center border-t border-gray-100">
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                                  <span className="text-xs text-muted-foreground">
+                                    Loading more jobs...
+                                  </span>
                                 </div>
-                              </div>
-                            ))
+                              )}
+                            </>
                           ) : (
                             <div className="p-3 text-sm text-muted-foreground text-center">
                               No jobs found
@@ -3142,6 +3247,7 @@ const validateLineItems = (lineItems: any[] = []) => {
               </div>
             </div>
 
+            {inlineInvoiceData.invoiceType === "Estimate" && (
             <div className="secnacher">
               {/* Customer Acceptance Section */}
               <div className="mt-5">
@@ -3183,6 +3289,7 @@ const validateLineItems = (lineItems: any[] = []) => {
                 </div>
               </div>
             </div>
+            )}
           </div>
         </div>
 

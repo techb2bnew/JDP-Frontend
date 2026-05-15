@@ -21,6 +21,7 @@ import { motion } from 'framer-motion'
 import { Logo } from '../common/Logo'
 import Image from 'next/image';
 import InvoiceLineItemsManager from '../common/invoice-line-items/InvoiceLineItemsManager'
+import { createDefaultEmptyLineItems } from '../common/invoice-line-items/lineItemHelpers'
 // import { formatCurrency, formatDate } from '../../utils/invoiceUtils'
 
 interface CustomInvoiceDialogProps {
@@ -314,21 +315,10 @@ export const CustomInvoiceDialog = ({
     dueDate: '',
     paymentCredits: 0,
     balanceDue: '',
-    lineItems: [{
-      id: Math.random().toString(36).substring(2, 9),
-      productId: null,
-      qty: 1,
-      item: '',
-      description: '',
-      rate: 0,
-      estimatedPrice: 0,
-      total: 0,
-      searchQuery: '',
-      showSearchResults: false,
-      supplierId: 1,
-      isCustomProduct: false,
-      unit_cost:""
-    }],
+    lineItems: createDefaultEmptyLineItems(5).map((item) => ({
+      ...item,
+      unit_cost: '',
+    })),
     notes: 'NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE',
     signatureText: 'ACCEPTED BY________________DATE_____',
     invoiceType: defaultInvoiceType,
@@ -2027,6 +2017,7 @@ console.log(totalAmount,"amounttt");
             </div>
           </div>
 
+          {inlineInvoiceData.invoiceType === "Estimate" && (
           <div className="secnacher">
             <div className="mt-2">
               <div className="border-t border-gray-300 mb-1.5"></div>
@@ -2065,6 +2056,7 @@ console.log(totalAmount,"amounttt");
               </div>
             </div>
           </div>
+          )}
         </div>
       </div>
 

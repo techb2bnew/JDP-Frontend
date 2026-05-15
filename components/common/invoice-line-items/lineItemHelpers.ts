@@ -1,3 +1,5 @@
+export const DEFAULT_EMPTY_LINE_ITEM_COUNT = 5;
+
 export const createRowId = () =>
   Math.random().toString(36).substring(2, 9);
 
@@ -28,13 +30,13 @@ export const createHeaderRow = (selectedSupplierId: number, headerName = "") => 
 
 export const createItemRow = ({
   selectedSupplierId,
-  parentHeaderKey,
-  parentHeaderName,
+  parentHeaderKey = null,
+  parentHeaderName = null,
   isCustomProduct = false,
 }: {
   selectedSupplierId: number;
-  parentHeaderKey: string;
-  parentHeaderName: string;
+  parentHeaderKey?: string | null;
+  parentHeaderName?: string | null;
   isCustomProduct?: boolean;
 }) => ({
   id: createRowId(),
@@ -57,3 +59,16 @@ export const createItemRow = ({
   isCustomProduct,
   estimate_product_id: null,
 });
+
+export const createDefaultEmptyLineItems = (
+  count = DEFAULT_EMPTY_LINE_ITEM_COUNT,
+  selectedSupplierId = 1,
+) =>
+  Array.from({ length: count }, () =>
+    createItemRow({
+      selectedSupplierId,
+      parentHeaderKey: null,
+      parentHeaderName: null,
+      isCustomProduct: false,
+    }),
+  );

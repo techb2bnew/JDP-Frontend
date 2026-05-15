@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import GroupedLineItemsTable from "./GroupedLineItemsTable";
 import { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { toast } from "sonner";
+import { createDefaultEmptyLineItems } from "./lineItemHelpers";
 
 export type ProductType = {
   id: string | number;
@@ -303,6 +304,12 @@ const highlightDuplicateItem = (rowId: string | null) => {
 
 const duplicateRowRef = useRef<HTMLElement | null>(null);
 const dropdownPortalRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (lineItems.length > 0) return;
+    setLineItems(createDefaultEmptyLineItems(5, selectedSupplierId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed once when parent starts with no rows
+  }, []);
 
   useEffect(() => {
     if (!duplicateItemRowId) return;

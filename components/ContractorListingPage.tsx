@@ -2945,22 +2945,13 @@ export function ContractorListingPage() {
           </div>
         </div>
 
-        {/* Search */}
-        <div className="p-4 bg-white border-b border-gray-200">
-          <input
-            type="text"
-            placeholder="Search contractors or jobs..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-transparent"
-          />
-        </div>
-
         {/* Contractor Listings */}
         <div className="min-w-0 flex-1 min-h-0">
            <CommonEntityListing
               data={filteredContractors}
               emptyText="No contractors found"
+              searchPlaceholder="Search contractors or jobs..."
+              onSearchChange={setSearchTerm}
               expandedParents={expandedContractors}
               expandedJobs={expandedJobs}
               selectedParent={selectedContractor}

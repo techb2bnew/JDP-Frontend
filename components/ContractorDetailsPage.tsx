@@ -31,6 +31,7 @@ import {
 } from "./ui/table";
 import { apiClient } from "../utils/api";
 import { JobDetailsPage } from "./JobDetailsPage";
+import { TableListPagination } from "./common/TableListPagination";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -88,14 +89,21 @@ export function ContractorDetailsPage({
   const [enhancedJobData, setEnhancedJobData] = useState<any>(null);
   const [isJobDetailsLoading, setIsJobDetailsLoading] = useState(false);
   
-  useEffect(()=>{
+  useEffect(() => {
     setSelectedJob(null);
     setSelectedSubJob(null);
     setEnhancedJobData(null);
-  },[contractorId])
+    setJobsPage(1);
+    setSubJobsPageByJobId({});
+    setExpandedTableJobs(new Set());
+  }, [contractorId]);
   // Pagination state
   const [jobsPage, setJobsPage] = useState(1);
   const jobsPerPage = 10;
+  const subJobsPerPage = 10;
+  const [subJobsPageByJobId, setSubJobsPageByJobId] = useState<
+    Record<string, number>
+  >({});
   const [jobDeleteTarget, setJobDeleteTarget] = useState<{
     id: string;
     title: string;
@@ -179,6 +187,7 @@ export function ContractorDetailsPage({
 
           // Reset to first page whenever fresh contractor data loads
           setJobsPage(1);
+          setSubJobsPageByJobId({});
         } else {
           console.error("Invalid contractor details API response:", responseData);
           setContractor(null);
@@ -262,6 +271,24 @@ export function ContractorDetailsPage({
     const end = start + jobsPerPage;
     return allJobs.slice(start, end);
   }, [allJobs, jobsPage]);
+
+  const getPaginatedSubJobs = (subJobs: Job[], jobId: string) => {
+    const total = subJobs.length;
+    const totalPages = Math.max(1, Math.ceil(total / subJobsPerPage));
+    const page = Math.min(subJobsPageByJobId[jobId] ?? 1, totalPages);
+    const start = (page - 1) * subJobsPerPage;
+    return {
+      items: subJobs.slice(start, start + subJobsPerPage),
+      page,
+      totalPages,
+      total,
+    };
+  };
+
+  const setSubJobsPageForJob = (jobId: string, page: number) => {
+    setSubJobsPageByJobId((prev) => ({ ...prev, [jobId]: page }));
+  };
+
   const totalContractorActivityCount = contractorActivity.length;
   const totalContractorActivityPages = Math.max(
     1,
@@ -952,12 +979,20 @@ export function ContractorDetailsPage({
                       const hasSubJobs =
                         Array.isArray(job.subJobs) && job.subJobs.length > 0;
                       const isExpanded = expandedTableJobs.has(jobId);
+                      const subJobsPagination = hasSubJobs
+                        ? getPaginatedSubJobs(job.subJobs!, jobId)
+                        : null;
 
                       return (
                         <React.Fragment key={jobId}>
                           <TableRow>
-                            <TableCell className="font-medium">
-                              {job.job_title || "N/A"}
+                            <TableCell className="max-w-[240px] font-medium">
+                              <span
+                                className="block truncate"
+                                title={job.job_title || "N/A"}
+                              >
+                                {job.job_title || "N/A"}
+                              </span>
                             </TableCell>
 
                             <TableCell className="capitalize">
@@ -1048,12 +1083,18 @@ export function ContractorDetailsPage({
                                             </TableRow>
                                           </TableHeader>
                                           <TableBody>
-                                            {job.subJobs?.map((subJob: Job) => (
-                                              <TableRow
-                                                key={`${jobId}-${subJob.id}`}
-                                              >
-                                                <TableCell className="font-medium">
-                                                  {subJob.job_title || "N/A"}
+                                            {(subJobsPagination?.items ?? []).map(
+                                              (subJob: Job) => (
+                                                <TableRow
+                                                  key={`${jobId}-${subJob.id}`}
+                                                >
+                                                <TableCell className="max-w-[200px] font-medium">
+                                                  <span
+                                                    className="block truncate"
+                                                    title={subJob.job_title || "N/A"}
+                                                  >
+                                                    {subJob.job_title || "N/A"}
+                                                  </span>
                                                 </TableCell>
                                                 <TableCell className="capitalize">
                                                   {(
@@ -1117,6 +1158,21 @@ export function ContractorDetailsPage({
                                             ))}
                                           </TableBody>
                                         </Table>
+                                        {subJobsPagination && (
+                                          <TableListPagination
+                                            compact
+                                            page={subJobsPagination.page}
+                                            totalPages={
+                                              subJobsPagination.totalPages
+                                            }
+                                            totalItems={subJobsPagination.total}
+                                            itemsPerPage={subJobsPerPage}
+                                            itemLabel="sub-jobs"
+                                            onPageChange={(page) =>
+                                              setSubJobsPageForJob(jobId, page)
+                                            }
+                                          />
+                                        )}
                                       </div>
                                     </div>
                                   </div>
@@ -1140,41 +1196,14 @@ export function ContractorDetailsPage({
               </div>
             )}
 
-            {totalJobsPages > 1 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
-                <div className="text-sm text-gray-500">
-                  Showing {(jobsPage - 1) * jobsPerPage + 1} to{" "}
-                  {Math.min(jobsPage * jobsPerPage, totalJobsCount)} of{" "}
-                  {totalJobsCount} jobs
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setJobsPage((prev) => Math.max(prev - 1, 1))}
-                    disabled={jobsPage === 1}
-                  >
-                    Previous
-                  </Button>
-
-                  <span className="text-sm text-gray-600">
-                    Page {jobsPage} of {totalJobsPages}
-                  </span>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setJobsPage((prev) => Math.min(prev + 1, totalJobsPages))
-                    }
-                    disabled={jobsPage === totalJobsPages}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            )}
+            <TableListPagination
+              page={jobsPage}
+              totalPages={totalJobsPages}
+              totalItems={totalJobsCount}
+              itemsPerPage={jobsPerPage}
+              itemLabel="jobs"
+              onPageChange={setJobsPage}
+            />
           </CardContent>
           </Card>
 

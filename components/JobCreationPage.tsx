@@ -128,6 +128,8 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
   const [entityErrors, setEntityErrors] = useState<{ name?: string; email?: string; phone?: string }>({})
   const [customerRefreshKey, setCustomerRefreshKey] = useState(0)
   const [contractorRefreshKey, setContractorRefreshKey] = useState(0)
+  /** Last customer/contractor row from AutoScrollSelect — used to refill location when checkbox is re-enabled. */
+  const selectedEntityForLocationRef = useRef<any>(null)
 
   const [formData, setFormData] = useState({
     // Step 1: Job Type
@@ -152,7 +154,8 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     billToPhone: '',
     billToEmail: '',
     sameAsAddress: false,
-    
+    useEntityAddressForLocation: true,
+
     // Step 3: Scheduling & Resources
     dueDate: '',
     estimatedHours: 0,
@@ -547,9 +550,27 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
           const newId = String(data.data.id)
           const name = payload.customer_name
           const customerEmail = entityForm.email.toLowerCase()
-          setFormData(prev => {
-            const next = { ...prev, customer: newId, customerName: name, email: customerEmail }
-            if (prev.sameAsAddress) next.billToEmail = customerEmail
+          const createdCustomer = {
+            id: newId,
+            name: payload.customer_name,
+            customer_name: payload.customer_name,
+            email: payload.email,
+            phone: payload.phone,
+            address: payload.address,
+          }
+          selectedEntityForLocationRef.current = createdCustomer
+          setFormData((prev) => {
+            let next = {
+              ...prev,
+              customer: newId,
+              customerName: name,
+              email: customerEmail,
+            }
+            if (prev.useEntityAddressForLocation) {
+              next = applyEntityToLocationFields(next, createdCustomer)
+            } else if (prev.sameAsAddress) {
+              next.billToEmail = customerEmail
+            }
             return next
           })
           setSelectedCustomerName(name)
@@ -581,11 +602,27 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
           const newId = String(data.data.id)
           const name = payload.contractor_name
           const contractorEmail = entityForm.email.toLowerCase()
-          setFormData(prev => {
-            const next = { ...prev, contractor: newId, contractorName: name }
+          const createdContractor = {
+            id: newId,
+            name: payload.contractor_name,
+            contractor_name: payload.contractor_name,
+            email: payload.email,
+            phone: payload.phone,
+            address: payload.address,
+          }
+          selectedEntityForLocationRef.current = createdContractor
+          setFormData((prev) => {
+            let next = { ...prev, contractor: newId, contractorName: name }
             if (prev.type === 'contract-based') {
               next.email = contractorEmail
-              if (prev.sameAsAddress) next.billToEmail = contractorEmail
+            }
+            if (prev.useEntityAddressForLocation) {
+              next = applyEntityToLocationFields(next, createdContractor)
+            } else if (
+              prev.type === 'contract-based' &&
+              prev.sameAsAddress
+            ) {
+              next.billToEmail = contractorEmail
             }
             return next
           })
@@ -636,6 +673,105 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
   const getContractorEmail = (contractor: any): string => {
     return contractor?.email || contractor?.contractor_email || contractor?.users?.email || ''
+  }
+
+  const getLocationFromEntity = (item: any) => {
+    if (!item) {
+      return { address: '', cityZip: '', phone: '', email: '' }
+    }
+
+    const email =
+      getCustomerEmail(item) || getContractorEmail(item) || String(item.email || '')
+    const phone = String(item.phone ?? '').trim()
+    let cityZip = String(item.city_zip ?? item.cityZip ?? '').trim()
+    let address = String(item.address ?? '').trim()
+
+    if (address && !cityZip && address.includes(',')) {
+      const parts = address
+        .split(',')
+        .map((part: string) => part.trim())
+        .filter(Boolean)
+      if (parts.length >= 2) {
+        address = parts[0]
+        cityZip = parts.slice(1).join(', ')
+      }
+    }
+
+    return { address, cityZip, phone, email }
+  }
+
+  const applyEntityToLocationFields = <T extends typeof formData>(base: T, item: any): T => {
+    const loc = getLocationFromEntity(item)
+    const next = {
+      ...base,
+      address: loc.address,
+      cityZip: loc.cityZip,
+      phone: loc.phone,
+      email: loc.email,
+    } as T
+
+    if (base.sameAsAddress) {
+      return {
+        ...next,
+        billToAddress: loc.address,
+        billToCityZip: loc.cityZip,
+        billToPhone: loc.phone,
+        billToEmail: loc.email,
+      } as T
+    }
+
+    return next
+  }
+
+  const clearLocationFields = <T extends typeof formData>(base: T): T => {
+    const next = {
+      ...base,
+      address: '',
+      cityZip: '',
+      phone: '',
+      email: '',
+    } as T
+
+    if (base.sameAsAddress) {
+      return {
+        ...next,
+        billToAddress: '',
+        billToCityZip: '',
+        billToPhone: '',
+        billToEmail: '',
+      } as T
+    }
+
+    return next
+  }
+
+  const handleUseEntityAddressForLocationChange = (checked: boolean) => {
+    if (checked) {
+      setFormData((prev) => {
+        const item = selectedEntityForLocationRef.current
+        if (!item) {
+          return { ...prev, useEntityAddressForLocation: true }
+        }
+        return {
+          ...applyEntityToLocationFields(prev, item),
+          useEntityAddressForLocation: true,
+        }
+      })
+      clearValidationError('address')
+      clearValidationError('cityZip')
+      clearValidationError('phone')
+      clearValidationError('email')
+      return
+    }
+
+    setFormData((prev) => ({
+      ...clearLocationFields(prev),
+      useEntityAddressForLocation: false,
+    }))
+    clearValidationError('address')
+    clearValidationError('cityZip')
+    clearValidationError('phone')
+    clearValidationError('email')
   }
 
   // Load Google Maps script with Places API
@@ -957,19 +1093,25 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               <AutoScrollSelect
                 value={formData.customer}
                 onValueChange={(value, item) => {
-                  console.log('Customer selected:', { value, item, name: item?.name })
-                  const customerName = item?.name || item?.customer_name || item?.company_name || ''
+                  selectedEntityForLocationRef.current = item ?? null
+                  const customerName =
+                    item?.name || item?.customer_name || item?.company_name || ''
                   const customerEmail = getCustomerEmail(item)
-                  const nextFormData = {
-                    ...formData,
-                    customer: value,
-                    customerName: customerName,
-                    email: customerEmail
-                  }
-                  if (formData.sameAsAddress) {
-                    nextFormData.billToEmail = customerEmail
-                  }
-                  setFormData(nextFormData)
+
+                  setFormData((prev) => {
+                    let next = {
+                      ...prev,
+                      customer: value,
+                      customerName,
+                      email: customerEmail,
+                    }
+                    if (prev.useEntityAddressForLocation && item) {
+                      next = applyEntityToLocationFields(next, item)
+                    } else if (prev.sameAsAddress) {
+                      next.billToEmail = customerEmail
+                    }
+                    return next
+                  })
                   setSelectedCustomerName(customerName)
                   clearValidationError('customer')
                   clearValidationError('email')
@@ -1002,21 +1144,30 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               <AutoScrollSelect
                 value={formData.contractor}
                 onValueChange={(value, item) => {
-                  console.log('Contractor selected:', { value, item, name: item?.name })
-                  const contractorName = item?.name || item?.contractor_name || item?.company_name || ''
+                  selectedEntityForLocationRef.current = item ?? null
+                  const contractorName =
+                    item?.name || item?.contractor_name || item?.company_name || ''
                   const contractorEmail = getContractorEmail(item)
-                  const nextFormData = {
-                    ...formData,
-                    contractor: value,
-                    contractorName: contractorName,
-                  }
-                  if (formData.type === 'contract-based') {
-                    nextFormData.email = contractorEmail
-                    if (formData.sameAsAddress) {
-                      nextFormData.billToEmail = contractorEmail
+
+                  setFormData((prev) => {
+                    let next = {
+                      ...prev,
+                      contractor: value,
+                      contractorName,
                     }
-                  }
-                  setFormData(nextFormData)
+                    if (prev.type === 'contract-based') {
+                      next.email = contractorEmail
+                    }
+                    if (prev.useEntityAddressForLocation && item) {
+                      next = applyEntityToLocationFields(next, item)
+                    } else if (
+                      prev.type === 'contract-based' &&
+                      prev.sameAsAddress
+                    ) {
+                      next.billToEmail = contractorEmail
+                    }
+                    return next
+                  })
                   setSelectedContractorName(contractorName)
                   clearValidationError('contractor')
                   if (formData.type === 'contract-based') {
@@ -1061,7 +1212,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-3">
           <div className="space-y-2">
-            <Label htmlFor="dueDate">Due Date *</Label>
+            <Label htmlFor="dueDate">Due Date</Label>
             <Input
               id="dueDate"
               type="date"
@@ -1069,14 +1220,8 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               min={new Date().toISOString().split('T')[0]} // Prevent selecting past dates
               onChange={(e) => {
                 setFormData({...formData, dueDate: e.target.value})
-                clearValidationError('dueDate')
               }}
-              className={validationErrors.dueDate ? 'border-red-500' : ''}
-              required
             />
-            {validationErrors.dueDate && (
-              <p className="text-red-500 text-sm">{validationErrors.dueDate}</p>
-            )}
           </div>
 
           
@@ -1117,10 +1262,25 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
         {/* Enhanced Location Section */}
         <div className="space-y-4 bg-white shadow-lg p-3">
           <div className="flex items-center gap-2 mb-4">
-            <MapPin className="h-5 w-5 text-[#00A1FF]" /> 
+            <MapPin className="h-5 w-5 text-[#00A1FF]" />
             <h3 className="font-bold text-[#2b2b2b]  text-lg">Location Information</h3>
           </div>
-          
+
+          <div className="flex items-center space-x-2 mb-4">
+            <Checkbox
+              id="useEntityAddressForLocation"
+              checked={formData.useEntityAddressForLocation}
+              onCheckedChange={(checked) =>
+                handleUseEntityAddressForLocationChange(checked === true)
+              }
+            />
+            <Label htmlFor="useEntityAddressForLocation" className="text-sm font-medium">
+              {formData.type === 'contract-based'
+                ? 'Same as contractor address'
+                : 'Same as customer address'}
+            </Label>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="address">Address *</Label>
@@ -1503,8 +1663,12 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Due Date:</span>
-                  <span className="font-medium">{new Date(formData.dueDate).toLocaleDateString()}</span>
-                </div> 
+                  <span className="font-medium">
+                    {formData.dueDate
+                      ? new Date(formData.dueDate).toLocaleDateString()
+                      : 'Not specified'}
+                  </span>
+                </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Estimated Cost:</span>
                   <span className="font-medium">
