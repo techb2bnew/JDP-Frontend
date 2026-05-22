@@ -1,7 +1,7 @@
  'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { JobDetailsPage } from './JobDetailsPage'
 import { apiClient } from '../utils/api'
 import { ContractorDetailsPage } from './ContractorDetailsPage'
@@ -957,6 +957,7 @@ function resolveContractorJobNavigation(
 
 export function ContractorListingPage() {
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const { hasPermission } = usePermissions()
   const [selectedContractor, setSelectedContractor] = useState<string | null>(null)
@@ -1686,7 +1687,21 @@ export function ContractorListingPage() {
     setExpandedSubJobs(newExpanded)
   }
 
+  const clearDeepLinkParamsIfDifferentParent = (parentId: string) => {
+    const urlParentId = focusFromUrl.contractorId
+    if (!urlParentId || urlParentId === parentId) return
+
+    const params = new URLSearchParams(searchParams?.toString() ?? '')
+    params.delete('customerId')
+    params.delete('contractorId')
+    params.delete('jobId')
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    setPinnedListingContractor(null)
+  }
+
   const selectContractor = (contractorId: string) => {
+    clearDeepLinkParamsIfDifferentParent(contractorId)
     setSelectedJob(null)
     setSelectedSubJob(null)
     setEnhancedJobData(null)
@@ -2016,6 +2031,7 @@ export function ContractorListingPage() {
   }, [focusFromUrl.contractorId, focusFromUrl.jobId])
 
   const selectJob = async (jobId: string, contractorId: string) => {
+    clearDeepLinkParamsIfDifferentParent(contractorId)
     setSelectedContractor(contractorId)
     setSelectedJob(jobId)
     setSelectedSubJob(null)
@@ -2036,8 +2052,7 @@ export function ContractorListingPage() {
   }
 
   const selectSubJob = async (subJobId: string, jobId: string, contractorId: string) => {
-
-
+    clearDeepLinkParamsIfDifferentParent(contractorId)
     setSelectedContractor(contractorId)
     setSelectedJob(jobId)
     setSelectedSubJob(subJobId)

@@ -82,7 +82,7 @@ import {
 import { apiClient } from "@/utils/api";
 import Autocomplete from "react-google-autocomplete";
 import { toast } from "sonner";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Tooltip,
   TooltipContent,
@@ -200,6 +200,7 @@ export function CustomersPage() {
   const { hasPermission } = usePermissions();
   const canDeleteJob = hasPermission("jobs", "delete");
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
@@ -569,7 +570,21 @@ export function CustomersPage() {
     });
   };
 
+  const clearDeepLinkParamsIfDifferentParent = (parentId: string) => {
+    const urlParentId = focusFromUrl.customerId;
+    if (!urlParentId || urlParentId === parentId) return;
+
+    const params = new URLSearchParams(searchParams?.toString() ?? "");
+    params.delete("customerId");
+    params.delete("contractorId");
+    params.delete("jobId");
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    setPinnedListingCustomer(null);
+  };
+
   const selectCustomer = (customerId: string) => {
+    clearDeepLinkParamsIfDifferentParent(customerId);
     setSelectedCustomer(customerId);
     setSelectedJob(null);
     setSelectedSubJob(null);
@@ -819,6 +834,7 @@ export function CustomersPage() {
   ]);
 
   const selectJob = async (jobId: string, customerId: string) => {
+    clearDeepLinkParamsIfDifferentParent(customerId);
     setSelectedJob(jobId);
     setSelectedCustomer(customerId);
     setSelectedSubJob(null);
@@ -934,6 +950,7 @@ export function CustomersPage() {
     jobId: string,
     customerId: string,
   ) => {
+    clearDeepLinkParamsIfDifferentParent(customerId);
     setSelectedSubJob(subJobId);
     setSelectedJob(jobId);
     setSelectedCustomer(customerId);
