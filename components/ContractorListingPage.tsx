@@ -1,4 +1,4 @@
-'use client'
+ 'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -1149,24 +1149,27 @@ export function ContractorListingPage() {
         }
       }),
     )
-    return sortEntitiesByRecentJobActivity(
-      annotated.filter((contractor) => {
-        const matchesStatus =
-          statusFilter === 'all' || contractor.status === statusFilter
-        return matchesStatus
-      }),
-      (a, b) => {
-        if (!sortBy) return 0
+    const filtered = annotated.filter((contractor) => {
+      const matchesStatus =
+        statusFilter === 'all' || contractor.status === statusFilter
+      return matchesStatus
+    })
 
-        const aValue = a[sortBy] || ''
-        const bValue = b[sortBy] || ''
+    if (isSearchActive) {
+      return filtered
+    }
 
-        if (sortOrder === 'asc') {
-          return aValue.toString().localeCompare(bValue.toString())
-        }
-        return bValue.toString().localeCompare(aValue.toString())
-      },
-    )
+    return sortEntitiesByRecentJobActivity(filtered, (a, b) => {
+      if (!sortBy) return 0
+
+      const aValue = a[sortBy] || ''
+      const bValue = b[sortBy] || ''
+
+      if (sortOrder === 'asc') {
+        return aValue.toString().localeCompare(bValue.toString())
+      }
+      return bValue.toString().localeCompare(aValue.toString())
+    })
   }, [contractors, statusFilter, sortBy, sortOrder, searchTerm])
 
   const sidebarListingContractors = useMemo(() => {

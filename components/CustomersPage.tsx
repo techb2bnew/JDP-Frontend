@@ -1620,7 +1620,7 @@ export function CustomersPage() {
               .toLowerCase()
               .includes(searchLower),
           );
-          const annotatedFallback = annotateEntitiesForListing(
+          const fallback = annotateEntitiesForListing(
             fallbackRaw.map((c: any) => {
               const { customer_type: _omit, ...withoutType } = c;
               return {
@@ -1629,33 +1629,17 @@ export function CustomersPage() {
               };
             }),
           );
-          const fallback = sortEntitiesByRecentJobActivity(
-            annotatedFallback,
-            (a: any, b: any) => {
-              if (b.total_jobs !== a.total_jobs) {
-                return b.total_jobs - a.total_jobs;
-              }
-              return (a.customer_name || "").localeCompare(
-                b.customer_name || "",
-              );
-            },
-          );
           setCustomersWithJobs(fallback);
           setPaginatedCustomers(fallback);
         } else {
-          const annotatedSearch = annotateEntitiesForListing(
+          const searchResults = annotateEntitiesForListing(
             customersFromSearch.map((c: any) => ({
               ...c,
               jobs: annotateJobsForListing(c.jobs || []),
             })),
           );
-          const searchSorted = sortEntitiesByRecentJobActivity(
-            annotatedSearch,
-            (a: any, b: any) =>
-              (a.customer_name || "").localeCompare(b.customer_name || ""),
-          );
-          setCustomersWithJobs(searchSorted);
-          setPaginatedCustomers(searchSorted);
+          setCustomersWithJobs(searchResults);
+          setPaginatedCustomers(searchResults);
         }
       } catch (error) {
         console.error("Error searching customers/jobs:", error);
