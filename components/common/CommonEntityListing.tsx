@@ -47,6 +47,7 @@ type EntityType = {
   customer_name?: string;
   contractor_name?: string;
   name?: string;
+  customer_type?: string;
   total_jobs?: number;
   jobs?: JobType[];
   /** Set by listing pages when any job was created in last 48h (optional). */
@@ -184,6 +185,14 @@ export default function CommonEntityListing({
     return "Sub job";
   };
 
+  const customerTypeChipLabel = (customerType?: string) => {
+    const normalized = customerType?.trim().toLowerCase();
+    if (normalized === "contractor") return "Contractor";
+    if (normalized === "customer") return "Customer";
+    if (!customerType?.trim()) return "";
+    return customerType.trim();
+  };
+
   /** Address line for any sub-job row (change order or regular sub job). */
   const subJobAddressLine = (subJob: {
     address?: string;
@@ -272,13 +281,13 @@ export default function CommonEntityListing({
                         className="group h-auto w-full min-w-0 justify-start rounded-[20px] p-0 text-left whitespace-normal hover:bg-transparent"
                       >
                         <div
-                          className={`w-full rounded-[20px] border px-4 py-4 transition-all duration-300 ${
+                          className={`w-full rounded-[20px] border px-3 py-3.5 transition-all duration-300 ${
                             isSelected || (isExpanded && hasJobs)
                               ? "border-sky-200 bg-gradient-to-r from-sky-200 via-blue-200 to-cyan-100 text-slate-800 shadow-[0_8px_18px_rgba(59,130,246,0.10)]"
                               : "border-sky-100 bg-gradient-to-r from-sky-100 via-blue-100 to-cyan-50 text-slate-800 shadow-[0_4px_12px_rgba(59,130,246,0.06)]"
                           }`}
                         >
-                          <div className="flex min-w-0 items-start justify-between gap-3">
+                          <div className="flex min-w-0 items-start justify-between gap-1.5">
                             <div className="flex min-w-0 flex-1 items-center gap-2">
                               <div className="flex shrink-0 items-center gap-2">
                                 <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/80 ring-1 ring-sky-100">
@@ -298,15 +307,27 @@ export default function CommonEntityListing({
                                 <div className="text-[13.4px] font-semibold leading-snug text-slate-800 break-words capitalize">
                                   {formatListingParentName(getParentName(entity))}
                                 </div>
-                                <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
-                                  <span>{totalJobs} jobs</span>
+                                <div className="mt-0.5 flex min-w-0 flex-nowrap items-center gap-1 text-xs text-slate-500">
+                                  <span className="shrink-0">{totalJobs} jobs</span>
+                                  {customerTypeChipLabel(entity.customer_type) && (
+                                    <span
+                                      className={`shrink-0 whitespace-nowrap rounded-full border px-1 py-0.5 text-[8px] font-semibold leading-none capitalize ${
+                                        entity.customer_type?.trim().toLowerCase() ===
+                                        "contractor"
+                                          ? "border-violet-200 bg-violet-50 text-violet-800"
+                                          : "border-sky-200 bg-sky-50 text-sky-700"
+                                      }`}
+                                    >
+                                      {customerTypeChipLabel(entity.customer_type)}
+                                    </span>
+                                  )}
                                   {entity.__listingRecentlyAdded && (
-                                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-1 py-0.5 text-[8px] font-semibold leading-none text-emerald-800">
+                                    <span className="shrink-0 whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-1 py-0.5 text-[8px] font-semibold leading-none text-emerald-800">
                                       Recently Added
                                     </span>
                                   )}
                                   {entity.__listingRecentlyUpdated && !entity.__listingRecentlyAdded && (
-                                    <span className="rounded-full border border-blue-200 bg-blue-50 px-1 py-0.5 text-[8px] font-semibold leading-none text-blue-800">
+                                    <span className="shrink-0 whitespace-nowrap rounded-full border border-blue-200 bg-blue-50 px-1 py-0.5 text-[8px] font-semibold leading-none text-blue-800">
                                       Recently Updated
                                     </span>
                                   )}
@@ -314,19 +335,19 @@ export default function CommonEntityListing({
                               </div>
                             </div>
 
-                            <div className="flex shrink-0 items-center gap-1 self-start">
+                            <div className="-mr-0.5 flex shrink-0 items-center gap-0 self-start">
                               {hasEditPermission && onEditParent && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   title="Edit"
-                                  className="h-8 w-8 rounded-full p-0 hover:bg-white/70"
+                                  className="h-7 w-7 rounded-full p-0 hover:bg-white/70"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     onEditParent(entity);
                                   }}
                                 >
-                                  <Edit className="h-4 w-4 text-sky-600" />
+                                  <Edit className="h-3.5 w-3.5 text-sky-600" />
                                 </Button>
                               )}
 
@@ -335,13 +356,13 @@ export default function CommonEntityListing({
                                   variant="ghost"
                                   size="sm"
                                   title="Delete"
-                                  className="h-8 w-8 rounded-full p-0 hover:bg-red-50"
+                                  className="h-7 w-7 rounded-full p-0 hover:bg-red-50"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     onDeleteParent(entity);
                                   }}
                                 >
-                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                  <Trash2 className="h-3.5 w-3.5 text-red-500" />
                                 </Button>
                               )}
                             </div>

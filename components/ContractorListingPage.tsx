@@ -124,6 +124,8 @@ interface Contractor {
   email: string
   phone: string
   status: string
+  /** Set only from globalSearch results — shown as listing chip. */
+  customer_type?: string
   created_at: string
   jobs: Job[]
   total_jobs: number
@@ -993,6 +995,9 @@ export function ContractorListingPage() {
 
   // Contractor Listing State
   const [contractors, setContractors] = useState<any[]>([])
+  /** Cross-page URL target — pinned to top of sidebar (outside paginated page 1). */
+  const [pinnedListingContractor, setPinnedListingContractor] =
+    useState<Contractor | null>(null)
   const [totalContractors, setTotalContractors] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
@@ -1030,6 +1035,17 @@ export function ContractorListingPage() {
     if (digits.length === 10) return `+1${digits}`;
     return `+${digits}`;
   };
+
+  const focusFromUrl = useMemo(() => {
+    const contractorId = searchParams?.get('contractorId') || ''
+    const jobId = searchParams?.get('jobId') || ''
+    const estimateId = searchParams?.get('estimateId') || ''
+    return {
+      contractorId: contractorId.trim(),
+      jobId: jobId.trim(),
+      estimateId: estimateId.trim(),
+    }
+  }, [searchParams])
 
   // Fix Google Autocomplete dropdown z-index and prevent Dialog close
   useEffect(() => {
@@ -1123,11 +1139,15 @@ export function ContractorListingPage() {
 
   // Filter and sort contractors (status + sort only; search is server-side via globalSearch)
   const filteredContractors = useMemo(() => {
+    const isSearchActive = searchTerm.trim().length > 0
     const annotated = annotateEntitiesForListing(
-      contractors.map((c) => ({
-        ...c,
-        jobs: annotateJobsForListing(c.jobs || []),
-      })),
+      contractors.map((c) => {
+        const { customer_type, ...rest } = c
+        return {
+          ...(isSearchActive ? c : rest),
+          jobs: annotateJobsForListing(c.jobs || []),
+        }
+      }),
     )
     return sortEntitiesByRecentJobActivity(
       annotated.filter((contractor) => {
@@ -1147,7 +1167,28 @@ export function ContractorListingPage() {
         return bValue.toString().localeCompare(aValue.toString())
       },
     )
-  }, [contractors, statusFilter, sortBy, sortOrder])
+  }, [contractors, statusFilter, sortBy, sortOrder, searchTerm])
+
+  const sidebarListingContractors = useMemo(() => {
+    const base = filteredContractors
+    if (!pinnedListingContractor) return base
+    const pinId = pinnedListingContractor.id?.toString?.()
+    if (!pinId) return base
+    const existing = base.find((c) => c.id?.toString?.() === pinId)
+    if (existing) {
+      return [
+        existing,
+        ...base.filter((c) => c.id?.toString?.() !== pinId),
+      ]
+    }
+    const [annotatedPin] = annotateEntitiesForListing([
+      {
+        ...pinnedListingContractor,
+        jobs: annotateJobsForListing(pinnedListingContractor.jobs || []),
+      },
+    ])
+    return [annotatedPin, ...base]
+  }, [filteredContractors, pinnedListingContractor])
 
   // Handle sorting
   const handleSort = (field: string) => {
@@ -1186,16 +1227,19 @@ export function ContractorListingPage() {
       try {
         setIsLoadingContractors(true)
 
-        // Global search returns both customers and contractors; here we care about contractors array
+        // Global search: customer_type chip only for these results (not normal getContractors list)
         const response = await apiClient.globalSearch(term, 1, itemsPerPage)
         const contractorsFromApi: any[] = response.data?.contractors || []
+        const customersFromApi: any[] = response.data?.customers || []
 
-        const mappedContractors = contractorsFromApi.map((entry: any) => {
-          const contractor = entry.contractor || entry // depending on backend shape
+        const mapContractorEntry = (entry: any): Contractor => {
+          const contractor = entry.contractor || entry
           const jobsForContractor = entry.jobs || contractor.jobs || []
           return {
             id: contractor.id,
-            contractor_name: contractor.contractor_name || contractor.name || '',
+            contractor_name:
+              contractor.contractor_name || contractor.name || '',
+            customer_type: contractor.customer_type || '',
             company_name: contractor.company_name || '',
             email: contractor.email || '',
             phone: contractor.phone || '',
@@ -1205,11 +1249,37 @@ export function ContractorListingPage() {
             total_jobs: jobsForContractor.length,
             active_jobs: contractor.active_jobs ?? 0,
             completed_jobs: contractor.completed_jobs ?? 0,
-          } as Contractor
-        })
+          }
+        }
+
+        const mapCustomerEntry = (entry: any): Contractor => {
+          const customer = entry.customer
+          const jobsForCustomer = entry.jobs || []
+          return {
+            id: customer.id,
+            contractor_name: customer.customer_name || customer.name || '',
+            customer_type: customer.customer_type || '',
+            company_name: customer.company_name || '',
+            email: customer.email || '',
+            phone: customer.phone || '',
+            status: customer.status || 'active',
+            created_at: customer.created_at || '',
+            jobs: jobsForCustomer,
+            total_jobs: jobsForCustomer.length,
+            active_jobs: 0,
+            completed_jobs: 0,
+          }
+        }
+
+        const mappedContractors = [
+          ...contractorsFromApi.map(mapContractorEntry),
+          ...customersFromApi.map(mapCustomerEntry),
+        ]
 
         setContractors(mappedContractors)
-        setTotalContractors(mappedContractors.length)
+        setTotalContractors(
+          response.data?.pagination?.total ?? mappedContractors.length,
+        )
       } catch (error) {
         console.error('Error searching contractors/jobs:', error)
       } finally {
@@ -1434,15 +1504,16 @@ export function ContractorListingPage() {
     }
   }, [contractors])
 
-  // Auto-select first contractor when contractors are loaded
+  // Auto-select first contractor when contractors are loaded (skip when URL targets a specific contractor)
   useEffect(() => {
+    if (focusFromUrl.contractorId || focusFromUrl.jobId) return
     if (contractors.length > 0 && !selectedContractor) {
       const firstContractor = contractors[0]
       if (firstContractor && firstContractor.id) {
         selectContractor(firstContractor.id.toString())
       }
     }
-  }, [contractors])
+  }, [contractors, focusFromUrl.contractorId, focusFromUrl.jobId])
 
   // Validation function
   const validateForm = () => {
@@ -1628,6 +1699,319 @@ export function ContractorListingPage() {
     }
   }
 
+  const mapApiContractorToListing = (data: any, jobs: Job[] = []): Contractor => ({
+    id: data.id,
+    contractor_name: data.contractor_name || data.name || '',
+    company_name: data.company_name || '',
+    email: data.email || '',
+    phone: data.phone || '',
+    status: data.status || 'active',
+    created_at: data.created_at || '',
+    jobs,
+    total_jobs: jobs.length,
+    active_jobs: data.active_jobs ?? 0,
+    completed_jobs: data.completed_jobs ?? 0,
+  })
+
+  const mapApiCustomerToContractorListing = (
+    apiCustomer: any,
+    jobs: Job[] = [],
+  ): Contractor => ({
+    id: apiCustomer.id,
+    contractor_name: apiCustomer.customer_name || apiCustomer.name || '',
+    company_name: apiCustomer.company_name || '',
+    email: apiCustomer.email || '',
+    phone: apiCustomer.phone || '',
+    status: apiCustomer.status || 'active',
+    created_at: apiCustomer.created_at || '',
+    jobs,
+    total_jobs: jobs.length,
+    active_jobs: 0,
+    completed_jobs: 0,
+  })
+
+  const normalizeJobsPayload = (data: unknown): any[] => {
+    if (Array.isArray(data)) return data
+    if (data && typeof data === 'object') {
+      const o = data as Record<string, unknown>
+      if (Array.isArray(o.jobs)) return o.jobs as any[]
+      if (Array.isArray(o.data)) return o.data as any[]
+    }
+    return []
+  }
+
+  const jobBelongsToParent = (job: any, parentId: string) => {
+    const id = String(parentId)
+    return (
+      String(job.customer_id ?? job.customer?.id ?? '') === id ||
+      String(job.contractor_id ?? job.contractor?.id ?? '') === id
+    )
+  }
+
+  const fetchAllJobsBulk = async (): Promise<any[]> => {
+    const jobsResponse = await globalApiCall(
+      `${apiBaseUrl}/job/getJobsByCustomer`,
+      { method: 'GET' },
+    )
+    const jobsData = await jobsResponse.json()
+    if (jobsData.success) {
+      return normalizeJobsPayload(jobsData.data)
+    }
+    return []
+  }
+
+  const fetchJobsForContractorListing = async (contractorId: string) => {
+    try {
+      const result = await apiClient.getJobsByCustomer(contractorId)
+      if (result.success) {
+        const jobs = normalizeJobsPayload(result.data)
+        if (jobs.length > 0) {
+          return annotateJobsForListing(jobs)
+        }
+      }
+    } catch (error) {
+      console.error(
+        'Per-id jobs API failed, trying bulk filter:',
+        contractorId,
+        error,
+      )
+    }
+
+    try {
+      const allJobs = await fetchAllJobsBulk()
+      const filtered = allJobs.filter((job) =>
+        jobBelongsToParent(job, contractorId),
+      )
+      if (filtered.length > 0) {
+        return annotateJobsForListing(filtered)
+      }
+    } catch (error) {
+      console.error('Bulk jobs fetch for contractor failed:', contractorId, error)
+    }
+    return []
+  }
+
+  const buildContractorListingEntry = async (
+    base: Contractor,
+    contractorId: string,
+  ): Promise<Contractor> => {
+    let jobs = base.jobs?.length
+      ? annotateJobsForListing(base.jobs)
+      : await fetchJobsForContractorListing(contractorId)
+
+    if (jobs.length === 0) {
+      try {
+        const response = await globalApiCall(
+          `${apiBaseUrl}/contractor/getContractorById/${contractorId}?include_jobs=true`,
+          { method: 'GET' },
+        )
+        const responseData = await response.json()
+        if (responseData.success && responseData.data?.jobs?.length) {
+          jobs = annotateJobsForListing(responseData.data.jobs)
+        }
+      } catch (error) {
+        console.error('Error fetching contractor with jobs:', error)
+      }
+    }
+
+    return {
+      ...base,
+      jobs,
+      total_jobs: jobs.length,
+    }
+  }
+
+  const loadContractorForUrlSelection = async (
+    contractorId: string,
+  ): Promise<Contractor | null> => {
+    const inList = contractors.find((c) => c.id?.toString?.() === contractorId)
+    if (inList) {
+      const entry = await buildContractorListingEntry(inList, contractorId)
+      setPinnedListingContractor(entry)
+      return entry
+    }
+
+    try {
+      const response = await globalApiCall(
+        `${apiBaseUrl}/contractor/getContractorById/${contractorId}?include_jobs=true`,
+        { method: 'GET' },
+      )
+      const responseData = await response.json()
+      if (responseData.success && responseData.data) {
+        const entry = await buildContractorListingEntry(
+          mapApiContractorToListing(
+            responseData.data,
+            responseData.data.jobs || [],
+          ),
+          contractorId,
+        )
+        setPinnedListingContractor(entry)
+        return entry
+      }
+    } catch (error) {
+      console.error('Contractor fetch by id failed, trying customer:', error)
+    }
+
+    try {
+      const response = await globalApiCall(
+        `${apiBaseUrl}/customer/getCustomerById/${contractorId}`,
+        { method: 'GET' },
+      )
+      const responseData = await response.json()
+      if (responseData.success && responseData.data) {
+        const jobs = await fetchJobsForContractorListing(contractorId)
+        const entry = await buildContractorListingEntry(
+          mapApiCustomerToContractorListing(responseData.data, jobs),
+          contractorId,
+        )
+        setPinnedListingContractor(entry)
+        return entry
+      }
+    } catch (error) {
+      console.error('Customer fetch for contractor selection failed:', error)
+    }
+
+    return null
+  }
+
+  const findListingContractor = (parentId: string) => {
+    if (pinnedListingContractor?.id?.toString?.() === parentId) {
+      return pinnedListingContractor
+    }
+    return (
+      contractors.find((c) => c.id?.toString?.() === parentId) ||
+      filteredContractors.find((c) => c.id?.toString?.() === parentId) ||
+      null
+    )
+  }
+
+  const mergeListingContractorsForJobResolve = () => {
+    const seen = new Set<string>()
+    const merged: Contractor[] = []
+    for (const c of [
+      pinnedListingContractor,
+      ...contractors,
+      ...filteredContractors,
+    ]) {
+      if (!c?.id) continue
+      const id = c.id.toString()
+      if (seen.has(id)) continue
+      seen.add(id)
+      merged.push(c)
+    }
+    return merged
+  }
+
+  const handleSelectParent = (parentId: string) => {
+    const entity = findListingContractor(parentId)
+
+    if (entity?.customer_type?.trim().toLowerCase() === 'customer') {
+      router.push(`/customers?customerId=${parentId}`)
+      return
+    }
+    selectContractor(parentId)
+  }
+
+  const handleSelectJob = (jobId: string, parentId: string) => {
+    const entity = findListingContractor(parentId)
+    if (entity?.customer_type?.trim().toLowerCase() === 'customer') {
+      router.push(`/customers?customerId=${parentId}&jobId=${jobId}`)
+      return
+    }
+    selectJob(jobId, parentId)
+  }
+
+  const handleSelectSubJob = (
+    subJobId: string,
+    jobId: string,
+    parentId: string,
+  ) => {
+    const entity = findListingContractor(parentId)
+    if (entity?.customer_type?.trim().toLowerCase() === 'customer') {
+      router.push(`/customers?customerId=${parentId}&jobId=${subJobId}`)
+      return
+    }
+    selectSubJob(subJobId, jobId, parentId)
+  }
+
+  // Pin + select contractor from cross-page navigation (?contractorId= without jobId)
+  useEffect(() => {
+    const contractorId = focusFromUrl.contractorId
+    if (!contractorId) {
+      setPinnedListingContractor(null)
+      return
+    }
+    if (focusFromUrl.jobId) return
+    if (selectedContractor === contractorId && pinnedListingContractor) return
+
+    let cancelled = false
+    ;(async () => {
+      const entry = await loadContractorForUrlSelection(contractorId)
+      if (cancelled) return
+      if (!entry) {
+        toast.error('Could not load contractor')
+        return
+      }
+      selectContractor(contractorId)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusFromUrl.contractorId, focusFromUrl.jobId])
+
+  // After page fetch, merge page row into pin without dropping jobs fetched for off-page users
+  useEffect(() => {
+    const contractorId = focusFromUrl.contractorId
+    if (!contractorId || focusFromUrl.jobId) return
+    const fromPage = contractors.find((c) => c.id?.toString?.() === contractorId)
+    if (!fromPage) return
+
+    setPinnedListingContractor((prev) => {
+      const pageJobs = fromPage.jobs?.length
+        ? annotateJobsForListing(fromPage.jobs)
+        : []
+      const prevJobs =
+        prev?.id?.toString?.() === contractorId && prev.jobs?.length
+          ? prev.jobs
+          : []
+      const jobs = pageJobs.length > 0 ? pageJobs : prevJobs
+      return {
+        ...fromPage,
+        jobs,
+        total_jobs: jobs.length,
+      }
+    })
+  }, [contractors, focusFromUrl.contractorId, focusFromUrl.jobId])
+
+  // Load pinned contractor when landing with ?contractorId= & ?jobId= together
+  useEffect(() => {
+    const contractorId = focusFromUrl.contractorId
+    const jobId = focusFromUrl.jobId
+    if (!contractorId || !jobId) return
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        await loadContractorForUrlSelection(contractorId)
+        if (cancelled) return
+        setExpandedContractors((prev) => {
+          const next = new Set(prev)
+          next.add(contractorId)
+          return next
+        })
+      } catch (error) {
+        console.error('Error loading contractor for job deep-link:', error)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusFromUrl.contractorId, focusFromUrl.jobId])
+
   const selectJob = async (jobId: string, contractorId: string) => {
     setSelectedContractor(contractorId)
     setSelectedJob(jobId)
@@ -1670,25 +2054,16 @@ export function ContractorListingPage() {
     }
   }
 
-  const focusFromUrl = useMemo(() => {
-    const contractorId = searchParams?.get('contractorId') || ''
-    const jobId = searchParams?.get('jobId') || ''
-    const estimateId = searchParams?.get('estimateId') || ''
-    return {
-      contractorId: contractorId.trim(),
-      jobId: jobId.trim(),
-      estimateId: estimateId.trim(),
-    }
-  }, [searchParams])
-
   // Open the right contractor job (or sub-job) after estimate send — same idea as CustomersPage ?jobId=&estimateId=
   useEffect(() => {
     const jobId = focusFromUrl.jobId
     if (!jobId) return
-    if (!contractors || contractors.length === 0) return
+
+    const listingContractors = mergeListingContractorsForJobResolve()
+    if (!listingContractors.length) return
 
     const resolved = resolveContractorJobNavigation(
-      contractors,
+      listingContractors,
       jobId,
       focusFromUrl.contractorId,
     )
@@ -1734,7 +2109,13 @@ export function ContractorListingPage() {
       void selectJob(jobId, resolved.contractorId)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusFromUrl.jobId, focusFromUrl.contractorId, contractors])
+  }, [
+    focusFromUrl.jobId,
+    focusFromUrl.contractorId,
+    contractors,
+    pinnedListingContractor,
+    filteredContractors,
+  ])
 
   const handleGenerateInvoice = (subJob: SubJob) => {
     setInvoiceSubJob(subJob)
@@ -2500,7 +2881,12 @@ export function ContractorListingPage() {
 
 
 
-  const selectedContractorData = selectedContractor ? contractors.find(c => c.id.toString() === selectedContractor) : null
+  const selectedContractorData = selectedContractor
+    ? contractors.find((c) => c.id.toString() === selectedContractor) ||
+      (pinnedListingContractor?.id?.toString() === selectedContractor
+        ? pinnedListingContractor
+        : null)
+    : null
   const selectedJobData = selectedJob ? selectedContractorData?.jobs.find((j: Job) => j.id.toString() === selectedJob) : null
   console.log(selectedJobData, 'selectedJobData')
   console.log(selectedContractorData, 'selectedContractorData')
@@ -2948,7 +3334,7 @@ export function ContractorListingPage() {
         {/* Contractor Listings */}
         <div className="min-w-0 flex-1 min-h-0">
            <CommonEntityListing
-              data={filteredContractors}
+              data={sidebarListingContractors}
               emptyText="No contractors found"
               searchPlaceholder="Search contractors or jobs..."
               onSearchChange={setSearchTerm}
@@ -2959,13 +3345,11 @@ export function ContractorListingPage() {
               selectedSubJob={selectedSubJob}
               onToggleParent={toggleContractor}
               onToggleJob={toggleJob}
-              onSelectParent={selectContractor}
+              onSelectParent={handleSelectParent}
               itemsPerPage={itemsPerPage}
               totalItems={totalContractors}
-              onSelectJob={(jobId, contractorId) => selectJob(jobId, contractorId)}
-              onSelectSubJob={(subJobId, jobId, contractorId) =>
-                selectSubJob(subJobId, jobId, contractorId)
-              }
+              onSelectJob={handleSelectJob}
+              onSelectSubJob={handleSelectSubJob}
               onEditParent={(contractor) =>
                 handleEditContractor(contractor.id.toString())
               }
@@ -3013,20 +3397,34 @@ export function ContractorListingPage() {
 
       </div>
 
-      {/* Right Content - Job Details */}
+      {/* Right Content - Contractor / Job Details */}
       <div className="flex-1 bg-white" style={{ width: '80%', margin: '0 auto' }}>
         <div className="p-4 border-b border-gray-200">
-          {hasPermission('contractors', 'create') && (
-            <div className="flex justify-end">
-              <Button
-                className="gap-2 text-white"
-                onClick={() => setShowCreateContractModal(true)}
-              >
-                <Plus className="h-4 w-4" />
-                Create Contractor
-              </Button>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-medium text-[#2b2b2b]">
+                Contractor Management
+              </h1>
+              <p className="text-muted-foreground">
+                Manage and track all contractor relationships and job history
+              </p>
             </div>
-          )}
+            <div className="flex gap-2">
+              {hasPermission('contractors', 'create') && (
+                <Button
+                  className="text-white"
+                  onClick={() => {
+                    setIsEditMode(false)
+                    setEditingContractor(null)
+                    setShowCreateContractModal(true)
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Contractor
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Contractor Details */}
@@ -3044,25 +3442,6 @@ export function ContractorListingPage() {
 
         {selectedJobData && selectedContractorData ? (
           <div className="p-6 space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-medium text-gray-900">
-                  {selectedJobData.title}
-                </h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  Job Details • {selectedContractorData.name}
-                </p>
-              </div>
-              {/* <div className="flex gap-3">
-                <Button variant="outline" className="gap-2">Export Report</Button>
-                <Button className="bg-primary text-white hover:bg-primary/90 gap-2">
-                  <Send className="h-4 w-4" />
-                  Generate Invoice
-                </Button>
-              </div> */}
-            </div>
-
             {/* Job Overview */}
             <Card>
               <CardHeader>

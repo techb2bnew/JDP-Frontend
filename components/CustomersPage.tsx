@@ -82,7 +82,7 @@ import {
 import { apiClient } from "@/utils/api";
 import Autocomplete from "react-google-autocomplete";
 import { toast } from "sonner";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Tooltip,
   TooltipContent,
@@ -117,9 +117,89 @@ const getInitials = (name: string) => {
     .toUpperCase();
 };
 
+const normalizeJobsPayload = (data: unknown): any[] => {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === "object") {
+    const o = data as Record<string, unknown>;
+    if (Array.isArray(o.jobs)) return o.jobs as any[];
+    if (Array.isArray(o.data)) return o.data as any[];
+  }
+  return [];
+};
+
+const jobBelongsToCustomer = (job: any, customerId: string) =>
+  String(job.customer_id ?? job.customer?.id ?? "") === String(customerId);
+
+/** Resolve customer + main/sub job for deep-link (?customerId=&jobId=). */
+function resolveCustomerJobNavigation(
+  customers: any[],
+  jobId: string,
+  preferredCustomerId?: string,
+): {
+  customerId: string;
+  parentJobId: string;
+  subJobId: string | null;
+} | null {
+  const jid = (jobId || "").trim();
+  if (!jid || !Array.isArray(customers)) return null;
+
+  const tryCustomer = (c: any) => {
+    if (!c) return null;
+    for (const j of c.jobs || []) {
+      if (j?.id != null && String(j.id) === jid) {
+        return {
+          customerId: String(c.id),
+          parentJobId: String(j.id),
+          subJobId: null as string | null,
+        };
+      }
+      for (const sj of j.subJobs || []) {
+        if (sj?.id != null && String(sj.id) === jid) {
+          return {
+            customerId: String(c.id),
+            parentJobId: String(j.id),
+            subJobId: String(sj.id),
+          };
+        }
+      }
+    }
+    return null;
+  };
+
+  const pref = (preferredCustomerId || "").trim();
+  if (pref) {
+    const c = customers.find((x) => x?.id != null && String(x.id) === pref);
+    const hit = tryCustomer(c);
+    if (hit) return hit;
+  }
+
+  for (const c of customers) {
+    const hit = tryCustomer(c);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+const mapApiCustomerToListingEntity = (
+  apiCustomer: any,
+  jobs: any[] = [],
+) => ({
+  id: apiCustomer.id,
+  customer_name: apiCustomer.customer_name || "",
+  name: apiCustomer.customer_name || "",
+  email: apiCustomer.email || "",
+  phone: apiCustomer.phone || "",
+  company_name: apiCustomer.company_name || "",
+  address: apiCustomer.address || "",
+  created_at: apiCustomer.created_at || "",
+  jobs,
+  total_jobs: jobs.length,
+});
+
 export function CustomersPage() {
   const { hasPermission } = usePermissions();
   const canDeleteJob = hasPermission("jobs", "delete");
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
@@ -181,6 +261,9 @@ export function CustomersPage() {
   const [customersWithJobs, setCustomersWithJobs] = useState<any[]>([]);
   const [allCustomersWithJobs, setAllCustomersWithJobs] = useState<any[]>([]); // Store original list for filtering
   const [paginatedCustomers, setPaginatedCustomers] = useState<any[]>([]);
+  /** Cross-page URL target — pinned to top of sidebar so they stay visible outside page 1. */
+  const [pinnedListingCustomer, setPinnedListingCustomer] =
+    useState<any | null>(null);
   const [jobDeleteTarget, setJobDeleteTarget] = useState<{
     id: string;
     title: string;
@@ -210,9 +293,11 @@ export function CustomersPage() {
   const focusFromUrl = useMemo(() => {
     const jobId = searchParams?.get("jobId") || "";
     const estimateId = searchParams?.get("estimateId") || "";
+    const customerId = searchParams?.get("customerId") || "";
     return {
       jobId: jobId.trim(),
       estimateId: estimateId.trim(),
+      customerId: customerId.trim(),
     };
   }, [searchParams]);
 
@@ -422,8 +507,9 @@ export function CustomersPage() {
     }
   }, [customersWithJobs]);
 
-  // Auto-select first customer when customers are loaded
+  // Auto-select first customer when customers are loaded (skip when URL targets a specific customer)
   useEffect(() => {
+    if (focusFromUrl.customerId || focusFromUrl.jobId) return;
     if (customersWithJobs.length > 0 && !selectedCustomer) {
       const firstCustomer = customersWithJobs[0];
       if (firstCustomer && firstCustomer.id) {
@@ -435,7 +521,7 @@ export function CustomersPage() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customersWithJobs.length]);
+  }, [customersWithJobs.length, focusFromUrl.customerId, focusFromUrl.jobId]);
 
   // Helper functions for customer listing (similar to ContractorListingPage)
   const toggleCustomer = (customerId: string) => {
@@ -494,6 +580,244 @@ export function CustomersPage() {
     // Jobs are already loaded in fetchCustomersWithJobs, no need to fetch again
   };
 
+  const fetchAllJobsBulk = async (): Promise<any[]> => {
+    const jobsResponse = await globalApiCall(
+      `${apiBaseUrl}/job/getJobsByCustomer`,
+      { method: "GET" },
+    );
+    const jobsData = await jobsResponse.json();
+    if (jobsData.success) {
+      return normalizeJobsPayload(jobsData.data);
+    }
+    return [];
+  };
+
+  const fetchJobsForCustomerListing = async (customerId: string) => {
+    try {
+      const result = await apiClient.getJobsByCustomer(customerId);
+      if (result.success) {
+        const jobs = normalizeJobsPayload(result.data);
+        if (jobs.length > 0) {
+          return annotateJobsForListing(jobs);
+        }
+      }
+    } catch (error) {
+      console.error(
+        "Per-customer jobs API failed, trying bulk filter:",
+        customerId,
+        error,
+      );
+    }
+
+    try {
+      const allJobs = await fetchAllJobsBulk();
+      const filtered = allJobs.filter((job) =>
+        jobBelongsToCustomer(job, customerId),
+      );
+      if (filtered.length > 0) {
+        return annotateJobsForListing(filtered);
+      }
+    } catch (error) {
+      console.error("Bulk jobs fetch for customer failed:", customerId, error);
+    }
+    return [];
+  };
+
+  const buildCustomerListingEntry = async (
+    base: any,
+    customerId: string,
+  ) => {
+    const jobs = base.jobs?.length
+      ? annotateJobsForListing(base.jobs)
+      : await fetchJobsForCustomerListing(customerId);
+    return {
+      ...base,
+      jobs,
+      total_jobs: jobs.length,
+    };
+  };
+
+  const loadCustomerForUrlSelection = async (customerId: string) => {
+    const inList =
+      paginatedCustomers.find((c) => c.id?.toString?.() === customerId) ||
+      customersWithJobs.find((c) => c.id?.toString?.() === customerId);
+
+    if (inList) {
+      const entry = await buildCustomerListingEntry(inList, customerId);
+      setPinnedListingCustomer(entry);
+      return entry;
+    }
+
+    const response = await globalApiCall(
+      `${apiBaseUrl}/customer/getCustomerById/${customerId}`,
+      { method: "GET" },
+    );
+    const responseData = await response.json();
+    if (!responseData.success || !responseData.data) {
+      throw new Error(
+        responseData.message || "Failed to fetch customer details",
+      );
+    }
+    const jobs = await fetchJobsForCustomerListing(customerId);
+    const entry = mapApiCustomerToListingEntity(responseData.data, jobs);
+    setPinnedListingCustomer(entry);
+    return entry;
+  };
+
+  const findListingCustomer = (parentId: string) => {
+    if (pinnedListingCustomer?.id?.toString?.() === parentId) {
+      return pinnedListingCustomer;
+    }
+    return (
+      paginatedCustomers.find((c) => c.id?.toString?.() === parentId) ||
+      customersWithJobs.find((c) => c.id?.toString?.() === parentId) ||
+      null
+    );
+  };
+
+  const mergeListingCustomersForJobResolve = () => {
+    const seen = new Set<string>();
+    const merged: any[] = [];
+    for (const c of [
+      pinnedListingCustomer,
+      ...customersWithJobs,
+      ...paginatedCustomers,
+    ]) {
+      if (!c?.id) continue;
+      const id = c.id.toString();
+      if (seen.has(id)) continue;
+      seen.add(id);
+      merged.push(c);
+    }
+    return merged;
+  };
+
+  const handleSelectParent = (parentId: string) => {
+    const entity = findListingCustomer(parentId);
+
+    if (entity?.customer_type?.trim().toLowerCase() === "contractor") {
+      router.push(`/contractors?contractorId=${parentId}`);
+      return;
+    }
+    selectCustomer(parentId);
+  };
+
+  const handleSelectJob = (jobId: string, parentId: string) => {
+    const entity = findListingCustomer(parentId);
+    if (entity?.customer_type?.trim().toLowerCase() === "contractor") {
+      router.push(`/contractors?contractorId=${parentId}&jobId=${jobId}`);
+      return;
+    }
+    selectJob(jobId, parentId);
+  };
+
+  const handleSelectSubJob = (
+    subJobId: string,
+    jobId: string,
+    parentId: string,
+  ) => {
+    const entity = findListingCustomer(parentId);
+    if (entity?.customer_type?.trim().toLowerCase() === "contractor") {
+      router.push(
+        `/contractors?contractorId=${parentId}&jobId=${subJobId}`,
+      );
+      return;
+    }
+    selectSubJob(subJobId, jobId, parentId);
+  };
+
+  // Pin + select customer from cross-page navigation (?customerId=)
+  useEffect(() => {
+    const customerId = focusFromUrl.customerId;
+    if (!customerId) {
+      setPinnedListingCustomer(null);
+      return;
+    }
+    if (focusFromUrl.jobId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        await loadCustomerForUrlSelection(customerId);
+        if (cancelled) return;
+        setExpandedCustomers((prev) => {
+          const next = new Set(prev);
+          next.add(customerId);
+          return next;
+        });
+        selectCustomer(customerId);
+      } catch (error) {
+        console.error("Error selecting customer from URL:", error);
+        toast.error("Could not load customer");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusFromUrl.customerId, focusFromUrl.jobId]);
+
+  // After page fetch, merge page row into pin without dropping jobs fetched for off-page users
+  useEffect(() => {
+    const customerId = focusFromUrl.customerId;
+    if (!customerId || focusFromUrl.jobId) return;
+    const fromPage =
+      paginatedCustomers.find((c) => c.id?.toString?.() === customerId) ||
+      customersWithJobs.find((c) => c.id?.toString?.() === customerId);
+    if (!fromPage) return;
+
+    setPinnedListingCustomer((prev: any) => {
+      const pageJobs = fromPage.jobs?.length
+        ? annotateJobsForListing(fromPage.jobs)
+        : [];
+      const prevJobs =
+        prev?.id?.toString?.() === customerId && prev.jobs?.length
+          ? prev.jobs
+          : [];
+      const jobs = pageJobs.length > 0 ? pageJobs : prevJobs;
+      return {
+        ...fromPage,
+        jobs,
+        total_jobs: jobs.length,
+      };
+    });
+  }, [
+    paginatedCustomers,
+    customersWithJobs,
+    focusFromUrl.customerId,
+    focusFromUrl.jobId,
+  ]);
+
+  // Retry jobs when bulk getJobsByCustomer finishes after pin was created with 0 jobs
+  useEffect(() => {
+    const customerId = focusFromUrl.customerId;
+    if (!customerId || focusFromUrl.jobId) return;
+    if (pinnedListingCustomer?.id?.toString?.() !== customerId) return;
+    if ((pinnedListingCustomer?.jobs?.length ?? 0) > 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const jobs = await fetchJobsForCustomerListing(customerId);
+      if (cancelled || jobs.length === 0) return;
+      setPinnedListingCustomer((prev: any) => {
+        if (prev?.id?.toString?.() !== customerId) return prev;
+        return { ...prev, jobs, total_jobs: jobs.length };
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    focusFromUrl.customerId,
+    focusFromUrl.jobId,
+    pinnedListingCustomer?.id,
+    customersWithJobs.length,
+    isLoadingCustomers,
+  ]);
+
   const selectJob = async (jobId: string, customerId: string) => {
     setSelectedJob(jobId);
     setSelectedCustomer(customerId);
@@ -514,32 +838,96 @@ export function CustomersPage() {
     }
   };
 
-  // Auto-select job (and pass estimate focus down) after navigation from invoice send flow
+  // Deep-link: ?customerId= & ?jobId= (main job or sub-job)
   useEffect(() => {
     const jobId = focusFromUrl.jobId;
     if (!jobId) return;
-    if (!customersWithJobs || customersWithJobs.length === 0) return;
-    if (selectedJob === jobId) return;
+    const listingCustomers = mergeListingCustomersForJobResolve();
+    if (!listingCustomers.length) return;
 
-    const match = customersWithJobs.find((c: any) =>
-      (c.jobs || []).some((j: any) => j?.id?.toString?.() === jobId),
+    const resolved = resolveCustomerJobNavigation(
+      listingCustomers,
+      jobId,
+      focusFromUrl.customerId,
     );
-    if (!match) return;
+    if (!resolved) return;
 
-    const customerId = match.id?.toString?.();
-    if (!customerId) return;
+    if (resolved.subJobId) {
+      if (
+        selectedSubJob === resolved.subJobId &&
+        selectedJob === resolved.parentJobId &&
+        selectedCustomer === resolved.customerId
+      ) {
+        return;
+      }
+    } else if (
+      selectedJob === resolved.parentJobId &&
+      selectedCustomer === resolved.customerId &&
+      !selectedSubJob
+    ) {
+      return;
+    }
 
-    // Ensure the customer accordion is expanded so selection is visible
     setExpandedCustomers((prev) => {
       const next = new Set(prev);
-      next.add(customerId);
+      next.add(resolved.customerId);
+      return next;
+    });
+    setExpandedJobs((prev) => {
+      const next = new Set(prev);
+      next.add(resolved.parentJobId);
       return next;
     });
 
-    // Select job (this also fetches enhanced job data)
-    selectJob(jobId, customerId);
+    if (resolved.subJobId) {
+      setExpandedSubJobs((prev) => {
+        const next = new Set(prev);
+        next.add(resolved.subJobId!);
+        return next;
+      });
+      void selectSubJob(
+        resolved.subJobId,
+        resolved.parentJobId,
+        resolved.customerId,
+      );
+    } else {
+      void selectJob(resolved.parentJobId, resolved.customerId);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusFromUrl.jobId, customersWithJobs]);
+  }, [
+    focusFromUrl.jobId,
+    focusFromUrl.customerId,
+    customersWithJobs,
+    paginatedCustomers,
+    pinnedListingCustomer,
+  ]);
+
+  // Load pinned customer when landing with ?customerId= & ?jobId= together
+  useEffect(() => {
+    const customerId = focusFromUrl.customerId;
+    const jobId = focusFromUrl.jobId;
+    if (!customerId || !jobId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        await loadCustomerForUrlSelection(customerId);
+        if (cancelled) return;
+        setExpandedCustomers((prev) => {
+          const next = new Set(prev);
+          next.add(customerId);
+          return next;
+        });
+      } catch (error) {
+        console.error("Error loading customer for job deep-link:", error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusFromUrl.customerId, focusFromUrl.jobId]);
 
   const selectSubJob = async (
     subJobId: string,
@@ -685,8 +1073,21 @@ export function CustomersPage() {
     }
   };
 
+  const sidebarListingCustomers = useMemo(() => {
+    const base = paginatedCustomers;
+    if (!pinnedListingCustomer) return base;
+    const pinId = pinnedListingCustomer.id?.toString?.();
+    if (!pinId) return base;
+    const withoutPin = base.filter((c) => c.id?.toString?.() !== pinId);
+    return [pinnedListingCustomer, ...withoutPin];
+  }, [paginatedCustomers, pinnedListingCustomer]);
+
   const selectedCustomerData = selectedCustomer
-    ? customersWithJobs.find((c) => c.id.toString() === selectedCustomer)
+    ? customersWithJobs.find((c) => c.id.toString() === selectedCustomer) ||
+      paginatedCustomers.find((c) => c.id.toString() === selectedCustomer) ||
+      (pinnedListingCustomer?.id?.toString() === selectedCustomer
+        ? pinnedListingCustomer
+        : null)
     : null;
   const selectedJobData = selectedJob
     ? selectedCustomerData?.jobs?.find(
@@ -1036,12 +1437,8 @@ export function CustomersPage() {
             const jobsData = await jobsResponse.json();
             console.log("Jobs by Customer API Response:", jobsData);
 
-            if (
-              jobsData.success &&
-              jobsData.data &&
-              Array.isArray(jobsData.data)
-            ) {
-              jobsByCustomer = jobsData.data;
+            if (jobsData.success && jobsData.data != null) {
+              jobsByCustomer = normalizeJobsPayload(jobsData.data);
             }
           } catch (jobsError) {
             console.error(
@@ -1111,6 +1508,27 @@ export function CustomersPage() {
           setCustomersWithJobs(sortedWithRecent);
           setPaginatedCustomers(sortedWithRecent);
           setAllCustomersWithJobs(sortedWithRecent);
+
+          // URL deep-link: attach jobs from bulk map when user is not on page 1
+          const urlCustomerId = searchParams?.get("customerId")?.trim();
+          if (urlCustomerId) {
+            const numericId = Number(urlCustomerId);
+            const urlJobs =
+              jobsMap.get(numericId) ||
+              jobsMap.get(Number(urlCustomerId) as unknown as number) ||
+              [];
+            if (urlJobs.length > 0) {
+              const annotatedUrlJobs = annotateJobsForListing(urlJobs);
+              setPinnedListingCustomer((prev: any) => {
+                if (prev?.id?.toString?.() !== urlCustomerId) return prev;
+                return {
+                  ...prev,
+                  jobs: annotatedUrlJobs,
+                  total_jobs: annotatedUrlJobs.length,
+                };
+              });
+            }
+          }
 
           // Also set for table view compatibility
           const transformedCustomers = sortedWithRecent.map(
@@ -1183,6 +1601,7 @@ export function CustomersPage() {
             id: customer.id,
             customer_name: customer.customer_name || "",
             name: customer.customer_name || "",
+            customer_type: customer.customer_type || "",
             email: customer.email || "",
             phone: customer.phone || "",
             company_name: customer.company_name || "",
@@ -1202,10 +1621,13 @@ export function CustomersPage() {
               .includes(searchLower),
           );
           const annotatedFallback = annotateEntitiesForListing(
-            fallbackRaw.map((c: any) => ({
-              ...c,
-              jobs: annotateJobsForListing(c.jobs || []),
-            })),
+            fallbackRaw.map((c: any) => {
+              const { customer_type: _omit, ...withoutType } = c;
+              return {
+                ...withoutType,
+                jobs: annotateJobsForListing(c.jobs || []),
+              };
+            }),
           );
           const fallback = sortEntitiesByRecentJobActivity(
             annotatedFallback,
@@ -1624,7 +2046,7 @@ export function CustomersPage() {
         {/* Customer Listings */}
         <div className="min-w-0 flex-1 min-h-0">
             <CommonEntityListing
-              data={paginatedCustomers}
+              data={sidebarListingCustomers}
               isLoading={isLoadingCustomers}
               emptyText="No customers found"
               searchPlaceholder="Search customers or jobs..."
@@ -1636,11 +2058,9 @@ export function CustomersPage() {
               selectedSubJob={selectedSubJob}
               onToggleParent={toggleCustomer}
               onToggleJob={toggleJob}
-              onSelectParent={selectCustomer}
-              onSelectJob={(jobId, customerId) => selectJob(jobId, customerId)}
-              onSelectSubJob={(subJobId, jobId, customerId) =>
-                selectSubJob(subJobId, jobId, customerId)
-              }
+              onSelectParent={handleSelectParent}
+              onSelectJob={handleSelectJob}
+              onSelectSubJob={handleSelectSubJob}
               onEditParent={(customer) => handleEditCustomer(customer)}
               onDeleteParent={(customer) => handleDeleteCustomerClick(customer)}
               hasEditPermission={hasPermission("customers", "edit")}

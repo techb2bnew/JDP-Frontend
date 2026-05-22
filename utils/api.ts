@@ -2423,16 +2423,25 @@ export const apiClient = {
 
     const result = await response.json();
 
-    if (!result.success || !result.data) {
+    if (!result.success || result.data == null) {
       return {
         success: false,
         data: [],
       };
     }
 
+    const raw = result.data;
+    const data = Array.isArray(raw)
+      ? raw
+      : Array.isArray(raw?.jobs)
+        ? raw.jobs
+        : Array.isArray(raw?.data)
+          ? raw.data
+          : [];
+
     return {
       success: true,
-      data: result.data,
+      data,
     };
   },
 
