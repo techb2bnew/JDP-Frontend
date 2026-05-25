@@ -227,17 +227,6 @@ async function fetchListingParentEntity(
   }
 }
 
-function resolveBillToAddressFromJob(job: any): string {
-  if (!job) return "";
-  const v =
-    job.bill_to_address ??
-    job.billToAddress ??
-    job.bill_to ??
-    job.billTo;
-  if (v == null || v === "") return "";
-  return String(v).trim();
-}
-
 /** Normalize API/UI job type (`type`, `job_type`, hyphen vs underscore). */
 function normalizeJobServiceType(job: any): "contract_based" | "service_based" | null {
   if (!job) return null;
@@ -250,6 +239,51 @@ function normalizeJobServiceType(job: any): "contract_based" | "service_based" |
 
 function isJobContractBased(job: any): boolean {
   return normalizeJobServiceType(job) === "contract_based";
+}
+
+/** Bill To: job bill_to fields, then site address, then nested customer/contractor. */
+function resolveBillToAddressFromJob(job: any): string {
+  if (!job) return "";
+
+  const billToLine = joinAddressParts(
+    job.bill_to_address ?? job.billToAddress,
+    job.bill_to_city_zip ?? job.billToCityZip,
+  );
+  if (billToLine) return billToLine;
+
+  const legacyBillTo = job.bill_to ?? job.billTo;
+  if (legacyBillTo != null && String(legacyBillTo).trim()) {
+    return String(legacyBillTo).trim();
+  }
+
+  const siteAddress = joinAddressParts(
+    job.address,
+    job.city_zip ?? job.cityZip,
+  );
+  if (siteAddress) return siteAddress;
+
+  const location = job.location;
+  if (
+    location != null &&
+    String(location).trim() &&
+    !String(location).includes("undefined")
+  ) {
+    return String(location).trim();
+  }
+
+  if (isJobContractBased(job)) {
+    const contractor = job.contractor;
+    if (contractor && typeof contractor === "object") {
+      return resolveBillToAddressFromListingEntity(contractor, "contractors");
+    }
+  } else {
+    const customer = job.customer;
+    if (customer && typeof customer === "object") {
+      return resolveBillToAddressFromListingEntity(customer, "customers");
+    }
+  }
+
+  return "";
 }
 
 function resolveContractorIdFromJob(job: any): number | null {
@@ -829,11 +863,13 @@ export const NewInvoiceDialog = ({
 
       if (shouldApplyBillTo) {
         billToSyncedJobIdRef.current = stableJobKey;
+        const billToAddress = resolveBillToAddressFromJob(currentJob);
         setInlineInvoiceData((prev) => ({
           ...prev,
           customerName: customerName,
           customerAddress: customerAddress,
-          billToAddress: resolveBillToAddressFromJob(currentJob),
+          billToAddress,
+          billToAddressEnabled: true,
           project: currentJob.title || currentJob.job_title || "",
           jobId: currentJob.id || jobId,
         }));
@@ -1513,12 +1549,15 @@ export const NewInvoiceDialog = ({
       job.location || job.address || job.customer?.address || "";
   }
 
+  const billToAddress = resolveBillToAddressFromJob(job);
+
   setInlineInvoiceData((prev) => ({
     ...prev,
     jobId: job.id,
     customerName,
     customerAddress,
-    billToAddress: resolveBillToAddressFromJob(job),
+    billToAddress,
+    billToAddressEnabled: true,
     project: job.title || job.job_title || "",
   }));
 
@@ -1550,19 +1589,27 @@ export const NewInvoiceDialog = ({
     const applyListingPrefill = async () => {
       const idStr = String(jobId);
       try {
-        let job =
-          jobsList.find((j: any) => String(j?.id ?? "") === idStr) ||
-          jobs?.find((j: any) => String(j?.id ?? "") === idStr) ||
-          null;
+        let job: any = null;
+
+        try {
+          const fetched = await apiClient.getJobById(idStr);
+          if (!cancelled && fetched) {
+            job = {
+              ...fetched,
+              id: fetched.id ?? idStr,
+              job_title: fetched.job_title || fetched.title,
+              title: fetched.title || fetched.job_title,
+            };
+          }
+        } catch {
+          // Fall back to jobs already loaded in the dropdown
+        }
 
         if (!job) {
-          const fetched = await apiClient.getJobById(idStr);
-          if (cancelled || !fetched) return;
-          job = {
-            ...fetched,
-            id: fetched.id ?? idStr,
-            job_title: fetched.job_title || fetched.title,
-          };
+          job =
+            jobsList.find((j: any) => String(j?.id ?? "") === idStr) ||
+            jobs?.find((j: any) => String(j?.id ?? "") === idStr) ||
+            null;
         }
 
         if (cancelled || !job) return;
