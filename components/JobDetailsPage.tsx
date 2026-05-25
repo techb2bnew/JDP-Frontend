@@ -115,6 +115,13 @@ import Image from "next/image";
 import TimeRangePicker from "@wojtekmaj/react-timerange-picker";
 import "@wojtekmaj/react-timerange-picker/dist/TimeRangePicker.css";
 import Autocomplete from "react-google-autocomplete";
+import {
+  ADDRESS_AUTOCOMPLETE_OPTIONS,
+  ADDRESS_SEARCH_PLACEHOLDER,
+  GOOGLE_MAPS_API_KEY,
+  parsePlaceToAddressFields,
+  resolveFormattedPlaceAddress,
+} from "@/lib/googleAddressAutocomplete";
 import ActivityLogs from "./ActivityLogs";
 import { CheckCircle } from "lucide-react";
 import { invoicesData } from "@/data/invoiceData";
@@ -7272,101 +7279,33 @@ const handlePrintInvoice = async (invoice: any) => {
                       <div className="flex-1">
                         <p className="text-sm text-gray-600">Location</p>
                         <Autocomplete
-                          apiKey="AIzaSyBEQp-ZFMYZjsTNyximu2pAifQ9EWA4W3M"
+                          apiKey={GOOGLE_MAPS_API_KEY}
+                          options={ADDRESS_AUTOCOMPLETE_OPTIONS}
                           onPlaceSelected={(place: any) => {
                             if (!place) return;
 
                             try {
-                              // Parse address components
-                              const addressComponents =
-                                place.address_components || [];
-                              let streetNumber = "";
-                              let route = "";
-                              let city = "";
-                              let state = "";
-                              let zipCode = "";
-                              let sublocality = "";
-
-                              addressComponents.forEach((component: any) => {
-                                const types = component.types;
-                                if (types.includes("street_number")) {
-                                  streetNumber = component.long_name;
-                                } else if (types.includes("route")) {
-                                  route = component.long_name;
-                                } else if (types.includes("locality")) {
-                                  city = component.long_name;
-                                } else if (
-                                  types.includes("sublocality") ||
-                                  types.includes("sublocality_level_1")
-                                ) {
-                                  sublocality = component.long_name;
-                                } else if (
-                                  types.includes("administrative_area_level_1")
-                                ) {
-                                  state = component.short_name;
-                                } else if (types.includes("postal_code")) {
-                                  zipCode = component.long_name;
-                                }
-                              });
-
-                              // Use sublocality if city is not available
-                              if (!city && sublocality) {
-                                city = sublocality;
-                              }
-
-                              // Build address - use street number + route, or fallback to formatted address
-                              let fullAddress =
-                                `${streetNumber} ${route}`.trim();
-                              if (!fullAddress) {
-                                const formattedAddress =
-                                  place.formatted_address || place.name || "";
-                                const parts = formattedAddress.split(",");
-                                fullAddress = parts[0] || "";
-                              }
-
-                              // Build cityZip - prioritize city, state, zip
-                              let cityZip = "";
-                              if (city && state && zipCode) {
-                                cityZip = `${city}, ${state} ${zipCode}`;
-                              } else if (city && state) {
-                                cityZip = `${city}, ${state}`;
-                              } else if (city) {
-                                cityZip = city;
-                              } else if (place.formatted_address) {
-                                const parts =
-                                  place.formatted_address.split(",");
-                                if (parts.length > 1) {
-                                  cityZip = parts.slice(1).join(",").trim();
-                                }
-                              }
-
-                              // Update editedJob with parsed address components
+                              const { address: fullAddress, cityZip } =
+                                parsePlaceToAddressFields(place);
                               const formattedAddress =
-                                place.formatted_address ||
-                                place.name ||
+                                resolveFormattedPlaceAddress(place) ||
                                 fullAddress;
                               setEditedJob({
                                 ...editedJob,
                                 location: formattedAddress,
                                 address: fullAddress,
-                                cityZip: cityZip,
+                                cityZip,
                               });
                             } catch (error) {
                               console.error("Error parsing place:", error);
-                              // Fallback to formatted address
                               const address =
-                                place.formatted_address ||
-                                place.name ||
+                                resolveFormattedPlaceAddress(place) ||
                                 editedJob.location;
                               setEditedJob({ ...editedJob, location: address });
                             }
                           }}
-                          options={{
-                            types: ["address"],
-                            componentRestrictions: { country: "us" },
-                          }}
                           className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                          placeholder="Start typing address..."
+                          placeholder={ADDRESS_SEARCH_PLACEHOLDER}
                           defaultValue={editedJob.location}
                           onChange={(e: any) => {
                             setEditedJob({

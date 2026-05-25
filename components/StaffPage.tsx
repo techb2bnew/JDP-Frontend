@@ -25,6 +25,12 @@ import { getCompactPaginationItems } from '../utils/pagination'
 import PhoneInput from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
 import Autocomplete from "react-google-autocomplete";
+import {
+  ADDRESS_AUTOCOMPLETE_OPTIONS,
+  ADDRESS_SEARCH_PLACEHOLDER,
+  GOOGLE_MAPS_API_KEY,
+  resolveFormattedPlaceAddress,
+} from "@/lib/googleAddressAutocomplete";
 
 interface Staff {
   id: string
@@ -1508,10 +1514,8 @@ useEffect(() => {
               <Label htmlFor="edit-address">Address</Label>
               <div className="relative">
                 <Autocomplete
-                  apiKey={
-                    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
-                    "AIzaSyBEQp-ZFMYZjsTNyximu2pAifQ9EWA4W3M"
-                  }
+                  apiKey={GOOGLE_MAPS_API_KEY}
+                  options={ADDRESS_AUTOCOMPLETE_OPTIONS}
                   onPlaceSelected={(place: any) => {
                     if (place) {
                       // Prevent dialog overlay from stealing clicks while selecting
@@ -1522,8 +1526,7 @@ useEffect(() => {
                         (overlay as HTMLElement).style.pointerEvents = "none";
                       }
 
-                      const address =
-                        place.formatted_address || place.name || "";
+                      const address = resolveFormattedPlaceAddress(place);
                       setFormData({ ...formData, address });
                       validateField("address", address);
 
@@ -1542,17 +1545,13 @@ useEffect(() => {
                       }, 300);
                     }
                   }}
-                  options={{
-                    types: ["address"],
-                    componentRestrictions: { country: "us" },
-                  }}
                   value={formData.address}
                   onChange={(e: any) => {
                     const value = e.target.value;
                     setFormData({ ...formData, address: value });
                     validateField("address", value);
                   }}
-                  placeholder="Enter full address"
+                  placeholder={ADDRESS_SEARCH_PLACEHOLDER}
                   className={`w-full h-10 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
                     validationErrors.address ? "border-red-500" : ""
                   }`}

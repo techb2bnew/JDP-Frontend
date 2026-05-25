@@ -40,7 +40,7 @@ import { Invoice } from '../types/invoice'
 import { invoicesData, customersData, jobsData } from '../data/invoiceData'
 import { InvoiceTemplate } from './invoices/InvoiceTemplate'
 import { NewInvoiceDialog } from './invoices/NewInvoiceDialog'
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { InvoiceComparisonPage } from './InvoiceComparisonPage';
 import { ApprovalsPage } from './ApprovalsPage';
 import html2canvas from 'html2canvas'
@@ -152,7 +152,12 @@ const mockJobs: Job[] = [
 
 export function InvoicesPage() {
   const { hasPermission } = usePermissions()
-  const [activeTab, setActiveTab] = useState('invoices');
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const tabFromUrl = searchParams.get('tab')
+  const [activeTab, setActiveTab] = useState(() =>
+    tabFromUrl === 'approvals' ? 'approvals' : 'invoices',
+  );
   const [invoices, setInvoices] = useState<Invoice[]>(invoicesData)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -189,7 +194,14 @@ export function InvoicesPage() {
   const [isPaidLoading, setIsPaidLoading] = useState(false);
 
   const dispatch = useDispatch();
-  const router = useRouter();
+
+  // Deep-link: /invoices?tab=approvals (e.g. global search bluesheet)
+  useEffect(() => {
+    const tab = searchParams.get('tab')
+    if (tab === 'approvals' || tab === 'invoices') {
+      setActiveTab(tab)
+    }
+  }, [searchParams])
 
   // const filteredInvoices = invoices.filter(invoice => {
   //   const matchesSearch = invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1403,6 +1415,11 @@ const handleViewInvoice = (invoice: any) => {
             onBack={handleBackToInvoices}
             jobs={mockJobs}
             onApprovalCountChange={handleApprovalCountChange}
+            initialJobId={searchParams.get('jobId') ?? undefined}
+            initialBluesheetId={searchParams.get('bluesheetId') ?? undefined}
+            onDeepLinkConsumed={() => {
+              router.replace('/invoices?tab=approvals', { scroll: false })
+            }}
           /></TabsContent>
       </Tabs>
 

@@ -13,7 +13,20 @@ export default function CreateEstimatePage() {
 
   const mode = searchParams.get("mode");
   const invoiceId = searchParams.get("id");
-  const jobId = searchParams.get("jobId");
+  const jobIdParam = searchParams.get("jobId");
+  const parentIdParam = searchParams.get("parentId");
+  const listingSourceParam = searchParams.get("listingSource");
+  const fromListing = searchParams.get("fromListing") === "1";
+  const prefillJobId =
+    fromListing && jobIdParam ? Number(jobIdParam) : undefined;
+  const listingParentId =
+    fromListing && parentIdParam ? parentIdParam : undefined;
+  const listingSource =
+    fromListing &&
+    (listingSourceParam === "customers" ||
+      listingSourceParam === "contractors")
+      ? listingSourceParam
+      : undefined;
 
   const isViewMode = mode === "view" && !!invoiceId;
 
@@ -118,7 +131,10 @@ export default function CreateEstimatePage() {
         onOpenChange={() => router.push("/invoices")}
         onSave={() => {}}
         jobs={jobs}
-        jobId={jobId ? Number(jobId) : undefined}
+        jobId={prefillJobId}
+        prefillFromListing={fromListing && !!jobIdParam}
+        listingParentId={listingParentId}
+        listingSource={listingSource}
         isViewMode={isViewMode}
         viewInvoiceData={viewInvoiceData}
         onInvoiceSaved={() => router.push("/invoices")}

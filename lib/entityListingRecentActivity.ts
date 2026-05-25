@@ -129,3 +129,67 @@ export function annotateEntitiesForListing<T extends { jobs?: any[] }>(
     };
   });
 }
+
+export type ListingParentSource = "customers" | "contractors";
+
+export function jobBelongsToListingParent(
+  job: any,
+  parentId: string,
+  source: ListingParentSource,
+): boolean {
+  const pid = String(parentId).trim();
+  if (!pid) return false;
+
+  const customerId = String(
+    job?.customer_id ??
+      job?.customer?.id ??
+      (typeof job?.customer === "string" || typeof job?.customer === "number"
+        ? job.customer
+        : "") ??
+      "",
+  );
+  const contractorId = String(
+    job?.contractor_id ??
+      job?.contractor?.id ??
+      (typeof job?.contractor === "string" || typeof job?.contractor === "number"
+        ? job.contractor
+        : "") ??
+      "",
+  );
+
+  if (source === "customers") {
+    return customerId === pid;
+  }
+  return contractorId === pid || customerId === pid;
+}
+
+/** Create-estimate job dropdown: selected customer/contractor jobs first. */
+export function sortJobsWithListingParentFirst(
+  jobs: any[],
+  parentId: string | null | undefined,
+  source: ListingParentSource | null | undefined,
+  selectedJobId?: string | null,
+): any[] {
+  if (!parentId || !source) return jobs;
+
+  const first: any[] = [];
+  const rest: any[] = [];
+  for (const job of jobs) {
+    if (jobBelongsToListingParent(job, parentId, source)) {
+      first.push(job);
+    } else {
+      rest.push(job);
+    }
+  }
+
+  if (selectedJobId) {
+    const sid = String(selectedJobId);
+    const idx = first.findIndex((j) => String(j?.id ?? "") === sid);
+    if (idx > 0) {
+      const [picked] = first.splice(idx, 1);
+      first.unshift(picked);
+    }
+  }
+
+  return [...first, ...rest];
+}

@@ -2,6 +2,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import PhoneInput from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
 import Autocomplete from 'react-google-autocomplete'
+import {
+  ADDRESS_AUTOCOMPLETE_OPTIONS,
+  ADDRESS_SEARCH_PLACEHOLDER,
+  GOOGLE_MAPS_API_KEY,
+  resolveFormattedPlaceAddress,
+} from '@/lib/googleAddressAutocomplete'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Label } from '../ui/label'
 import { Input } from '../ui/input'
@@ -53,27 +59,6 @@ export function SupplierFormDialog({
   isLoading = false
 }: SupplierFormDialogProps) {
     console.log(formData,"formData");
-
-  const resolveAutocompleteAddress = (place: any): string => {
-    const formattedAddress = String(place?.formatted_address || '').trim()
-    if (formattedAddress) return formattedAddress
-
-    const placeName = String(place?.name || '').trim()
-    const vicinity = String(place?.vicinity || '').trim()
-    if (placeName && vicinity) return `${placeName}, ${vicinity}`
-    if (placeName) return placeName
-    if (vicinity) return vicinity
-
-    const components = Array.isArray(place?.address_components)
-      ? place.address_components
-      : []
-    const fromComponents = components
-      .map((component: any) => component?.long_name)
-      .filter((part: unknown): part is string => typeof part === 'string' && part.trim().length > 0)
-      .join(', ')
-
-    return fromComponents.trim()
-  }
 
   const isPacInteraction = (target: EventTarget | null): boolean => {
     const element = target as HTMLElement | null
@@ -283,21 +268,16 @@ export function SupplierFormDialog({
               <div className="col-span-2 space-y-2">
                 <Label htmlFor="address">Address</Label>
                 <Autocomplete
-                  apiKey={
-                    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
-                    'AIzaSyBEQp-ZFMYZjsTNyximu2pAifQ9EWA4W3M'
-                  }
+                  apiKey={GOOGLE_MAPS_API_KEY}
+                  options={ADDRESS_AUTOCOMPLETE_OPTIONS}
                   onPlaceSelected={(place: any) => {
-                    const address = resolveAutocompleteAddress(place)
+                    const address = resolveFormattedPlaceAddress(place)
                     if (address) {
                       setFormData((prev) => ({ ...prev, address }))
                       if (validationErrors.address) {
                         setValidationErrors({ ...validationErrors, address: '' })
                       }
                     }
-                  }}
-                  options={{
-                    types: ['address']
                   }}
                   value={formData.address}
                   onChange={(e: any) => {
@@ -307,7 +287,7 @@ export function SupplierFormDialog({
                       setValidationErrors({ ...validationErrors, address: '' })
                     }
                   }}
-                  placeholder="Enter full address"
+                  placeholder={ADDRESS_SEARCH_PLACEHOLDER}
                   className={`w-full h-10 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
                     validationErrors.address ? 'border-red-500' : ''
                   }`}

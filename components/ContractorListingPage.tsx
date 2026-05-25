@@ -26,6 +26,13 @@ import { toast } from 'sonner'
 import jsPDF from 'jspdf'
 import { globalApiCall } from '../utils/globalApiHandler'
 import { usePermissions } from '../contexts/PermissionContext'
+import { useListingEstimatePrefillSync } from '../contexts/EstimatePrefillContext'
+import {
+  ADDRESS_AUTOCOMPLETE_OPTIONS,
+  ADDRESS_SEARCH_PLACEHOLDER,
+  GOOGLE_MAPS_API_KEY,
+  resolveFormattedPlaceAddress,
+} from '@/lib/googleAddressAutocomplete'
 import { ArrowUpAZ, Edit, Trash2 } from 'lucide-react'
 import {
   ChevronDown,
@@ -963,6 +970,12 @@ export function ContractorListingPage() {
   const [selectedContractor, setSelectedContractor] = useState<string | null>(null)
   const [selectedJob, setSelectedJob] = useState<string | null>(null)
   const [selectedSubJob, setSelectedSubJob] = useState<string | null>(null)
+  useListingEstimatePrefillSync(
+    'contractors',
+    selectedContractor,
+    selectedJob,
+    selectedSubJob,
+  )
   const [showContractorDetails, setShowContractorDetails] = useState(false)
   const [enhancedJobData, setEnhancedJobData] = useState<any>(null)
   const [expandedContractors, setExpandedContractors] = useState<Set<string>>(new Set())
@@ -3930,7 +3943,8 @@ export function ContractorListingPage() {
                 Address
               </Label>
               <Autocomplete
-                apiKey="AIzaSyBEQp-ZFMYZjsTNyximu2pAifQ9EWA4W3M"
+                apiKey={GOOGLE_MAPS_API_KEY}
+                options={ADDRESS_AUTOCOMPLETE_OPTIONS}
                 onPlaceSelected={(place: any) => {
                   if (place) {
                     // Keep overlay disabled during selection to prevent modal close
@@ -3941,8 +3955,7 @@ export function ContractorListingPage() {
                       (overlay as HTMLElement).style.pointerEvents = "none";
                     }
 
-                    const address =
-                      place.formatted_address || place.name || "";
+                    const address = resolveFormattedPlaceAddress(place);
                     if (address) {
                       handleInputChange("address", address);
                     }
@@ -3963,16 +3976,12 @@ export function ContractorListingPage() {
                     }, 300);
                   }
                 }}
-                options={{
-                  types: ["address"],
-                  componentRestrictions: { country: "us" },
-                }}
                 value={contractFormData.address}
                 onChange={(e: any) => {
                   const value = e.target.value;
                   handleInputChange("address", value);
                 }}
-                placeholder="Enter contractor's address"
+                placeholder={ADDRESS_SEARCH_PLACEHOLDER}
                 disabled={isViewMode}
                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent mt-1 ${
                   validationErrors.address

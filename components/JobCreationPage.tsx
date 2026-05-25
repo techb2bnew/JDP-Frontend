@@ -18,6 +18,13 @@ import { usePermissions } from '../contexts/PermissionContext'
 import PhoneInput, { isValidPhoneNumber, parsePhoneNumber } from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
 import Autocomplete from 'react-google-autocomplete'
+import {
+  ADDRESS_AUTOCOMPLETE_OPTIONS,
+  ADDRESS_SEARCH_PLACEHOLDER,
+  GOOGLE_MAPS_API_KEY,
+  parsePlaceToAddressFields,
+  resolveFormattedPlaceAddress,
+} from '@/lib/googleAddressAutocomplete'
 
 // Extend Window interface for Google Maps
 declare global {
@@ -312,11 +319,11 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     }
 
     // Email validation (required)
-    if (!formData.email || !formData.email.trim()) {
-      errors.email = 'Email is required'
-    } else if (!validateEmail(formData.email)) {
-      errors.email = 'Please enter a valid email address'
-    }
+    // if (!formData.email || !formData.email.trim()) {
+    //   errors.email = 'Email is required'
+    // } else if (!validateEmail(formData.email)) {
+    //   errors.email = 'Please enter a valid email address'
+    // }
 
     // Phone validation (if provided)
     if (formData.phone && !validatePhone(formData.phone)) {
@@ -413,7 +420,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
         address: formData.address,
         city_zip: formData.cityZip,
         phone: formData.phone || undefined,
-        email: formData.email || undefined,
+        // email: formData.email || undefined,
         bill_to_address: formData.billToAddress || undefined,
         bill_to_city_zip: formData.billToCityZip || undefined,
         bill_to_phone: formData.billToPhone || undefined,
@@ -453,7 +460,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
       address: formData.address,
       cityZip: formData.cityZip,
       phone: formData.phone,
-      email: formData.email,
+      // email: formData.email,
       billToAddress: formData.billToAddress,
       billToCityZip: formData.billToCityZip,
       billToPhone: formData.billToPhone,
@@ -800,73 +807,16 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     }
   }, [isAddEntityOpen])
 
-  // Handle address selection from autocomplete
   const handlePlaceSelect = (place: any) => {
     if (!place) return
 
     try {
-      // Parse address components
-      const addressComponents = place.address_components || []
-      let streetNumber = ''
-      let route = ''
-      let city = ''
-      let state = ''
-      let zipCode = ''
-      let sublocality = '' // For areas that don't have locality
-
-      addressComponents.forEach((component: any) => {
-        const types = component.types
-        if (types.includes('street_number')) {
-          streetNumber = component.long_name
-        } else if (types.includes('route')) {
-          route = component.long_name
-        } else if (types.includes('locality')) {
-          city = component.long_name
-        } else if (types.includes('sublocality') || types.includes('sublocality_level_1')) {
-          sublocality = component.long_name
-        } else if (types.includes('administrative_area_level_1')) {
-          state = component.short_name
-        } else if (types.includes('postal_code')) {
-          zipCode = component.long_name
-        }
-      })
-
-      // Use sublocality if city is not available
-      if (!city && sublocality) {
-        city = sublocality
-      }
-
-      // Build address - use street number + route, or fallback to formatted address
-      let fullAddress = `${streetNumber} ${route}`.trim()
-      if (!fullAddress) {
-        // Try to extract from formatted address
-        const formattedAddress = place.formatted_address || place.name || ''
-        const parts = formattedAddress.split(',')
-        fullAddress = parts[0] || ''
-      }
-
-      // Build cityZip - prioritize city, state, zip
-      let cityZip = ''
-      if (city && state && zipCode) {
-        cityZip = `${city}, ${state} ${zipCode}`
-      } else if (city && state) {
-        cityZip = `${city}, ${state}`
-      } else if (city && zipCode) {
-        cityZip = `${city} ${zipCode}`
-      } else if (state && zipCode) {
-        cityZip = `${state} ${zipCode}`
-      } else if (city) {
-        cityZip = city
-      } else if (zipCode) {
-        cityZip = zipCode
-      } else if (state) {
-        cityZip = state
-      }
+      const { address: fullAddress, cityZip } = parsePlaceToAddressFields(place)
 
       const newFormData = {
         ...formData,
         address: fullAddress,
-        cityZip: cityZip
+        cityZip,
       }
 
       if (formData.sameAsAddress) {
@@ -879,10 +829,10 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
       clearValidationError('cityZip')
     } catch (error) {
       console.error('Error parsing address:', error)
-      // Fallback: just set the formatted address
-      const newFormData = { 
-        ...formData, 
-        address: place.formatted_address || place.name || '' 
+      const fallback = resolveFormattedPlaceAddress(place)
+      const newFormData = {
+        ...formData,
+        address: fallback,
       }
       if (formData.sameAsAddress) {
         newFormData.billToAddress = newFormData.address
@@ -1285,12 +1235,13 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             <div className="space-y-2">
               <Label htmlFor="address">Address *</Label>
               <Autocomplete
-                apiKey="AIzaSyBEQp-ZFMYZjsTNyximu2pAifQ9EWA4W3M"
+                apiKey={GOOGLE_MAPS_API_KEY}
+                options={ADDRESS_AUTOCOMPLETE_OPTIONS}
                 onPlaceSelected={(place: any) => {
                   handlePlaceSelect(place)
-                }} 
+                }}
                 className={`flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${validationErrors.address ? 'border-red-500' : ''}`}
-                placeholder="Start typing address..."
+                placeholder={ADDRESS_SEARCH_PLACEHOLDER}
                 defaultValue={formData.address}
                 onChange={(e: any) => {
                   const value = e.target.value
@@ -1361,7 +1312,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               )}
             </div>
 
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <Label htmlFor="email">Email *</Label>
               <Input
                 id="email"
@@ -1385,7 +1336,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               {validationErrors.email && (
                 <p className="text-red-500 text-sm">{validationErrors.email}</p>
               )}
-            </div>
+            </div> */}
           </div>
         </div>
         {showAssignedSection && (
@@ -1614,12 +1565,12 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                     <span className="font-medium">{formData.phone}</span>
                   </div>
                 )}
-                {formData.email && (
+                {/* {formData.email && (
                   <div className="flex justify-between">
                     <span className="text-gray-600">Email:</span>
                     <span className="font-medium">{formData.email}</span>
                   </div>
-                )}
+                )} */}
               </div>
             </div>
 
@@ -1867,18 +1818,15 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             <div>
               <Label className="mb-1 block">Address</Label>
               <Autocomplete
-                apiKey="AIzaSyBEQp-ZFMYZjsTNyximu2pAifQ9EWA4W3M"
-                options={{
-                  types: ['address'],
-                  componentRestrictions: { country: 'us' },
-                }}
+                apiKey={GOOGLE_MAPS_API_KEY}
+                options={ADDRESS_AUTOCOMPLETE_OPTIONS}
                 value={entityForm.address}
                 onChange={(e: any) => setEntityForm({ ...entityForm, address: e.target.value })}
                 onPlaceSelected={(place: any) => {
-                  const address = place?.formatted_address || place?.name || ''
+                  const address = resolveFormattedPlaceAddress(place)
                   setEntityForm({ ...entityForm, address })
                 }}
-                placeholder="Start typing address..."
+                placeholder={ADDRESS_SEARCH_PLACEHOLDER}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>

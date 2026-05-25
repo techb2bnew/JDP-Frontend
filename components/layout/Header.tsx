@@ -24,6 +24,7 @@ import { NotificationPopup } from "../NotificationPopup";
 import { useTheme } from "../../contexts/ThemeContext";
 import { toast } from "sonner";
 import { usePermissions } from "../../contexts/PermissionContext";
+import { useEstimatePrefill } from "../../contexts/EstimatePrefillContext";
 import { supabase } from "../../lib/supabase";
 import { NewInvoiceDialog } from "../invoices/NewInvoiceDialog";
 import { apiClient } from "../../utils/api";
@@ -43,6 +44,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { GlobalSearchBar } from "./GlobalSearchBar";
 interface HeaderProps {
   currentPath: string;
   onLogout: () => void;
@@ -70,6 +72,11 @@ export function Header({
   const { theme, toggleTheme, isLoading } = useTheme();
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
   const { hasPermission } = usePermissions();
+  const {
+    listingEstimateJobId,
+    listingEstimateParentId,
+    listingEstimateSource,
+  } = useEstimatePrefill();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
   const hasFetchedNotifications = useRef(false);
@@ -513,8 +520,33 @@ export function Header({
 
   // const unreadCount = notifications.filter(n => n.unread).length
 
-  const router = useRouter()
+  const router = useRouter();
 
+  const handleCreateEstimate = () => {
+    const isListingPage =
+      currentPath === "/customers" || currentPath === "/contractors";
+    const jobId =
+      isListingPage && listingEstimateJobId
+        ? listingEstimateJobId
+        : null;
+    const parentId =
+      isListingPage && listingEstimateParentId
+        ? listingEstimateParentId
+        : null;
+
+    if (isListingPage && (jobId || parentId)) {
+      const params = new URLSearchParams({ fromListing: "1" });
+      if (jobId) params.set("jobId", jobId);
+      if (parentId) params.set("parentId", parentId);
+      if (listingEstimateSource) {
+        params.set("listingSource", listingEstimateSource);
+      }
+      router.push(`/invoices/create?${params.toString()}`);
+      return;
+    }
+
+    router.push("/invoices/create");
+  };
 
   return (
     <TooltipProvider>
@@ -525,14 +557,9 @@ export function Header({
               {getPageTitle(currentPath)}
             </h1> */}
 
-            {/* Search */}
-            {/* <div className="relative hidden md:block w-[35%]">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search..."
-                className=" pl-9 transition-all duration-200 focus:w-80 bg-[#f8f8f8]"
-              />
-            </div> */}
+            <div className="min-w-0 flex-1 max-w-md">
+              <GlobalSearchBar />
+            </div>
           </div>
 
           <div className="flex items-center space-x-3">
@@ -547,7 +574,7 @@ export function Header({
             )}
             {hasPermission("invoices", "create") && (
               <Button
-                onClick={() => router.push("/invoices/create")}
+                onClick={handleCreateEstimate}
                 className="bg-primary text-white"
               >
                 <Plus className="h-4 w-4" />

@@ -5,6 +5,7 @@ import { store } from '@/redux/store'
 import { Toaster } from '@/components/ui/sonner'
 import { ThemeProvider as NextThemesProvider } from 'next-themes'
 import { PermissionProvider } from '@/contexts/PermissionContext'
+import { EstimatePrefillProvider } from '@/contexts/EstimatePrefillContext'
 import { useState, useEffect } from 'react'
 
 interface ProvidersProps {
@@ -32,6 +33,7 @@ export function Providers({ children }: ProvidersProps) {
         disableTransitionOnChange={false}
       >
         <PermissionProvider>
+          <EstimatePrefillProvider>
           {children}
           <Toaster 
             position="top-right"
@@ -44,6 +46,7 @@ export function Providers({ children }: ProvidersProps) {
               },
             }}
           />
+          </EstimatePrefillProvider>
         </PermissionProvider>
       </NextThemesProvider>
     </Provider>

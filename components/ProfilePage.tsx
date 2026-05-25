@@ -14,6 +14,12 @@ import { getYesterdayLocalDateString, validateDobValue } from '../utils/dobValid
 import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import Autocomplete from "react-google-autocomplete";
+import {
+  ADDRESS_AUTOCOMPLETE_OPTIONS,
+  ADDRESS_SEARCH_PLACEHOLDER,
+  GOOGLE_MAPS_API_KEY,
+  resolveFormattedPlaceAddress,
+} from "@/lib/googleAddressAutocomplete";
 import { 
   User,
   Mail,
@@ -793,20 +799,15 @@ export function ProfilePage({ onBack }: ProfilePageProps) {
                 </Label>
                 <Autocomplete
                   id="address"
-                  apiKey={
-                    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
-                    "AIzaSyBEQp-ZFMYZjsTNyximu2pAifQ9EWA4W3M"
-                  }
-                  options={{
-                    types: ["address"],
-                    componentRestrictions: { country: "us" },
-                  }}
+                  apiKey={GOOGLE_MAPS_API_KEY}
+                  options={ADDRESS_AUTOCOMPLETE_OPTIONS}
                   value={profileData.address}
                   onPlaceSelected={(place: any) => {
-                    const address = place?.formatted_address || place?.name || "";
+                    const address = resolveFormattedPlaceAddress(place);
                     if (!address) return;
                     setProfileData((prev) => ({ ...prev, address }));
                   }}
+                  placeholder={ADDRESS_SEARCH_PLACEHOLDER}
                   onChange={(e: any) => {
                     const value = e.target.value;
                     setProfileData((prev) => ({ ...prev, address: value }));

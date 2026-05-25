@@ -1426,6 +1426,40 @@ export const apiClient = {
     return response.json();
   },
 
+  /** Universal global search (customers, jobs, estimates, etc.). */
+  universalGlobalSearch: async (query: string = "", limit: number = 5) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const url = `${apiBaseUrl}/search/global?q=${encodeURIComponent(query)}&limit=${limit}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.message || "Failed to perform universal global search",
+      );
+    }
+
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.message || "Global search failed");
+    }
+
+    return (result.data || {}) as Record<string, unknown[]>;
+  },
+
   // Search Jobs by Job Type
   searchJobsByType: async (jobType: any) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -2443,6 +2477,70 @@ export const apiClient = {
       success: true,
       data,
     };
+  },
+
+  getCustomerById: async (customerId: string | number) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const response = await fetch(
+      `${apiBaseUrl}/customer/getCustomerById/${customerId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to fetch customer");
+    }
+
+    const result = await response.json();
+    if (!result.success || !result.data) {
+      throw new Error(result.message || "Failed to fetch customer");
+    }
+
+    return result.data;
+  },
+
+  getContractorById: async (contractorId: string | number) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const response = await fetch(
+      `${apiBaseUrl}/contractor/getContractorById/${contractorId}?include_jobs=false`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || "Failed to fetch contractor");
+    }
+
+    const result = await response.json();
+    if (!result.success || !result.data) {
+      throw new Error(result.message || "Failed to fetch contractor");
+    }
+
+    return result.data;
   },
 
   // Contractors

@@ -50,6 +50,10 @@ import { Logo } from "../common/Logo";
 import Image from "next/image";
 import InvoiceLineItemsManager from "../common/invoice-line-items/InvoiceLineItemsManager";
 import { useRouter } from "next/navigation";
+import {
+  sortJobsWithListingParentFirst,
+  type ListingParentSource,
+} from "@/lib/entityListingRecentActivity";
 // import { formatCurrency, formatDate } from '../../utils/invoiceUtils'
 
 interface NewInvoiceDialogProps {
@@ -58,6 +62,11 @@ interface NewInvoiceDialogProps {
   onSave: (invoice: Partial<Invoice>) => void;
   jobs: any[];
   jobId?: number;
+  /** When true, fetch and pre-select job from listing navigation (customers/contractors). */
+  prefillFromListing?: boolean;
+  /** Selected customer/contractor from listing — their jobs show first in dropdown. */
+  listingParentId?: string;
+  listingSource?: ListingParentSource;
   onInvoiceSaved?: (invoice: any) => void;
   isViewMode?: boolean;
   viewInvoiceData?: any;
@@ -135,6 +144,89 @@ interface ProductFormData {
 }
 
 /** Job APIs use `bill_to_address`; support camelCase too. */
+function joinAddressParts(
+  ...parts: (string | null | undefined)[]
+): string {
+  return parts
+    .map((p) => (p != null ? String(p).trim() : ""))
+    .filter(Boolean)
+    .join(", ");
+}
+
+function resolveBillToAddressFromListingEntity(
+  entity: any,
+  source: ListingParentSource,
+): string {
+  const billTo =
+    entity?.bill_to_address ??
+    entity?.billToAddress ??
+    entity?.bill_to ??
+    entity?.billTo ??
+    "";
+  if (String(billTo).trim()) return String(billTo).trim();
+
+  const address = entity?.address || "";
+  const cityZip =
+    entity?.bill_to_city_zip ??
+    entity?.billToCityZip ??
+    entity?.city_zip ??
+    entity?.cityZip ??
+    "";
+
+  return joinAddressParts(address, cityZip) || String(address).trim();
+}
+
+function resolveListingParentInvoiceFields(
+  entity: any,
+  source: ListingParentSource,
+): {
+  customerName: string;
+  customerAddress: string;
+  billToAddress: string;
+} {
+  if (source === "contractors") {
+    const customerName =
+      entity?.contractor_name ||
+      entity?.name ||
+      entity?.company_name ||
+      "";
+    const customerAddress = entity?.address || "";
+    return {
+      customerName,
+      customerAddress,
+      billToAddress: resolveBillToAddressFromListingEntity(entity, source),
+    };
+  }
+
+  const customerName =
+    entity?.customer_name || entity?.name || entity?.company_name || "";
+  const customerAddress = entity?.address || "";
+  return {
+    customerName,
+    customerAddress,
+    billToAddress: resolveBillToAddressFromListingEntity(entity, source),
+  };
+}
+
+async function fetchListingParentEntity(
+  parentId: string,
+  source: ListingParentSource,
+): Promise<any | null> {
+  try {
+    if (source === "customers") {
+      return await apiClient.getCustomerById(parentId);
+    }
+    try {
+      return await apiClient.getContractorById(parentId);
+    } catch {
+      return await apiClient.getCustomerById(parentId);
+    }
+  } catch (error) {
+    console.error("Failed to fetch listing parent entity:", error);
+    return null;
+  }
+}
+
 function resolveBillToAddressFromJob(job: any): string {
   if (!job) return "";
   const v =
@@ -285,6 +377,9 @@ export const NewInvoiceDialog = ({
   onOpenChange,
   onSave,
   jobId,
+  prefillFromListing = false,
+  listingParentId,
+  listingSource,
   jobs,
   onInvoiceSaved,
   isViewMode = false,
@@ -358,6 +453,8 @@ export const NewInvoiceDialog = ({
   const currentJob = selectedJob || jobs?.find((j: any) => j.id === jobId);
   /** Avoid re-applying bill from job on re-renders after user edits (same job id). */
   const billToSyncedJobIdRef = useRef<string | number | null>(null);
+  const listingPrefillAppliedRef = useRef(false);
+  const listingParentBillingSyncedRef = useRef<string | null>(null);
   /** Latest notes text for API payloads (avoids stale closure if send runs before state flushes). */
   const invoiceNotesRef = useRef<string | null>(null);
   const [invalidHeaderKeys, setInvalidHeaderKeys] = useState<string[]>([]);
@@ -526,12 +623,18 @@ export const NewInvoiceDialog = ({
         setJobsList((prev) => {
           const merged = append ? [...prev, ...jobs] : jobs;
           const seen = new Set<string>();
-          return merged.filter((job) => {
+          const deduped = merged.filter((job) => {
             const id = String(job?.id ?? "");
             if (!id || seen.has(id)) return false;
             seen.add(id);
             return true;
           });
+          return sortJobsWithListingParentFirst(
+            deduped,
+            listingParentId,
+            listingSource,
+            jobId != null ? String(jobId) : null,
+          );
         });
         setJobsPage(currentPage);
         setJobsTotalPages(totalPages);
@@ -549,8 +652,108 @@ export const NewInvoiceDialog = ({
         setIsLoadingMoreJobs(false);
       }
     },
-    [],
+    [listingParentId, listingSource, jobId],
   );
+
+  useEffect(() => {
+    if (!listingParentId || !listingSource || isViewMode) return;
+
+    let cancelled = false;
+
+    const loadParentJobs = async () => {
+      try {
+        const result = await apiClient.getJobsByCustomer(listingParentId);
+        if (cancelled || !result?.success) return;
+
+        let parentJobs: any[] = [];
+        const data = result.data;
+        if (Array.isArray(data)) parentJobs = data;
+        else if (data && typeof data === "object") {
+          const o = data as Record<string, unknown>;
+          if (Array.isArray(o.jobs)) parentJobs = o.jobs as any[];
+          else if (Array.isArray(o.data)) parentJobs = o.data as any[];
+        }
+
+        if (!parentJobs.length) return;
+
+        setJobsList((prev) => {
+          const seen = new Set<string>();
+          const deduped = [...parentJobs, ...prev].filter((job) => {
+            const id = String(job?.id ?? "");
+            if (!id || seen.has(id)) return false;
+            seen.add(id);
+            return true;
+          });
+          return sortJobsWithListingParentFirst(
+            deduped,
+            listingParentId,
+            listingSource,
+            jobId != null ? String(jobId) : null,
+          );
+        });
+      } catch (error) {
+        console.error("Failed to load listing parent jobs:", error);
+      }
+    };
+
+    void loadParentJobs();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [listingParentId, listingSource, isViewMode, jobId]);
+
+  const applyListingParentBilling = useCallback(async () => {
+    if (!listingParentId || !listingSource) return false;
+
+    try {
+      const entity = await fetchListingParentEntity(
+        listingParentId,
+        listingSource,
+      );
+      if (!entity) return false;
+
+      const { customerName, customerAddress, billToAddress } =
+        resolveListingParentInvoiceFields(entity, listingSource);
+
+      listingParentBillingSyncedRef.current = listingParentId;
+      setInlineInvoiceData((prev) => ({
+        ...prev,
+        customerName,
+        customerAddress,
+        billToAddress,
+        billToAddressEnabled: true,
+      }));
+      return true;
+    } catch (error) {
+      console.error("Failed to prefill billing from listing parent:", error);
+      return false;
+    }
+  }, [listingParentId, listingSource]);
+
+  // Auto-fill billing when only customer/contractor selected (no job in dropdown)
+  useEffect(() => {
+    if (
+      !listingParentId ||
+      !listingSource ||
+      isViewMode ||
+      selectedJob ||
+      (prefillFromListing && jobId != null) ||
+      listingParentBillingSyncedRef.current === listingParentId
+    ) {
+      return;
+    }
+
+    void applyListingParentBilling();
+  }, [
+    listingParentId,
+    listingSource,
+    isViewMode,
+    selectedJob,
+    jobId,
+    prefillFromListing,
+    applyListingParentBilling,
+  ]);
 
   const handleJobsDropdownScroll = useCallback(
     (e: React.UIEvent<HTMLDivElement>) => {
@@ -1330,6 +1533,54 @@ export const NewInvoiceDialog = ({
     });
   }
 };
+
+  // Pre-fill job when navigating from customers/contractors with a selected job or sub-job
+  useEffect(() => {
+    if (
+      !prefillFromListing ||
+      !jobId ||
+      isViewMode ||
+      listingPrefillAppliedRef.current
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const applyListingPrefill = async () => {
+      const idStr = String(jobId);
+      try {
+        let job =
+          jobsList.find((j: any) => String(j?.id ?? "") === idStr) ||
+          jobs?.find((j: any) => String(j?.id ?? "") === idStr) ||
+          null;
+
+        if (!job) {
+          const fetched = await apiClient.getJobById(idStr);
+          if (cancelled || !fetched) return;
+          job = {
+            ...fetched,
+            id: fetched.id ?? idStr,
+            job_title: fetched.job_title || fetched.title,
+          };
+        }
+
+        if (cancelled || !job) return;
+
+        listingPrefillAppliedRef.current = true;
+        handleJobSelection(job);
+      } catch (error) {
+        console.error("Failed to prefill job for estimate:", error);
+      }
+    };
+
+    void applyListingPrefill();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillFromListing, jobId, isViewMode]);
 
   const handleSaveInvoiceAsDraft = async () => {
     // Validation
@@ -2564,11 +2815,19 @@ const validateLineItems = (lineItems: any[] = []) => {
                             setInlineInvoiceData((prev) => ({
                               ...prev,
                               jobId: "",
-                              customerName: "",
-                              customerAddress: "",
-                              billToAddress: "",
                               project: "",
+                              ...(listingParentId && listingSource
+                                ? {}
+                                : {
+                                    customerName: "",
+                                    customerAddress: "",
+                                    billToAddress: "",
+                                  }),
                             }));
+                            if (listingParentId && listingSource) {
+                              listingParentBillingSyncedRef.current = null;
+                              void applyListingParentBilling();
+                            }
                           }
 
                           setShowJobResults(true);

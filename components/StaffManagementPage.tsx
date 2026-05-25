@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from './ui/button'
 import { Card, CardContent } from './ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
@@ -39,9 +40,12 @@ export function StaffManagementPage({
   selectedLeadLabourId,
   showLeadLabourDetails
 }: StaffManagementPageProps) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const { hasPermission, isLoading: permissionsLoading, permissions } = usePermissions()
   const [activeTab, setActiveTab] = useState<string>('')
   const hasInitializedTab = useRef(false)
+  const deepLinkHandledRef = useRef<string | null>(null)
 
   const [viewState, setViewState] = useState<{
     type: 'list' | 'detail'
@@ -479,6 +483,37 @@ export function StaffManagementPage({
       selectedId: id
     })
   }
+
+  // Deep-link from global search: /staff?tab=lead-labour&entityId=123
+  useEffect(() => {
+    if (permissionsLoading) return
+
+    const tab = searchParams.get('tab')?.trim()
+    const entityId = searchParams.get('entityId')?.trim()
+    if (!tab || !entityId) return
+
+    const linkKey = `${tab}:${entityId}`
+    if (deepLinkHandledRef.current === linkKey) return
+
+    const categoryMap: Record<
+      string,
+      'staff' | 'lead-labour' | 'labor'
+    > = {
+      staff: 'staff',
+      'lead-labour': 'lead-labour',
+      labor: 'labor',
+      labour: 'labor',
+    }
+
+    const category = categoryMap[tab.toLowerCase()]
+    if (!category) return
+
+    deepLinkHandledRef.current = linkKey
+    hasInitializedTab.current = true
+    setActiveTab(category)
+    void handleViewDetails(category, entityId)
+    router.replace('/staff', { scroll: false })
+  }, [permissionsLoading, searchParams, router])
 
   const handleBackToList = () => {
     setViewState({

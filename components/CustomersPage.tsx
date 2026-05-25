@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "./ui/table";
 import { usePermissions } from "../contexts/PermissionContext";
+import { useListingEstimatePrefillSync } from "../contexts/EstimatePrefillContext";
 import { globalApiCall } from "../utils/globalApiHandler";
 import { JobDetailsPage } from "./JobDetailsPage";
 import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
@@ -96,6 +97,12 @@ import {
   annotateJobsForListing,
   sortEntitiesByRecentJobActivity,
 } from "@/lib/entityListingRecentActivity";
+import {
+  ADDRESS_AUTOCOMPLETE_OPTIONS,
+  ADDRESS_SEARCH_PLACEHOLDER,
+  GOOGLE_MAPS_API_KEY,
+  resolveFormattedPlaceAddress,
+} from "@/lib/googleAddressAutocomplete";
 // Static customers data removed - now using API data from /customer/getCustomers
 
 const getStatusColor = (status: string) => {
@@ -251,6 +258,12 @@ export function CustomersPage() {
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
   const [selectedSubJob, setSelectedSubJob] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
+  useListingEstimatePrefillSync(
+    "customers",
+    selectedCustomer,
+    selectedJob,
+    selectedSubJob,
+  );
   const [enhancedJobData, setEnhancedJobData] = useState<any>(null);
   const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(
     new Set(),
@@ -3298,9 +3311,9 @@ export function CustomersPage() {
                     Address *
                   </Label>
                   <Autocomplete
-                    apiKey="AIzaSyBEQp-ZFMYZjsTNyximu2pAifQ9EWA4W3M"
+                    apiKey={GOOGLE_MAPS_API_KEY}
+                    options={ADDRESS_AUTOCOMPLETE_OPTIONS}
                     onPlaceSelected={(place: any) => {
-                      console.log("Place selected:", place);
                       if (place) {
                         // Keep overlay disabled during selection to prevent modal close
                         const overlay = document.querySelector(
@@ -3310,9 +3323,7 @@ export function CustomersPage() {
                           (overlay as HTMLElement).style.pointerEvents = "none";
                         }
 
-                        // Use formatted_address if available, otherwise use name
-                        const address =
-                          place.formatted_address || place.name || "";
+                        const address = resolveFormattedPlaceAddress(place);
                         if (address) {
                           setCustomerFormData({ ...customerFormData, address });
                           if (validationErrors.address) {
@@ -3339,10 +3350,6 @@ export function CustomersPage() {
                         }, 300);
                       }
                     }}
-                    options={{
-                      types: ["address"],
-                      componentRestrictions: { country: "us" },
-                    }}
                     defaultValue={customerFormData.address}
                     onChange={(e: any) => {
                       const value = e.target.value;
@@ -3362,7 +3369,7 @@ export function CustomersPage() {
                         ? "border-red-500"
                         : "border-gray-300"
                     }`}
-                    placeholder="Enter full address"
+                    placeholder={ADDRESS_SEARCH_PLACEHOLDER}
                   />
                   {validationErrors.address && (
                     <p className="mt-1 text-sm text-red-600">

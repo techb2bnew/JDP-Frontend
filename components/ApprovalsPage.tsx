@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Button } from './ui/button'
 import {
   AlertDialog,
@@ -102,6 +102,10 @@ interface JobApprovalsProps {
   onBack: () => void
   jobs: Job[]
   onApprovalCountChange?: (count: number) => void
+  /** From global search / URL: open matching row in Review & Approve flow */
+  initialJobId?: string
+  initialBluesheetId?: string
+  onDeepLinkConsumed?: () => void
 }
 
 // Updated approver names as requested
@@ -111,7 +115,13 @@ const getRandomApprover = () => {
   return approverNames[Math.floor(Math.random() * approverNames.length)]
 }
 
-export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsProps) {
+export function ApprovalsPage({
+  onBack,
+  onApprovalCountChange,
+  initialJobId,
+  initialBluesheetId,
+  onDeepLinkConsumed,
+}: JobApprovalsProps) {
   const [blueSheets, setBlueSheets] = useState<ApiBlueSheetItem[]>([])
   const [allBlueSheets, setAllBlueSheets] = useState<ApiBlueSheetItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -128,6 +138,7 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
   const [jobSheetsForModal, setJobSheetsForModal] = useState<any[]>([])
   const [selectionTarget, setSelectionTarget] = useState<ApiBlueSheetItem | null>(null)
   const [selectedBlueSheets, setSelectedBlueSheets] = useState<any[]>([])
+  const deepLinkHandledRef = useRef(false)
   console.log(blueSheets, "bluesheets");
   console.log(selectedBlueSheet, "selectedBlueSheet")
   // Fetch bluesheets from API
@@ -190,7 +201,7 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
 
   const [isLoadingSheets, setIsLoadingSheets] = useState(false)
 
-  const handleApprove = async (blueSheet: ApiBlueSheetItem) => {
+  const handleApprove = useCallback(async (blueSheet: ApiBlueSheetItem) => {
     try {
       setIsLoadingSheets(true)
 
@@ -233,7 +244,37 @@ export function ApprovalsPage({ onBack, onApprovalCountChange }: JobApprovalsPro
     } finally {
       setIsLoadingSheets(false)
     }
-  }
+  }, [])
+
+  // Global search deep-link: open Review & Approve for matching job/bluesheet
+  useEffect(() => {
+    const jobId = initialJobId?.trim()
+    const bluesheetId = initialBluesheetId?.trim()
+    if (!jobId && !bluesheetId) return
+    if (isLoading || deepLinkHandledRef.current) return
+
+    const match = blueSheets.find((bs) => {
+      if (jobId && String(bs.job_id) === jobId) return true
+      if (bluesheetId) {
+        const sheetId = String(bs.id ?? bs.latest_bluesheet_id ?? '')
+        return sheetId === bluesheetId
+      }
+      return false
+    })
+
+    if (!match) return
+
+    deepLinkHandledRef.current = true
+    void handleApprove(match)
+    onDeepLinkConsumed?.()
+  }, [
+    isLoading,
+    blueSheets,
+    initialJobId,
+    initialBluesheetId,
+    handleApprove,
+    onDeepLinkConsumed,
+  ])
 
   const handleApproveClick = (blueSheet: ApiBlueSheetItem) => {
     setApproveTarget(blueSheet)

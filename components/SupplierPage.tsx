@@ -1,4 +1,5 @@
 import { useState, useEffect, ChangeEvent, useMemo, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Card, CardContent } from './ui/card'
@@ -51,6 +52,9 @@ interface SupplierPageProps {
 }
 
 export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPageProps) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const supplierDeepLinkRef = useRef<string | null>(null)
   const { hasPermission } = usePermissions()
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -867,6 +871,34 @@ export function SupplierPage({ onViewDetails, onDetailViewChange }: SupplierPage
       setIsLoadingDetails(false)
     }
   }
+
+  // Deep-link from global search: /suppliers?supplierId=3040
+  useEffect(() => {
+    if (onViewDetails) return
+
+    const supplierId = searchParams.get('supplierId')?.trim()
+    if (!supplierId || supplierDeepLinkRef.current === supplierId) return
+
+    supplierDeepLinkRef.current = supplierId
+    setIsLoadingDetails(true)
+    setViewingSupplier({
+      id: supplierId,
+      supplierId: '',
+      fullName: '',
+      companyName: '',
+      contactPerson: '',
+      email: '',
+      phone: '',
+      address: '',
+      status: 'active',
+      contractStart: '',
+      contractEnd: '',
+      totalOrders: 0,
+      totalProducts: 0,
+    })
+    void fetchSupplierDetails(supplierId)
+    router.replace('/suppliers', { scroll: false })
+  }, [searchParams, onViewDetails, router])
 
   if (viewingSupplier) {
     return (
