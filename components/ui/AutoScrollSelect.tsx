@@ -20,6 +20,7 @@ interface AutoScrollSelectProps {
   onCreateNew?: () => void
   /** Label for the create button (default: "+ Create New") */
   createNewLabel?: string
+  renderItem?: (item: any) => React.ReactNode
 }
 
 export function AutoScrollSelect({
@@ -32,7 +33,8 @@ export function AutoScrollSelect({
   className,
   refreshKey,
   onCreateNew,
-  createNewLabel = '+ Create New'
+  createNewLabel = '+ Create New', 
+  renderItem
 }: AutoScrollSelectProps) {
   const [items, setItems] = useState<Array<{ id: string; name: string; [key: string]: any }>>([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -101,7 +103,7 @@ export function AutoScrollSelect({
       )
       if (foundItem) {
         // Only fire if the selectedItem reference actually changed
-        setSelectedItem(prev => {
+        setSelectedItem((prev: any) => {
           if (prev?.[valueField] !== foundItem[valueField]) {
             return foundItem
           }
@@ -174,7 +176,7 @@ export function AutoScrollSelect({
                 key={item[valueField]}
                 value={String(item[valueField])}
               >
-                {item[displayField]}
+                {renderItem ? renderItem(item) : item[displayField]}
               </SelectItem>
             ))}
 

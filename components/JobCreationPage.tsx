@@ -460,7 +460,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
       address: formData.address,
       cityZip: formData.cityZip,
       phone: formData.phone,
-      // email: formData.email,
+      email: formData.billToEmail || '',
       billToAddress: formData.billToAddress,
       billToCityZip: formData.billToCityZip,
       billToPhone: formData.billToPhone,
@@ -494,7 +494,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
       email: '',
       phone: '',
       company: '',
-      address: ''
+      address: '',
     })
     setEntityErrors({})
     setIsAddEntityOpen(true)
@@ -811,7 +811,8 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     if (!place) return
 
     try {
-      const { address: fullAddress, cityZip } = parsePlaceToAddressFields(place)
+      const { cityZip } = parsePlaceToAddressFields(place)
+      const fullAddress = resolveFormattedPlaceAddress(place)
 
       const newFormData = {
         ...formData,
@@ -861,7 +862,9 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
       if (formData.customer && !formData.customerName && !selectedCustomerName) {
         try {
           const response = await apiClient.getCustomers(1, 100) // Get more items to find the selected one
+          console.log('response', response)
           const customer = response.data.find((c: any) => String(c.id) === String(formData.customer))
+          console.log('customer', customer)
           if (customer) {
             const customerName = customer.name || customer.customer_name || customer.company_name || ''
             const customerEmail = getCustomerEmail(customer)
@@ -884,6 +887,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
       if (formData.contractor && !formData.contractorName && !selectedContractorName) {
         try {
           const response = await apiClient.getContractors(1, 100) // Get more items to find the selected one
+          console.log('response', response)
           const contractor = response.data.find((c: any) => String(c.id) === String(formData.contractor))
           if (contractor) {
             const contractorName = contractor.name || contractor.contractor_name || contractor.company_name || ''
@@ -1045,7 +1049,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                 onValueChange={(value, item) => {
                   selectedEntityForLocationRef.current = item ?? null
                   const customerName =
-                    item?.name || item?.customer_name || item?.company_name || ''
+                    item?.name || item?.customer_name || item?.company_name || '' 
                   const customerEmail = getCustomerEmail(item)
 
                   setFormData((prev) => {
@@ -1074,6 +1078,16 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                 className={validationErrors.customer ? 'border-red-500' : ''}
                 onCreateNew={() => openAddEntityModal('customer')}   // ← ADD
                 createNewLabel="+ Create Customer"  
+                renderItem={(item:any) => (
+                  <div className="flex items-center gap-2">
+                    <span>{item.name || item.customer_name || item.company_name}</span>
+                    {item.tag && (
+                      <span className="px-1.5 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 font-medium">
+                        {item.tag}  {/* ya item.tag_name, item.tags[0] — API ke hisaab se */}
+                      </span>
+                    )}
+                  </div>
+                )}
               />
               {validationErrors.customer && (
                 <p className="text-red-500 text-sm">{validationErrors.customer}</p>
@@ -1132,6 +1146,16 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                 className={validationErrors.contractor ? 'border-red-500' : ''}
                 onCreateNew={() => openAddEntityModal('contractor')}  // ← ADD
                 createNewLabel="+ Create Contractor" 
+                renderItem={(item:any) => (
+                  <div className="flex items-center gap-2">
+                    <span>{item.name || item.contractor_name || item.company_name}</span>
+                    {item.tag && (
+                      <span className="px-1.5 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 font-medium">
+                        {item.tag}  {/* ya item.tag_name, item.tags[0] — API ke hisaab se */}
+                      </span>
+                    )}
+                  </div>
+                )}
               />
               {validationErrors.contractor && (
                 <p className="text-red-500 text-sm">{validationErrors.contractor}</p>

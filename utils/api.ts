@@ -2420,6 +2420,7 @@ export const apiClient = {
           email: customer.email,
           phone: customer.phone,
           address: customer.address,
+          tag:customer.tag,
         };
         return transformedCustomer;
       }),
@@ -2608,6 +2609,7 @@ export const apiClient = {
           email: contractor.email,
           phone: contractor.phone,
           address: contractor.address,
+          tag:contractor.tag,
         };
         return transformedContractor;
       }),
