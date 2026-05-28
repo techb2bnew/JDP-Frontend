@@ -7293,7 +7293,8 @@ const handlePrintInvoice = async (invoice: any) => {
                               setEditedJob({
                                 ...editedJob,
                                 location: formattedAddress,
-                                address: fullAddress,
+                                // Keep payload address as full selected address
+                                address: formattedAddress,
                                 cityZip,
                               });
                             } catch (error) {
@@ -7301,7 +7302,11 @@ const handlePrintInvoice = async (invoice: any) => {
                               const address =
                                 resolveFormattedPlaceAddress(place) ||
                                 editedJob.location;
-                              setEditedJob({ ...editedJob, location: address });
+                              setEditedJob({
+                                ...editedJob,
+                                location: address,
+                                address,
+                              });
                             }
                           }}
                           className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -7311,6 +7316,7 @@ const handlePrintInvoice = async (invoice: any) => {
                             setEditedJob({
                               ...editedJob,
                               location: e.target.value,
+                              address: e.target.value,
                             });
                           }}
                         />
