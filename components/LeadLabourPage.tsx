@@ -525,15 +525,11 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       formDataPayload.append('phone', normalizePhoneForPayload(formData.phone));
       formDataPayload.append('status', formData.status);
       formDataPayload.append('labor_code', generateLeadLabourId());
-      if (formData.dob.trim()) {
-        formDataPayload.append('dob', formData.dob.trim());
-      }
+      formDataPayload.append('dob', formData.dob.trim());
       formDataPayload.append('address', formData.address);
       formDataPayload.append('notes', formData.notes);
       formDataPayload.append('department', formData.department);
-      if (formData.dateOfJoining.trim()) {
-        formDataPayload.append('date_of_joining', formData.dateOfJoining.trim());
-      }
+      formDataPayload.append('date_of_joining', formData.dateOfJoining.trim());
       formDataPayload.append('specialization', formData.specialization);
       formDataPayload.append('trade', formData.experience);
       formDataPayload.append('experience', formData.experience);
@@ -716,15 +712,11 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       formDataPayload.append('email', formData.email.toLowerCase());
       formDataPayload.append('phone', normalizePhoneForPayload(formData.phone));
       formDataPayload.append('status', formData.status);
-      if (formData.dob.trim()) {
-        formDataPayload.append('dob', formData.dob.trim());
-      }
+      formDataPayload.append('dob', formData.dob.trim());
       formDataPayload.append('address', formData.address);
       formDataPayload.append('notes', formData.notes);
       formDataPayload.append('department', formData.department);
-      if (formData.dateOfJoining.trim()) {
-        formDataPayload.append('date_of_joining', formData.dateOfJoining.trim());
-      }
+      formDataPayload.append('date_of_joining', formData.dateOfJoining.trim());
       formDataPayload.append('specialization', formData.specialization);
       formDataPayload.append('trade', formData.experience);
       formDataPayload.append('experience', formData.experience);
