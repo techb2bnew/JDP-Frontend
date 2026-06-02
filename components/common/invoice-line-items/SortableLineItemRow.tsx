@@ -375,14 +375,20 @@ const cellClass = isInvalidItem
       </td>
 
       <td
-        className={`border border-gray-300 px-2 py-1 max-h-[72px] ${cellClass}`}
+        className={`border border-gray-300 px-2 py-1 h-[72px] max-h-[72px] align-top overflow-hidden ${cellClass}`}
       >
         <Textarea
           value={lineItem.description}
           onChange={(e) =>
             onUpdateRow(lineItem.id, "description", e.target.value)
           }
-          className="border-0 p-1.5 min-h-[60px] h-[60px] max-h-[60px] resize-none text-xs"
+          spellCheck={false}
+          autoComplete="off"
+          autoCorrect="off"
+          data-gramm="false"
+          data-gramm_editor="false"
+          data-enable-grammarly="false"
+          className="border-0 p-1.5 min-h-[60px] h-[60px] max-h-[60px] resize-none text-xs leading-tight overflow-y-auto [field-sizing:fixed] focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-transparent"
           placeholder="Enter product description"
         />
       </td>

@@ -307,7 +307,7 @@ const dropdownPortalRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (lineItems.length > 0) return;
-    setLineItems(createDefaultEmptyLineItems(5, selectedSupplierId));
+    setLineItems(createDefaultEmptyLineItems(5, selectedSupplierId) as LineItemType[]);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- seed once when parent starts with no rows
   }, []);
 
@@ -552,7 +552,7 @@ const handleUpdateLineItem = (rowId: string, field: string, value: any) => {
 
   if (field === "item" || field === "product_name") {
     const nextValue = String(value || "").trim();
-    if (nextValue) {
+    if (nextValue && typeof setInvalidLineItemIds === "function") {
       setInvalidLineItemIds((prev) => prev.filter((id) => id !== rowId));
     }
   }

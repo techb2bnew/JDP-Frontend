@@ -26,6 +26,7 @@ import {
   Download,
   Send,
   Eye,
+  Edit,
   Trash2,
   Receipt,
   DollarSign,
@@ -311,6 +312,10 @@ const handleViewInvoice = (invoice: any) => {
   console.log("navigating to:", `/invoices/create?mode=view&id=${invoice.id}`);
 
   router.push(`/invoices/create?mode=view&id=${invoice.id}`);
+};
+
+const handleEditInvoice = (invoice: any) => {
+  router.push(`/invoices/create?mode=edit&id=${invoice.id}`);
 };
 
   const handleDownloadInvoice = async (invoice: any) => {
@@ -1313,6 +1318,18 @@ const handleViewInvoice = (invoice: any) => {
                                         }
                                       >
                                         <Download className="w-4 h-4" />
+                                      </Button>
+                                    )}
+                                    {hasPermission("invoices", "edit") &&
+                                      String(invoice.status || "").toLowerCase() ===
+                                        "draft" && (
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={() => handleEditInvoice(invoice)}
+                                        title="Edit Draft Invoice"
+                                      >
+                                        <Edit className="w-4 h-4 text-orange-600" />
                                       </Button>
                                     )}
                                     {hasPermission("invoices", "edit") &&

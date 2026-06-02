@@ -29,6 +29,8 @@ export default function CreateEstimatePage() {
       : undefined;
 
   const isViewMode = mode === "view" && !!invoiceId;
+  const isEditMode = mode === "edit" && !!invoiceId;
+  const shouldLoadInvoiceData = isViewMode || isEditMode;
   
 
   const [loading, setLoading] = useState(false);
@@ -49,8 +51,8 @@ export default function CreateEstimatePage() {
           console.error("Failed to load jobs:", err);
         }
 
-        if (isViewMode && invoiceId) {
-          const response = await apiClient.getEstimateById(invoiceId);
+        if (shouldLoadInvoiceData && invoiceId) {
+          const response = await apiClient.getEstimateById(Number(invoiceId));
           const estimateData = response?.data || response;
 
           const customerName =
@@ -109,7 +111,7 @@ export default function CreateEstimatePage() {
     };
 
     loadPageData();
-  }, [invoiceId, isViewMode]);
+  }, [invoiceId, shouldLoadInvoiceData]);
   console.log(isViewMode,"isViewMode");
   
 

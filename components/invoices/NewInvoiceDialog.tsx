@@ -3856,9 +3856,6 @@ const validateLineItems = (lineItems: any[] = []) => {
                           Rate
                         </th>
                         <th className="border border-gray-300 px-3 py-2 text-right text-sm">
-                          Amount
-                        </th>
-                        <th className="border border-gray-300 px-3 py-2 text-right text-sm">
                           Total
                         </th>
                       </tr>
@@ -3925,7 +3922,7 @@ const validateLineItems = (lineItems: any[] = []) => {
                               return (
                                 <tr key={lineItem.id} className="bg-transparent">
                                   <td
-                                    colSpan={6}
+                                    colSpan={5}
                                     className="px-0 py-0 border border-gray-300 bg-white"
                                   >
                                     <div className="w-full bg-gray-800 px-3 py-2 text-white">
@@ -3960,12 +3957,6 @@ const validateLineItems = (lineItems: any[] = []) => {
                                   ${Number(lineItem.rate || 0).toFixed(2)}
                                 </td>
                                 <td className="border border-gray-300 px-3 py-2 text-right align-middle text-sm">
-                                  $
-                                  {Number(lineItem.estimatedPrice || 0).toFixed(
-                                    2,
-                                  )}
-                                </td>
-                                <td className="border border-gray-300 px-3 py-2 text-right font-medium align-middle text-sm">
                                   ${(lineItem.total || 0).toFixed(2)}
                                 </td>
                               </tr>
