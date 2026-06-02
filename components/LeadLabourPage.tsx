@@ -335,7 +335,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
 
   const validateExperienceValue = (value: string): string => {
     const trimmed = value.trim()
-    if (!trimmed) return 'Experience is required'
+    if (!trimmed) return ''
     if (/^-\d/.test(trimmed)) return 'Experience cannot be negative'
     // Accept formats like: "6 months", "1 month", "3 years", "1 year"
     if (!/^\d+\s+(month|months|year|years)$/i.test(trimmed)) {
@@ -454,51 +454,38 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
   const handleCreate = async () => {
     if (isCreatingLeadLabour) return
 
-    // Validation
-    if (!formData.role || !formData.name || !formData.email || !formData.phone || !formData.dob || !formData.address || !formData.department || !formData.dateOfJoining || !formData.specialization || !formData.experience || !formData.agreeToTerms) {
-      const errors: Record<string, string> = {};
-      if (!formData.role) errors.role = 'Role is required';
-      if (!formData.name) errors.name = 'Name is required';
-      if (!formData.email) errors.email = 'Email is required';
-      if (!formData.phone) errors.phone = 'Phone is required';
-      if (!formData.dob) errors.dob = 'Date of Birth is required';
-      if (formData.dob) {
-        const dobError = validateDobValue(formData.dob)
-        if (dobError) errors.dob = dobError
+    const errors: Record<string, string> = {};
+    if (!formData.name.trim()) errors.name = 'Name is required';
+    if (!formData.email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      errors.email = 'Please enter a valid email address';
+    }
+    if (!formData.address.trim()) {
+      errors.address = 'Address is required';
+    }
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      toast.error('Please enter full name, email, and address');
+      return;
+    }
+
+    if (formData.dob.trim()) {
+      const createDobError = validateDobValue(formData.dob)
+      if (createDobError) {
+        setValidationErrors((prev) => ({ ...prev, dob: createDobError }))
+        toast.error(createDobError)
+        return
       }
-      if (!formData.address) errors.address = 'Address is required';
-      if (!formData.department) errors.department = 'Department is required';
-      if (!formData.dateOfJoining) errors.dateOfJoining = 'Date of Joining is required';
-      if (!formData.specialization) errors.specialization = 'Specialization is required';
-      if (!formData.experience) errors.experience = 'Experience is required';
-      if (!formData.agreeToTerms) errors.agreeToTerms = 'Please agree to terms';
-
-      setValidationErrors(errors);
-      toast.error('Please fill in all required fields and agree to terms');
-      return;
     }
 
-    const createDobError = validateDobValue(formData.dob)
-    if (createDobError) {
-      setValidationErrors((prev) => ({ ...prev, dob: createDobError }))
-      toast.error(createDobError)
-      return
-    }
-
-    const createExperienceError = validateExperienceValue(formData.experience)
-    if (createExperienceError) {
-      setValidationErrors((prev) => ({ ...prev, experience: createExperienceError }))
-      toast.error(createExperienceError)
-      return
-    }
-
-    // Email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      const errors = { ...validationErrors, email: 'Please enter a valid email address' };
-      setValidationErrors(errors);
-      toast.error('Please enter a valid email address');
-      return;
+    if (formData.experience.trim()) {
+      const createExperienceError = validateExperienceValue(formData.experience)
+      if (createExperienceError) {
+        setValidationErrors((prev) => ({ ...prev, experience: createExperienceError }))
+        toast.error(createExperienceError)
+        return
+      }
     }
 
     let loadingToastId: string | number | undefined;
@@ -538,11 +525,15 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       formDataPayload.append('phone', normalizePhoneForPayload(formData.phone));
       formDataPayload.append('status', formData.status);
       formDataPayload.append('labor_code', generateLeadLabourId());
-      formDataPayload.append('dob', formData.dob);
+      if (formData.dob.trim()) {
+        formDataPayload.append('dob', formData.dob.trim());
+      }
       formDataPayload.append('address', formData.address);
       formDataPayload.append('notes', formData.notes);
       formDataPayload.append('department', formData.department);
-      formDataPayload.append('date_of_joining', formData.dateOfJoining);
+      if (formData.dateOfJoining.trim()) {
+        formDataPayload.append('date_of_joining', formData.dateOfJoining.trim());
+      }
       formDataPayload.append('specialization', formData.specialization);
       formDataPayload.append('trade', formData.experience);
       formDataPayload.append('experience', formData.experience);
@@ -656,51 +647,38 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
   const handleUpdate = async () => {
     if (!editingLeadLabour) return
 
-    // Validation
-    if (!formData.role || !formData.name || !formData.email || !formData.phone || !formData.dob || !formData.address || !formData.department || !formData.dateOfJoining || !formData.specialization || !formData.experience || !formData.agreeToTerms) {
-      const errors: Record<string, string> = {};
-      if (!formData.role) errors.role = 'Role is required';
-      if (!formData.name) errors.name = 'Name is required';
-      if (!formData.email) errors.email = 'Email is required';
-      if (!formData.phone) errors.phone = 'Phone is required';
-      if (!formData.dob) errors.dob = 'Date of Birth is required';
-      if (formData.dob) {
-        const dobError = validateDobValue(formData.dob)
-        if (dobError) errors.dob = dobError
+    const updateErrors: Record<string, string> = {};
+    if (!formData.name.trim()) updateErrors.name = 'Name is required';
+    if (!formData.email.trim()) {
+      updateErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      updateErrors.email = 'Please enter a valid email address';
+    }
+    if (!formData.address.trim()) {
+      updateErrors.address = 'Address is required';
+    }
+    if (Object.keys(updateErrors).length > 0) {
+      setValidationErrors(updateErrors);
+      toast.error('Please enter full name, email, and address');
+      return;
+    }
+
+    if (formData.dob.trim()) {
+      const updateDobError = validateDobValue(formData.dob)
+      if (updateDobError) {
+        setValidationErrors((prev) => ({ ...prev, dob: updateDobError }))
+        toast.error(updateDobError)
+        return
       }
-      if (!formData.address) errors.address = 'Address is required';
-      if (!formData.department) errors.department = 'Department is required';
-      if (!formData.dateOfJoining) errors.dateOfJoining = 'Date of Joining is required';
-      if (!formData.specialization) errors.specialization = 'Specialization is required';
-      if (!formData.experience) errors.experience = 'Experience is required';
-      if (!formData.agreeToTerms) errors.agreeToTerms = 'Please agree to terms';
-
-      setValidationErrors(errors);
-      toast.error('Please fill in all required fields and agree to terms');
-      return;
     }
 
-    const updateDobError = validateDobValue(formData.dob)
-    if (updateDobError) {
-      setValidationErrors((prev) => ({ ...prev, dob: updateDobError }))
-      toast.error(updateDobError)
-      return
-    }
-
-    const updateExperienceError = validateExperienceValue(formData.experience)
-    if (updateExperienceError) {
-      setValidationErrors((prev) => ({ ...prev, experience: updateExperienceError }))
-      toast.error(updateExperienceError)
-      return
-    }
-
-    // Email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      const errors = { ...validationErrors, email: 'Please enter a valid email address' };
-      setValidationErrors(errors);
-      toast.error('Please enter a valid email address');
-      return;
+    if (formData.experience.trim()) {
+      const updateExperienceError = validateExperienceValue(formData.experience)
+      if (updateExperienceError) {
+        setValidationErrors((prev) => ({ ...prev, experience: updateExperienceError }))
+        toast.error(updateExperienceError)
+        return
+      }
     }
 
     let loadingToastId: string | number | undefined;
@@ -738,11 +716,15 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       formDataPayload.append('email', formData.email.toLowerCase());
       formDataPayload.append('phone', normalizePhoneForPayload(formData.phone));
       formDataPayload.append('status', formData.status);
-      formDataPayload.append('dob', formData.dob);
+      if (formData.dob.trim()) {
+        formDataPayload.append('dob', formData.dob.trim());
+      }
       formDataPayload.append('address', formData.address);
       formDataPayload.append('notes', formData.notes);
       formDataPayload.append('department', formData.department);
-      formDataPayload.append('date_of_joining', formData.dateOfJoining);
+      if (formData.dateOfJoining.trim()) {
+        formDataPayload.append('date_of_joining', formData.dateOfJoining.trim());
+      }
       formDataPayload.append('specialization', formData.specialization);
       formDataPayload.append('trade', formData.experience);
       formDataPayload.append('experience', formData.experience);
@@ -1437,7 +1419,7 @@ useEffect(() => {
         <h3 className="text-lg font-medium text-[#2b2b2b] mb-4">Personal Details</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="role">Role *</Label>
+            <Label htmlFor="role">Role</Label>
             <Select value={formData.role} onValueChange={(value) => {
               setFormData({ ...formData, role: value })
               if (validationErrors.role) {
@@ -1478,7 +1460,7 @@ useEffect(() => {
             )}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="phone">Phone Number *</Label>
+            <Label htmlFor="phone">Phone Number</Label>
             <PhoneInput
               id="phone"
               international
@@ -1525,7 +1507,7 @@ useEffect(() => {
             )}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="dob">DOB *</Label>
+            <Label htmlFor="dob">DOB</Label>
             <Input
               id="dob"
               type="date"
@@ -1620,7 +1602,7 @@ useEffect(() => {
         <h3 className="text-lg font-medium text-[#2b2b2b] mb-4">Job Details</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="department">Department *</Label>
+            <Label htmlFor="department">Department</Label>
             <AutoSuggestInput
               label=""
               value={formData.department}
@@ -1636,7 +1618,7 @@ useEffect(() => {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="specialization">Specialization *</Label>
+            <Label htmlFor="specialization">Specialization</Label>
             <AutoSuggestInput
               label=""
               value={formData.specialization}
@@ -1652,7 +1634,7 @@ useEffect(() => {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="dateOfJoining">Date of Joining *</Label>
+            <Label htmlFor="dateOfJoining">Date of Joining</Label>
             <Input
               id="dateOfJoining"
               type="date"
@@ -1671,7 +1653,7 @@ useEffect(() => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="experience">Experience *</Label>
+            <Label htmlFor="experience">Experience</Label>
             <Input
               id="experience"
               value={formData.experience}

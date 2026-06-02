@@ -720,10 +720,19 @@ export function CustomersPage() {
     return merged;
   };
 
+  const getListingEntityType = (entity: any) => {
+    return (
+      entity?.tag?.toString?.().trim().toLowerCase() ||
+      entity?.type?.toString?.().trim().toLowerCase() ||
+      entity?.customer_type?.toString?.().trim().toLowerCase() ||
+      ""
+    );
+  };
+
   const handleSelectParent = (parentId: string) => {
     const entity = findListingCustomer(parentId);
 
-    if (entity?.customer_type?.trim().toLowerCase() === "contractor") {
+    if (getListingEntityType(entity) === "contractor") {
       router.push(`/contractors?contractorId=${parentId}`);
       return;
     }
@@ -732,7 +741,7 @@ export function CustomersPage() {
 
   const handleSelectJob = (jobId: string, parentId: string) => {
     const entity = findListingCustomer(parentId);
-    if (entity?.customer_type?.trim().toLowerCase() === "contractor") {
+    if (getListingEntityType(entity) === "contractor") {
       router.push(`/contractors?contractorId=${parentId}&jobId=${jobId}`);
       return;
     }
@@ -745,7 +754,7 @@ export function CustomersPage() {
     parentId: string,
   ) => {
     const entity = findListingCustomer(parentId);
-    if (entity?.customer_type?.trim().toLowerCase() === "contractor") {
+    if (getListingEntityType(entity) === "contractor") {
       router.push(
         `/contractors?contractorId=${parentId}&jobId=${subJobId}`,
       );
@@ -1507,6 +1516,9 @@ export function CustomersPage() {
               id: customerId,
               customer_name: customer.customer_name || "",
               name: customer.customer_name || "",
+              tag: customer.tag || "customer",
+              type: customer.type || "customer",
+              customer_type: customer.customer_type || "customer",
               email: customer.email || "",
               phone: customer.phone || "",
               company_name: customer.company_name || "",
@@ -1631,6 +1643,8 @@ export function CustomersPage() {
             id: customer.id,
             customer_name: customer.customer_name || "",
             name: customer.customer_name || "",
+            tag: customer.tag || "customer",
+            type: customer.type || "customer",
             customer_type: customer.customer_type || "",
             email: customer.email || "",
             phone: customer.phone || "",
@@ -1652,9 +1666,8 @@ export function CustomersPage() {
           );
           const fallback = annotateEntitiesForListing(
             fallbackRaw.map((c: any) => {
-              const { customer_type: _omit, ...withoutType } = c;
               return {
-                ...withoutType,
+                ...c,
                 jobs: annotateJobsForListing(c.jobs || []),
               };
             }),

@@ -263,12 +263,13 @@ export function GlobalSearchBar() {
     <div ref={containerRef} className="relative w-full max-w-lg min-w-[240px]">
       <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
       <Input
-        type="search"
+        type="text"
         value={query}
         placeholder="Search customers, jobs, estimates..."
         className={cn(
           "h-10 w-full rounded-full border-slate-200 bg-slate-50/80 pl-10 pr-10 text-sm shadow-sm transition-all",
           "placeholder:text-slate-400 focus-visible:border-primary/40 focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-primary/15",
+          "[&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden",
         )}
         onChange={(e) => {
           setQuery(e.target.value);

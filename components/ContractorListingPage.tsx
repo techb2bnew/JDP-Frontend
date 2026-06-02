@@ -131,6 +131,8 @@ interface Contractor {
   email: string
   phone: string
   status: string
+  tag?: string
+  type?: string
   /** Set only from globalSearch results — shown as listing chip. */
   customer_type?: string
   created_at: string
@@ -1126,7 +1128,14 @@ export function ContractorListingPage() {
         console.log('Contractors with Jobs API Response:', responseData)
 
         if (responseData.success && responseData.data) {
-          setContractors(responseData.data.contractors || [])
+          const normalizedContractors = (responseData.data.contractors || []).map(
+            (contractor: Contractor) => ({
+              ...contractor,
+              // Contractor listing should always prefer contractor tag in chip.
+              tag: contractor.tag || 'contractor',
+            }),
+          )
+          setContractors(normalizedContractors)
           setTotalContractors(responseData.data.pagination?.total || 0)
         } else {
           console.error('Invalid contractors API response structure:', responseData)
@@ -1156,9 +1165,8 @@ export function ContractorListingPage() {
     const isSearchActive = searchTerm.trim().length > 0
     const annotated = annotateEntitiesForListing(
       contractors.map((c) => {
-        const { customer_type, ...rest } = c
         return {
-          ...(isSearchActive ? c : rest),
+          ...c,
           jobs: annotateJobsForListing(c.jobs || []),
         }
       }),
@@ -1256,6 +1264,8 @@ export function ContractorListingPage() {
             id: contractor.id,
             contractor_name:
               contractor.contractor_name || contractor.name || '',
+            tag: contractor.tag || 'contractor',
+            type: contractor.type || 'contractor',
             customer_type: contractor.customer_type || '',
             company_name: contractor.company_name || '',
             email: contractor.email || '',
@@ -1275,6 +1285,8 @@ export function ContractorListingPage() {
           return {
             id: customer.id,
             contractor_name: customer.customer_name || customer.name || '',
+            tag: customer.tag || 'customer',
+            type: customer.type || 'customer',
             customer_type: customer.customer_type || '',
             company_name: customer.company_name || '',
             email: customer.email || '',

@@ -288,7 +288,7 @@ export function LaborPage({ onViewDetails }: LaborPageProps) {
 
   const validateExperienceValue = (value: string): string => {
     const trimmed = value.trim()
-    if (!trimmed) return 'Experience is required'
+    if (!trimmed) return ''
     if (/^-\d/.test(trimmed)) return 'Experience cannot be negative'
     // Accept formats like: "6 months", "1 month", "3 years", "1 year"
     if (!/^\d+\s+(month|months|year|years)$/i.test(trimmed)) {
@@ -351,52 +351,38 @@ const getAvailabilityBadge = (availability: string) => {
   const handleCreate = async () => {
     if (isCreatingLabor) return
 
-    // Validation
-    if (!formData.role || !formData.full_name || !formData.email || !formData.phone || !formData.dob || 
-        !formData.address || !formData.date_of_joining || !formData.trade || 
-        !formData.experience || !formData.supervisor_id ) {
-      const errors: Record<string, string> = {};
-      if (!formData.role) errors.role = 'Role is required';
-      if (!formData.full_name) errors.full_name = 'Full name is required';
-      if (!formData.email) errors.email = 'Email is required';
-      if (!formData.phone) errors.phone = 'Phone is required';
-      if (!formData.dob) errors.dob = 'Date of Birth is required';
-      if (formData.dob) {
-        const dobError = validateDobValue(formData.dob)
-        if (dobError) errors.dob = dobError
+    const errors: Record<string, string> = {};
+    if (!formData.full_name.trim()) errors.full_name = 'Full name is required';
+    if (!formData.email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      errors.email = 'Please enter a valid email address';
+    }
+    if (!formData.address.trim()) {
+      errors.address = 'Address is required';
+    }
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      toast.error('Please enter full name, email, and address');
+      return;
+    }
+
+    if (formData.dob.trim()) {
+      const createDobError = validateDobValue(formData.dob)
+      if (createDobError) {
+        setValidationErrors((prev) => ({ ...prev, dob: createDobError }))
+        toast.error(createDobError)
+        return
       }
-      if (!formData.address) errors.address = 'Address is required';
-      if (!formData.date_of_joining) errors.date_of_joining = 'Date of Joining is required';
-      if (!formData.trade) errors.trade = 'Trade is required';
-      if (!formData.experience) errors.experience = 'Experience is required';
-      if (!formData.supervisor_id) errors.supervisor_id = 'Supervisor is required';
-      
-      setValidationErrors(errors);
-      toast.error('Please fill in all required fields');
-      return;
     }
 
-    const createDobError = validateDobValue(formData.dob)
-    if (createDobError) {
-      setValidationErrors((prev) => ({ ...prev, dob: createDobError }))
-      toast.error(createDobError)
-      return
-    }
-
-    const experienceError = validateExperienceValue(formData.experience)
-    if (experienceError) {
-      setValidationErrors((prev) => ({ ...prev, experience: experienceError }))
-      toast.error(experienceError)
-      return
-    }
-
-    // Email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      const errors = {...validationErrors, email: 'Please enter a valid email address'};
-      setValidationErrors(errors);
-      toast.error('Please enter a valid email address');
-      return;
+    if (formData.experience.trim()) {
+      const experienceError = validateExperienceValue(formData.experience)
+      if (experienceError) {
+        setValidationErrors((prev) => ({ ...prev, experience: experienceError }))
+        toast.error(experienceError)
+        return
+      }
     }
 
     let loadingToastId: string | number | undefined;
@@ -435,9 +421,9 @@ const getAvailabilityBadge = (availability: string) => {
         full_name: formData.full_name,
         email: formData.email.toLowerCase(),
         phone: normalizePhoneForPayload(formData.phone),
-        dob: formData.dob,
+        dob: formData.dob.trim() ? formData.dob : null,
         address: formData.address,
-        date_of_joining: formData.date_of_joining,
+        date_of_joining: formData.date_of_joining.trim() ? formData.date_of_joining : null,
         status: formData.status,
         trade: formData.trade,
         experience: formData.experience,
@@ -496,52 +482,38 @@ const getAvailabilityBadge = (availability: string) => {
   const handleUpdate = async () => {
     if (!editingLabor) return
 
-    // Validation
-    if (!formData.role || !formData.full_name || !formData.email || !formData.phone || !formData.dob || 
-        !formData.address || !formData.date_of_joining || !formData.trade || 
-        !formData.experience || !formData.supervisor_id) {
-      const errors: Record<string, string> = {};
-      if (!formData.role) errors.role = 'Role is required';
-      if (!formData.full_name) errors.full_name = 'Full name is required';
-      if (!formData.email) errors.email = 'Email is required';
-      if (!formData.phone) errors.phone = 'Phone is required';
-      if (!formData.dob) errors.dob = 'Date of Birth is required';
-      if (formData.dob) {
-        const dobError = validateDobValue(formData.dob)
-        if (dobError) errors.dob = dobError
+    const updateErrors: Record<string, string> = {};
+    if (!formData.full_name.trim()) updateErrors.full_name = 'Full name is required';
+    if (!formData.email.trim()) {
+      updateErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      updateErrors.email = 'Please enter a valid email address';
+    }
+    if (!formData.address.trim()) {
+      updateErrors.address = 'Address is required';
+    }
+    if (Object.keys(updateErrors).length > 0) {
+      setValidationErrors(updateErrors);
+      toast.error('Please enter full name, email, and address');
+      return;
+    }
+
+    if (formData.dob.trim()) {
+      const updateDobError = validateDobValue(formData.dob)
+      if (updateDobError) {
+        setValidationErrors((prev) => ({ ...prev, dob: updateDobError }))
+        toast.error(updateDobError)
+        return
       }
-      if (!formData.address) errors.address = 'Address is required';
-      if (!formData.date_of_joining) errors.date_of_joining = 'Date of Joining is required';
-      if (!formData.trade) errors.trade = 'Trade is required';
-      if (!formData.experience) errors.experience = 'Experience is required';
-      if (!formData.supervisor_id) errors.supervisor_id = 'Supervisor is required';
-      
-      setValidationErrors(errors);
-      toast.error('Please fill in all required fields');
-      return;
     }
 
-    const updateDobError = validateDobValue(formData.dob)
-    if (updateDobError) {
-      setValidationErrors((prev) => ({ ...prev, dob: updateDobError }))
-      toast.error(updateDobError)
-      return
-    }
-
-    const experienceError = validateExperienceValue(formData.experience)
-    if (experienceError) {
-      setValidationErrors((prev) => ({ ...prev, experience: experienceError }))
-      toast.error(experienceError)
-      return
-    }
-
-    // Email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      const errors = {...validationErrors, email: 'Please enter a valid email address'};
-      setValidationErrors(errors);
-      toast.error('Please enter a valid email address');
-      return;
+    if (formData.experience.trim()) {
+      const experienceError = validateExperienceValue(formData.experience)
+      if (experienceError) {
+        setValidationErrors((prev) => ({ ...prev, experience: experienceError }))
+        toast.error(experienceError)
+        return
+      }
     }
 
     let loadingToastId: string | number | undefined;
@@ -579,9 +551,9 @@ const getAvailabilityBadge = (availability: string) => {
         full_name: formData.full_name,
         email: formData.email.toLowerCase(),
         phone: normalizePhoneForPayload(formData.phone),
-        dob: formData.dob,
+        dob: formData.dob.trim() ? formData.dob : null,
         address: formData.address,
-        date_of_joining: formData.date_of_joining,
+        date_of_joining: formData.date_of_joining.trim() ? formData.date_of_joining : null,
         status: formData.status,
         trade: formData.trade,
         experience: formData.experience,
@@ -1193,7 +1165,7 @@ const fetchLaborById = async (id: string) => {
   const renderForm = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[65vh] overflow-y-auto px-4 py-4">
       <div className="space-y-2">
-              <Label htmlFor="role">Role *</Label>
+              <Label htmlFor="role">Role</Label>
               <Select value={formData.role} onValueChange={(value) => {
                 setFormData({...formData, role: value})
                 if (validationErrors.role) {
@@ -1256,7 +1228,7 @@ const fetchLaborById = async (id: string) => {
       </div>
       
       <div className="space-y-2">
-        <Label htmlFor="phone">Phone Number *</Label>
+        <Label htmlFor="phone">Phone Number</Label>
         <PhoneInput
           id="phone"
           international
@@ -1285,7 +1257,7 @@ const fetchLaborById = async (id: string) => {
       </div>
       
       <div className="space-y-2">
-        <Label htmlFor="dob">Date of Birth *</Label>
+        <Label htmlFor="dob">Date of Birth</Label>
         <Input
           id="dob"
           type="date"
@@ -1305,7 +1277,7 @@ const fetchLaborById = async (id: string) => {
       </div>
       
       <div className="space-y-2">
-        <Label htmlFor="date_of_joining">Date of Joining *</Label>
+        <Label htmlFor="date_of_joining">Date of Joining</Label>
         <Input
           id="date_of_joining"
           type="date"
@@ -1368,12 +1340,12 @@ const fetchLaborById = async (id: string) => {
           suggestions={trades}
           placeholder="Enter trade"
           error={validationErrors.trade}
-          required={true}
+          required={false}
         />
       </div>
       
       <div className="space-y-2">
-        <Label htmlFor="experience">Experience *</Label>
+        <Label htmlFor="experience">Experience</Label>
         <Input
           id="experience"
           value={formData.experience}
@@ -1407,7 +1379,7 @@ const fetchLaborById = async (id: string) => {
       </div>
       
       <div className="space-y-2">
-        <Label htmlFor="supervisor_id">Supervisor *</Label>
+        <Label htmlFor="supervisor_id">Supervisor</Label>
         <Select value={formData.supervisor_id} onValueChange={(value) => {
           setFormData({...formData, supervisor_id: value})
           if (validationErrors.supervisor_id) {

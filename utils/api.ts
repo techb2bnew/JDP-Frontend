@@ -1029,7 +1029,8 @@ export const apiClient = {
     phone: string;
     position: string;
     department: string;
-    date_of_joining: string;
+    date_of_joining: string | null;
+    dob?: string | null;
     address: string;
     role: string;
     status: string;
@@ -2286,8 +2287,8 @@ export const apiClient = {
       phone: string;
       position: string;
       department: string;
-      date_of_joining: string;
-      dob: string;
+      date_of_joining: string | null;
+      dob: string | null;
       address: string;
       role: string;
       status: string;
@@ -2733,9 +2734,9 @@ export const apiClient = {
     bill_to_phone?: string;
     bill_to_email?: string;
     same_as_address: boolean;
-    due_date: string;
+    due_date: string | null;
     estimated_hours?: number;
-    estimated_cost?: number;
+    estimated_cost?: number | null;
     assigned_lead_labor_ids?: string;
     assigned_labor_ids?: string;
     assigned_material_ids?: string;

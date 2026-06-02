@@ -47,6 +47,8 @@ type EntityType = {
   customer_name?: string;
   contractor_name?: string;
   name?: string;
+  tag?: string;
+  type?: string;
   customer_type?: string;
   total_jobs?: number;
   jobs?: JobType[];
@@ -193,6 +195,14 @@ export default function CommonEntityListing({
     return customerType.trim();
   };
 
+  const resolveEntityTypeLabel = (entity: EntityType) => {
+    return (
+      customerTypeChipLabel(entity.tag) ||
+      customerTypeChipLabel(entity.type) ||
+      customerTypeChipLabel(entity.customer_type)
+    );
+  };
+
   /** Address line for any sub-job row (change order or regular sub job). */
   const subJobAddressLine = (subJob: {
     address?: string;
@@ -251,13 +261,15 @@ export default function CommonEntityListing({
             data.map((entity) => {
               const parentId = entity.id.toString();
               const entityJobs = entity.jobs || [];
+              const entityTypeLabel = resolveEntityTypeLabel(entity);
               const hasJobs = entityJobs.length > 0;
               const isExpanded = expandedParents.has(parentId);
               const isSelected = selectedParent === parentId && !selectedJob;
               const totalJobs = getParentJobCount
                 ? getParentJobCount(entity)
                 : entity.total_jobs || entityJobs.length;
-
+                console.log(entity,"entityentity");
+                
               return (
                 <div key={entity.id} className="mb-3 min-w-0">
                   <Collapsible
@@ -309,16 +321,15 @@ export default function CommonEntityListing({
                                 </div>
                                 <div className="mt-0.5 flex min-w-0 flex-nowrap items-center gap-1 text-xs text-slate-500">
                                   <span className="shrink-0">{totalJobs} jobs</span>
-                                  {customerTypeChipLabel(entity.customer_type) && (
+                                  {entityTypeLabel && (
                                     <span
-                                      className={`shrink-0 whitespace-nowrap rounded-full border px-1 py-0.5 text-[8px] font-semibold leading-none capitalize ${
-                                        entity.customer_type?.trim().toLowerCase() ===
-                                        "contractor"
+                                      className={`shrink-0 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[9px] font-semibold leading-none capitalize ${
+                                        entityTypeLabel.toLowerCase() === "contractor"
                                           ? "border-violet-200 bg-violet-50 text-violet-800"
                                           : "border-sky-200 bg-sky-50 text-sky-700"
                                       }`}
                                     >
-                                      {customerTypeChipLabel(entity.customer_type)}
+                                      {entityTypeLabel}
                                     </span>
                                   )}
                                   {entity.__listingRecentlyAdded && (

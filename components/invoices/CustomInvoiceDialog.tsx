@@ -21,7 +21,11 @@ import { motion } from 'framer-motion'
 import { Logo } from '../common/Logo'
 import Image from 'next/image';
 import InvoiceLineItemsManager from '../common/invoice-line-items/InvoiceLineItemsManager'
-import { createDefaultEmptyLineItems } from '../common/invoice-line-items/lineItemHelpers'
+import {
+  createDefaultEmptyLineItems,
+  getFilledLineItemRows,
+  validateInvoiceLineItemsForSubmit,
+} from '../common/invoice-line-items/lineItemHelpers'
 // import { formatCurrency, formatDate } from '../../utils/invoiceUtils'
 
 interface CustomInvoiceDialogProps {
@@ -877,19 +881,12 @@ console.log(totalAmount,"amounttt");
   }
 
   const validateLineItems = (lineItems: any[] = []) => {
-    const invalidItems = lineItems.filter((row) => {
-      if (row.type !== "item") return false;
-  
-      const name = String(row.item || row.product_name || "").trim();
-      return !name;
-    });
-  
-    if (invalidItems.length > 0) {
-      setInvalidLineItemIds(invalidItems.map((row) => row.id));
-      toast.error("Item's product_name is not allowed to be empty");
+    const result = validateInvoiceLineItemsForSubmit(lineItems);
+    if (!result.valid) {
+      setInvalidLineItemIds(result.invalidIds);
+      toast.error(result.message || "Please fix line item errors");
       return false;
     }
-  
     setInvalidLineItemIds([]);
     return true;
   };
@@ -1351,13 +1348,17 @@ console.log(totalAmount,"amounttt");
         paymentCredits: effectiveInlineInvoiceData.paymentCredits,
         balanceDue: effectiveInlineInvoiceData.balanceDue,
 
-        lineItems: lineItemsSource.map((item) => ({
-          qty: item.qty,
-          item: item.item,
-          description: item.description,
-          rate: item.rate,
-          total: item.total,
-        })),
+        lineItems: lineItemsSource.map((item) => {
+          const qtyNum = Number(item.qty || 0);
+          const rateNum = Number(item.rate || 0);
+          return {
+            qty: qtyNum,
+            item: item.item,
+            description: item.description,
+            rate: rateNum,
+            total: qtyNum * rateNum,
+          };
+        }),
         notes: getInvoiceNotesForSendPayload(effectiveInlineInvoiceData.notes),
         invoice_description: INVOICE_DESCRIPTION,
         signatureText: effectiveInlineInvoiceData.signatureText || '',
@@ -1365,6 +1366,11 @@ console.log(totalAmount,"amounttt");
           effectiveInlineInvoiceData.invoiceType === 'Custom'
             ? effectiveInlineInvoiceData.customInvoiceType
             : effectiveInlineInvoiceData.invoiceType,
+        invoice_type: mapInvoiceTypeToAPI(
+          effectiveInlineInvoiceData.invoiceType === 'Custom'
+            ? effectiveInlineInvoiceData.customInvoiceType
+            : effectiveInlineInvoiceData.invoiceType,
+        ),
       
         // Summary numbers backend ko handle karne do
         // subtotal: 0,

@@ -126,7 +126,12 @@ import ActivityLogs from "./ActivityLogs";
 import { CheckCircle } from "lucide-react";
 import { invoicesData } from "@/data/invoiceData";
 import InvoiceLineItemsManager from "./common/invoice-line-items/InvoiceLineItemsManager";
-import { createDefaultEmptyLineItems } from "./common/invoice-line-items/lineItemHelpers";
+import {
+  createDefaultEmptyLineItems,
+  getFilledLineItemRows,
+  hasAtLeastOneFilledLineItem,
+  validateInvoiceLineItemsForSubmit,
+} from "./common/invoice-line-items/lineItemHelpers";
 import { INVOICE_DESCRIPTION } from "@/utils/invoiceConstants";
 // Sample data structure - replace with your actual data
 const sampleJobData = {
@@ -1363,19 +1368,12 @@ export function JobDetailsPage({
 const [invalidLineItemIds, setInvalidLineItemIds] = useState<string[]>([]);
 
 const validateLineItems = (lineItems: any[] = []) => {
-  const invalidItems = lineItems.filter((row) => {
-    if (row.type !== "item") return false;
-
-    const name = String(row.item || row.product_name || "").trim();
-    return !name;
-  });
-
-  if (invalidItems.length > 0) {
-    setInvalidLineItemIds(invalidItems.map((row) => row.id));
-    toast.error("Item's product_name is not allowed to be empty");
+  const result = validateInvoiceLineItemsForSubmit(lineItems);
+  if (!result.valid) {
+    setInvalidLineItemIds(result.invalidIds);
+    toast.error(result.message || "Please fix line item errors");
     return false;
   }
-
   setInvalidLineItemIds([]);
   return true;
 };
@@ -5736,28 +5734,21 @@ const handlePrintInvoice = async (invoice: any) => {
       errors.project = "Project field is required";
     }
 
-    // Filter out empty line items and check if we have at least one valid item
-    const validLineItems = inlineInvoiceData.lineItems.filter(
-      (item) => item.item && item.item.trim() !== "",
-    );
-
-    console.log(errors, "errors");
-
-    if (validLineItems.length === 0) {
-      errors.lineItems = "Please add at least one product item with name";
+    if (!hasAtLeastOneFilledLineItem(inlineInvoiceData.lineItems)) {
+      errors.lineItems = "Please fill at least one line item";
     }
-        if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
-          return;
-        }
-
-        if (!validateLineItems(inlineInvoiceData.lineItems)) return;
-
+    if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
+      return;
+    }
+    if (!validateLineItems(inlineInvoiceData.lineItems)) return;
 
     if (Object.keys(errors).length > 0) {
       setInvoiceValidationErrors(errors);
       toast.error("Please fix the validation errors");
       return;
     }
+
+    const validLineItems = getFilledLineItemRows(inlineInvoiceData.lineItems);
 
 
 
@@ -5931,24 +5922,21 @@ const handlePrintInvoice = async (invoice: any) => {
       errors.project = "Project field is required";
     }
 
-    // Filter out empty line items and check if we have at least one valid item
-    const validLineItems = inlineInvoiceData.lineItems.filter(
-      (item) => item.item && item.item.trim() !== "",
-    );
-
-    if (validLineItems.length === 0) {
-      errors.lineItems = "Please add at least one product item with name";
+    if (!hasAtLeastOneFilledLineItem(inlineInvoiceData.lineItems)) {
+      errors.lineItems = "Please fill at least one line item";
     }
-     if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
-       return;
-     }
-     if (!validateLineItems(inlineInvoiceData.lineItems)) return;
+    if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
+      return;
+    }
+    if (!validateLineItems(inlineInvoiceData.lineItems)) return;
 
     if (Object.keys(errors).length > 0) {
       setInvoiceValidationErrors(errors);
       toast.error("Please fix the validation errors");
       return;
     }
+
+    const validLineItems = getFilledLineItemRows(inlineInvoiceData.lineItems);
 
     // First save as draft
     try {
@@ -6103,15 +6091,27 @@ const handlePrintInvoice = async (invoice: any) => {
         poNumber: inlineInvoiceData.poNumber || "",
         projectName: inlineInvoiceData.project || job.title || "",
         items: (inlineInvoiceData.lineItems || [])
-        .filter((item: any) => item.type !== "header")
-        .map((item: any) => ({
-          quantity: String(item.qty || 0),
-          item: item.item || "",
-          description: item.description || "",
-          rate: Number(item.rate || 0).toFixed(2),
-          amount: Number(item.estimatedPrice || 0).toFixed(2),
-          parent_header_name: item.parentHeaderName || item.parent_header_name || null,
-        })),
+        // Only send rows that actually have an item name filled.
+        // Empty seeded rows should not affect payload calculations.
+        .filter((item: any) => {
+          if (item.type === "header") return false;
+          return String(item.item || "").trim() !== "";
+        })
+        .map((item: any) => {
+          const qtyNum = Number(item.qty || 0);
+          const rateNum = Number(item.rate || 0);
+          const amountNum = qtyNum * rateNum;
+
+          return {
+            quantity: String(qtyNum),
+            item: item.item || "",
+            description: item.description || "",
+            rate: rateNum.toFixed(2),
+            amount: amountNum.toFixed(2),
+            parent_header_name:
+              item.parentHeaderName || item.parent_header_name || null,
+          };
+        }),
         subtotal: subtotal.toFixed(2),
         total: total.toFixed(2),
         dueDate: inlineInvoiceData.dueDate || "",
@@ -6124,6 +6124,11 @@ const handlePrintInvoice = async (invoice: any) => {
           ? notesTextForEmail.split("\n").filter((note) => note.trim())
           : [],
         invoice_description: INVOICE_DESCRIPTION,
+        invoice_type: mapInvoiceTypeToAPI(
+          inlineInvoiceData.invoiceType === "Custom"
+            ? inlineInvoiceData.customInvoiceType
+            : inlineInvoiceData.invoiceType,
+        ),
         email: "jen@jdpelectric.us",
         phone: "952-449-1088",
         status: "sent",
@@ -10788,9 +10793,6 @@ const handlePrintInvoice = async (invoice: any) => {
                   Rate
                 </th>
                 <th className="border border-gray-300 px-3 py-2 text-right text-sm">
-                  Amount
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-right text-sm">
                   Total
                 </th>
               </tr>
@@ -10852,7 +10854,7 @@ const handlePrintInvoice = async (invoice: any) => {
                     return (
                       <tr key={lineItem.id} className="bg-transparent">
                         <td
-                          colSpan={6}
+                          colSpan={5}
                           className="px-0 py-0 border border-gray-300 bg-white"
                         >
                           <div className="w-full bg-gray-800 px-3 py-2 text-white">
@@ -10892,10 +10894,6 @@ const handlePrintInvoice = async (invoice: any) => {
 
                       <td className="border border-gray-300 px-3 py-2 text-right align-middle text-sm">
                         ${Number(lineItem.rate || 0).toFixed(2)}
-                      </td>
-
-                      <td className="border border-gray-300 px-3 py-2 text-right align-middle text-sm">
-                        ${Number(lineItem.estimatedPrice || 0).toFixed(2)}
                       </td>
 
                       <td className="border border-gray-300 px-3 py-2 text-right font-medium align-middle text-sm">

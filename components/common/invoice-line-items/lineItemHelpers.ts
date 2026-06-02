@@ -72,3 +72,80 @@ export const createDefaultEmptyLineItems = (
       isCustomProduct: false,
     }),
   );
+
+/** Product/item name on a line row (supports API-shaped rows). */
+export function getLineItemProductName(row: any): string {
+  return String(row?.item ?? row?.product_name ?? "").trim();
+}
+
+/** Row has a product selected or item name entered (counts toward "at least one"). */
+export function isFilledLineItemRow(row: any): boolean {
+  if (!row || row.type === "header") return false;
+  if (getLineItemProductName(row)) return true;
+  const productId = row.productId ?? row.product_id;
+  return productId != null && productId !== "";
+}
+
+/** Row has partial data but no item name (should show field error). */
+export function isStartedLineItemRow(row: any): boolean {
+  if (!row || row.type === "header") return false;
+  if (isFilledLineItemRow(row)) return false;
+  const desc = String(row.description ?? "").trim();
+  const rate = Number(row.rate ?? row.unit_cost) || 0;
+  const estimated =
+    Number(row.estimatedPrice ?? row.estimated_price) || 0;
+  const total = Number(row.total ?? row.total_cost) || 0;
+  const qty = Number(row.qty ?? row.stock_quantity);
+  return !!(
+    desc ||
+    rate > 0 ||
+    estimated > 0 ||
+    total > 0 ||
+    (Number.isFinite(qty) && qty > 1)
+  );
+}
+
+export function getFilledLineItemRows(lineItems: any[] = []): any[] {
+  return lineItems.filter(isFilledLineItemRow);
+}
+
+export function hasAtLeastOneFilledLineItem(lineItems: any[] = []): boolean {
+  return getFilledLineItemRows(lineItems).length > 0;
+}
+
+/** First product line row (for single-row validation highlight). */
+export function getFirstItemLineRow(lineItems: any[] = []): any | null {
+  return lineItems.find((row) => row?.type === "item") ?? null;
+}
+
+export function validateInvoiceLineItemsForSubmit(lineItems: any[] = []): {
+  valid: boolean;
+  message?: string;
+  invalidIds: string[];
+} {
+  if (!hasAtLeastOneFilledLineItem(lineItems)) {
+    const firstRow = getFirstItemLineRow(lineItems);
+    return {
+      valid: false,
+      message: "Please fill at least one line item",
+      invalidIds: firstRow?.id ? [firstRow.id] : [],
+    };
+  }
+
+  const startedIncomplete = lineItems.filter(
+    (row) =>
+      row.type === "item" &&
+      isStartedLineItemRow(row) &&
+      !isFilledLineItemRow(row),
+  );
+
+  if (startedIncomplete.length > 0) {
+    return {
+      valid: false,
+      message: "Each started line item must have an item name",
+      invalidIds: startedIncomplete.map((row) => row.id),
+    };
+  }
+
+  return { valid: true, invalidIds: [] };
+}

@@ -286,16 +286,12 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
         break
         
       case 'phone':
-        if (!value.trim()) {
-          errors.phone = 'Phone number is required'
-        } else {
-          delete errors.phone
-        }
+        delete errors.phone
         break
         
       case 'dob':
         if (!value.trim()) {
-          errors.dob = 'Date of Birth is required'
+          delete errors.dob
         } else {
           const dobError = validateDobValue(value)
           if (dobError) {
@@ -307,17 +303,11 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
         break
         
       case 'dateOfJoining':
-        if (!value.trim()) {
-          errors.dateOfJoining = 'Date of Joining is required'
-        } else {
-          delete errors.dateOfJoining
-        }
+        delete errors.dateOfJoining
         break
         
       case 'position':
-        if (!value.trim()) {
-          errors.position = 'Position is required'
-        } else if (value.trim().length < 2) {
+        if (value.trim() && value.trim().length < 2) {
           errors.position = 'Position must be at least 2 characters'
         } else {
           delete errors.position
@@ -325,9 +315,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
         break
         
       case 'department':
-        if (!value.trim()) {
-          errors.department = 'Department is required'
-        } else if (value.trim().length < 2) {
+        if (value.trim() && value.trim().length < 2) {
           errors.department = 'Department must be at least 2 characters'
         } else {
           delete errors.department
@@ -335,7 +323,9 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
         break
         
       case 'address':
-        if (value.trim() && value.trim().length < 5) {
+        if (!value.trim()) {
+          errors.address = 'Address is required'
+        } else if (value.trim().length < 5) {
           errors.address = 'Address must be at least 5 characters'
         } else {
           delete errors.address
@@ -575,8 +565,8 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
         phone: formatPhoneForPayload(formData.phone) || '',
         position: formData.position,
         department: formData.department,
-        date_of_joining: formData.dateOfJoining,
-        dob: formData.dob,
+        date_of_joining: formData.dateOfJoining.trim() ? formData.dateOfJoining : null,
+        dob: formData.dob.trim() ? formData.dob : null,
         address: formData.address,
         role: formData.role,
         status: formData.status,
@@ -708,15 +698,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       isValid = false
     }
 
-    if (!formData.phone.trim()) {
-      errors.phone = 'Phone is required'
-      isValid = false
-    }
-
-    if (!formData.dob.trim()) {
-      errors.dob = 'Date of Birth is required'
-      isValid = false
-    } else {
+    if (formData.dob.trim()) {
       const dobError = validateDobValue(formData.dob)
       if (dobError) {
         errors.dob = dobError
@@ -724,29 +706,20 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       }
     }
 
-    if (!formData.dateOfJoining.trim()) {
-      errors.dateOfJoining = 'Date of Joining is required'
+    if (formData.position.trim() && formData.position.trim().length < 2) {
+      errors.position = 'Position must be at least 2 characters'
       isValid = false
     }
 
-    if (!formData.role.trim()) {
-      errors.role = 'Role is required'
+    if (formData.department.trim() && formData.department.trim().length < 2) {
+      errors.department = 'Department must be at least 2 characters'
       isValid = false
     }
 
-    // Validate required fields
-    if (!formData.position.trim()) {
-      errors.position = 'Position is required'
+    if (!formData.address.trim()) {
+      errors.address = 'Address is required'
       isValid = false
-    }
-
-    if (!formData.department.trim()) {
-      errors.department = 'Department is required'
-      isValid = false
-    }
-
-    // Validate optional fields if they have values
-    if (formData.address.trim() && formData.address.trim().length < 5) {
+    } else if (formData.address.trim().length < 5) {
       errors.address = 'Address must be at least 5 characters'
       isValid = false
     }
@@ -772,10 +745,10 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
         full_name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
         phone: formatPhoneForPayload(formData.phone) || '',
-        dob: formData.dob,
+        dob: formData.dob.trim() ? formData.dob : null,
         position: formData.position.trim(),
         department: formData.department.trim(),
-        date_of_joining: formData.dateOfJoining,
+        date_of_joining: formData.dateOfJoining.trim() ? formData.dateOfJoining : null,
         address: formData.address.trim(),
         role: formData.role,
         status: formData.status,
@@ -1393,7 +1366,7 @@ useEffect(() => {
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="role">Role *</Label>
+              <Label htmlFor="role">Role</Label>
               <Select value={formData.role} onValueChange={(value) => setFormData({...formData, role: value})}>
                 <SelectTrigger className={validationErrors.role ? 'border-red-500' : ''}>
                   <SelectValue placeholder="Select role" />
@@ -1446,7 +1419,7 @@ useEffect(() => {
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-phone">Phone Number *</Label>
+              <Label htmlFor="edit-phone">Phone Number</Label>
               <PhoneInput
                 id="edit-phone"
                 international
@@ -1467,7 +1440,7 @@ useEffect(() => {
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-dob">Date of Birth *</Label>
+              <Label htmlFor="edit-dob">Date of Birth</Label>
               <Input
                 id="edit-dob"
                 type="date"
@@ -1494,7 +1467,7 @@ useEffect(() => {
               placeholder="Enter or select position"
               suggestions={positions}
               error={validationErrors.position}
-              required={true}
+              required={false}
             />
             <AutoSuggestInput
               label="Department"
@@ -1507,11 +1480,11 @@ useEffect(() => {
               placeholder="Enter or select department"
               suggestions={departments}
               error={validationErrors.department}
-              required={true}
+              required={false}
             />
            
             <div className="col-span-2 space-y-2">
-              <Label htmlFor="edit-address">Address</Label>
+              <Label htmlFor="edit-address">Address *</Label>
               <div className="relative">
                 <Autocomplete
                   apiKey={GOOGLE_MAPS_API_KEY}
@@ -1562,7 +1535,7 @@ useEffect(() => {
               )}
             </div>
              <div className="space-y-2">
-              <Label htmlFor="edit-dateOfJoining">Date of Joining *</Label>
+              <Label htmlFor="edit-dateOfJoining">Date of Joining</Label>
               <Input
                 id="edit-dateOfJoining"
                 type="date"

@@ -306,9 +306,6 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     if (!formData.cityZip.trim()) {
       errors.cityZip = 'City & ZIP is required'
     }
-    if (!Number.isFinite(formData.estimatedCost) || formData.estimatedCost <= 0) {
-      errors.estimatedCost = 'Estimated amount must be greater than 0'
-    }
 
     // Job type specific validation
     if (formData.type === 'service-based' && !formData.customer) {
@@ -384,7 +381,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     if (currentStep === 2) {
       if (!validateStep2()) {
         const step2Errors = getStep2ValidationErrors()
-        const firstError = step2Errors.estimatedCost || Object.values(step2Errors)[0]
+        const firstError = Object.values(step2Errors)[0]
         toast.error(firstError || 'Please fix the validation errors before proceeding')
         return
       }
@@ -402,7 +399,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
     if (!validateStep2()) {
       const step2Errors = getStep2ValidationErrors()
-      const firstError = step2Errors.estimatedCost || Object.values(step2Errors)[0]
+      const firstError = Object.values(step2Errors)[0]
       toast.error(firstError || 'Please fix the validation errors before submission')
       return
     }
@@ -426,9 +423,10 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
         bill_to_phone: formData.billToPhone || undefined,
         bill_to_email: formData.billToEmail || undefined,
         same_as_address: formData.sameAsAddress,
-        due_date: formData.dueDate,
+        due_date: formData.dueDate?.trim() ? formData.dueDate.trim() : null,
         estimated_hours: formData.estimatedHours || undefined,
-        estimated_cost: formData.estimatedCost || undefined,
+        estimated_cost:
+          formData.estimatedCost > 0 ? formData.estimatedCost : null,
         assigned_lead_labor_ids: formData.assignedLeadLabor.length > 0 ? JSON.stringify(formData.assignedLeadLabor) : undefined,
         assigned_labor_ids: formData.assignedLabor.length > 0 ? JSON.stringify(formData.assignedLabor) : undefined,
         assigned_material_ids: undefined,
@@ -1215,8 +1213,11 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
                 setValidationErrors(prev => {
                   const next = { ...prev }
-                  if (rawValue !== '' && (!Number.isFinite(numericValue) || numericValue <= 0)) {
-                    next.estimatedCost = 'Estimated amount must be greater than 0'
+                  if (
+                    rawValue !== '' &&
+                    (!Number.isFinite(numericValue) || numericValue < 0)
+                  ) {
+                    next.estimatedCost = 'Estimated amount cannot be negative'
                   } else {
                     delete next.estimatedCost
                   }
@@ -1305,7 +1306,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone *</Label>
+              <Label htmlFor="phone">Phone</Label>
               <PhoneInput
                 id="phone"
                 value={formData.phone}

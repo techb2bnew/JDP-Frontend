@@ -49,6 +49,11 @@ import { motion } from "framer-motion";
 import { Logo } from "../common/Logo";
 import Image from "next/image";
 import InvoiceLineItemsManager from "../common/invoice-line-items/InvoiceLineItemsManager";
+import {
+  getFilledLineItemRows,
+  hasAtLeastOneFilledLineItem,
+  validateInvoiceLineItemsForSubmit,
+} from "../common/invoice-line-items/lineItemHelpers";
 import { useRouter } from "next/navigation";
 import {
   sortJobsWithListingParentFirst,
@@ -1203,18 +1208,22 @@ export const NewInvoiceDialog = ({
         balanceDue: inlineInvoiceData.balanceDue || "",
         lineItems: inlineInvoiceData.lineItems
           .filter((item: any) => item.type !== "header")
-          .map((item: any) => ({
-            id: item.id,
-            qty: item.qty,
-            item: item.item,
-            type: item.type,
-            parentHeaderKey: item.parentHeaderKey || null,
-            parentHeaderName: item.parentHeaderName || null,
-            description: item.description,
-            rate: item.rate,
-            total: item.total,
-            is_custom: item.isCustomProduct === true,
-          })),
+          .map((item: any) => {
+            const qtyNum = Number(item.qty || 0);
+            const rateNum = Number(item.rate || 0);
+            return {
+              id: item.id,
+              qty: qtyNum,
+              item: item.item,
+              type: item.type,
+              parentHeaderKey: item.parentHeaderKey || null,
+              parentHeaderName: item.parentHeaderName || null,
+              description: item.description,
+              rate: rateNum,
+              total: qtyNum * rateNum,
+              is_custom: item.isCustomProduct === true,
+            };
+          }),
         notes: getInvoiceNotesForPayload(),
         invoice_description: INVOICE_DESCRIPTION,
         signatureText: inlineInvoiceData.signatureText || "",
@@ -1222,6 +1231,11 @@ export const NewInvoiceDialog = ({
           inlineInvoiceData.invoiceType === "Custom"
             ? inlineInvoiceData.customInvoiceType
             : inlineInvoiceData.invoiceType,
+        invoice_type: mapInvoiceTypeToAPI(
+          inlineInvoiceData.invoiceType === "Custom"
+            ? inlineInvoiceData.customInvoiceType
+            : inlineInvoiceData.invoiceType,
+        ),
         subtotal: calculateInvoiceSubtotal(),
         total: calculateInvoiceSubtotal(),
       };
@@ -1646,24 +1660,19 @@ export const NewInvoiceDialog = ({
     // if (inlineInvoiceData.lineItems.length === 0 || !inlineInvoiceData.lineItems[0].item) {
     //   errors.lineItems = 'Please add at least one product item'
     // }
-    const invoiceItemRows = inlineInvoiceData.lineItems.filter(
-      (item: any) => item.type !== "header",
-    );
-    console.log(inlineInvoiceData.lineItems, "inlineInvoiceData.lineItems");
-
-    if (invoiceItemRows.length === 0) {
-      errors.lineItems = "Please add at least one product item";
+    if (!hasAtLeastOneFilledLineItem(inlineInvoiceData.lineItems)) {
+      errors.lineItems = "Please fill at least one line item";
     }
-        if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
-          return;
-        }
-        if (!validateLineItems(inlineInvoiceData.lineItems)) return;
+    if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
+      return;
+    }
+    if (!validateLineItems(inlineInvoiceData.lineItems)) return;
 
-        if (Object.keys(errors).length > 0) {
-          setValidationErrors(errors);
-          toast.error("Please fix the validation errors");
-          return;
-        }
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      toast.error("Please fix the validation errors");
+      return;
+    }
 
 
     setValidationErrors({});
@@ -1671,9 +1680,7 @@ export const NewInvoiceDialog = ({
     try {
       const subtotal = calculateInvoiceSubtotal();
 
-      const invoiceItemRows = inlineInvoiceData.lineItems.filter(
-        (item: any) => item.type !== "header",
-      );
+      const invoiceItemRows = getFilledLineItemRows(inlineInvoiceData.lineItems);
 
       const customProducts = invoiceItemRows.map((item: any) => {
         const base = {
@@ -1882,19 +1889,12 @@ export const NewInvoiceDialog = ({
 const [invalidLineItemIds, setInvalidLineItemIds] = useState<string[]>([]);
 
 const validateLineItems = (lineItems: any[] = []) => {
-  const invalidItems = lineItems.filter((row) => {
-    if (row.type !== "item") return false;
-
-    const name = String(row.item || row.product_name || "").trim();
-    return !name;
-  });
-
-  if (invalidItems.length > 0) {
-    setInvalidLineItemIds(invalidItems.map((row) => row.id));
-    toast.error("Item's product_name is not allowed to be empty");
+  const result = validateInvoiceLineItemsForSubmit(lineItems);
+  if (!result.valid) {
+    setInvalidLineItemIds(result.invalidIds);
+    toast.error(result.message || "Please fix line item errors");
     return false;
   }
-
   setInvalidLineItemIds([]);
   return true;
 };
@@ -1912,22 +1912,19 @@ const validateLineItems = (lineItems: any[] = []) => {
       errors.project = "Project field is required";
     }
 
-    if (
-      inlineInvoiceData.lineItems.length === 0
-      // !inlineInvoiceData.lineItems[0].item
-    ) {
-      errors.lineItems = "Please add at least one product item";
+    if (!hasAtLeastOneFilledLineItem(inlineInvoiceData.lineItems)) {
+      errors.lineItems = "Please fill at least one line item";
     }
-      if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
-        return;
-      }
-      if (!validateLineItems(inlineInvoiceData.lineItems)) return;
+    if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
+      return;
+    }
+    if (!validateLineItems(inlineInvoiceData.lineItems)) return;
 
-      if (Object.keys(errors).length > 0) {
-        setValidationErrors(errors);
-        toast.error("Please fix the validation errors");
-        return;
-      }
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      toast.error("Please fix the validation errors");
+      return;
+    }
   
 
 
@@ -1936,9 +1933,7 @@ const validateLineItems = (lineItems: any[] = []) => {
     try {
       const subtotal = calculateInvoiceSubtotal();
 
-      const invoiceItemRows = inlineInvoiceData.lineItems.filter(
-        (item: any) => item.type !== "header",
-      );
+      const invoiceItemRows = getFilledLineItemRows(inlineInvoiceData.lineItems);
 
       const customProducts = invoiceItemRows.map((item: any) => {
         const base = {
@@ -2201,9 +2196,7 @@ const validateLineItems = (lineItems: any[] = []) => {
 
     setQuickbookActionLoading(action);
     try {
-      const invoiceItemRows = inlineInvoiceData.lineItems.filter(
-        (item: any) => item.type !== "header",
-      );
+      const invoiceItemRows = getFilledLineItemRows(inlineInvoiceData.lineItems);
 
       const customProducts = invoiceItemRows.map((item: any) => {
         const base = {

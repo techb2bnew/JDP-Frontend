@@ -29,11 +29,6 @@ export default function CreateEstimatePage() {
       : undefined;
 
   const isViewMode = mode === "view" && !!invoiceId;
-
-  console.log(mode , invoiceId,"invoiceIdinvoiceId");
-    console.log("helloooo");
-
-  
   
 
   const [loading, setLoading] = useState(false);
