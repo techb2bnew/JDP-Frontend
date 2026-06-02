@@ -268,8 +268,7 @@ export default function CommonEntityListing({
               const totalJobs = getParentJobCount
                 ? getParentJobCount(entity)
                 : entity.total_jobs || entityJobs.length;
-                console.log(entity,"entityentity");
-                
+
               return (
                 <div key={entity.id} className="mb-3 min-w-0">
                   <Collapsible
@@ -277,8 +276,6 @@ export default function CommonEntityListing({
                     onOpenChange={() => {
                       if (!hasJobs) return;
                       onToggleParent(parentId);
-                      /* Always re-focus parent: clears job/sub-job in listing pages so detail + jobs table shows */
-                      onSelectParent(parentId);
                     }}
                     className={`min-w-0 overflow-hidden rounded-[22px] border transition-all duration-300 ${
                       isExpanded && hasJobs
@@ -286,35 +283,45 @@ export default function CommonEntityListing({
                         : "border-sky-100 bg-white shadow-[0_4px_14px_rgba(14,165,233,0.05)]"
                     }`}
                   >
-                    <CollapsibleTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        onClick={() => onSelectParent(parentId)}
-                        className="group h-auto w-full min-w-0 justify-start rounded-[20px] p-0 text-left whitespace-normal hover:bg-transparent"
-                      >
-                        <div
-                          className={`w-full rounded-[20px] border px-3 py-3.5 transition-all duration-300 ${
-                            isSelected || (isExpanded && hasJobs)
-                              ? "border-sky-200 bg-gradient-to-r from-sky-200 via-blue-200 to-cyan-100 text-slate-800 shadow-[0_8px_18px_rgba(59,130,246,0.10)]"
-                              : "border-sky-100 bg-gradient-to-r from-sky-100 via-blue-100 to-cyan-50 text-slate-800 shadow-[0_4px_12px_rgba(59,130,246,0.06)]"
-                          }`}
-                        >
-                          <div className="flex min-w-0 items-start justify-between gap-1.5">
-                            <div className="flex min-w-0 flex-1 items-center gap-2">
-                              <div className="flex shrink-0 items-center gap-2">
-                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/80 ring-1 ring-sky-100">
-                                  {hasJobs ? (
-                                    isExpanded ? (
-                                      <ChevronDown className="h-4 w-4 text-sky-600" />
-                                    ) : (
-                                      <ChevronRight className="h-4 w-4 text-sky-600" />
-                                    )
-                                  ) : (
-                                    <ChevronRight className="h-4 w-4 text-sky-300 opacity-40" />
-                                  )}
-                                </div>
-                              </div>
+                    <div
+                      className={`w-full cursor-pointer rounded-[20px] border px-3 py-3.5 transition-all duration-300 ${
+                        isSelected || (isExpanded && hasJobs)
+                          ? "border-sky-200 bg-gradient-to-r from-sky-200 via-blue-200 to-cyan-100 text-slate-800 shadow-[0_8px_18px_rgba(59,130,246,0.10)]"
+                          : "border-sky-100 bg-gradient-to-r from-sky-100 via-blue-100 to-cyan-50 text-slate-800 shadow-[0_4px_12px_rgba(59,130,246,0.06)]"
+                      }`}
+                      onClick={() => onSelectParent(parentId)}
+                    >
+                      <div className="flex min-w-0 items-start justify-between gap-1.5">
+                        <div className="flex min-w-0 flex-1 items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={!hasJobs}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!hasJobs) return;
+                              onToggleParent(parentId);
+                            }}
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/80 ring-1 ring-sky-100 disabled:cursor-default"
+                            aria-label={
+                              isExpanded ? "Collapse jobs" : "Expand jobs"
+                            }
+                          >
+                            {hasJobs ? (
+                              isExpanded ? (
+                                <ChevronDown className="h-4 w-4 text-sky-600" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-sky-600" />
+                              )
+                            ) : (
+                              <ChevronRight className="h-4 w-4 text-sky-300 opacity-40" />
+                            )}
+                          </button>
 
+                          <CollapsibleTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              className="group h-auto min-w-0 flex-1 justify-start rounded-[14px] p-0 text-left whitespace-normal hover:bg-transparent"
+                            >
                               <div className="min-w-0 flex-1">
                                 <div className="text-[13.4px] font-semibold leading-snug text-slate-800 break-words capitalize">
                                   {formatListingParentName(getParentName(entity))}
@@ -344,9 +351,11 @@ export default function CommonEntityListing({
                                   )}
                                 </div>
                               </div>
-                            </div>
+                            </Button>
+                          </CollapsibleTrigger>
+                        </div>
 
-                            <div className="-mr-0.5 flex shrink-0 items-center gap-0 self-start">
+                        <div className="-mr-0.5 flex shrink-0 items-center gap-0 self-start">
                               {hasEditPermission && onEditParent && (
                                 <Button
                                   variant="ghost"
@@ -376,11 +385,9 @@ export default function CommonEntityListing({
                                   <Trash2 className="h-3.5 w-3.5 text-red-500" />
                                 </Button>
                               )}
-                            </div>
-                          </div>
                         </div>
-                      </Button>
-                    </CollapsibleTrigger>
+                      </div>
+                    </div>
 
                     {hasJobs && (
                       <CollapsibleContent className="px-1.5 pb-2.5 pt-1.5">
