@@ -56,6 +56,8 @@ interface GroupedLineItemsTableProps {
   activeDraggedItem?: any;
   groupedItems: HeaderGroupType[];
   sortableIds: string[];
+  /** All group keys including virtual standalone segments (drop targets only). */
+  allGroupHeaderKeys?: string[];
   onDragEnd: (event: DragEndEvent) => void;
 
   onAddHeaderWithFirstItem: () => void;
@@ -92,6 +94,7 @@ interface GroupedLineItemsTableProps {
 const GroupedLineItemsTable = ({
   groupedItems,
   sortableIds,
+  allGroupHeaderKeys,
   onDragEnd,
   onAddLineItemUnderHeader,
   onAddCustomProductUnderHeader,
@@ -134,7 +137,7 @@ const GroupedLineItemsTable = ({
       >
         <SortableContext
           items={[
-            ...sortableIds,
+            ...(allGroupHeaderKeys?.length ? allGroupHeaderKeys : sortableIds),
             ...groupedItems.flatMap((group) =>
               group.items.map((item) => item.id),
             ),

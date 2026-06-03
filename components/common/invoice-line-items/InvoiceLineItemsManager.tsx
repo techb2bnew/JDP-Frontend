@@ -2,7 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import GroupedLineItemsTable from "./GroupedLineItemsTable";
 import { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { toast } from "sonner";
-import { createDefaultEmptyLineItems } from "./lineItemHelpers";
+import {
+  createDefaultEmptyLineItems,
+  isStandaloneGroupKey,
+} from "./lineItemHelpers";
 
 export type ProductType = {
   id: string | number;
@@ -123,64 +126,107 @@ const createItemRow = ({
   jdpSKU: null,
 });
 
+const STANDALONE_GROUP_KEY_PREFIX = "standalone_";
+
+const createStandaloneVirtualHeader = (segmentKey: string): LineItemType => ({
+  id: `standalone_header_${segmentKey}`,
+  type: "header",
+  headerKey: segmentKey,
+  headerName: "Items",
+  parentHeaderKey: null,
+  parentHeaderName: null,
+  qty: 0,
+  item: "",
+  description: "",
+  rate: 0,
+  estimatedPrice: 0,
+  total: 0,
+  searchQuery: "",
+  showSearchResults: false,
+  supplierId: 1,
+  isCustomProduct: true,
+  productId: null,
+  estimate_product_id: null,
+});
+
+/** Build groups in flat `lineItems` order (standalone segments stay where they appear). */
 const getHeaderGroups = (lineItems: LineItemType[] = []): HeaderGroupType[] => {
   const groups: HeaderGroupType[] = [];
-  const standaloneItems: LineItemType[] = [];
-  let currentGroup: HeaderGroupType | null = null;
+  let currentHeaderGroup: HeaderGroupType | null = null;
+  let currentStandaloneGroup: HeaderGroupType | null = null;
+
+  const flushStandalone = () => {
+    if (currentStandaloneGroup && currentStandaloneGroup.items.length > 0) {
+      groups.push(currentStandaloneGroup);
+    }
+    currentStandaloneGroup = null;
+  };
+
+  const flushHeader = () => {
+    if (currentHeaderGroup) {
+      groups.push(currentHeaderGroup);
+      currentHeaderGroup = null;
+    }
+  };
 
   for (const row of lineItems) {
     if (row.type === "item" && !row.parentHeaderKey) {
-      standaloneItems.push(row);
+      flushHeader();
+      if (!currentStandaloneGroup) {
+        currentStandaloneGroup = {
+          header: createStandaloneVirtualHeader(
+            `${STANDALONE_GROUP_KEY_PREFIX}${row.id}`,
+          ),
+          items: [],
+        };
+      }
+      currentStandaloneGroup.items.push(row);
       continue;
     }
 
     if (row.type === "header") {
-      if (currentGroup) groups.push(currentGroup);
-      currentGroup = {
-        header: row,
-        items: [],
-      };
+      flushStandalone();
+      flushHeader();
+      currentHeaderGroup = { header: row, items: [] };
       continue;
     }
 
     if (
       row.type === "item" &&
-      currentGroup &&
-      row.parentHeaderKey === currentGroup.header.headerKey
+      currentHeaderGroup &&
+      row.parentHeaderKey === currentHeaderGroup.header.headerKey
     ) {
-      currentGroup.items.push(row);
+      currentHeaderGroup.items.push(row);
     }
   }
 
-  if (standaloneItems.length > 0) {
-    groups.unshift({
-      header: {
-        id: "standalone_header",
-        type: "header",
-        headerKey: "standalone_header_key",
-        headerName: "Items",
-        parentHeaderKey: null,
-        parentHeaderName: null,
-        qty: 0,
-        item: "",
-        description: "",
-        rate: 0,
-        estimatedPrice: 0,
-        total: 0,
-        searchQuery: "",
-        showSearchResults: false,
-        supplierId: 1,
-        isCustomProduct: true,
-        productId: null,
-        estimate_product_id: null,
-      },
-      items: standaloneItems,
-    });
-  }
-
-  if (currentGroup) groups.push(currentGroup);
+  flushStandalone();
+  flushHeader();
 
   return groups;
+};
+
+const flattenGroupsToLineItems = (groups: HeaderGroupType[]): LineItemType[] =>
+  groups.flatMap((group) =>
+    isStandaloneGroupKey(group.header.headerKey)
+      ? group.items
+      : [group.header, ...group.items],
+  );
+
+const getGroupStartIndexInFlatList = (
+  groups: HeaderGroupType[],
+  targetHeaderKey: string,
+): number => {
+  let index = 0;
+  for (const group of groups) {
+    if (group.header.headerKey === targetHeaderKey) return index;
+    if (isStandaloneGroupKey(group.header.headerKey)) {
+      index += group.items.length;
+    } else {
+      index += 1 + group.items.length;
+    }
+  }
+  return index;
 };
 
 const reorderHeaderGroups = ({
@@ -196,20 +242,11 @@ const reorderHeaderGroups = ({
     return lineItems;
   }
 
-  if (
-    activeHeaderKey === "standalone_header_key" ||
-    overHeaderKey === "standalone_header_key"
-  ) {
+  if (isStandaloneGroupKey(activeHeaderKey)) {
     return lineItems;
   }
 
-  const groups = getHeaderGroups(lineItems).filter(
-    (group) => group.header.headerKey !== "standalone_header_key",
-  );
-
-  const standaloneRows = lineItems.filter(
-    (row) => row.type === "item" && !row.parentHeaderKey,
-  );
+  const groups = getHeaderGroups(lineItems);
 
   const activeIndex = groups.findIndex(
     (group) => group.header.headerKey === activeHeaderKey,
@@ -224,17 +261,14 @@ const reorderHeaderGroups = ({
   const [movedGroup] = updatedGroups.splice(activeIndex, 1);
   updatedGroups.splice(overIndex, 0, movedGroup);
 
-  return [
-    ...standaloneRows,
-    ...updatedGroups.flatMap((group) => [group.header, ...group.items]),
-  ];
+  return flattenGroupsToLineItems(updatedGroups);
 };
 
 const resolveParentAfterDrop = (rows: LineItemType[], targetIndex: number) => {
   for (let i = targetIndex - 1; i >= 0; i--) {
     const row = rows[i];
 
-    if (row.type === "header" && row.headerKey !== "standalone_header_key") {
+    if (row.type === "header" && !isStandaloneGroupKey(row.headerKey)) {
       return {
         parentHeaderKey: row.headerKey || null,
         parentHeaderName: row.headerName || null,
@@ -359,7 +393,15 @@ const dropdownPortalRef = useRef<HTMLElement | null>(null);
     () =>
       groupedItems
         .map((group) => group.header.headerKey as string)
-        .filter((id) => id !== "standalone_header_key"),
+        .filter((id) => !isStandaloneGroupKey(id)),
+    [groupedItems],
+  );
+
+  const allGroupHeaderKeys = useMemo(
+    () =>
+      groupedItems
+        .map((group) => group.header.headerKey as string)
+        .filter(Boolean),
     [groupedItems],
   );
 
@@ -563,7 +605,7 @@ const handleRemoveLineItem = (rowId: string) => {
       if (!target) return prev;
 
       if (target.type === "header") {
-        if (target.headerKey === "standalone_header_key") return prev;
+        if (isStandaloneGroupKey(target.headerKey)) return prev;
 
         return prev.filter(
           (row) =>
@@ -788,23 +830,28 @@ const handleRemoveLineItem = (rowId: string) => {
       (group) => group.header.headerKey === activeId,
     );
 
-    // HEADER GROUP DRAG
-    if (activeGroup?.header.type === "header") {
+    // HEADER GROUP DRAG (custom headers only; virtual standalone groups are drop targets)
+    if (
+      activeGroup?.header.type === "header" &&
+      !isStandaloneGroupKey(activeId)
+    ) {
       let normalizedOverHeaderKey = overId;
 
-      // if dropped on empty drop zone
       if (overId.startsWith("empty-drop-")) {
         normalizedOverHeaderKey = overId.replace("empty-drop-", "");
       }
 
-      // if dropped on an item row, resolve its parent header
       const overRow = lineItems.find((row) => row.id === overId);
       if (overRow?.type === "item") {
+        const itemGroup = groupedItems.find((group) =>
+          group.items.some((item) => item.id === overId),
+        );
         normalizedOverHeaderKey =
-          overRow.parentHeaderKey || "standalone_header_key";
+          itemGroup?.header.headerKey ||
+          overRow.parentHeaderKey ||
+          normalizedOverHeaderKey;
       }
 
-      // if dropped on header row id, keep as is
       const overGroup = groupedItems.find(
         (group) => group.header.headerKey === normalizedOverHeaderKey,
       );
@@ -829,11 +876,24 @@ const handleRemoveLineItem = (rowId: string) => {
 
     if (overRowIndex === -1 && overId.startsWith("empty-drop-")) {
       const targetHeaderKey = overId.replace("empty-drop-", "");
-      const headerIndex = lineItems.findIndex(
-        (row) => row.type === "header" && row.headerKey === targetHeaderKey,
+      const targetGroup = groupedItems.find(
+        (group) => group.header.headerKey === targetHeaderKey,
       );
-      if (headerIndex !== -1) {
-        overRowIndex = headerIndex + 1;
+
+      if (targetGroup) {
+        if (isStandaloneGroupKey(targetHeaderKey)) {
+          overRowIndex = getGroupStartIndexInFlatList(
+            groupedItems,
+            targetHeaderKey,
+          );
+        } else {
+          const headerIndex = lineItems.findIndex(
+            (row) => row.type === "header" && row.headerKey === targetHeaderKey,
+          );
+          if (headerIndex !== -1) {
+            overRowIndex = headerIndex + 1;
+          }
+        }
       }
     }
 
@@ -843,14 +903,21 @@ const handleRemoveLineItem = (rowId: string) => {
       );
 
       if (overGroup) {
-        const headerIndex = lineItems.findIndex(
-          (row) =>
-            row.type === "header" &&
-            row.headerKey === overGroup.header.headerKey,
-        );
+        if (isStandaloneGroupKey(overGroup.header.headerKey)) {
+          overRowIndex = getGroupStartIndexInFlatList(
+            groupedItems,
+            overGroup.header.headerKey as string,
+          );
+        } else {
+          const headerIndex = lineItems.findIndex(
+            (row) =>
+              row.type === "header" &&
+              row.headerKey === overGroup.header.headerKey,
+          );
 
-        if (headerIndex !== -1) {
-          overRowIndex = headerIndex + 1;
+          if (headerIndex !== -1) {
+            overRowIndex = headerIndex + 1;
+          }
         }
       }
     }
@@ -868,28 +935,24 @@ const handleRemoveLineItem = (rowId: string) => {
     }, 0);
   };
 
-  const handleAddStandaloneLineItem = () => {
+  const prependStandaloneLineItem = (isCustomProduct: boolean) => {
     setLineItems((prev) => [
-      ...prev,
       createItemRow({
         selectedSupplierId,
         parentHeaderKey: null,
         parentHeaderName: null,
-        isCustomProduct: false,
+        isCustomProduct,
       }),
+      ...prev,
     ]);
   };
 
+  const handleAddStandaloneLineItem = () => {
+    prependStandaloneLineItem(false);
+  };
+
   const handleAddStandaloneCustomItem = () => {
-    setLineItems((prev) => [
-      ...prev,
-      createItemRow({
-        selectedSupplierId,
-        parentHeaderKey: null,
-        parentHeaderName: null,
-        isCustomProduct: true,
-      }),
-    ]);
+    prependStandaloneLineItem(true);
   };
 
   const handleAddHeaderWithFirstItem = () => {
@@ -911,6 +974,7 @@ const handleRemoveLineItem = (rowId: string) => {
     <GroupedLineItemsTable
       groupedItems={groupedItems}
       sortableIds={sortableIds}
+      allGroupHeaderKeys={allGroupHeaderKeys}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       activeDraggedItem={activeDraggedItem}

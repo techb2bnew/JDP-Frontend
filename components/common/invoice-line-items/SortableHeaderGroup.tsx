@@ -6,6 +6,7 @@ import { GripVertical, Plus } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import SortableLineItemRow from "./SortableLineItemRow";
+import { isStandaloneGroupKey } from "./lineItemHelpers";
 
 type ProductType = {
   id: string | number;
@@ -79,8 +80,9 @@ const SortableHeaderGroup = ({
   invalidLineItemIds=[]
   
 }: SortableHeaderGroupProps) => {
-  const isVirtualStandaloneHeader =
-    group.header.headerKey === "standalone_header_key";
+  const isVirtualStandaloneHeader = isStandaloneGroupKey(
+    group.header.headerKey,
+  );
 
   const {
     setNodeRef,

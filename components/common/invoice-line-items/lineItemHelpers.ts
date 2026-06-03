@@ -1,5 +1,12 @@
 export const DEFAULT_EMPTY_LINE_ITEM_COUNT = 5;
 
+const STANDALONE_GROUP_KEY_PREFIX = "standalone_";
+
+/** Virtual UI-only groups for items without a custom header. */
+export const isStandaloneGroupKey = (key?: string | null): boolean =>
+  !!key &&
+  (key === "standalone_header_key" || key.startsWith(STANDALONE_GROUP_KEY_PREFIX));
+
 export const createRowId = () =>
   Math.random().toString(36).substring(2, 9);
 
