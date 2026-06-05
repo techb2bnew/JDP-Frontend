@@ -3,15 +3,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Input } from './input'
 import { LoadingSpinner } from '../common/LoadingSpinner'
 
+type FetchResult = {
+  data: Array<{ id: string; name: string; [key: string]: any }>
+  totalPages: number
+  currentPage: number
+}
+
 interface AutoScrollSelectProps {
   value: string
   onValueChange: (value: string, item?: any) => void
   placeholder: string
-  fetchData: (page: number, limit: number) => Promise<{
-    data: Array<{ id: string; name: string; [key: string]: any }>
-    totalPages: number
-    currentPage: number
-  }>
+  fetchData: (page: number, limit: number) => Promise<FetchResult>
   displayField: string
   valueField: string
   className?: string
@@ -21,6 +23,14 @@ interface AutoScrollSelectProps {
   /** Label for the create button (default: "+ Create New") */
   createNewLabel?: string
   renderItem?: (item: any) => React.ReactNode
+  /** Page size for list + search requests (default 10) */
+  pageSize?: number
+  /** When set, non-empty search uses this API instead of client-side filter */
+  serverSearchFetch?: (
+    term: string,
+    page: number,
+    limit: number,
+  ) => Promise<FetchResult>
 }
 
 export function AutoScrollSelect({
@@ -33,10 +43,14 @@ export function AutoScrollSelect({
   className,
   refreshKey,
   onCreateNew,
-  createNewLabel = '+ Create New', 
-  renderItem
+  createNewLabel = '+ Create New',
+  renderItem,
+  pageSize = 10,
+  serverSearchFetch,
 }: AutoScrollSelectProps) {
-  const [items, setItems] = useState<Array<{ id: string; name: string; [key: string]: any }>>([])
+  const [items, setItems] = useState<
+    Array<{ id: string; name: string; [key: string]: any }>
+  >([])
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
@@ -46,63 +60,99 @@ export function AutoScrollSelect({
   const [selectedItem, setSelectedItem] = useState<any>(null)
   const [searchTerm, setSearchTerm] = useState('')
 
-  const loadData = useCallback(async (page: number, append: boolean = false) => {
-    try {
-      if (page === 1) {
-        setIsLoading(true)
-      } else {
-        setIsLoadingMore(true)
-      }
+  const searchTermRef = useRef(searchTerm)
+  searchTermRef.current = searchTerm
+  const isOpenRef = useRef(isOpen)
+  isOpenRef.current = isOpen
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-      const response = await fetchData(page, 10)
-
-      if (response && response.data && response.data.length > 0) {
-        if (append) {
-          setItems(prev => [...prev, ...response.data])
+  const loadData = useCallback(
+    async (page: number, append: boolean = false) => {
+      try {
+        if (page === 1) {
+          setIsLoading(true)
         } else {
-          setItems(response.data)
+          setIsLoadingMore(true)
         }
 
-        setCurrentPage(response.currentPage || 1)
-        setTotalPages(response.totalPages || 1)
-        setHasMore((response.currentPage || 1) < (response.totalPages || 1))
-      } else {
+        const term = searchTermRef.current.trim()
+        const response: FetchResult =
+          serverSearchFetch && term
+            ? await serverSearchFetch(term, page, pageSize)
+            : await fetchData(page, pageSize)
+
+        if (response?.data?.length > 0) {
+          if (append) {
+            setItems((prev) => {
+              const seen = new Set(prev.map((i) => String(i[valueField])))
+              const merged = [...prev]
+              for (const row of response.data) {
+                const key = String(row[valueField])
+                if (!seen.has(key)) {
+                  seen.add(key)
+                  merged.push(row)
+                }
+              }
+              return merged
+            })
+          } else {
+            setItems(response.data)
+          }
+
+          const pageNum = response.currentPage || page
+          const total = response.totalPages || 1
+          setCurrentPage(pageNum)
+          setTotalPages(total)
+          setHasMore(pageNum < total)
+        } else {
+          if (!append) {
+            setItems([])
+          }
+          setCurrentPage(page)
+          setTotalPages(page)
+          setHasMore(false)
+        }
+      } catch (error) {
+        console.error('AutoScrollSelect: Error loading data:', error)
         if (!append) {
           setItems([])
         }
-        setCurrentPage(1)
-        setTotalPages(1)
         setHasMore(false)
+      } finally {
+        setIsLoading(false)
+        setIsLoadingMore(false)
       }
-    } catch (error) {
-      console.error('AutoScrollSelect: Error loading data:', error)
-    } finally {
-      setIsLoading(false)
-      setIsLoadingMore(false)
-    }
-  }, [fetchData])
+    },
+    [fetchData, serverSearchFetch, pageSize, valueField],
+  )
 
   const loadMore = useCallback(() => {
-    if (hasMore && !isLoadingMore && currentPage < totalPages) {
-      loadData(currentPage + 1, true)
+    if (hasMore && !isLoadingMore && !isLoading && currentPage < totalPages) {
+      void loadData(currentPage + 1, true)
     }
-  }, [hasMore, isLoadingMore, currentPage, totalPages, loadData])
+  }, [hasMore, isLoadingMore, isLoading, currentPage, totalPages, loadData])
+
+  const handleListScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget
+    const nearBottom =
+      el.scrollHeight - el.scrollTop - el.clientHeight < 48
+    if (nearBottom) {
+      loadMore()
+    }
+  }
 
   useEffect(() => {
     if (isOpen && items.length === 0) {
-      loadData(1)
+      void loadData(1)
     }
   }, [isOpen, items.length, loadData])
 
-  // Auto-select: find + fire onValueChange whenever value or items change
-  // This covers the "after creation → refreshKey reload → items updated" case
   useEffect(() => {
     if (value && items.length > 0) {
       const foundItem = items.find(
-        item => String(item[valueField]) === String(value)
+        (item) => String(item[valueField]) === String(value),
       )
       if (foundItem) {
-        // Only fire if the selectedItem reference actually changed
         setSelectedItem((prev: any) => {
           if (prev?.[valueField] !== foundItem[valueField]) {
             return foundItem
@@ -113,65 +163,98 @@ export function AutoScrollSelect({
     }
   }, [value, items, valueField])
 
-  // Load data when component mounts with a value but no items
   useEffect(() => {
     if (value && items.length === 0) {
-      loadData(1)
+      void loadData(1)
     }
   }, [value, items.length, loadData])
 
-  // Explicit refresh from parent (e.g. after creating new item)
   useEffect(() => {
     if (refreshKey !== undefined) {
-      loadData(1)
+      void loadData(1)
     }
   }, [refreshKey, loadData])
+
+  useEffect(() => {
+    if (!serverSearchFetch || !isOpenRef.current) return
+
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current)
+    }
+
+    searchDebounceRef.current = setTimeout(() => {
+      searchDebounceRef.current = null
+      if (isOpenRef.current) {
+        void loadData(1)
+      }
+    }, 300)
+
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current)
+      }
+    }
+  }, [searchTerm, serverSearchFetch, loadData])
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open)
     if (open) {
       if (items.length === 0) {
-        loadData(1)
-      } else if (hasMore && !isLoadingMore) {
-        loadMore()
+        void loadData(1)
       }
+    } else if (serverSearchFetch) {
+      setSearchTerm('')
+      searchTermRef.current = ''
     }
   }
 
   const handleValueChange = (selectedValue: string) => {
-    const foundItem = items.find(item => String(item[valueField]) === String(selectedValue))
+    const foundItem = items.find(
+      (item) => String(item[valueField]) === String(selectedValue),
+    )
     setSelectedItem(foundItem)
     onValueChange(selectedValue, foundItem)
   }
 
-  const filteredItems = items.filter(item =>
-    item[displayField]?.toString().toLowerCase().includes(searchTerm.toLowerCase())
-  )
-
-  const showCreateButton = !!onCreateNew && filteredItems.length === 0 && !isLoading
+  const displayItems = serverSearchFetch
+    ? items
+    : items.filter((item) =>
+        item[displayField]
+          ?.toString()
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()),
+      )
 
   return (
-    <Select value={value} onValueChange={handleValueChange} onOpenChange={handleOpenChange}>
+    <Select
+      value={value}
+      onValueChange={handleValueChange}
+      onOpenChange={handleOpenChange}
+    >
       <SelectTrigger className={className}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
-      <SelectContent className="max-h-72">
+      <SelectContent className="max-h-80 p-0">
+        <div className="p-2 pb-1 border-b border-gray-100 bg-white sticky top-0 z-10">
+          <Input
+            placeholder="Search..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="h-8 text-xs"
+          />
+        </div>
+
         {isLoading ? (
           <div className="flex items-center justify-center p-4">
             <LoadingSpinner />
           </div>
         ) : (
-          <>
-            <div className="p-2 pb-1 border-b border-gray-100">
-              <Input
-                placeholder="Search..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-8 text-xs"
-              />
-            </div>
-
-            {filteredItems.map((item) => (
+          <div
+            className="max-h-60 overflow-y-auto"
+            onScroll={handleListScroll}
+          >
+            {displayItems.map((item) => (
               <SelectItem
                 key={item[valueField]}
                 value={String(item[valueField])}
@@ -180,8 +263,7 @@ export function AutoScrollSelect({
               </SelectItem>
             ))}
 
-            {/* Empty state: no results + optional create button */}
-            {filteredItems.length === 0 && !isLoading && (
+            {displayItems.length === 0 && !isLoading && (
               <div className="p-3 text-center space-y-2">
                 <p className="text-sm text-gray-500">
                   {searchTerm ? 'No results found' : 'No items available'}
@@ -190,7 +272,6 @@ export function AutoScrollSelect({
                   <button
                     type="button"
                     onMouseDown={(e) => {
-                      // Use onMouseDown so the Select doesn't close before the click fires
                       e.preventDefault()
                       e.stopPropagation()
                       onCreateNew()
@@ -209,12 +290,12 @@ export function AutoScrollSelect({
               </div>
             )}
 
-            {!hasMore && items.length > 0 && filteredItems.length > 0 && (
+            {!hasMore && items.length > 0 && displayItems.length > 0 && (
               <div className="text-center text-sm text-gray-500 p-2">
                 No more items
               </div>
             )}
-          </>
+          </div>
         )}
       </SelectContent>
     </Select>

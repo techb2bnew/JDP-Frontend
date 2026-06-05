@@ -135,8 +135,75 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
   const [entityErrors, setEntityErrors] = useState<{ name?: string; email?: string; phone?: string }>({})
   const [customerRefreshKey, setCustomerRefreshKey] = useState(0)
   const [contractorRefreshKey, setContractorRefreshKey] = useState(0)
+  const JOB_ENTITY_SELECT_PAGE_SIZE = 10
   /** Last customer/contractor row from AutoScrollSelect — used to refill location when checkbox is re-enabled. */
   const selectedEntityForLocationRef = useRef<any>(null)
+
+  const searchCustomersForJobSelect = useCallback(
+    async (term: string, page: number, limit: number) => {
+      const response = await apiClient.globalSearch(term, page, limit)
+      const customersFromApi: any[] = response.data?.customers || []
+      const pagination = response.data?.pagination || {}
+
+      const data = customersFromApi.map((entry: any) => {
+        const customer = entry.customer || entry
+        return {
+          id: customer.id,
+          name:
+            customer.customer_name ||
+            customer.name ||
+            customer.company_name ||
+            `Customer ${customer.id}`,
+          customer_name: customer.customer_name || customer.name,
+          company_name: customer.company_name,
+          email: customer.email,
+          phone: customer.phone,
+          address: customer.address,
+          tag: customer.tag,
+        }
+      })
+
+      return {
+        data,
+        totalPages: pagination.totalPages || 1,
+        currentPage: pagination.page || page,
+      }
+    },
+    [],
+  )
+
+  const searchContractorsForJobSelect = useCallback(
+    async (term: string, page: number, limit: number) => {
+      const response = await apiClient.globalSearch(term, page, limit)
+      const contractorsFromApi: any[] = response.data?.contractors || []
+      const pagination = response.data?.pagination || {}
+
+      const data = contractorsFromApi.map((entry: any) => {
+        const contractor = entry.contractor || entry
+        return {
+          id: contractor.id,
+          name:
+            contractor.contractor_name ||
+            contractor.name ||
+            contractor.company_name ||
+            `Contractor ${contractor.id}`,
+          contractor_name: contractor.contractor_name || contractor.name,
+          company_name: contractor.company_name,
+          email: contractor.email,
+          phone: contractor.phone,
+          address: contractor.address,
+          tag: contractor.tag,
+        }
+      })
+
+      return {
+        data,
+        totalPages: pagination.totalPages || 1,
+        currentPage: pagination.page || page,
+      }
+    },
+    [],
+  )
 
   const [formData, setFormData] = useState({
     // Step 1: Job Type
@@ -1070,6 +1137,8 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                 }}
                 placeholder="Select customer"
                 fetchData={apiClient.getCustomers}
+                serverSearchFetch={searchCustomersForJobSelect}
+                pageSize={JOB_ENTITY_SELECT_PAGE_SIZE}
                 displayField="name"
                 valueField="id"
                 refreshKey={customerRefreshKey}
@@ -1138,6 +1207,8 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                 }}
                 placeholder="Select contractor"
                 fetchData={apiClient.getContractors}
+                serverSearchFetch={searchContractorsForJobSelect}
+                pageSize={JOB_ENTITY_SELECT_PAGE_SIZE}
                 displayField="name"
                 valueField="id"
                 refreshKey={contractorRefreshKey}
