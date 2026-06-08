@@ -176,9 +176,10 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     async (term: string, page: number, limit: number) => {
       const response = await apiClient.globalSearch(term, page, limit)
       const contractorsFromApi: any[] = response.data?.contractors || []
+      const customersFromApi: any[] = response.data?.customers || []
       const pagination = response.data?.pagination || {}
 
-      const data = contractorsFromApi.map((entry: any) => {
+      const contractorRows = contractorsFromApi.map((entry: any) => {
         const contractor = entry.contractor || entry
         return {
           id: contractor.id,
@@ -192,12 +193,30 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
           email: contractor.email,
           phone: contractor.phone,
           address: contractor.address,
-          tag: contractor.tag,
+          tag: contractor.tag || 'contractor',
+        }
+      })
+
+      const customerRows = customersFromApi.map((entry: any) => {
+        const customer = entry.customer || entry
+        return {
+          id: customer.id,
+          name:
+            customer.customer_name ||
+            customer.name ||
+            customer.company_name ||
+            `Customer ${customer.id}`,
+          contractor_name: customer.customer_name || customer.name,
+          company_name: customer.company_name,
+          email: customer.email,
+          phone: customer.phone,
+          address: customer.address,
+          tag: customer.tag || 'customer',
         }
       })
 
       return {
-        data,
+        data: [...contractorRows, ...customerRows],
         totalPages: pagination.totalPages || 1,
         currentPage: pagination.page || page,
       }
