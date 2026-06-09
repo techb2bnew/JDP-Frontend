@@ -496,52 +496,52 @@ export function JobDetailsPage({
         });
     };
 
+  const refreshJobBluesheetsList = useCallback(async () => {
+    try {
+      if (!jobId) return;
+      setIsLoadingBluesheets(true);
+      const numericJobId = Number(jobId);
+      const response = await apiClient.getJobBluesheets(numericJobId);
+      const responseData = response.data || response;
+      const blues =
+        responseData?.bluesheets || responseData?.data || responseData || [];
+      const totalLaborCost = responseData?.total_labor_cost;
+
+      const normalized = (Array.isArray(blues) ? blues : []).map(
+        (sheet: any) => ({
+          ...sheet,
+          id: sheet.id ?? sheet.latest_bluesheet_id,
+          date: sheet.date ?? sheet.latest_bluesheet_date ?? "",
+          status:
+            sheet.status ?? (sheet.approved_by ? "approved" : "pending"),
+          notes: sheet.notes ?? "",
+          additional_charges: sheet.additional_charges ?? 0,
+          created_by: sheet.created_by ?? sheet.submitted_by?.id ?? 0,
+          created_by_user: sheet.created_by_user ??
+            sheet.submitted_by ?? { id: 0, email: "", full_name: "N/A" },
+          labor_entries: sheet.labor_entries ?? [],
+          material_entries: sheet.material_entries ?? [],
+          materials_invoiced: sheet.materials_invoiced,
+          total_labor_hours: sheet.total_labor_hours ?? null,
+          total_labor_cost: sheet.total_labor_cost ?? totalLaborCost ?? 0,
+          created_at: sheet.created_at ?? "",
+          updated_at: sheet.updated_at ?? "",
+        }),
+      );
+
+      setBluesheets(normalized);
+    } catch (error) {
+      console.error("Error fetching job bluesheets:", error);
+      setBluesheets(job.bluesheets || []);
+    } finally {
+      setIsLoadingBluesheets(false);
+    }
+  }, [jobId, job.bluesheets]);
+
   // Refresh bluesheets for this job from API whenever jobId changes
   useEffect(() => {
-    const fetchJobBluesheets = async () => {
-      try {
-        if (!jobId) return;
-        setIsLoadingBluesheets(true);
-        const numericJobId = Number(jobId);
-        const response = await apiClient.getJobBluesheets(numericJobId);
-        const responseData = response.data || response;
-        const blues =
-          responseData?.bluesheets || responseData?.data || responseData || [];
-        const totalLaborCost = responseData?.total_labor_cost;
-
-        const normalized = (Array.isArray(blues) ? blues : []).map(
-          (sheet: any) => ({
-            ...sheet,
-            id: sheet.id ?? sheet.latest_bluesheet_id,
-            date: sheet.date ?? sheet.latest_bluesheet_date ?? "",
-            status:
-              sheet.status ?? (sheet.approved_by ? "approved" : "pending"),
-            notes: sheet.notes ?? "",
-            additional_charges: sheet.additional_charges ?? 0,
-            created_by: sheet.created_by ?? sheet.submitted_by?.id ?? 0,
-            created_by_user: sheet.created_by_user ??
-              sheet.submitted_by ?? { id: 0, email: "", full_name: "N/A" },
-            labor_entries: sheet.labor_entries ?? [],
-            material_entries: sheet.material_entries ?? [],
-            materials_invoiced: sheet.materials_invoiced,
-            total_labor_hours: sheet.total_labor_hours ?? null,
-            total_labor_cost: sheet.total_labor_cost ?? totalLaborCost ?? 0,
-            created_at: sheet.created_at ?? "",
-            updated_at: sheet.updated_at ?? "",
-          }),
-        );
-
-        setBluesheets(normalized);
-      } catch (error) {
-        console.error("Error fetching job bluesheets:", error);
-        setBluesheets(job.bluesheets || []);
-      } finally {
-        setIsLoadingBluesheets(false);
-      }
-    };
-
-    fetchJobBluesheets();
-  }, [jobId, job.bluesheets]);
+    void refreshJobBluesheetsList();
+  }, [refreshJobBluesheetsList]);
 
   job.estimatedCost || 0;
   const totalHours = timeLogs.reduce(
@@ -2752,23 +2752,31 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
     }
   };
 
-  const fetchEstimates = async () => {
+  const fetchEstimates = useCallback(async () => {
     setIsLoadingEstimates(true);
     try {
-      const response = await apiClient.getEstimatesByJob(jobId, 1, 10);
-      setEstimates(response.data.estimates || []);
-      setTotalEstimates(response.data.total || 0);
-      setInvoioiceNumber(response.data.estimates[0]?.invoice_number || "");
+      const response = await apiClient.getEstimatesByJob(
+        jobId,
+        currentPage,
+        itemsPerPage,
+      );
+      const responseData = response?.data ?? response;
+      const nextEstimates = Array.isArray(responseData?.estimates)
+        ? responseData.estimates
+        : [];
+      setEstimates([...nextEstimates]);
+      setTotalEstimates(Number(responseData?.total ?? nextEstimates.length));
+      setInvoioiceNumber(nextEstimates[0]?.invoice_number || "");
     } catch (error) {
       console.error("Failed to fetch estimates:", error);
     } finally {
       setIsLoadingEstimates(false);
     }
-  };
+  }, [jobId, currentPage, itemsPerPage]);
 
   useEffect(() => {
-    fetchEstimates();
-  }, [jobId, refreshInvoices]);
+    void fetchEstimates();
+  }, [fetchEstimates, refreshInvoices]);
 
   useEffect(() => {
     if (showAddMaterialModal) {
@@ -3887,6 +3895,25 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
       Paid: "border-green-300 bg-green-100 text-green-700",
     };
     return colors[status] || "border-gray-300 bg-gray-100 text-gray-700";
+  };
+
+  const getSentDeliveryTag = (invoice: {
+    status?: string;
+    qb_invoice_id?: string | number | null;
+  }) => {
+    if (String(invoice.status || "").toLowerCase() !== "sent") return null;
+    const hasQuickBooksId =
+      invoice.qb_invoice_id != null &&
+      String(invoice.qb_invoice_id).trim() !== "";
+    return hasQuickBooksId
+      ? {
+          label: "QuickBooks",
+          className: "border-indigo-200 bg-indigo-50 text-indigo-800",
+        }
+      : {
+          label: "Custom",
+          className: "border-teal-200 bg-teal-50 text-teal-800",
+        };
   };
 
   const handleViewInvoice = async (invoice: any) => {
@@ -6179,6 +6206,19 @@ const handlePrintInvoice = async (invoice: any) => {
 
       toast.success("Invoice sent successfully to customer!");
 
+      const sentInvoiceId = Number(
+        editingInvoiceId || estimates[0]?.id,
+      );
+      if (sentInvoiceId) {
+        setEstimates((prev) =>
+          prev.map((item: any) =>
+            Number(item.id) === sentInvoiceId
+              ? { ...item, status: "sent" }
+              : item,
+          ),
+        );
+      }
+
       // Also save the invoice data to backend
     const customProducts = sanitizeCustomProductsForPayload(
       inlineInvoiceData.lineItems,
@@ -6225,13 +6265,9 @@ const handlePrintInvoice = async (invoice: any) => {
           Number(editingInvoiceId),
           backendPayload as any,
         );
-        // toast.success('Invoice updated and sent successfully!')
-      } else {
-        // Don't create new estimate when sending - it should already exist from preview step
-        // toast.success('Invoice sent successfully!')
       }
 
-      // Refresh estimates list
+      // Refresh estimates list from server (fresh data after send)
       await fetchEstimates();
       try {
         const res = await apiClient.getJobDashboard(jobId);
@@ -6323,12 +6359,47 @@ const handlePrintInvoice = async (invoice: any) => {
           action === "send" ? "sendtoquickbook" : "sevetoquickbook",
       };
 
-      await apiClient.createEstimate(payload as any);
+      const response = await apiClient.createEstimate(payload as any);
+      const created = response?.data ?? response;
+      const estimateId = Number(
+        editingInvoiceId ?? created?.id ?? created?.estimate?.id,
+      );
+      const qbInvoiceId =
+        created?.qb_invoice_id ?? created?.estimate?.qb_invoice_id ?? null;
+
+      if (action === "send" && estimateId) {
+        setEstimates((prev) => {
+          const exists = prev.some(
+            (item: any) => Number(item.id) === estimateId,
+          );
+          if (!exists) return prev;
+          return prev.map((item: any) =>
+            Number(item.id) === estimateId
+              ? {
+                  ...item,
+                  status: "sent",
+                  ...(qbInvoiceId != null && String(qbInvoiceId).trim() !== ""
+                    ? { qb_invoice_id: qbInvoiceId }
+                    : {}),
+                }
+              : item,
+          );
+        });
+      }
+
       toast.success(
         action === "send"
           ? "Send Invoice from QuickBooks"
           : "Save Invoice to QuickBooks",
       );
+
+      await fetchEstimates();
+      try {
+        const res = await apiClient.getJobDashboard(jobId);
+        setDashboardMetrics(res.data.dashboardMetrics);
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      }
 
       // Close add-invoice popup flow after successful QuickBooks action.
       setShowPreviewDialog(false);
@@ -8540,7 +8611,9 @@ const handlePrintInvoice = async (invoice: any) => {
                   <p>No invoices found for this job</p>
                 </div>
               ) : (
-                estimates.map((invoice: any) => (
+                estimates.map((invoice: any) => {
+                  const sentDeliveryTag = getSentDeliveryTag(invoice);
+                  return (
                   <div
                     key={invoice.id}
                     id={`estimate-row-${invoice.id}`}
@@ -8557,7 +8630,7 @@ const handlePrintInvoice = async (invoice: any) => {
                           <FileText className="h-7 w-7 text-primary" />
                         </div>
                         <div>
-                          <div className="flex items-center gap-3 mb-1">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
                             <h4 className="font-semibold text-foreground capitalize">
                               {invoice.invoice_type || "Estimate"}
                             </h4>
@@ -8567,6 +8640,14 @@ const handlePrintInvoice = async (invoice: any) => {
                             >
                               {invoice.invoice_type || "Estimate"}
                             </Badge>
+                            {sentDeliveryTag && (
+                              <Badge
+                                variant="outline"
+                                className={`text-[10px] font-medium leading-tight ${sentDeliveryTag.className}`}
+                              >
+                                {sentDeliveryTag.label}
+                              </Badge>
+                            )}
                           </div>
                           <p className="text-sm text-muted-foreground mb-2">
                             {invoice.description || invoice.estimate_title}
@@ -8594,7 +8675,7 @@ const handlePrintInvoice = async (invoice: any) => {
                             {formatCurrency(invoice.total_amount || 0)}
                           </p>
                           <Badge
-                            className={getStatusBadgeColor(invoice.status)}
+                            className={`mt-1 ${getStatusBadgeColor(invoice.status)}`}
                             variant="outline"
                           >
                             {invoice.status || "draft"}
@@ -8739,7 +8820,8 @@ const handlePrintInvoice = async (invoice: any) => {
                       </div>
                     </div>
                   </div>
-                ))
+                );
+                })
               )}
             </div>
             {totalEstimates > 0 && (
@@ -11102,9 +11184,11 @@ const handlePrintInvoice = async (invoice: any) => {
         selectedBlueSheets={
           selectedBlueSheetForReview ? [selectedBlueSheetForReview] : []
         }
+        onBluesheetsRefresh={refreshJobBluesheetsList}
         onApprovalComplete={() => {
           setIsBlueSheetDialogOpen(false);
           setSelectedBlueSheetForReview(null);
+          void refreshJobBluesheetsList();
         }}
       />
 

@@ -123,6 +123,7 @@ interface BlueSheetApprovalDialogProps {
   selectedBlueSheets?: BlueSheetItem[]
   onApprovalComplete: (approvedItem: BlueSheetItem) => void
   selectedBlueSheetIds?: number[]
+  onBluesheetsRefresh?: () => void | Promise<void>
 }
 
 export function BlueSheetApprovalDialog({
@@ -131,7 +132,8 @@ export function BlueSheetApprovalDialog({
   blueSheet,
   selectedBlueSheets = [],
   onApprovalComplete,
-  selectedBlueSheetIds
+  selectedBlueSheetIds,
+  onBluesheetsRefresh,
 }: BlueSheetApprovalDialogProps) {
   console.log('Dialog render', { isOpen, blueSheet })
   const [supplierInvoice, setSupplierInvoice] = useState<SupplierInvoice | null>(null)
@@ -925,6 +927,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
       setIsProceedingToReview(true)
       await apiClient.approveBulkBluesheet(ids, 'approved')
       toast.success('BlueSheet(s) approved')
+      await onBluesheetsRefresh?.()
       setCurrentStep('review')
       const nextNotes = String((editedBlueSheet ?? blueSheet)?.notes ?? "");
       setInvoiceApprovalNotes(nextNotes)

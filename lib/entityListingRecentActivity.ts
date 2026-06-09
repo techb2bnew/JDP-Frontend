@@ -38,30 +38,44 @@ function jobHasRecentUpdate(job: any): boolean {
   return false;
 }
 
+type ListingEntity = {
+  jobs?: any[];
+  created_at?: unknown;
+  createdAt?: unknown;
+  updated_at?: unknown;
+  updatedAt?: unknown;
+};
+
 /**
  * Listing sort priority (higher = closer to top):
- * - 2: any job/sub-job `created_at` in last 48h → also eligible for "Recently Added" badge
- * - 1: any job/sub-job `updated_at` in last 48h, but no recent creation → sort only, no badge
+ * - 2: customer/contractor or any job/sub-job `created_at` in last 48h → "Recently Added" badge
+ * - 1: customer/contractor or any job/sub-job `updated_at` in last 48h, but no recent creation
  * - 0: neither
  */
-export function entityRecentActivityRank(entity: { jobs?: any[] }): 0 | 1 | 2 {
-  let hasCreate = false;
-  let hasUpdate = false;
+export function entityRecentActivityRank(entity: ListingEntity): 0 | 1 | 2 {
+  let hasJobCreate = false;
+  let hasJobUpdate = false;
   for (const job of entity.jobs || []) {
-    if (jobHasRecentCreation(job)) hasCreate = true;
-    if (jobHasRecentUpdate(job)) hasUpdate = true;
+    if (jobHasRecentCreation(job)) hasJobCreate = true;
+    if (jobHasRecentUpdate(job)) hasJobUpdate = true;
   }
-  if (hasCreate) return 2;
-  if (hasUpdate) return 1;
+  const hasEntityCreate = isRecentTimestamp(createdAtOf(entity));
+  const hasEntityUpdate = isRecentTimestamp(updatedAtOf(entity));
+  if (hasJobCreate || hasEntityCreate) return 2;
+  if (hasJobUpdate || hasEntityUpdate) return 1;
   return 0;
 }
 
 /**
- * Newest timestamp among job/sub-job fields that still fall inside the 48h window.
- * Used to break ties so a just-updated job floats above another "recent" customer.
+ * Newest timestamp among entity + job/sub-job fields inside the 48h window.
+ * Used to break ties so a just-created customer or job floats above another "recent" row.
  */
-function entityRecentTouchMs(entity: { jobs?: any[] }): number {
+function entityRecentTouchMs(entity: ListingEntity): number {
   let max = 0;
+  for (const raw of [createdAtOf(entity), updatedAtOf(entity)]) {
+    const ms = parseTimeMs(raw);
+    if (ms && isRecentTimestamp(raw)) max = Math.max(max, ms);
+  }
   for (const job of entity.jobs || []) {
     for (const raw of [createdAtOf(job), updatedAtOf(job)]) {
       const ms = parseTimeMs(raw);
@@ -78,7 +92,7 @@ function entityRecentTouchMs(entity: { jobs?: any[] }): number {
 }
 
 /** Rank 2 → 1 → 0; same rank → most recently touched (within 48h) first; then `compareRest`. */
-export function sortEntitiesByRecentJobActivity<T extends { jobs?: any[] }>(
+export function sortEntitiesByRecentJobActivity<T extends ListingEntity>(
   list: T[],
   compareRest: (a: T, b: T) => number,
 ): T[] {
@@ -117,7 +131,7 @@ export function annotateJobsForListing(jobs: any[] | undefined): any[] {
 }
 
 /** Annotate entities based on their rank: 2 -> Added, 1 -> Updated. */
-export function annotateEntitiesForListing<T extends { jobs?: any[] }>(
+export function annotateEntitiesForListing<T extends ListingEntity>(
   list: T[],
 ): T[] {
   return list.map((entity) => {

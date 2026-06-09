@@ -1111,7 +1111,7 @@ export const NewInvoiceDialog = ({
           isContractBased: isContractBased,
           viewInvoiceData: viewInvoiceData,
         });
-      } else {
+      } else if (inlineInvoiceData.jobId) {
         createModeJob = resolveJobForInvoicePayload(
           inlineInvoiceData.jobId,
           jobsList,
@@ -1427,6 +1427,8 @@ export const NewInvoiceDialog = ({
     return mapping[uiType] || "estimate";
   };
 
+  const isEstimateInvoiceType = () => inlineInvoiceData.invoiceType === "Estimate";
+
   const getSelectedInvoiceTypeLabel = () => {
     if (inlineInvoiceData.invoiceType === "Custom") {
       const customType = String(inlineInvoiceData.customInvoiceType || "").trim();
@@ -1649,7 +1651,7 @@ export const NewInvoiceDialog = ({
         console.log(errors, "::errors");
 
 
-    if (!inlineInvoiceData.jobId) {
+    if (!isEstimateInvoiceType() && !inlineInvoiceData.jobId) {
       errors.jobId = "Please select a job first";
     }
 
@@ -1741,19 +1743,21 @@ export const NewInvoiceDialog = ({
             : null) ||
           null;
       } else {
-        draftJob = resolveJobForInvoicePayload(
-          inlineInvoiceData.jobId,
-          jobsList,
-          jobs,
-          selectedJob,
-          currentJob,
-        );
-        if (!draftJob) {
-          toast.error("Job not found");
-          setSavingDraft(false);
-          return;
+        if (inlineInvoiceData.jobId) {
+          draftJob = resolveJobForInvoicePayload(
+            inlineInvoiceData.jobId,
+            jobsList,
+            jobs,
+            selectedJob,
+            currentJob,
+          );
+          if (!draftJob) {
+            toast.error("Job not found");
+            setSavingDraft(false);
+            return;
+          }
         }
-        isContractBased = isJobContractBased(draftJob);
+        isContractBased = draftJob ? isJobContractBased(draftJob) : false;
         contractorId = isContractBased
           ? resolveContractorIdFromJob(draftJob)
           : null;
@@ -1802,7 +1806,9 @@ export const NewInvoiceDialog = ({
         String(inlineInvoiceData.customerAddress || "").trim();
 
       const payload: any = {
-        job_id: Number(inlineInvoiceData.jobId),
+        ...(inlineInvoiceData.jobId
+          ? { job_id: Number(inlineInvoiceData.jobId) }
+          : {}),
         estimate_title:
           inlineInvoiceData.project ||
           draftJob?.title ||
@@ -1904,7 +1910,7 @@ const validateLineItems = (lineItems: any[] = []) => {
     const errors: Record<string, string> = {};
     
 
-    if (!inlineInvoiceData.jobId) {
+    if (!isEstimateInvoiceType() && !inlineInvoiceData.jobId) {
       errors.jobId = "Please select a job first";
     }
 
@@ -1998,19 +2004,21 @@ const validateLineItems = (lineItems: any[] = []) => {
             : null) ||
           null;
       } else {
-        previewJob = resolveJobForInvoicePayload(
-          inlineInvoiceData.jobId,
-          jobsList,
-          jobs,
-          selectedJob,
-          currentJob,
-        );
-        if (!previewJob) {
-          toast.error("Job not found");
-          setSendingInvoice(false);
-          return;
+        if (inlineInvoiceData.jobId) {
+          previewJob = resolveJobForInvoicePayload(
+            inlineInvoiceData.jobId,
+            jobsList,
+            jobs,
+            selectedJob,
+            currentJob,
+          );
+          if (!previewJob) {
+            toast.error("Job not found");
+            setSendingInvoice(false);
+            return;
+          }
         }
-        isContractBased = isJobContractBased(previewJob);
+        isContractBased = previewJob ? isJobContractBased(previewJob) : false;
         contractorId = isContractBased
           ? resolveContractorIdFromJob(previewJob)
           : null;
@@ -2059,7 +2067,9 @@ const validateLineItems = (lineItems: any[] = []) => {
         String(inlineInvoiceData.customerAddress || "").trim();
 
       const payload: any = {
-        job_id: Number(inlineInvoiceData.jobId),
+        ...(inlineInvoiceData.jobId
+          ? { job_id: Number(inlineInvoiceData.jobId) }
+          : {}),
         estimate_title:
           inlineInvoiceData.project ||
           previewJob?.title ||
@@ -2724,12 +2734,20 @@ const validateLineItems = (lineItems: any[] = []) => {
             <div className="relative w-[220px]">
               <Select
                 value={inlineInvoiceData.invoiceType}
-                onValueChange={(value) =>
+                onValueChange={(value) => {
                   setInlineInvoiceData((prev) => ({
                     ...prev,
                     invoiceType: value,
-                  }))
-                }
+                  }));
+                  if (value === "Estimate") {
+                    setValidationErrors((prev) => {
+                      if (!prev.jobId) return prev;
+                      const next = { ...prev };
+                      delete next.jobId;
+                      return next;
+                    });
+                  }
+                }}
               >
                 <SelectTrigger className="h-9 border-primary/30 focus:border-primary">
                   <SelectValue placeholder="Select invoice type..." />
@@ -2837,7 +2855,9 @@ const validateLineItems = (lineItems: any[] = []) => {
                 </Label>
                 <div className="border border-gray-300 p-3">
                   <div className="space-y-2">
-                    <Label htmlFor="job">Job *</Label>
+                    <Label htmlFor="job">
+                      Job{isEstimateInvoiceType() ? "" : " *"}
+                    </Label>
                     <div className="relative">
                       <Input
                         id="job"
