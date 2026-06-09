@@ -482,14 +482,35 @@ export function JobDetailsPage({
               item.parent_header_name || item.parentHeaderName || null,
           };
 
-          // searched/selected products ke liye id bhejo
-          if (item.isCustomProduct !== true && item.productId) {
-            productPayload.id = item.productId;
+          const isCustomLine =
+            item.isCustomProduct === true || item.is_custom === true;
+
+          const catalogProductId = (() => {
+            const explicit = item.productId ?? item.product_id;
+            if (explicit != null && String(explicit).trim() !== "") {
+              return Number(explicit);
+            }
+            // Approve / Mark paid pass raw API products where catalog id is `id`
+            if (!isCustomLine && item.id != null && !item.type) {
+              const n = Number(item.id);
+              if (!Number.isNaN(n) && n > 0) return n;
+            }
+            return null;
+          })();
+
+          // `id` / `product_id` = catalog product id (e.g. 5297), same as NewInvoiceDialog / BlueSheet
+          if (catalogProductId != null && !Number.isNaN(catalogProductId)) {
+            productPayload.id = catalogProductId;
+            productPayload.product_id = catalogProductId;
           }
 
-          // existing backend product id ho to usko bhi preserve karo
-          if (!productPayload.id && item.id && !item.type) {
-            productPayload.id = item.id;
+          const estimateProductId =
+            item.estimate_product_id ?? item.estimateProductId;
+          if (
+            estimateProductId != null &&
+            String(estimateProductId).trim() !== ""
+          ) {
+            productPayload.estimate_product_id = Number(estimateProductId);
           }
 
           return productPayload;
@@ -3824,7 +3845,7 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
         return {
           ...item,
           productId: product.id,
-          estimate_product_id: product.id,
+          estimate_product_id: null,
           item: product.name || "",
           description: product.description || "",
           rate,
@@ -3943,22 +3964,10 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
         dueDate: invoiceData.due_date || "",
         paymentCredits: invoiceData.payment_credits || 0,
         balanceDue: invoiceData.balance_due || "",
-        lineItems: invoiceData.products?.map((product: any) => ({
-          id: Math.random().toString(36).substring(2, 9),
-          productId: product.id,
-          qty: product.stock_quantity || 1,
-          item: product.product_name || "",
-          description: product.description || "",
-          rate: product.jdp_price || 0,
-          estimatedPrice: product.estimated_price || 0,
-          total: product.total_cost || 0,
-          searchQuery: "",
-          showSearchResults: false,
-          supplierId: product.supplier_id || 1,
-          isCustomProduct: true,
-          estimate_product_id: product.estimate_product_id || null,
-          parent_header_name: product.parent_header_name,
-        })) || createDefaultEmptyLineItems(5),
+        lineItems:
+          invoiceData.products && invoiceData.products.length > 0
+            ? buildLineItemsFromProducts(invoiceData.products)
+            : createDefaultEmptyLineItems(5),
         notes:
           (invoiceData.notes ?? invoiceData.description) ||
           "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
@@ -3987,7 +3996,7 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
         paymentHistory: [],
       });
 
-      // Show the preview dialog
+      setEditingInvoiceId(invoice.id);
       setShowPreviewDialog(true);
     } catch (error) {
       console.error("Error fetching invoice details:", error);
@@ -6573,8 +6582,8 @@ const handlePrintInvoice = async (invoice: any) => {
         showSearchResults: false,
         supplierId: product.supplier_id || 1,
         isCustomProduct: !!product.is_custom,
-        productId: product.id || null,
-        estimate_product_id: product.estimate_product_id || null,
+        productId: product.product_id ?? product.id ?? null,
+        estimate_product_id: product.estimate_product_id ?? null,
       };
 
       if (!headerName) {
