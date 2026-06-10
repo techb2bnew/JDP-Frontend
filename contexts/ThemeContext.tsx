@@ -1,6 +1,11 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
+import {
+  THEME_STORAGE_KEY,
+  applyThemeToDocument,
+  resolveStoredTheme,
+} from '@/lib/theme-config'
 
 type Theme = 'light' | 'dark'
 
@@ -29,10 +34,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initializeTheme = () => {
       try {
-        const savedTheme = localStorage.getItem('jdp-theme') as Theme | null
-        const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-        const initialTheme = savedTheme || systemTheme
-        
+        const initialTheme = resolveStoredTheme()
         setTheme(initialTheme)
         updateTheme(initialTheme)
       } catch (error) {
@@ -50,10 +52,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const updateTheme = (newTheme: Theme) => {
     try {
-      const root = document.documentElement
-      root.classList.remove('dark', 'light')
-      root.classList.add(newTheme)
-      localStorage.setItem('jdp-theme', newTheme)
+      applyThemeToDocument(newTheme)
+      localStorage.setItem(THEME_STORAGE_KEY, newTheme)
       window.dispatchEvent(new CustomEvent('themeChange', { detail: { theme: newTheme } }))
     } catch (error) {
       console.error('Failed to update theme:', error)
@@ -72,20 +72,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       updateTheme(newTheme)
     }
   }
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    const handleSystemThemeChange = (e: MediaQueryListEvent) => {
-      if (!localStorage.getItem('jdp-theme')) {
-        const systemTheme = e.matches ? 'dark' : 'light'
-        setTheme(systemTheme)
-        updateTheme(systemTheme)
-      }
-    }
-
-    mediaQuery.addEventListener('change', handleSystemThemeChange)
-    return () => mediaQuery.removeEventListener('change', handleSystemThemeChange)
-  }, [])
 
   const value = {
     theme,

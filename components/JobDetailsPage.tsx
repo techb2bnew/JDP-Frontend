@@ -3898,6 +3898,16 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
     return ((sj.location ?? "") as string) || "";
   };
 
+  const formatInvoiceTypeTagLabel = (type?: string) =>
+    String(type ?? "")
+      .split("_")
+      .filter(Boolean)
+      .map(
+        (word) =>
+          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase(),
+      )
+      .join(" ");
+
   const getInvoiceTypeColor = (type: string) => {
     const colors: any = {
       Estimate: "border-blue-200 bg-blue-50 text-blue-700",
@@ -3906,7 +3916,7 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
       "Progressive Invoice": "border-purple-200 bg-purple-50 text-purple-700",
       "Final Invoice": "border-gray-200 bg-gray-50 text-gray-700",
     };
-    return colors[type] || "border-gray-200 bg-gray-50 text-gray-700";
+    return colors[formatInvoiceTypeTagLabel(type)] || colors[type] || "border-gray-200 bg-gray-50 text-gray-700";
   };
 
   const getStatusBadgeColor = (status: string) => {
@@ -8622,6 +8632,9 @@ const handlePrintInvoice = async (invoice: any) => {
               ) : (
                 estimates.map((invoice: any) => {
                   const sentDeliveryTag = getSentDeliveryTag(invoice);
+                  const invoiceTypeLabel = formatInvoiceTypeTagLabel(
+                    invoice.invoice_type,
+                  );
                   return (
                   <div
                     key={invoice.id}
@@ -8640,14 +8653,14 @@ const handlePrintInvoice = async (invoice: any) => {
                         </div>
                         <div>
                           <div className="flex flex-wrap items-center gap-2 mb-1">
-                            <h4 className="font-semibold text-foreground capitalize">
-                              {invoice.invoice_type || "Estimate"}
+                            <h4 className="font-semibold text-foreground">
+                              {invoiceTypeLabel}
                             </h4>
                             <Badge
-                              className={`${getInvoiceTypeColor(invoice.invoice_type)} text-xs font-medium capitalize`}
+                              className={`${getInvoiceTypeColor(invoice.invoice_type)} text-xs font-medium`}
                               variant="outline"
                             >
-                              {invoice.invoice_type || "Estimate"}
+                              {invoiceTypeLabel}
                             </Badge>
                             {sentDeliveryTag && (
                               <Badge

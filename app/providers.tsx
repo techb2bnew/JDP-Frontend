@@ -6,31 +6,22 @@ import { Toaster } from '@/components/ui/sonner'
 import { ThemeProvider as NextThemesProvider } from 'next-themes'
 import { PermissionProvider } from '@/contexts/PermissionContext'
 import { EstimatePrefillProvider } from '@/contexts/EstimatePrefillContext'
-import { useState, useEffect } from 'react'
+import { THEME_STORAGE_KEY } from '@/lib/theme-config'
 
 interface ProvidersProps {
   children: React.ReactNode
 }
 
 export function Providers({ children }: ProvidersProps) {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  // Prevent hydration mismatch by not rendering until mounted
-  if (!mounted) {
-    return <div className="min-h-screen bg-background" />
-  }
-
   return (
     <Provider store={store}>
       <NextThemesProvider
         attribute="class"
         defaultTheme="light"
         enableSystem={false}
-        disableTransitionOnChange={false}
+        storageKey={THEME_STORAGE_KEY}
+        themes={['light', 'dark']}
+        disableTransitionOnChange
       >
         <PermissionProvider>
           <EstimatePrefillProvider>
