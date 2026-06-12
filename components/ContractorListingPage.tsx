@@ -73,6 +73,7 @@ import {
   annotateJobsForListing,
   sortEntitiesByRecentJobActivity,
 } from '@/lib/entityListingRecentActivity'
+import { resolveEntityKind } from '@/lib/resolveEntityKind'
 
 interface Job {
   id: number
@@ -1460,32 +1461,51 @@ export function ContractorListingPage() {
   const confirmDeleteContractor = async () => {
     if (!contractorToDelete) return
 
+    const entityKind = resolveEntityKind(contractorToDelete) ?? 'contractor'
+    const deleteUrl =
+      entityKind === 'customer'
+        ? `${apiBaseUrl}/customer/deleteCustomer/${contractorToDelete.id}`
+        : `${apiBaseUrl}/contractor/deleteContractor/${contractorToDelete.id}`
+
     setIsDeleting(true)
     try {
       const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const response = await fetch(`${apiBaseUrl}/contractor/deleteContractor/${contractorToDelete.id}`, {
+      const response = await fetch(deleteUrl, {
         method: 'DELETE',
         headers
       });
       const responseData = await response.json()
-      console.log('Delete Contractor API Response:', responseData)
+      console.log('Delete entity API Response:', responseData)
 
       if (responseData.success) {
-        toast.success('Contractor deleted successfully!')
+        toast.success(
+          entityKind === 'customer'
+            ? 'Customer deleted successfully!'
+            : 'Contractor deleted successfully!',
+        )
         setShowDeleteAlert(false)
         setContractorToDelete(null)
         // Refresh contractors list
         await fetchContractorsData({ force: true })
       } else {
-        toast.error(responseData.message || 'Failed to delete contractor')
+        toast.error(
+          responseData.message ||
+            (entityKind === 'customer'
+              ? 'Failed to delete customer'
+              : 'Failed to delete contractor'),
+        )
       }
     } catch (error) {
-      console.error('Error deleting contractor:', error)
+      console.error('Error deleting entity:', error)
       if (!(error instanceof Error && error.message?.includes('Session expired'))) {
-        toast.error('Failed to delete contractor. Please try again.')
+        toast.error(
+          entityKind === 'customer'
+            ? 'Failed to delete customer. Please try again.'
+            : 'Failed to delete contractor. Please try again.',
+        )
       }
     } finally {
       setIsDeleting(false)
@@ -4077,10 +4097,12 @@ export function ContractorListingPage() {
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Contractor</AlertDialogTitle>
+            <AlertDialogTitle>
+              Delete {resolveEntityKind(contractorToDelete) === 'customer' ? 'Customer' : 'Contractor'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete <strong>{contractorToDelete?.contractor_name}</strong>?
-              This action cannot be undone and will permanently remove the contractor from the system.
+              This action cannot be undone and will permanently remove this record from the system.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -4096,7 +4118,9 @@ export function ContractorListingPage() {
                   Deleting...
                 </>
               ) : (
-                'Delete Contractor'
+                resolveEntityKind(contractorToDelete) === 'customer'
+                  ? 'Delete Customer'
+                  : 'Delete Contractor'
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

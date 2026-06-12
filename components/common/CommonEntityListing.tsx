@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight, Edit, Trash2 } from "lucide-react";
+import {
+  resolveEntityKind,
+  type EntityKind,
+} from "@/lib/resolveEntityKind";
 import { Button } from "@/components/ui/button";
 import {
   Collapsible,
@@ -78,7 +82,7 @@ type CommonEntityListingProps = {
   onSelectSubJob: (subJobId: string, jobId: string, parentId: string) => void;
 
   onEditParent?: (entity: EntityType) => void;
-  onDeleteParent?: (entity: EntityType) => void;
+  onDeleteParent?: (entity: EntityType, entityKind: EntityKind | null) => void;
 
   hasEditPermission?: boolean;
   hasDeletePermission?: boolean;
@@ -196,11 +200,8 @@ export default function CommonEntityListing({
   };
 
   const resolveEntityTypeLabel = (entity: EntityType) => {
-    return (
-      customerTypeChipLabel(entity.tag) ||
-      customerTypeChipLabel(entity.type) ||
-      customerTypeChipLabel(entity.customer_type)
-    );
+    const kind = resolveEntityKind(entity);
+    return kind ? customerTypeChipLabel(kind) : "";
   };
 
   /** Address line for any sub-job row (change order or regular sub job). */
@@ -379,7 +380,7 @@ export default function CommonEntityListing({
                                   className="h-7 w-7 rounded-full p-0 hover:bg-red-50"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    onDeleteParent(entity);
+                                    onDeleteParent(entity, resolveEntityKind(entity));
                                   }}
                                 >
                                   <Trash2 className="h-3.5 w-3.5 text-red-500" />

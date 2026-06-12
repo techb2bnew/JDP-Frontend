@@ -160,6 +160,8 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
           phone: customer.phone,
           address: customer.address,
           tag: customer.tag,
+          customer_type: customer.customer_type,
+          type: customer.type || customer.tag || 'customer',
         }
       })
 
@@ -194,6 +196,8 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
           phone: contractor.phone,
           address: contractor.address,
           tag: contractor.tag || 'contractor',
+          customer_type: contractor.customer_type,
+          type: contractor.type || contractor.tag || 'contractor',
         }
       })
 
@@ -212,6 +216,8 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
           phone: customer.phone,
           address: customer.address,
           tag: customer.tag || 'customer',
+          customer_type: customer.customer_type || 'customer',
+          type: customer.type || customer.tag || 'customer',
         }
       })
 
@@ -234,6 +240,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     customerName: '', // Store customer name for display
     contractor: '', // For contract-based jobs in step 2, service-based in step 3
     contractorName: '', // Store contractor name for display
+    selectedEntityType: '' as 'customer' | 'contractor' | '',
     description: '',
     priority: 'medium' as 'low' | 'medium' | 'high',
     
@@ -493,11 +500,20 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     setIsCreatingJob(true)
     try {
       // Prepare the API payload
+      const selectedEntityId = formData.customer || formData.contractor
+      const entityType =
+        formData.selectedEntityType ||
+        resolveSelectedEntityType(selectedEntityForLocationRef.current)
+
       const jobPayload = {
         job_title: formData.title,
         job_type: formData.type === 'service-based' ? 'service_based' : 'contract_based',
-        customer_id: formData.type === 'service-based' && formData.customer ? parseInt(formData.customer) : undefined,
-        contractor_id: formData.contractor ? parseInt(formData.contractor) : undefined,
+        ...(entityType === 'customer' && selectedEntityId
+          ? { customer_id: parseInt(selectedEntityId, 10) }
+          : {}),
+        ...(entityType === 'contractor' && selectedEntityId
+          ? { contractor_id: parseInt(selectedEntityId, 10) }
+          : {}),
         description: formData.description,
         priority: formData.priority,
         address: formData.address,
@@ -648,6 +664,9 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             email: payload.email,
             phone: payload.phone,
             address: payload.address,
+            customer_type: 'customer',
+            type: 'customer',
+            tag: 'customer',
           }
           selectedEntityForLocationRef.current = createdCustomer
           setFormData((prev) => {
@@ -656,6 +675,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               customer: newId,
               customerName: name,
               email: customerEmail,
+              selectedEntityType: 'customer' as const,
             }
             if (prev.useEntityAddressForLocation) {
               next = applyEntityToLocationFields(next, createdCustomer)
@@ -700,10 +720,18 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             email: payload.email,
             phone: payload.phone,
             address: payload.address,
+            customer_type: 'contractor',
+            type: 'contractor',
+            tag: 'contractor',
           }
           selectedEntityForLocationRef.current = createdContractor
           setFormData((prev) => {
-            let next = { ...prev, contractor: newId, contractorName: name }
+            let next = {
+              ...prev,
+              contractor: newId,
+              contractorName: name,
+              selectedEntityType: 'contractor' as const,
+            }
             if (prev.type === 'contract-based') {
               next.email = contractorEmail
             }
@@ -756,6 +784,16 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     setSelectedLaborNames(
       selectedIds.map(id => laborSelectionDisplayName(byId.get(String(id)), id))
     )
+  }
+
+  const resolveSelectedEntityType = (
+    item: any,
+  ): 'customer' | 'contractor' | null => {
+    const raw = String(
+      item?.customer_type || item?.type || item?.tag || '',
+    ).toLowerCase()
+    if (raw === 'customer' || raw === 'contractor') return raw
+    return null
   }
 
   const getCustomerEmail = (customer: any): string => {
@@ -1044,7 +1082,17 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               p-6 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md
               ${formData.type === 'service-based' ? 'border-[#00A1FF] bg-[#E6F6FF]' : 'border-gray-200 hover:border-gray-300'}
             `}
-            onClick={() => setFormData({...formData, type: 'service-based'})}
+            onClick={() =>
+              setFormData((prev) => ({
+                ...prev,
+                type: 'service-based',
+                customer: '',
+                customerName: '',
+                contractor: '',
+                contractorName: '',
+                selectedEntityType: '',
+              }))
+            }
           >
             <div className="text-center space-y-4">
               <div className={`
@@ -1068,7 +1116,17 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               p-6 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md
               ${formData.type === 'contract-based' ? 'border-[#00A1FF] bg-[#E6F6FF]' : 'border-gray-200 hover:border-gray-300'}
             `}
-            onClick={() => setFormData({...formData, type: 'contract-based'})}
+            onClick={() =>
+              setFormData((prev) => ({
+                ...prev,
+                type: 'contract-based',
+                customer: '',
+                customerName: '',
+                contractor: '',
+                contractorName: '',
+                selectedEntityType: '',
+              }))
+            }
           >
             <div className="text-center space-y-4">
               <div className={`
@@ -1135,6 +1193,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                   const customerName =
                     item?.name || item?.customer_name || item?.company_name || '' 
                   const customerEmail = getCustomerEmail(item)
+                  const entityType = resolveSelectedEntityType(item) || 'customer'
 
                   setFormData((prev) => {
                     let next = {
@@ -1142,6 +1201,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                       customer: value,
                       customerName,
                       email: customerEmail,
+                      selectedEntityType: entityType,
                     }
                     if (prev.useEntityAddressForLocation && item) {
                       next = applyEntityToLocationFields(next, item)
@@ -1198,12 +1258,14 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                   const contractorName =
                     item?.name || item?.contractor_name || item?.company_name || ''
                   const contractorEmail = getContractorEmail(item)
+                  const entityType = resolveSelectedEntityType(item) || 'contractor'
 
                   setFormData((prev) => {
                     let next = {
                       ...prev,
                       contractor: value,
                       contractorName,
+                      selectedEntityType: entityType,
                     }
                     if (prev.type === 'contract-based') {
                       next.email = contractorEmail

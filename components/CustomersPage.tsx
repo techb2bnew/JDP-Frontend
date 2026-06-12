@@ -97,6 +97,7 @@ import {
   annotateJobsForListing,
   sortEntitiesByRecentJobActivity,
 } from "@/lib/entityListingRecentActivity";
+import { resolveEntityKind } from "@/lib/resolveEntityKind";
 import {
   ADDRESS_AUTOCOMPLETE_OPTIONS,
   ADDRESS_SEARCH_PLACEHOLDER,
@@ -1827,6 +1828,12 @@ export function CustomersPage() {
   const handleDeleteCustomer = async () => {
     if (!customerToDelete) return;
 
+    const entityKind = resolveEntityKind(customerToDelete) ?? "customer";
+    const deleteUrl =
+      entityKind === "contractor"
+        ? `${apiBaseUrl}/contractor/deleteContractor/${customerToDelete.id}`
+        : `${apiBaseUrl}/customer/deleteCustomer/${customerToDelete.id}`;
+
     try {
       setIsLoading(true);
       const token = localStorage.getItem("jdp_auth")
@@ -1835,22 +1842,23 @@ export function CustomersPage() {
       const headers: Record<string, string> = {};
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const response = await fetch(
-        `${apiBaseUrl}/customer/deleteCustomer/${customerToDelete.id}`,
-        {
-          method: "DELETE",
-          headers,
-        },
-      );
+      const response = await fetch(deleteUrl, {
+        method: "DELETE",
+        headers,
+      });
 
       const responseData = await response.json();
-      console.log("Customer deletion response:", responseData);
+      console.log("Entity deletion response:", responseData);
 
       if (responseData.success) {
         // Show success message
         if (typeof window !== "undefined") {
           const { toast } = await import("sonner");
-          toast.success("Customer deleted successfully!");
+          toast.success(
+            entityKind === "contractor"
+              ? "Contractor deleted successfully!"
+              : "Customer deleted successfully!",
+          );
         }
 
         setShowDeleteAlert(false);
@@ -1859,14 +1867,19 @@ export function CustomersPage() {
         fetchCustomersData(currentPage, itemsPerPage, true);
         fetchCustomerStats();
       } else {
-        throw new Error(responseData.message || "Failed to delete customer");
+        throw new Error(
+          responseData.message ||
+            (entityKind === "contractor"
+              ? "Failed to delete contractor"
+              : "Failed to delete customer"),
+        );
       }
     } catch (error) {
-      console.error("Error deleting customer:", error);
+      console.error("Error deleting entity:", error);
       if (typeof window !== "undefined") {
         const { toast } = await import("sonner");
         toast.error(
-          error instanceof Error ? error.message : "Failed to delete customer",
+          error instanceof Error ? error.message : "Failed to delete record",
         );
       }
     } finally {
@@ -3538,11 +3551,15 @@ export function CustomersPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Are you sure you want to delete this customer?
+              Are you sure you want to delete this{" "}
+              {resolveEntityKind(customerToDelete) === "contractor"
+                ? "contractor"
+                : "customer"}
+              ?
             </AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the
-              customer &quot;{customerToDelete?.name}&quot; from your database.
+              record &quot;{customerToDelete?.name}&quot; from your database.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
