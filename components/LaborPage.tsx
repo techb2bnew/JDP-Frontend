@@ -389,7 +389,7 @@ const getAvailabilityBadge = (availability: string) => {
     
     try {
       setIsCreatingLabor(true)
-      loadingToastId = toast.loading('Creating labour worker...');
+      loadingToastId = toast.loading('Creating labor worker...');
       
       const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -448,7 +448,7 @@ const getAvailabilityBadge = (availability: string) => {
       if (response.ok) {
         const responseData = await response.json();
         if (responseData.success) {
-          toast.success('Labour worker created successfully!');
+          toast.success('Labor worker created successfully!');
           setIsCreateDialogOpen(false);
           resetForm();
           setValidationErrors({});
@@ -578,7 +578,7 @@ const getAvailabilityBadge = (availability: string) => {
       if (response.ok) {
         const responseData = await response.json();
         if (responseData.success) {
-          toast.success('Labour worker updated successfully!');
+          toast.success('Labor worker updated successfully!');
           setIsEditDialogOpen(false);
           setEditingLabor(null);
           resetForm();
@@ -623,7 +623,7 @@ const getAvailabilityBadge = (availability: string) => {
       if (response.ok) {
         const responseData = await response.json();
         if (responseData.success) {
-          toast.success('Labour worker deleted successfully');
+          toast.success('Labor worker deleted successfully');
           // Refresh the data and stats
           fetchLaborData(currentPage, itemsPerPage);
           fetchLaborStats();
@@ -697,7 +697,7 @@ const getAvailabilityBadge = (availability: string) => {
   function convertToCSV(data: Labour[]) {
   const headers = [
     'ID',
-    'Labour ID',
+    'Labor ID',
     'Name',
     'Email',
     'Phone',
@@ -903,7 +903,7 @@ const fetchLeadLabourData = async () => {
           full_name: item.users?.full_name || 'N/A',
           email: item.users?.email || 'N/A',
           phone: item.users?.phone || 'N/A',
-          role: item.users?.role || 'Lead Labour'
+          role: item.users?.role || 'Lead Labor'
         }));
 
         setLeadLabours(mappedData);
@@ -912,11 +912,11 @@ const fetchLeadLabourData = async () => {
         setLeadLabours([]); // Set empty array as fallback
       }
     } else {
-      console.error('Failed to fetch lead labour data:', response.status, response.statusText);
+      console.error('Failed to fetch lead labor data:', response.status, response.statusText);
       setLeadLabours([]); // Set empty array as fallback
     }
   } catch (error) {
-    console.error('Error fetching lead labour data:', error);
+    console.error('Error fetching lead labor data:', error);
     setLeadLabours([]); // Set empty array as fallback
   }
 };
@@ -1021,7 +1021,7 @@ const fetchBySearchLabor = async () => {
     setFilteredLabors(transformedData);
     setTotalLabor(laborData.pagination.total || transformedData.length);
   } catch (error) {
-    console.error('Labour search error:', error);
+    console.error('Labor search error:', error);
     setFilteredLabors([]);
   } finally {
     setIsLoadingLabor(false);
@@ -1076,7 +1076,7 @@ useEffect(() => {
       setFilteredLabors(transformed);
       setTotalLabor(res.data?.pagination?.total ?? transformed.length ?? 0);
     } catch (err) {
-      console.error('Labour filter error:', err);
+      console.error('Labor filter error:', err);
       setFilteredLabors([]);
       setTotalLabor(0);
     } finally {
@@ -1144,7 +1144,7 @@ const fetchLaborById = async (id: string) => {
           skills: Array.isArray(item.skills) ? item.skills : 
                  item.skills ? [item.skills] : [],
           notes: item.notes || '',
-          role: resolveLaborRoleSelectValue(item.users?.role || 'Labour', roles)
+          role: resolveLaborRoleSelectValue(item.users?.role || 'Labor', roles)
         };
 
         setFormData(formData);
@@ -1479,7 +1479,7 @@ const fetchLaborById = async (id: string) => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-medium text-[#2b2b2b]">Labour Management</h2>
+          <h2 className="text-xl font-medium text-[#2b2b2b]">Labor Management</h2>
           <p className="text-sm text-[#2b2b2b]/60 mt-1">Manage your labor workforce and their assignments.</p>
         </div>
         
@@ -1493,7 +1493,7 @@ const fetchLaborById = async (id: string) => {
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
-                <DialogTitle>Import Labour</DialogTitle>
+                <DialogTitle>Import Labor</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
@@ -1548,7 +1548,7 @@ const fetchLaborById = async (id: string) => {
               <DialogTrigger asChild>
                 <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2">
                   <Plus className="h-4 w-4" />
-                  Add Labour Worker
+                  Add Labor Worker
                 </Button>
               </DialogTrigger>
               <DialogContent
@@ -1567,7 +1567,7 @@ const fetchLaborById = async (id: string) => {
                 }}
               >
                 <DialogHeader>
-                  <DialogTitle>Add New Labour Worker</DialogTitle>
+                  <DialogTitle>Add New Labor Worker</DialogTitle>
                 </DialogHeader>
                 {renderForm()}
                 <div className="flex justify-end gap-3 mt-6">
@@ -1575,7 +1575,7 @@ const fetchLaborById = async (id: string) => {
                     Cancel
                   </Button>
                   <Button disabled={isCreatingLabor} onClick={handleCreate} className="bg-primary text-white hover:bg-[#0090e6]">
-                    {isCreatingLabor ? 'Creating...' : 'Create Labour Worker'}
+                    {isCreatingLabor ? 'Creating...' : 'Create Labor Worker'}
                   </Button>
                 </div>
               </DialogContent>
@@ -1769,7 +1769,7 @@ const fetchLaborById = async (id: string) => {
                         onEdit={() => handleEdit(labor)}
                         onDelete={() => handleDelete(labor.id)}
                         itemName={labor.name}
-                        itemType="Labour Worker"
+                        itemType="Labor Worker"
                         showView={!!onViewDetails && canViewLabour}
                         showEdit={canEditLabour}
                         showDelete={canDeleteLabour}
@@ -1863,7 +1863,7 @@ const fetchLaborById = async (id: string) => {
           }}
         >
           <DialogHeader>
-            <DialogTitle>Edit Labour Worker</DialogTitle>
+            <DialogTitle>Edit Labor Worker</DialogTitle>
           </DialogHeader>
           {renderForm()}
           <div className="flex justify-end gap-3 mt-6">
@@ -1876,7 +1876,7 @@ const fetchLaborById = async (id: string) => {
               Cancel
             </Button>
             <Button onClick={handleUpdate} className="bg-primary text-white hover:bg-[#0090e6]">
-              Update Labour Worker
+              Update Labor Worker
             </Button>
           </div>
         </DialogContent>

@@ -445,9 +445,9 @@ export function LabourProfilePage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="leadLabour">Lead Labour</Label>
+                    <Label htmlFor="leadLabor">Lead Labor</Label>
                     <Input
-                      id="leadLabour"
+                      id="leadLabor"
                       value={profile.leadLabour}
                       onChange={(e) => setProfile(prev => ({ ...prev, leadLabour: e.target.value }))}
                       disabled={!isEditing}
@@ -596,7 +596,7 @@ export function LabourProfilePage() {
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <div>
-                    <h3 className="text-lg font-medium">Labour Permissions</h3>
+                    <h3 className="text-lg font-medium">Labor Permissions</h3>
                     <p className="text-sm text-muted-foreground">Configure access permissions for this labor</p>
                   </div>
                 </div>

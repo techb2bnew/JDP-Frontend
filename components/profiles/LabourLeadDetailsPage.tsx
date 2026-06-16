@@ -46,7 +46,7 @@ const labourLeadData: LabourLeadProfile = {
   
   // Job Details
   department: 'Construction',
-  position: 'Lead Labour Supervisor',
+  position: 'Lead Labor Supervisor',
   dateOfJoining: '2023-03-10',
   status: 'active',
   supervisor: 'Sarah Johnson',
@@ -160,7 +160,7 @@ export function LabourLeadDetailsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Labour Lead Profile</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Labor Lead Profile</h1>
           <p className="text-muted-foreground">Lead labor management and permissions</p>
         </div>
         <div className="flex gap-2">
@@ -212,7 +212,7 @@ export function LabourLeadDetailsPage() {
                         {profile.status.charAt(0).toUpperCase() + profile.status.slice(1)}
                       </Badge>
                       <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
-                        Lead Labour
+                        Lead Labor
                       </Badge>
                     </div>
                   </div>

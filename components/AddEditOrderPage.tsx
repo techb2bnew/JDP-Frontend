@@ -687,7 +687,7 @@ export function AddEditOrderPage() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lead-labor">Lead Labour *</Label>
+                  <Label htmlFor="lead-labor">Lead Labor *</Label>
                   <div className="relative">
                     <Input
                       id="lead-labor"

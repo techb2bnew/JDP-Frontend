@@ -492,7 +492,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
 
     try {
       setIsCreatingLeadLabour(true)
-      loadingToastId = toast.loading('Creating lead labour...');
+      loadingToastId = toast.loading('Creating lead labor...');
       const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -563,7 +563,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       if (response.ok) {
         const responseData = await response.json();
         if (responseData.success) {
-          toast.success('Lead Labour created successfully');
+          toast.success('Lead Labor created successfully');
           resetForm();
           setIsCreateDialogOpen(false);
           // Refresh the data
@@ -574,19 +574,19 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
             setLeadLaborStats(statsResponse.data.lead_labor);
           }
         } else {
-          toast.error(responseData.message || 'Failed to create lead labour');
+          toast.error(responseData.message || 'Failed to create lead labor');
         }
       } else {
         const errorData = await response.json().catch(() => ({}));
-        toast.error(errorData.message || 'Failed to create lead labour');
+        toast.error(errorData.message || 'Failed to create lead labor');
       }
     } catch (error) {
       // Make sure to dismiss loading toast even on error
       if (loadingToastId) {
         toast.dismiss(loadingToastId);
       }
-      console.error('Error creating lead labour:', error);
-      toast.error('Error creating lead labour. Please try again.');
+      console.error('Error creating lead labor:', error);
+      toast.error('Error creating lead labor. Please try again.');
     } finally {
       setIsCreatingLeadLabour(false)
     }
@@ -680,7 +680,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     let loadingToastId: string | number | undefined;
 
     try {
-      loadingToastId = toast.loading('Updating lead labour...');
+      loadingToastId = toast.loading('Updating lead labor...');
       const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -750,7 +750,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       if (response.ok) {
         const responseData = await response.json();
         if (responseData.success) {
-          toast.success('Lead Labour updated successfully');
+          toast.success('Lead Labor updated successfully');
           resetForm();
           setIsEditDialogOpen(false);
           setEditingLeadLabour(null);
@@ -762,19 +762,19 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
             setLeadLaborStats(statsResponse.data.lead_labor);
           }
         } else {
-          toast.error(responseData.message || 'Failed to update lead labour');
+          toast.error(responseData.message || 'Failed to update lead labor');
         }
       } else {
         const errorData = await response.json().catch(() => ({}));
-        toast.error(errorData.message || 'Failed to update lead labour');
+        toast.error(errorData.message || 'Failed to update lead labor');
       }
     } catch (error) {
       // Make sure to dismiss loading toast even on error
       if (loadingToastId) {
         toast.dismiss(loadingToastId);
       }
-      console.error('Error updating lead labour:', error);
-      toast.error('Error updating lead labour. Please try again.');
+      console.error('Error updating lead labor:', error);
+      toast.error('Error updating lead labor. Please try again.');
     }
   }
 
@@ -782,7 +782,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     let loadingToastId: string | number | undefined;
 
     try {
-      loadingToastId = toast.loading('Deleting lead labour...');
+      loadingToastId = toast.loading('Deleting lead labor...');
 
       const token = localStorage.getItem('jdp_auth') ? JSON.parse(localStorage.getItem('jdp_auth')!).token : null;
       const headers: Record<string, string> = {};
@@ -801,23 +801,23 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       if (response.ok) {
         const responseData = await response.json();
         if (responseData.success) {
-          toast.success('Lead Labour deleted successfully');
+          toast.success('Lead Labor deleted successfully');
           // Refresh the data
           fetchLeadLabourData(currentPage, itemsPerPage);
         } else {
-          toast.error(responseData.message || 'Failed to delete lead labour');
+          toast.error(responseData.message || 'Failed to delete lead labor');
         }
       } else {
         const errorData = await response.json().catch(() => ({}));
-        toast.error(errorData.message || 'Failed to delete lead labour');
+        toast.error(errorData.message || 'Failed to delete lead labor');
       }
     } catch (error) {
       // Make sure to dismiss loading toast even on error
       if (loadingToastId) {
         toast.dismiss(loadingToastId);
       }
-      console.error('Error deleting lead labour:', error);
-      toast.error('Error deleting lead labour. Please try again.');
+      console.error('Error deleting lead labor:', error);
+      toast.error('Error deleting lead labor. Please try again.');
     }
   }
 
@@ -1022,22 +1022,22 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
           await handleTokenRevocation();
           throw new Error('Session expired. Please login again.');
         }
-        throw new Error(responseData.message || 'Failed to import lead labour');
+        throw new Error(responseData.message || 'Failed to import lead labor');
       }
 
       if (responseData.success) {
-        toast.success(responseData.message || 'Successfully imported lead labour!');
+        toast.success(responseData.message || 'Successfully imported lead labor!');
         setShowImportDialog(false);
         setImportFile(null);
         
         // Refresh lead labour list
         fetchLeadLabourData(currentPage, itemsPerPage);
       } else {
-        throw new Error(responseData.message || 'Failed to import lead labour');
+        throw new Error(responseData.message || 'Failed to import lead labor');
       }
     } catch (error) {
-      console.error('Error importing lead labour:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to import lead labour');
+      console.error('Error importing lead labor:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to import lead labor');
     } finally {
       setIsImporting(false);
     }
@@ -1061,7 +1061,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     // CSV header
     const headers = [
       "ID",
-      "Lead Labour ID",
+      "Lead Labor ID",
       "Name",
       "Email",
       "Phone",
@@ -1208,10 +1208,10 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
           setSpecializations(uniqueSpecializations);
         }
       } else {
-        console.error('Failed to fetch lead labour data:', response.status, response.statusText);
+        console.error('Failed to fetch lead labor data:', response.status, response.statusText);
       }
     } catch (error) {
-      console.error('Error fetching lead labour data:', error);
+      console.error('Error fetching lead labor data:', error);
     } finally {
       setIsLoadingLeadLabour(false);
     }
@@ -1269,7 +1269,7 @@ useEffect(() => {
       setFilteredLeadLabours(transformed);
       setTotalLead(res.data?.pagination?.total ?? transformed.length ?? 0);
     } catch (err) {
-      console.error("Lead Labour filter error:", err);
+      console.error("Lead Labor filter error:", err);
       setLeadLabours([]);
       setFilteredLeadLabours([]);
       setTotalLead(0);
@@ -1376,17 +1376,17 @@ useEffect(() => {
 
           setLeadLabourDetails(detailPayload)
         } else {
-          toast.error('Failed to load lead labour details')
+          toast.error('Failed to load lead labor details')
           setShowDetails(false)
         }
       } else {
-        console.error('Failed to fetch lead labour details:', response.status, response.statusText);
-        toast.error('Failed to fetch lead labour details');
+        console.error('Failed to fetch lead labor details:', response.status, response.statusText);
+        toast.error('Failed to fetch lead labor details');
         setShowDetails(false)
       }
     } catch (error) {
-      console.error('Error fetching lead labour details:', error);
-      toast.error('Error fetching lead labour details');
+      console.error('Error fetching lead labor details:', error);
+      toast.error('Error fetching lead labor details');
       setShowDetails(false)
     } finally {
       setIsLoadingDetails(false)
@@ -1702,8 +1702,8 @@ useEffect(() => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-medium text-[#2b2b2b]">Lead Labour Management</h1>
-          <p className="text-sm text-[#2b2b2b]/60 mt-1">Manage your lead labour workforce and their assignments.</p>
+          <h1 className="text-2xl font-medium text-[#2b2b2b]">Lead Labor Management</h1>
+          <p className="text-sm text-[#2b2b2b]/60 mt-1">Manage your lead labor workforce and their assignments.</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -1716,7 +1716,7 @@ useEffect(() => {
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
-                <DialogTitle>Import Lead Labour</DialogTitle>
+                <DialogTitle>Import Lead Labor</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
@@ -1759,7 +1759,7 @@ useEffect(() => {
               <DialogTrigger asChild>
                 <Button className="bg-primary text-white hover:bg-[#0090e6] gap-2">
                   <Plus className="h-4 w-4" />
-                  Add Lead Labour
+                  Add Lead Labor
                 </Button>
               </DialogTrigger>
               <DialogContent
@@ -1778,7 +1778,7 @@ useEffect(() => {
                 }}
               >
                 <DialogHeader>
-                  <DialogTitle>Lead Labour Creation Form</DialogTitle>
+                  <DialogTitle>Lead Labor Creation Form</DialogTitle>
                 </DialogHeader>
                 {renderForm()}
                 <div className="flex justify-end gap-3 mt-6">
@@ -1855,7 +1855,7 @@ useEffect(() => {
                 <Shield className="h-6 w-6 text-yellow-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Total Lead Labour</p>
+                <p className="text-sm text-gray-600">Total Lead Labor</p>
                 <p className="text-2xl font-medium text-[#2b2b2b]">
                   {isStatsLoading ? '...' : leadLaborStats.total_lead_labor}
                 </p>
@@ -1873,7 +1873,7 @@ useEffect(() => {
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Search lead labour..."
+                  placeholder="Search lead labor..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -1936,7 +1936,7 @@ useEffect(() => {
                   <TableCell colSpan={9} className="text-center py-8">
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                      <span className="ml-2 text-gray-600">Loading lead labour data...</span>
+                      <span className="ml-2 text-gray-600">Loading lead labor data...</span>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -1947,15 +1947,15 @@ useEffect(() => {
                       <div className="text-lg font-medium mb-2">No data available</div>
                       <div className="text-sm">
                         {searchTerm || filterSpecialization !== 'all' || filterStatus !== 'all'
-                          ? 'No lead labour found matching your filters'
-                          : 'No lead labour data found. Create your first lead labour record.'}
+                          ? 'No lead labor found matching your filters'
+                          : 'No lead labor data found. Create your first lead labor record.'}
                       </div>
                     </div>
                   </TableCell>
                 </TableRow>
               ) : (
                 paginatedLeadLabours.map((labour, index) => {
-                  console.log(labour,"labourlabour");
+                  console.log(labour,"laborlabor");
                   return (
                     <TableRow key={labour.id} className={index % 2 === 1 ? "bg-[#eff4fa]" : ""}>
                     <TableCell className="text-sm text-[#2b2b2b]/80 pl-6">{labour.id}</TableCell>
@@ -1988,7 +1988,7 @@ useEffect(() => {
                         onEdit={() => handleEdit(labour)}
                         onDelete={() => handleDelete(labour.id)}
                         itemName={labour.name}
-                        itemType="Lead Labour"
+                        itemType="Lead Labor"
                         showView={canViewLeadLabour}
                         showEdit={canEditLeadLabour}
                         showDelete={canDeleteLeadLabour}
@@ -2074,7 +2074,7 @@ useEffect(() => {
           }}
         >
           <DialogHeader>
-            <DialogTitle>Edit Lead Labour</DialogTitle>
+            <DialogTitle>Edit Lead Labor</DialogTitle>
           </DialogHeader>
           {renderForm()}
           <div className="flex justify-end gap-3 mt-6">
@@ -2085,7 +2085,7 @@ useEffect(() => {
               Cancel
             </Button>
             <Button onClick={handleUpdate} className="bg-primary text-white hover:bg-[#0090e6]">
-              Update Lead Labour
+              Update Lead Labor
             </Button>
           </div>
         </DialogContent>

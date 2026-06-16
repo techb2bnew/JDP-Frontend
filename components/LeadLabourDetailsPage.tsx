@@ -100,7 +100,7 @@ const defaultDetails: LeadLabourDetails = {
   id: 'LL-2025-001',
   laborCode: '#2122',
   fullName: 'David Smith',
-  role: 'Lead Labour',
+  role: 'Lead Labor',
   status: 'Active',
   email: 'david@gmail.com',
   phone: '+61 2222 021 203',
@@ -382,7 +382,7 @@ export function LeadLabourDetailsPage({ leadLabourId, onBack, leadLabourData, is
           Back
         </Button>
         <div>
-            <h1 className="text-2xl font-semibold text-[#2b2b2b]">Lead Labour Details</h1>
+            <h1 className="text-2xl font-semibold text-[#2b2b2b]">Lead Labor Details</h1>
             <p className="text-sm text-gray-500">View and manage Lead labor profile and job history</p>
           </div>
       </div>

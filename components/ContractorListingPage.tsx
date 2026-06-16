@@ -850,11 +850,11 @@ const InvoiceTemplate = ({ subJob, job, contractor }: { subJob: SubJob, job: Job
 
       {/* Labour Costs */}
       <div className="mb-8">
-        <h3 className="font-semibold mb-4">Labour</h3>
+        <h3 className="font-semibold mb-4">Labor</h3>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Labour Name</TableHead>
+              <TableHead>Labor Name</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Hours</TableHead>
               <TableHead>Rate</TableHead>
@@ -884,7 +884,7 @@ const InvoiceTemplate = ({ subJob, job, contractor }: { subJob: SubJob, job: Job
               <span>{formatCurrency(totalMaterialCost)}</span>
             </div>
             <div className="flex justify-between">
-              <span>Labour Subtotal:</span>
+              <span>Labor Subtotal:</span>
               <span>{formatCurrency(totalLaborCost)}</span>
             </div>
             <Separator />
@@ -2570,11 +2570,11 @@ export function ContractorListingPage() {
 
         <!-- Labour -->
         <div class="labor-section">
-          <div class="section-heading">Labour</div>
+          <div class="section-heading">Labor</div>
           <table class="table">
             <thead>
               <tr>
-                <th>Labour Name</th>
+                <th>Labor Name</th>
                 <th>Date</th>
                 <th>Hours</th>
                 <th>Rate</th>
@@ -2603,7 +2603,7 @@ export function ContractorListingPage() {
               <span>${formatCurrency(totalMaterialCost)}</span>
             </div>
             <div class="summary-row">
-              <span>Labour Subtotal:</span>
+              <span>Labor Subtotal:</span>
               <span>${formatCurrency(totalLaborCost)}</span>
             </div>
             <div class="summary-row">
@@ -2746,14 +2746,14 @@ export function ContractorListingPage() {
 
       // Labour section
       pdf.setFontSize(12)
-      pdf.text('Labour', 20, yPosition)
+      pdf.text('Labor', 20, yPosition)
       yPosition += 10
 
       // Labour table header
       pdf.setFillColor(lightGray[0], lightGray[1], lightGray[2])
       pdf.rect(20, yPosition - 5, pageWidth - 40, 8, 'F')
       pdf.setFontSize(10)
-      pdf.text('Labour Name', 22, yPosition)
+      pdf.text('Labor Name', 22, yPosition)
       pdf.text('Date', 80, yPosition)
       pdf.text('Hours', 110, yPosition)
       pdf.text('Rate', 130, yPosition)
@@ -2801,7 +2801,7 @@ export function ContractorListingPage() {
       pdf.text(`$${totalMaterialCost.toFixed(2)}`, summaryX + summaryWidth - 5, yPosition, { align: 'right' })
       yPosition += 6
 
-      pdf.text('Labour Subtotal:', summaryX + 5, yPosition)
+      pdf.text('Labor Subtotal:', summaryX + 5, yPosition)
       pdf.text(`$${totalLaborCost.toFixed(2)}`, summaryX + summaryWidth - 5, yPosition, { align: 'right' })
       yPosition += 6
 
@@ -3135,7 +3135,7 @@ export function ContractorListingPage() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div>
-                      <span className="text-sm text-muted-foreground">Lead Labour:</span>
+                      <span className="text-sm text-muted-foreground">Lead Labor:</span>
                       <div className="flex items-center gap-2 mt-1">
                         <UserCheck className="h-3 w-3 text-primary" />
                         <span className="font-medium">{subJob.leadLabour}</span>
@@ -3241,7 +3241,7 @@ export function ContractorListingPage() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Timer className="h-4 w-4 text-blue-600" />
-                    Labour Timesheet
+                    Labor Timesheet
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -3250,7 +3250,7 @@ export function ContractorListingPage() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Labour Name</TableHead>
+                            <TableHead>Labor Name</TableHead>
                             <TableHead>Date</TableHead>
                             <TableHead>Hours</TableHead>
                             <TableHead>Rate</TableHead>

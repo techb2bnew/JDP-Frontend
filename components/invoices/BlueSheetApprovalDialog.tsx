@@ -1018,7 +1018,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
     if (laborEntriesTotalCost > 0) {
       customProducts.push({
         job_id: finalBlueSheet.job_id,
-        product_name: "Labour total cost",
+        product_name: "Labor total cost",
         description: "Total labor cost from BlueSheet labor entries",
         supplier_id: 1,
         supplier_sku: "LABOR_TOTAL",
@@ -2250,7 +2250,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
         colSpan={3}
         className="py-2 px-3 text-right font-bold text-[15px]"
       >
-        Labour Total Cost
+        Labor Total Cost
       </td>
       <td
         colSpan={2}
@@ -2713,7 +2713,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                     colSpan={3}
                                     className="py-2 px-3 text-right font-bold text-[15px]"
                                   >
-                                    Labour Total Cost
+                                    Labor Total Cost
                                   </td>
                                   <td
                                     colSpan={2}
@@ -2898,7 +2898,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                             {currentBlueSheet.material_entries.length} materials
                             {totalLaborLabel && (
                               <span className="ml-1.5">
-                                · Labour {totalLaborLabel}
+                                · Labor {totalLaborLabel}
                               </span>
                             )}
                           </p>
@@ -3102,7 +3102,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                               </div>
                               <div>
                                 <Label className="text-xs font-semibold uppercase text-slate-500">
-                                  Labour
+                                  Labor
                                 </Label>
                                 <p className="text-sm font-medium mt-0.5">
                                   {totalLaborLabel || "No labor hours"}

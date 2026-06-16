@@ -276,15 +276,15 @@ export function Sidebar({ currentPath, onLogout }: SidebarProps) {
   //   },
   //   {
   //     id: "lead-labour-profile",
-  //     name: "Lead Labour Profile",
+  //     name: "Lead Labor Profile",
   //     href: "/profiles/lead-labour",
-  //     description: "Manage lead labour profiles"
+  //     description: "Manage lead labor profiles"
   //   },
   //   {
   //     id: "labour-profile",
-  //     name: "Labour Profile",
+  //     name: "Labor Profile",
   //     href: "/profiles/labour",
-  //     description: "Manage labour profiles"
+  //     description: "Manage labor profiles"
   //   }
   // ]
 

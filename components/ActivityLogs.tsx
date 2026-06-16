@@ -631,7 +631,7 @@ const mapApiResponseToActivities = (
 
       result.push({
         id: `lead-${lead.id}`,
-        title: "Lead Labour Assigned",
+        title: "Lead Labor Assigned",
         description: `${assignedBy} assigned ${assignedLeadName} as lead labor.`,
         dateLabel: formatDateLabel(sortDate),
         userName: assignedBy,
@@ -647,7 +647,7 @@ const mapApiResponseToActivities = (
       const assignedLaborName =
         nameFromUser(labor.user) ||
         formatIfEmail(labor.labor_code) ||
-        "Labour";
+        "Labor";
       const assignedBy = resolveActor(
         activityAudit?.labor_assigned_by,
         job.updated_by_user,
@@ -659,7 +659,7 @@ const mapApiResponseToActivities = (
 
       result.push({
         id: `labor-${labor.id}`,
-        title: "Labour Assigned",
+        title: "Labor Assigned",
         description: `${assignedBy} assigned ${assignedLaborName} to this job.`,
         dateLabel: formatDateLabel(sortDate),
         userName: assignedBy,
@@ -684,7 +684,7 @@ const mapApiResponseToActivities = (
 
       result.push({
         id: `timesheet-${timesheet.id}`,
-        title: "Labour Hours Logged",
+        title: "Labor Hours Logged",
         description: `${workerName} logged ${
           timesheet.work_activity || "00:00:00"
         } labor hours.`,

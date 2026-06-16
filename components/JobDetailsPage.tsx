@@ -376,7 +376,7 @@ export function JobDetailsPage({
 
 
   console.log("Job data:", job);
-  console.log("Labour timesheets:", job.labor_timesheets);
+  console.log("Labor timesheets:", job.labor_timesheets);
   console.log("Bluesheets data:", job.bluesheets);
   console.log(job.subJobs,"job.subJobs");
 
@@ -935,7 +935,7 @@ export function JobDetailsPage({
           } else {
             console.log("Fetching labor by ID:", id);
             const response = await apiClient.getLaborById(id);
-            console.log("Labour API response:", response);
+            console.log("Labor API response:", response);
             if (response) {
               laborData.push({
                 id: response.id,
@@ -1880,7 +1880,7 @@ const validateLineItems = (lineItems: any[] = []) => {
     const errors: Record<string, string> = {};
 
     if (!timeLogFormData.selectedLabor && !timeLogFormData.selectedLeadLabor) {
-      errors.laborSelection = "Please select either Labour or Lead Labour";
+      errors.laborSelection = "Please select either Labor or Lead Labor";
     }
 
     if (!timeLogFormData.hoursWorked || timeLogFormData.hoursWorked === "") {
@@ -1972,7 +1972,7 @@ const validateLineItems = (lineItems: any[] = []) => {
             timeLogPayload,
           );
           toast.success(
-            "Labour time log added to existing bluesheet successfully!",
+            "Labor time log added to existing bluesheet successfully!",
           );
         } else if (timeLogModalMode === "edit") {
           // For edit, we might need a different API endpoint
@@ -2001,7 +2001,7 @@ const validateLineItems = (lineItems: any[] = []) => {
             currentTimeLog.id,
             updatePayload,
           );
-          toast.success("Labour time log updated successfully!");
+          toast.success("Labor time log updated successfully!");
         }
       } else {
         // Create new complete bluesheet with labor
@@ -3052,7 +3052,7 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
       };
 
       await apiClient.updateLaborTimeLog(currentTimeLog.id, updatePayload);
-      toast.success("Labour time log updated successfully!");
+      toast.success("Labor time log updated successfully!");
       setShowTimeLogModal(false);
       setCurrentTimeLog(null);
       resetTimeLogForm();
@@ -3069,7 +3069,7 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
   const handleDeleteTimeLog = async (timeLogId: string) => {
     try {
       await apiClient.deleteLaborTimeLog(timeLogId);
-      toast.success("Labour time log deleted successfully!");
+      toast.success("Labor time log deleted successfully!");
 
       // Refresh job data to remove the deleted labor time log
       await refreshJobData();
@@ -7108,7 +7108,7 @@ const handlePrintInvoice = async (invoice: any) => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-purple-600">
-                    Total Labour Entries
+                    Total Labor Entries
                   </p>
                   {isLoadingDashboard ? (
                     <div className="h-6 flex items-center">
@@ -7443,7 +7443,7 @@ const handlePrintInvoice = async (invoice: any) => {
                     <div>
                     <Label className="flex items-center gap-2 mb-2">
                       <UserCheck className="h-4 w-4 text-[#00A1FF]" />
-                      Assigned Lead Labour
+                      Assigned Lead Labor
                     </Label>
 
                     {isEditing ? (
@@ -7459,7 +7459,7 @@ const handlePrintInvoice = async (invoice: any) => {
                               return labor.toString();
                             }) || [];
                           console.log(
-                            "Lead Labour selectedValues:",
+                            "Lead Labor selectedValues:",
                             values,
                             "Original data:",
                             editedJob.assignedLeadLabor,
@@ -7473,7 +7473,7 @@ const handlePrintInvoice = async (invoice: any) => {
                               labor.name ||
                               labor.user?.full_name ||
                               labor.labor_code ||
-                              `Labour ${labor.id}`,
+                              `Labor ${labor.id}`,
                             labor_code: labor.labor_code,
                             department: labor.department,
                             specialization: labor.specialization,
@@ -7481,7 +7481,7 @@ const handlePrintInvoice = async (invoice: any) => {
                           })) || []
                         }
                         onSelectionChange={(selectedIds, selectedItems) => {
-                          console.log("Lead Labour selection changed:", {
+                          console.log("Lead Labor selection changed:", {
                             selectedIds,
                             selectedItems,
                           });
@@ -7523,7 +7523,7 @@ const handlePrintInvoice = async (invoice: any) => {
                     <div>
                     <Label className="flex items-center gap-2 mb-2">
                       <Users className="h-4 w-4 text-[#00A1FF]" />
-                      Assigned Labour
+                      Assigned Labor
                     </Label>
 
                     {isEditing ? (
@@ -7539,7 +7539,7 @@ const handlePrintInvoice = async (invoice: any) => {
                               return labor.toString();
                             }) || [];
                           console.log(
-                            "Labour selectedValues:",
+                            "Labor selectedValues:",
                             values,
                             "Original data:",
                             editedJob.assignedLabor,
@@ -7553,7 +7553,7 @@ const handlePrintInvoice = async (invoice: any) => {
                               labor.name ||
                               labor.user?.full_name ||
                               labor.labor_code ||
-                              `Labour ${labor.id}`,
+                              `Labor ${labor.id}`,
                             labor_code: labor.labor_code,
                             trade: labor.trade,
                             experience: labor.experience,
@@ -7561,7 +7561,7 @@ const handlePrintInvoice = async (invoice: any) => {
                           })) || []
                         }
                         onSelectionChange={(selectedIds, selectedItems) => {
-                          console.log("Labour selection changed:", {
+                          console.log("Labor selection changed:", {
                             selectedIds,
                             selectedItems,
                           });
@@ -7604,7 +7604,7 @@ const handlePrintInvoice = async (invoice: any) => {
                   {/* Assigned Labour Section */}
                   {/* {job.assignedLaborDetails && job.assignedLaborDetails.length > 0 && (
                   <div>
-                    <p className="text-sm text-gray-600 mb-2">Assigned Labour</p>
+                    <p className="text-sm text-gray-600 mb-2">Assigned Labor</p>
                     <div className="space-y-2">
                       {job.assignedLaborDetails.map((labor: any, index: number) => (
                         <div key={index} className="bg-gray-100 p-3 rounded-md">
@@ -7628,7 +7628,7 @@ const handlePrintInvoice = async (invoice: any) => {
                   {/* Assigned Lead Labour Section */}
                   {/* {job.assignedLeadLaborDetails && job.assignedLeadLaborDetails.length > 0 && (
                   <div>
-                    <p className="text-sm text-gray-600 mb-2">Lead Labour</p>
+                    <p className="text-sm text-gray-600 mb-2">Lead Labor</p>
                     <div className="space-y-2">
                       {job.assignedLeadLaborDetails.map((leadLabor: any, index: number) => (
                         <div key={index} className="bg-blue-50 p-3 rounded-md border border-blue-200">
@@ -7749,7 +7749,7 @@ const handlePrintInvoice = async (invoice: any) => {
 
                       <div className="flex justify-between">
                         <span className="text-sm text-gray-600">
-                          Labour Cost
+                          Labor Cost
                         </span>
                         <span className="font-medium">
                           {formatCurrency(projectSummary.laborCost)}
@@ -9237,7 +9237,7 @@ const handlePrintInvoice = async (invoice: any) => {
           <CardHeader className="flex flex-row items-center justify-between bg-gray-100 pb-5 rounded-t-lg">
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Labour & Time Logs
+              Labor & Time Logs
             </CardTitle>
             <div className="flex items-center gap-4">
               <span className="text-sm text-gray-600">
@@ -9318,10 +9318,10 @@ const handlePrintInvoice = async (invoice: any) => {
                                 </div>
                                 <div>
                                   <h6 className="font-medium">
-                                    {entry.role === 'lead_labor' ? 'Lead Labour' : 'Labour'}
+                                    {entry.role === 'lead_labor' ? 'Lead Labor' : 'Labor'}
                                   </h6>
                                   <p className="text-sm text-gray-600">
-                                    {entry.employee_name || entry.labor?.users?.full_name || entry.lead_labor?.users?.full_name || 'Unknown Labour'}
+                                    {entry.employee_name || entry.labor?.users?.full_name || entry.lead_labor?.users?.full_name || 'Unknown Labor'}
                                   </p>
                                   <p className="text-xs text-gray-500">
                                     Code: {entry.labor?.labor_code || entry.lead_labor?.labor_code || 'N/A'}
@@ -9345,7 +9345,7 @@ const handlePrintInvoice = async (invoice: any) => {
                                     ? 'bg-purple-100 text-purple-800'
                                     : 'bg-blue-100 text-blue-800'
                                     }`}>
-                                    {entry.role === 'lead_labor' ? 'Lead' : 'Labour'}
+                                    {entry.role === 'lead_labor' ? 'Lead' : 'Labor'}
                                   </span>
                                   <Button
                                     variant="outline"
@@ -10043,9 +10043,9 @@ const handlePrintInvoice = async (invoice: any) => {
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>
-              {timeLogModalMode === "create" && "Add Labour Time Log"}
-              {timeLogModalMode === "edit" && "Edit Labour Time Log"}
-              {timeLogModalMode === "view" && "View Labour Time Log"}
+              {timeLogModalMode === "create" && "Add Labor Time Log"}
+              {timeLogModalMode === "edit" && "Edit Labor Time Log"}
+              {timeLogModalMode === "view" && "View Labor Time Log"}
             </DialogTitle>
             <DialogDescription>
               {timeLogModalMode === "create" &&
@@ -10059,7 +10059,7 @@ const handlePrintInvoice = async (invoice: any) => {
             <div className="grid grid-cols-2 gap-2">
               {/* Labour Selection */}
               <div className="labor-dropdown">
-                <Label className="mb-2">Select Labour *</Label>
+                <Label className="mb-2">Select Labor *</Label>
                 <div className="relative">
                   <Input
                     type="text"
@@ -10135,7 +10135,7 @@ const handlePrintInvoice = async (invoice: any) => {
 
               {/* Lead Labour Selection */}
               <div className="lead-labor-dropdown">
-                <Label className="mb-2">Select Lead Labour *</Label>
+                <Label className="mb-2">Select Lead Labor *</Label>
                 <div className="relative">
                   <Input
                     type="text"

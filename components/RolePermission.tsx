@@ -71,18 +71,27 @@ interface Role {
 const PREDEFINED_ROLE_OPTIONS = [
   'super admin (Portal)',
   'admin (Portal)',
-  'lead labour (Mobile)',
-  'labour (Mobile)',
+  'lead labor (Mobile)',
+  'labor (Mobile)',
 ] as const;
 
 /**
  * Strip the (Portal)/(Mobile) suffix to get the clean API role name.
- * e.g. "labour (Mobile)" -> "labour"
+ * e.g. "labor (Mobile)" -> "labour"
  *      "my custom role (Portal)" -> "my custom role"
  *      "some role" -> "some role"  (no suffix — unchanged)
  */
 const stripPlatformSuffix = (displayName: string): string =>
   displayName.replace(/\s*\((Portal|Mobile)\)\s*$/i, '').trim();
+
+/** Map UI role spelling to API role name (backend may use British spelling). */
+const toApiRoleName = (displayName: string): string => {
+  const stripped = stripPlatformSuffix(displayName).trim();
+  const normalized = stripped.toLowerCase();
+  if (normalized === 'lead labor') return 'lead labour';
+  if (normalized === 'labor') return 'labour';
+  return stripped;
+};
 
 /** Extract platform tag from display name: returns 'Mobile' | 'Portal' | null */
 const getPlatformTag = (displayName: string): 'Mobile' | 'Portal' | null => {
@@ -512,7 +521,7 @@ const LABOUR_HIDDEN_PERMISSIONS: Record<string, string[]> = {
     const tag = getPlatformTag(roleName);
     if (tag !== 'Mobile') return false;
     const n = normalizeRoleName(roleName);
-    return n !== 'labour' && n !== 'labor' && n !== 'lead labour' && n !== 'lead labor';
+    return n !== 'labour' && n !== 'labor' && n !== 'lead labor' && n !== 'lead labour';
   };
 
   const isLabourScopedRole = (roleName: string) => {
@@ -670,7 +679,7 @@ const LABOUR_HIDDEN_PERMISSIONS: Record<string, string[]> = {
     if (!fromSession && !getPlatformTag(displayName)) {
       const platform = (role.platform || '').toLowerCase();
       const cleanName = role.roleName.toLowerCase();
-      const isPredefined = ['admin', 'super admin', 'labour', 'labor', 'lead labour', 'lead labor'].includes(cleanName);
+      const isPredefined = ['admin', 'super admin', 'labour', 'labor', 'lead labor', 'lead labour'].includes(cleanName);
 
       if (!isPredefined) {
         const inferredPlatform = platform === 'mobile' ? 'Mobile' : 'Portal';
@@ -719,8 +728,8 @@ const LABOUR_HIDDEN_PERMISSIONS: Record<string, string[]> = {
 
   const formatModuleName = (module: string): string => {
     // Handle virtual modules display name
-    if (module === ASSIGNED_LABOUR_MODULE) return 'Assigned Labour';
-    if (module === ASSIGNED_LEAD_LABOUR_MODULE) return 'Assigned Lead Labour';
+    if (module === ASSIGNED_LABOUR_MODULE) return 'Assigned Labor';
+    if (module === ASSIGNED_LEAD_LABOUR_MODULE) return 'Assigned Lead Labor';
     return module
       .split('_')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
@@ -1112,7 +1121,7 @@ const handlePermissionChange = (modName: string, act: string, allowed: boolean) 
     });
 
     // Strip (Portal)/(Mobile) suffix — API receives clean role name
-    const apiRoleName = stripPlatformSuffix(formData.roleName);
+    const apiRoleName = toApiRoleName(formData.roleName);
 
     // Determine platform from the display role name suffix
     const platformValue = getPlatformTag(formData.roleName) || 'Portal';
@@ -1965,7 +1974,7 @@ const handlePermissionChange = (modName: string, act: string, allowed: boolean) 
             >
               <span className="text-4xl">📱</span>
               <span className="font-semibold text-gray-700 group-hover:text-green-700">Mobile</span>
-              <span className="text-xs text-gray-400 text-center">Labour / Lead Labour permissions</span>
+              <span className="text-xs text-gray-400 text-center">Labor / Lead Labor permissions</span>
             </button>
             <button
               type="button"

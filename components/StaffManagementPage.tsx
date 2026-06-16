@@ -238,8 +238,8 @@ export function StaffManagementPage({
 
   const allTabItems = useMemo(() => [
     { id: 'staff', label: 'Staff', icon: UserCog, show: hasStaffPermissions },
-    { id: 'lead-labour', label: 'Lead Labour', icon: HardHat, show: hasLeadLabourPermissions },
-    { id: 'labor', label: 'Labour', icon: Wrench, show: hasLaborPermissions },
+    { id: 'lead-labour', label: 'Lead Labor', icon: HardHat, show: hasLeadLabourPermissions },
+    { id: 'labor', label: 'Labor', icon: Wrench, show: hasLaborPermissions },
     // { id: 'user', label: 'User', icon: User, show: false },
   ], [hasStaffPermissions, hasLeadLabourPermissions, hasLaborPermissions, hasSupplierPermissions])
 
@@ -740,7 +740,7 @@ export function StaffManagementPage({
                 <HardHat className="h-6 w-6 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Lead Labour</p>
+                <p className="text-sm text-gray-600">Lead Labor</p>
                 <p className="text-2xl font-medium text-[#2b2b2b]">{isStatsLoading ? '...' : staffStats.lead_labor}</p>
               </div>
             </div>
@@ -754,7 +754,7 @@ export function StaffManagementPage({
                 <Wrench className="h-6 w-6 text-yellow-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Labour</p>
+                <p className="text-sm text-gray-600">Labor</p>
                 <p className="text-2xl font-medium text-[#2b2b2b]">{isStatsLoading ? '...' : staffStats.labor}</p>
               </div>
             </div>
@@ -890,7 +890,7 @@ function AllStaffPage() {
                 <HardHat className="h-6 w-6 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Lead Labour</p>
+                <p className="text-sm text-gray-600">Lead Labor</p>
                 <p className="text-2xl font-medium text-[#2b2b2b]">{isStatsLoading ? '...' : staffStats.lead_labor}</p>
               </div>
             </div>
@@ -904,7 +904,7 @@ function AllStaffPage() {
                 <Wrench className="h-6 w-6 text-yellow-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Labour</p>
+                <p className="text-sm text-gray-600">Labor</p>
                 <p className="text-2xl font-medium text-[#2b2b2b]">{isStatsLoading ? '...' : staffStats.labor}</p>
               </div>
             </div>

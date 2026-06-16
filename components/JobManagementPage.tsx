@@ -788,10 +788,10 @@ useEffect(() => {
 
             {/* <Select value={filterLabor} onValueChange={setFilterLabor}>
               <SelectTrigger className="w-48">
-                <SelectValue placeholder="Assigned Labour" />
+                <SelectValue placeholder="Assigned Labor" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Labour</SelectItem>
+                <SelectItem value="all">All Labor</SelectItem>
                 {uniqueLabor.map((labor) => (
                   <SelectItem key={labor} value={labor}>{labor}</SelectItem>
                 ))}
@@ -921,7 +921,7 @@ useEffect(() => {
 
                 {/* {job.assignedLaborDetails && job.assignedLaborDetails.length > 0 && (
                   <div>
-                    <p className="text-sm text-gray-600 mb-2">Assigned Labour:</p>
+                    <p className="text-sm text-gray-600 mb-2">Assigned Labor:</p>
                     <div className="flex flex-wrap gap-1">
                       {job.assignedLaborDetails.map((labor, index) => (
                         <Badge key={index} className="bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-50">
@@ -934,7 +934,7 @@ useEffect(() => {
 
                 {/* {job.assignedLeadLaborDetails && job.assignedLeadLaborDetails.length > 0 && (
                   <div>
-                    <p className="text-sm text-gray-600 mb-2">Lead Labour:</p>
+                    <p className="text-sm text-gray-600 mb-2">Lead Labor:</p>
                     <div className="flex flex-wrap gap-1">
                       {job.assignedLeadLaborDetails.map((leadLabor, index) => (
                         <Badge key={index} className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-50">

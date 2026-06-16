@@ -1520,13 +1520,13 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
           <div className="space-y-4 bg-white shadow-lg p-3">
             <div className="flex items-center gap-2 mb-4">
               <UserCheck className="h-5 w-5 text-[#00A1FF]" /> 
-              <h3 className="font-bold text-[#2b2b2b]  text-lg">Assigned Lead Labour & Labour</h3>
+              <h3 className="font-bold text-[#2b2b2b]  text-lg">Assigned Lead Labor & Labor</h3>
             </div>
             {canAssignLeadLabor && (
               <div>
                 <Label className="flex items-center gap-2 mb-2">
                   {/* <UserCheck className="h-4 w-4 text-[#00A1FF]" /> */}
-                  Assigned Lead Labour
+                  Assigned Lead Labor
                 </Label>
 
                 <AutoScrollMultiSelect
@@ -1544,7 +1544,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               <div>
                 <Label className="flex items-center gap-2 mb-2">
                   {/* <Users className="h-4 w-4 text-[#00A1FF]" /> */}
-                  Assigned Labour
+                  Assigned Labor
                 </Label>
 
                 <AutoScrollMultiSelect
@@ -1808,7 +1808,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
             {formData.assignedLeadLabor.length > 0 && (
               <div>
-                <h4 className="font-medium text-[#2b2b2b] mb-2">Assigned Lead Labour ({formData.assignedLeadLabor.length})</h4>
+                <h4 className="font-medium text-[#2b2b2b] mb-2">Assigned Lead Labor ({formData.assignedLeadLabor.length})</h4>
                 <div className="flex flex-wrap gap-1">
                   {formData.assignedLeadLabor.map((id, index) => (
                     <Badge key={id} className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
@@ -1821,7 +1821,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
             {formData.assignedLabor.length > 0 && (
               <div>
-                <h4 className="font-medium text-[#2b2b2b] mb-2">Assigned Labour ({formData.assignedLabor.length})</h4>
+                <h4 className="font-medium text-[#2b2b2b] mb-2">Assigned Labor ({formData.assignedLabor.length})</h4>
                 <div className="flex flex-wrap gap-1">
                   {formData.assignedLabor.map((id, index) => (
                     <Badge key={id} className="bg-blue-50 text-blue-700 border-blue-200 text-xs">

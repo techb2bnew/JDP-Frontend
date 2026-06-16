@@ -177,8 +177,8 @@ export const CustomInvoiceDialog = ({
       /^0+m$/.test(normalizedLabor)
 
     // NOTE: Labour total cost is handled separately for payloads and
-    // the "Total Material + Labour" display. We deliberately do NOT
-    // push a "Labour total cost" product into the products list here
+    // the "Total Material + Labor" display. We deliberately do NOT
+    // push a "Labor total cost" product into the products list here
     // so that the main material line items and subtotal only reflect
     // material items, not labor.
     const customerId = job.customer?.id ?? job.customer_id ?? (blueSheet as any).customer_id ?? null

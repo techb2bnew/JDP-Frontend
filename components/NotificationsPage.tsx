@@ -78,8 +78,8 @@ interface Role {
 const availableRoles = [
   { value: 'admin', label: 'Admin' },
   { value: 'staff', label: 'Staff' },
-  { value: 'lead-labor', label: 'Lead Labour' },
-  { value: 'labor', label: 'Labour' }
+  { value: 'lead-labor', label: 'Lead Labor' },
+  { value: 'labor', label: 'Labor' }
 ]
 
 export function NotificationsPage() {

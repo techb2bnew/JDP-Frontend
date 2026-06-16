@@ -477,8 +477,8 @@ export function Header({
       "/profile": "Profile",
       "/profiles": "Profiles",
       "/profiles/staff": "Staff Profile",
-      "/profiles/lead-labour": "Lead Labour Profile",
-      "/profiles/labour": "Labour Profile",
+      "/profiles/lead-labour": "Lead Labor Profile",
+      "/profiles/labour": "Labor Profile",
     };
     return titles[path] || "Dashboard";
   };

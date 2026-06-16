@@ -314,7 +314,7 @@ const JobDetailsModal = ({ job, onViewCompleteJob }: { job: any, onViewCompleteJ
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Assigned Labour</label>
+              <label className="text-sm font-medium text-muted-foreground">Assigned Labor</label>
               <div className="space-y-1">
                 {job.assignedLabour.map((labor: string, index: number) => (
                   <div key={index} className="flex items-center gap-2 p-2 bg-secondary/50 rounded-lg border border-secondary">
@@ -466,7 +466,7 @@ export function LiveTrackingPage() {
             className={`flex items-center gap-2 ${activeTab === "labor" ? "bg-primary text-primary-foreground" : ""}`}
           >
             <Users className="w-4 h-4" />
-            Labour Tracking
+            Labor Tracking
           </TabsTrigger>
           <TabsTrigger
             value="map"
@@ -546,7 +546,7 @@ export function LiveTrackingPage() {
 
                           {/* Assigned Labour */}
                           <div className="space-y-1">
-                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Assigned Labour</label>
+                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Assigned Labor</label>
                             <div className="space-y-1">
                               {job.assignedLabour.map((labor, index) => (
                                 <div key={index} className="flex items-center gap-2 p-1.5 bg-secondary/30 rounded-md border border-secondary/50">
@@ -631,7 +631,7 @@ export function LiveTrackingPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Users className="w-5 h-5" />
-                  Live Labour Tracking
+                  Live Labor Tracking
                 </CardTitle>
                 <div className="flex items-center gap-3">
                   <div className="relative">
@@ -662,7 +662,7 @@ export function LiveTrackingPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Labour Details</TableHead>
+                    <TableHead>Labor Details</TableHead>
                     <TableHead>Current Assignment</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Location & Contact</TableHead>
