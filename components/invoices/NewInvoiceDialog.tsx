@@ -50,8 +50,10 @@ import { Logo } from "../common/Logo";
 import Image from "next/image";
 import InvoiceLineItemsManager from "../common/invoice-line-items/InvoiceLineItemsManager";
 import {
+  buildInvoicePreviewRows,
   getFilledLineItemRows,
   hasAtLeastOneFilledLineItem,
+  toPayloadStockQuantity,
   validateInvoiceLineItemsForSubmit,
 } from "../common/invoice-line-items/lineItemHelpers";
 import { useRouter } from "next/navigation";
@@ -489,6 +491,24 @@ function resolveJobListSubLabel(job: any): string {
       : null);
   if (raw != null && String(raw).trim() !== "") return String(raw).trim();
   return "No customer linked";
+}
+
+function isFilledPaymentCredits(value: unknown): boolean {
+  const n = Number(value);
+  return Number.isFinite(n) && n !== 0;
+}
+
+function isFilledBalanceDue(value: unknown): boolean {
+  const raw = String(value ?? "").trim();
+  if (!raw) return false;
+  const n = Number(raw);
+  if (Number.isFinite(n)) return n !== 0;
+  return true;
+}
+
+function formatCurrencyAmount(value: unknown): string {
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toFixed(2) : "0.00";
 }
 
 export const NewInvoiceDialog = ({
@@ -1810,7 +1830,7 @@ export const NewInvoiceDialog = ({
           supplier_id: item.supplierId || selectedSupplierId || 1,
           supplier_sku: item.item.substring(0, 10),
           jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          stock_quantity: item.qty,
+          stock_quantity: toPayloadStockQuantity(item.qty),
           unit: "unit",
           ...(payloadJobId != null ? { job_id: payloadJobId } : {}),
           unit_cost: item.rate,
@@ -2082,7 +2102,7 @@ const validateLineItems = (lineItems: any[] = []) => {
           supplier_id: item.supplierId || selectedSupplierId || 1,
           supplier_sku: item.item.substring(0, 10),
           jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          stock_quantity: item.qty,
+          stock_quantity: toPayloadStockQuantity(item.qty),
           unit: "unit",
           ...(payloadJobId != null ? { job_id: payloadJobId } : {}),
           unit_cost: item.rate,
@@ -2364,7 +2384,7 @@ const validateLineItems = (lineItems: any[] = []) => {
           supplier_id: item.supplierId || selectedSupplierId || 1,
           supplier_sku: item.item?.substring?.(0, 10) || "",
           jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          stock_quantity: item.qty,
+          stock_quantity: toPayloadStockQuantity(item.qty),
           unit: "unit",
           ...(payloadJobId != null ? { job_id: payloadJobId } : {}),
           unit_cost: item.rate,
@@ -2730,7 +2750,7 @@ const validateLineItems = (lineItems: any[] = []) => {
           supplier_id: i.supplierId && i.supplierId > 0 ? i.supplierId : 1,
           supplier_sku: i.sku || "",
           jdp_sku: i.jdp_sku || "SKU-DEFAULT",
-          stock_quantity: i.quantity,
+          stock_quantity: toPayloadStockQuantity(i.quantity),
           ...(payloadJobId != null ? { job_id: payloadJobId } : {}),
           unit: i.unit ? i.unit.toString() : "1",
           is_custom: false,
@@ -3410,60 +3430,105 @@ const validateLineItems = (lineItems: any[] = []) => {
             </div>
 
             <div className="mb-4">
-              <div className="grid grid-cols-3 gap-0">
-                <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-xs font-semibold">
-                  Due Date
-                </Label>
-                <Label className="bg-gray-600 text-white px-3 py-2 text-center text-xs font-semibold">
-                  Payment / Credits
-                </Label>
-                <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-xs font-semibold">
-                  Balance Due
-                </Label>
-              </div>
+              {isViewMode ? (
+                <>
+                  {inlineInvoiceData.dueDate && (
+                    <div className="mb-3">
+                      <Label className="bg-gray-800 text-white px-3 py-2 text-center text-xs font-semibold block">
+                        Due Date
+                      </Label>
+                      <div className="border border-gray-800 border-t-0 px-3 py-2 text-sm">
+                        {inlineInvoiceData.dueDate}
+                      </div>
+                    </div>
+                  )}
+                  {(isFilledPaymentCredits(inlineInvoiceData.paymentCredits) ||
+                    isFilledBalanceDue(inlineInvoiceData.balanceDue)) && (
+                    <div className="grid grid-cols-2 gap-0 mb-0">
+                      {isFilledPaymentCredits(
+                        inlineInvoiceData.paymentCredits,
+                      ) && (
+                        <div>
+                          <Label className="bg-gray-800 text-white px-3 py-2 text-center text-xs font-semibold block">
+                            Payment / Credits
+                          </Label>
+                          <div className="border border-gray-800 border-t-0 px-3 py-2 text-sm">
+                            $
+                            {formatCurrencyAmount(
+                              inlineInvoiceData.paymentCredits,
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {isFilledBalanceDue(inlineInvoiceData.balanceDue) && (
+                        <div>
+                          <Label className="bg-gray-800 text-white px-3 py-2 text-center text-xs font-semibold block">
+                            Balance Due
+                          </Label>
+                          <div className="border border-gray-800 border-t-0 px-3 py-2 text-sm">
+                            $
+                            {formatCurrencyAmount(inlineInvoiceData.balanceDue)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="grid grid-cols-3 gap-0">
+                    <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-xs font-semibold">
+                      Due Date
+                    </Label>
+                    <Label className="bg-gray-600 text-white px-3 py-2 text-center text-xs font-semibold">
+                      Payment / Credits
+                    </Label>
+                    <Label className="bg-white border border-gray-300 px-3 py-2 text-center text-xs font-semibold">
+                      Balance Due
+                    </Label>
+                  </div>
 
-              <div className="grid grid-cols-3 gap-0">
-                <div>
-                  <Input
-                    type="date"
-                    value={inlineInvoiceData.dueDate}
-                    onChange={(e) =>
-                      setInlineInvoiceData((prev) => ({
-                        ...prev,
-                        dueDate: e.target.value,
-                      }))
-                    }
-                    className="h-9 px-3 py-2 text-sm rounded-none border-t-0"
-                    readOnly={isViewMode}
-                  />
-                </div>
+                  <div className="grid grid-cols-3 gap-0">
+                    <div>
+                      <Input
+                        type="date"
+                        value={inlineInvoiceData.dueDate}
+                        onChange={(e) =>
+                          setInlineInvoiceData((prev) => ({
+                            ...prev,
+                            dueDate: e.target.value,
+                          }))
+                        }
+                        className="h-9 px-3 py-2 text-sm rounded-none border-t-0"
+                      />
+                    </div>
 
-                <Input
-                  value={inlineInvoiceData.paymentCredits}
-                  onChange={(e) =>
-                    setInlineInvoiceData((prev) => ({
-                      ...prev,
-                      paymentCredits: parseFloat(e.target.value) || 0,
-                    }))
-                  }
-                  className="h-9 px-3 py-2 text-sm rounded-none border-t-0"
-                  placeholder="Payment / Credits"
-                  readOnly={isViewMode}
-                />
+                    <Input
+                      value={inlineInvoiceData.paymentCredits}
+                      onChange={(e) =>
+                        setInlineInvoiceData((prev) => ({
+                          ...prev,
+                          paymentCredits: parseFloat(e.target.value) || 0,
+                        }))
+                      }
+                      className="h-9 px-3 py-2 text-sm rounded-none border-t-0"
+                      placeholder="Payment / Credits"
+                    />
 
-                <Input
-                  value={inlineInvoiceData.balanceDue}
-                  onChange={(e) =>
-                    setInlineInvoiceData((prev) => ({
-                      ...prev,
-                      balanceDue: e.target.value,
-                    }))
-                  }
-                  className="h-9 px-3 py-2 text-sm rounded-none border-t-0"
-                  placeholder="Balance Due"
-                  readOnly={isViewMode}
-                />
-              </div>
+                    <Input
+                      value={inlineInvoiceData.balanceDue}
+                      onChange={(e) =>
+                        setInlineInvoiceData((prev) => ({
+                          ...prev,
+                          balanceDue: e.target.value,
+                        }))
+                      }
+                      className="h-9 px-3 py-2 text-sm rounded-none border-t-0"
+                      placeholder="Balance Due"
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Line Items Table */}
@@ -3496,58 +3561,9 @@ const validateLineItems = (lineItems: any[] = []) => {
 
                     <tbody>
                       {(() => {
-                        const lineItems = inlineInvoiceData.lineItems || [];
-
-                        const getHeaderName = (item: any) =>
-                          item.parent_header_name ||
-                          item.parentHeaderName ||
-                          null;
-
-                        const normalizedItems = lineItems
-                          .filter((item: any) => item.type !== "header")
-                          .map((item: any) => ({
-                            ...item,
-                            qty: item.qty ?? item.stock_quantity ?? 0,
-                            item: item.item ?? item.product_name ?? "-",
-                            rate: item.rate ?? item.unit_cost ?? 0,
-                            estimatedPrice:
-                              item.estimatedPrice ?? item.estimated_price ?? 0,
-                            total: item.total ?? item.total_cost ?? 0,
-                            parent_header_name: getHeaderName(item),
-                          }));
-
-                        const directItems = normalizedItems.filter(
-                          (item: any) => !item.parent_header_name,
+                        const orderedRows = buildInvoicePreviewRows(
+                          inlineInvoiceData.lineItems || [],
                         );
-
-                        const groupedMap = normalizedItems.reduce(
-                          (acc: Record<string, any[]>, item: any) => {
-                            const headerName = item.parent_header_name;
-                            if (!headerName) return acc;
-
-                            if (!acc[headerName]) {
-                              acc[headerName] = [];
-                            }
-
-                            acc[headerName].push(item);
-                            return acc;
-                          },
-                          {},
-                        );
-
-                        const orderedRows: any[] = [
-                          ...directItems,
-                          ...Object.entries(groupedMap).flatMap(
-                            ([headerName, items]) => [
-                              {
-                                id: `header-${headerName}`,
-                                type: "synthetic-header",
-                                headerName,
-                              },
-                              ...items,
-                            ],
-                          ),
-                        ];
 
                         return orderedRows.map(
                           (lineItem: any, index: number) => {
@@ -3651,30 +3667,68 @@ const validateLineItems = (lineItems: any[] = []) => {
                 />
               )}
 
-              <div className="flex justify-end mt-3">
-                <div className="text-right min-w-[200px]">
-                  <div className="flex justify-between mb-1.5">
-                    <span className="text-sm text-gray-700">
-                      Payments / Credits:
-                    </span>
-                    <span className="text-sm text-gray-700">
-                      ${(inlineInvoiceData.paymentCredits || 0).toFixed(2)}
-                    </span>
-                  </div>
+              {isViewMode &&
+                (isFilledPaymentCredits(inlineInvoiceData.paymentCredits) ||
+                  isFilledBalanceDue(inlineInvoiceData.balanceDue)) && (
+                <div className="flex justify-end mt-3">
+                  <div className="text-right min-w-[200px]">
+                    {isFilledPaymentCredits(
+                      inlineInvoiceData.paymentCredits,
+                    ) && (
+                      <div className="flex justify-between mb-1.5">
+                        <span className="text-sm text-gray-700">
+                          Payments / Credits:
+                        </span>
+                        <span className="text-sm text-gray-700">
+                          $
+                          {formatCurrencyAmount(
+                            inlineInvoiceData.paymentCredits,
+                          )}
+                        </span>
+                      </div>
+                    )}
 
-                  <div className="flex justify-between bg-gray-100 px-3 py-2 rounded">
-                    <span className="font-bold text-sm text-gray-700">
-                      Balance Due:
-                    </span>
-                    <span className="font-bold text-sm text-gray-700">
-                      $
-                      {parseFloat(
-                        (inlineInvoiceData.balanceDue || 0).toString(),
-                      ).toFixed(2)}
-                    </span>
+                    {isFilledBalanceDue(inlineInvoiceData.balanceDue) && (
+                      <div className="flex justify-between bg-gray-100 px-3 py-2 rounded">
+                        <span className="font-bold text-sm text-gray-700">
+                          Balance Due:
+                        </span>
+                        <span className="font-bold text-sm text-gray-700">
+                          $
+                          {formatCurrencyAmount(inlineInvoiceData.balanceDue)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
+              )}
+
+              {!isViewMode && (
+                <div className="flex justify-end mt-3">
+                  <div className="text-right min-w-[200px]">
+                    <div className="flex justify-between mb-1.5">
+                      <span className="text-sm text-gray-700">
+                        Payments / Credits:
+                      </span>
+                      <span className="text-sm text-gray-700">
+                        ${(inlineInvoiceData.paymentCredits || 0).toFixed(2)}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between bg-gray-100 px-3 py-2 rounded">
+                      <span className="font-bold text-sm text-gray-700">
+                        Balance Due:
+                      </span>
+                      <span className="font-bold text-sm text-gray-700">
+                        $
+                        {parseFloat(
+                          (inlineInvoiceData.balanceDue || 0).toString(),
+                        ).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {validationErrors.lineItems && (
                 <p className="text-red-500 text-xs mt-2">
@@ -3980,7 +4034,7 @@ const validateLineItems = (lineItems: any[] = []) => {
                 {/* Project Details */}
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div>
-                    <div className="text-sm font-semibold border border-gray-800 px-3 py-2">
+                    <div className="bg-gray-800 text-white text-sm font-semibold border border-gray-800 px-3 py-2">
                       P.O. No.
                     </div>
                     <div className="text-gray-600 border border-gray-800 px-3 py-2 text-sm min-h-[40px]">
@@ -4001,27 +4055,73 @@ const validateLineItems = (lineItems: any[] = []) => {
                 <div className="mb-3">
                   <table className="w-full border-collapse border border-gray-300">
                     <thead>
-                      <tr className="bg-gray-100">
-                        <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-sm">
+                      <tr className="bg-gray-800 text-white">
+                        <th className="border border-gray-800 px-3 py-2 text-left font-semibold text-sm">
                           Rep
                         </th>
-                        <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-sm">
+                        <th className="border border-gray-800 px-3 py-2 text-left font-semibold text-sm">
                           Due Date
                         </th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr>
-                        <td className="border border-gray-300 px-3 py-2 text-sm">
+                        <td className="border border-gray-800 px-3 py-2 text-sm">
                           {inlineInvoiceData.rep || "JDP"}
                         </td>
-                        <td className="border border-gray-300 px-3 py-2 text-sm">
+                        <td className="border border-gray-800 px-3 py-2 text-sm">
                           {inlineInvoiceData.dueDate || ""}
                         </td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
+
+                {(isFilledPaymentCredits(inlineInvoiceData.paymentCredits) ||
+                  isFilledBalanceDue(inlineInvoiceData.balanceDue)) && (
+                  <div className="mb-3">
+                    <table className="w-full border-collapse border border-gray-300">
+                      <thead>
+                        <tr className="bg-gray-800 text-white">
+                          {isFilledPaymentCredits(
+                            inlineInvoiceData.paymentCredits,
+                          ) && (
+                            <th className="border border-gray-800 px-3 py-2 text-left font-semibold text-sm">
+                              Payment / Credits
+                            </th>
+                          )}
+                          {isFilledBalanceDue(inlineInvoiceData.balanceDue) && (
+                            <th className="border border-gray-800 px-3 py-2 text-left font-semibold text-sm">
+                              Balance Due
+                            </th>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          {isFilledPaymentCredits(
+                            inlineInvoiceData.paymentCredits,
+                          ) && (
+                            <td className="border border-gray-800 px-3 py-2 text-sm">
+                              $
+                              {formatCurrencyAmount(
+                                inlineInvoiceData.paymentCredits,
+                              )}
+                            </td>
+                          )}
+                          {isFilledBalanceDue(inlineInvoiceData.balanceDue) && (
+                            <td className="border border-gray-800 px-3 py-2 text-sm">
+                              $
+                              {formatCurrencyAmount(
+                                inlineInvoiceData.balanceDue,
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
                 {/* Line Items Table */}
                 <div className="mb-4">
@@ -4048,58 +4148,9 @@ const validateLineItems = (lineItems: any[] = []) => {
 
                     <tbody>
                       {(() => {
-                        const lineItems = inlineInvoiceData.lineItems || [];
-
-                        const getHeaderName = (item: any) =>
-                          item.parent_header_name ||
-                          item.parentHeaderName ||
-                          null;
-
-                        const normalizedItems = lineItems
-                          .filter((item: any) => item.type !== "header")
-                          .map((item: any) => ({
-                            ...item,
-                            qty: item.qty ?? item.stock_quantity ?? 0,
-                            item: item.item ?? item.product_name ?? "-",
-                            rate: item.rate ?? item.unit_cost ?? 0,
-                            estimatedPrice:
-                              item.estimatedPrice ?? item.estimated_price ?? 0,
-                            total: item.total ?? item.total_cost ?? 0,
-                            parent_header_name: getHeaderName(item),
-                          }));
-
-                        const directItems = normalizedItems.filter(
-                          (item: any) => !item.parent_header_name,
+                        const orderedRows = buildInvoicePreviewRows(
+                          inlineInvoiceData.lineItems || [],
                         );
-
-                        const groupedMap = normalizedItems.reduce(
-                          (acc: Record<string, any[]>, item: any) => {
-                            const headerName = item.parent_header_name;
-                            if (!headerName) return acc;
-
-                            if (!acc[headerName]) {
-                              acc[headerName] = [];
-                            }
-
-                            acc[headerName].push(item);
-                            return acc;
-                          },
-                          {},
-                        );
-
-                        const orderedRows: any[] = [
-                          ...directItems,
-                          ...Object.entries(groupedMap).flatMap(
-                            ([headerName, items]) => [
-                              {
-                                id: `header-${headerName}`,
-                                type: "synthetic-header",
-                                headerName,
-                              },
-                              ...items,
-                            ],
-                          ),
-                        ];
 
                         return orderedRows.map(
                           (lineItem: any, index: number) => {

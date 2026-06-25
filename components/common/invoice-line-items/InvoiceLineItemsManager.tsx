@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
   createDefaultEmptyLineItems,
   isStandaloneGroupKey,
+  syncParentHeadersFromFlatOrder,
 } from "./lineItemHelpers";
 
 export type ProductType = {
@@ -261,7 +262,9 @@ const reorderHeaderGroups = ({
   const [movedGroup] = updatedGroups.splice(activeIndex, 1);
   updatedGroups.splice(overIndex, 0, movedGroup);
 
-  return flattenGroupsToLineItems(updatedGroups);
+  return syncParentHeadersFromFlatOrder(
+    flattenGroupsToLineItems(updatedGroups),
+  );
 };
 
 const resolveParentAfterDrop = (rows: LineItemType[], targetIndex: number) => {

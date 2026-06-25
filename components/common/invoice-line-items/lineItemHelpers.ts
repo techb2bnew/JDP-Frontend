@@ -120,9 +120,93 @@ export function hasAtLeastOneFilledLineItem(lineItems: any[] = []): boolean {
   return getFilledLineItemRows(lineItems).length > 0;
 }
 
+/** API expects integer stock_quantity (not float/string). */
+export function toPayloadStockQuantity(qty: unknown): number {
+  const n = Number(qty);
+  if (!Number.isFinite(n) || n <= 0) return 1;
+  return Math.trunc(n);
+}
+
 /** First product line row (for single-row validation highlight). */
 export function getFirstItemLineRow(lineItems: any[] = []): any | null {
   return lineItems.find((row) => row?.type === "item") ?? null;
+}
+
+/** Keep parentHeaderKey/Name in sync with flat row order (after header drag). */
+export function syncParentHeadersFromFlatOrder<T extends {
+  type?: string;
+  headerKey?: string | null;
+  headerName?: string | null;
+  parentHeaderKey?: string | null;
+  parentHeaderName?: string | null;
+}>(rows: T[]): T[] {
+  let currentHeader: { key: string; name: string } | null = null;
+
+  return rows.map((row) => {
+    if (
+      row.type === "header" &&
+      row.headerKey &&
+      !isStandaloneGroupKey(row.headerKey)
+    ) {
+      currentHeader = {
+        key: row.headerKey,
+        name: String(row.headerName || "").trim(),
+      };
+      return row;
+    }
+
+    if (row.type !== "item") return row;
+
+    if (currentHeader) {
+      return {
+        ...row,
+        parentHeaderKey: currentHeader.key,
+        parentHeaderName: currentHeader.name || null,
+      };
+    }
+
+    return {
+      ...row,
+      parentHeaderKey: null,
+      parentHeaderName: null,
+    };
+  });
+}
+
+function normalizePreviewLineItem(item: any) {
+  return {
+    ...item,
+    qty: item.qty ?? item.stock_quantity ?? 0,
+    item: item.item ?? item.product_name ?? "-",
+    description: item.description ?? "",
+    rate: item.rate ?? item.unit_cost ?? 0,
+    estimatedPrice: item.estimatedPrice ?? item.estimated_price ?? 0,
+    total: item.total ?? item.total_cost ?? 0,
+  };
+}
+
+/** Preview rows in the same order as the line-item editor (headers + items). */
+export function buildInvoicePreviewRows(lineItems: any[] = []): any[] {
+  const rows: any[] = [];
+
+  for (const row of lineItems) {
+    if (row.type === "header" && !isStandaloneGroupKey(row.headerKey)) {
+      const headerName = String(row.headerName || "").trim();
+      if (headerName) {
+        rows.push({
+          id: `header-${row.headerKey}`,
+          type: "synthetic-header",
+          headerName,
+        });
+      }
+      continue;
+    }
+
+    if (row.type !== "item" || !isFilledLineItemRow(row)) continue;
+    rows.push(normalizePreviewLineItem(row));
+  }
+
+  return rows;
 }
 
 export function validateInvoiceLineItemsForSubmit(lineItems: any[] = []): {

@@ -554,7 +554,7 @@ export function Header({
 
   return (
     <TooltipProvider>
-      <header className="sticky top-0 bg-card border-b px-6 py-4 animate-fade-in shadow-sm bg-white z-[2]">
+      <header className="sticky top-0 bg-card border-b px-6 py-4 animate-fade-in shadow-sm bg-white z-[11]">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4 gap-3 w-[70%]">
             {/* <h1 className="text-2xl font-medium text-foreground w-[25%]">
