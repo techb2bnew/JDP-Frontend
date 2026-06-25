@@ -3444,11 +3444,19 @@ const validateLineItems = (lineItems: any[] = []) => {
                   )}
                   {(isFilledPaymentCredits(inlineInvoiceData.paymentCredits) ||
                     isFilledBalanceDue(inlineInvoiceData.balanceDue)) && (
-                    <div className="grid grid-cols-2 gap-0 mb-0">
+                    <div
+                      className={`grid gap-0 mb-0 ${
+                        isFilledPaymentCredits(
+                          inlineInvoiceData.paymentCredits,
+                        ) && isFilledBalanceDue(inlineInvoiceData.balanceDue)
+                          ? "grid-cols-2"
+                          : "grid-cols-1"
+                      }`}
+                    >
                       {isFilledPaymentCredits(
                         inlineInvoiceData.paymentCredits,
                       ) && (
-                        <div>
+                        <div className="min-w-0">
                           <Label className="bg-gray-800 text-white px-3 py-2 text-center text-xs font-semibold block">
                             Payment / Credits
                           </Label>
@@ -3461,7 +3469,7 @@ const validateLineItems = (lineItems: any[] = []) => {
                         </div>
                       )}
                       {isFilledBalanceDue(inlineInvoiceData.balanceDue) && (
-                        <div>
+                        <div className="min-w-0">
                           <Label className="bg-gray-800 text-white px-3 py-2 text-center text-xs font-semibold block">
                             Balance Due
                           </Label>
@@ -4080,18 +4088,18 @@ const validateLineItems = (lineItems: any[] = []) => {
                 {(isFilledPaymentCredits(inlineInvoiceData.paymentCredits) ||
                   isFilledBalanceDue(inlineInvoiceData.balanceDue)) && (
                   <div className="mb-3">
-                    <table className="w-full border-collapse border border-gray-300">
+                    <table className="w-full table-fixed border-collapse border border-gray-300">
                       <thead>
                         <tr className="bg-gray-800 text-white">
                           {isFilledPaymentCredits(
                             inlineInvoiceData.paymentCredits,
                           ) && (
-                            <th className="border border-gray-800 px-3 py-2 text-left font-semibold text-sm">
+                            <th className="w-1/2 border border-gray-800 px-3 py-2 text-left font-semibold text-sm">
                               Payment / Credits
                             </th>
                           )}
                           {isFilledBalanceDue(inlineInvoiceData.balanceDue) && (
-                            <th className="border border-gray-800 px-3 py-2 text-left font-semibold text-sm">
+                            <th className="w-1/2 border border-gray-800 px-3 py-2 text-left font-semibold text-sm">
                               Balance Due
                             </th>
                           )}
@@ -4102,7 +4110,7 @@ const validateLineItems = (lineItems: any[] = []) => {
                           {isFilledPaymentCredits(
                             inlineInvoiceData.paymentCredits,
                           ) && (
-                            <td className="border border-gray-800 px-3 py-2 text-sm">
+                            <td className="w-1/2 border border-gray-800 px-3 py-2 text-sm">
                               $
                               {formatCurrencyAmount(
                                 inlineInvoiceData.paymentCredits,
@@ -4110,7 +4118,7 @@ const validateLineItems = (lineItems: any[] = []) => {
                             </td>
                           )}
                           {isFilledBalanceDue(inlineInvoiceData.balanceDue) && (
-                            <td className="border border-gray-800 px-3 py-2 text-sm">
+                            <td className="w-1/2 border border-gray-800 px-3 py-2 text-sm">
                               $
                               {formatCurrencyAmount(
                                 inlineInvoiceData.balanceDue,
