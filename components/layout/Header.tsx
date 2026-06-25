@@ -76,6 +76,7 @@ export function Header({
     listingEstimateJobId,
     listingEstimateParentId,
     listingEstimateSource,
+    listingEstimateParentKind,
   } = useEstimatePrefill();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
@@ -540,6 +541,9 @@ export function Header({
       if (parentId) params.set("parentId", parentId);
       if (listingEstimateSource) {
         params.set("listingSource", listingEstimateSource);
+      }
+      if (listingEstimateParentKind) {
+        params.set("parentEntityKind", listingEstimateParentKind);
       }
       router.push(`/invoices/create?${params.toString()}`);
       return;

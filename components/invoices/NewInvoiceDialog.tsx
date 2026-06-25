@@ -59,6 +59,10 @@ import {
   sortJobsWithListingParentFirst,
   type ListingParentSource,
 } from "@/lib/entityListingRecentActivity";
+import {
+  resolveEntityKind,
+  type EntityKind,
+} from "@/lib/resolveEntityKind";
 // import { formatCurrency, formatDate } from '../../utils/invoiceUtils'
 
 interface NewInvoiceDialogProps {
@@ -72,6 +76,8 @@ interface NewInvoiceDialogProps {
   /** Selected customer/contractor from listing — their jobs show first in dropdown. */
   listingParentId?: string;
   listingSource?: ListingParentSource;
+  /** Actual selected row type — drives customer_id vs contractor_id in payload. */
+  listingParentKind?: EntityKind;
   onInvoiceSaved?: (invoice: any) => void;
   isViewMode?: boolean;
   viewInvoiceData?: any;
@@ -105,7 +111,7 @@ export interface CreateEstimatePayload {
   issue_date: string;
   due_date: string;
 
-  job_id: number;
+  job_id?: number;
 
   // additional_cost: {
   //   description: string;
@@ -117,7 +123,7 @@ export interface CreateEstimatePayload {
     email: string;
     hours_worked: number;
     hourly_rate: number;
-    job_id: number;
+    job_id?: number;
     is_custom: boolean;
   }[];
 
@@ -128,7 +134,7 @@ export interface CreateEstimatePayload {
     jdp_sku: string;
     stock_quantity: number;
     unit: string;
-    job_id: number;
+    job_id?: number;
     is_custom: boolean;
     unit_cost: number;
   }[];
@@ -184,12 +190,18 @@ function resolveBillToAddressFromListingEntity(
 function resolveListingParentInvoiceFields(
   entity: any,
   source: ListingParentSource,
+  entityKind?: EntityKind | null,
 ): {
   customerName: string;
   customerAddress: string;
   billToAddress: string;
 } {
-  if (source === "contractors") {
+  const kind =
+    entityKind ??
+    resolveEntityKind(entity) ??
+    (source === "contractors" ? "contractor" : "customer");
+
+  if (kind === "contractor") {
     const customerName =
       entity?.contractor_name ||
       entity?.name ||
@@ -378,6 +390,74 @@ function resolveInvoiceLocationFromJob(
   ).trim();
 }
 
+/** Valid job id for estimate payloads — omit when no job is selected. */
+function resolvePayloadJobId(
+  jobId: string | number | undefined | null,
+): number | null {
+  if (jobId === undefined || jobId === null || jobId === "") return null;
+  const n = Number(jobId);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
+}
+
+/** customer_id / contractor_id from listing navigation when no job is selected. */
+function resolveListingParentEntityIds(
+  listingParentId: string | undefined,
+  parentKind: EntityKind | null | undefined,
+  listingSource?: ListingParentSource,
+): {
+  customerId: number | null;
+  contractorId: number | null;
+  isContractBased: boolean;
+} {
+  if (!listingParentId?.trim()) {
+    return { customerId: null, contractorId: null, isContractBased: false };
+  }
+  const id = Number(listingParentId);
+  if (!Number.isFinite(id) || id <= 0) {
+    return { customerId: null, contractorId: null, isContractBased: false };
+  }
+
+  const kind =
+    parentKind ??
+    (listingSource === "contractors"
+      ? "contractor"
+      : listingSource === "customers"
+        ? "customer"
+        : null);
+
+  if (!kind) {
+    return { customerId: null, contractorId: null, isContractBased: false };
+  }
+
+  if (kind === "contractor") {
+    return { customerId: null, contractorId: id, isContractBased: true };
+  }
+  return { customerId: id, contractorId: null, isContractBased: false };
+}
+
+function withListingParentEntityIds(
+  customerId: number | null,
+  contractorId: number | null,
+  isContractBased: boolean,
+  listingParentId: string | undefined,
+  parentKind: EntityKind | null | undefined,
+  listingSource?: ListingParentSource,
+): {
+  customerId: number | null;
+  contractorId: number | null;
+  isContractBased: boolean;
+} {
+  if (customerId || contractorId) {
+    return { customerId, contractorId, isContractBased };
+  }
+  return resolveListingParentEntityIds(
+    listingParentId,
+    parentKind,
+    listingSource,
+  );
+}
+
 /** Secondary line under job title in job picker (customer vs contractor). */
 function resolveJobListSubLabel(job: any): string {
   if (!job) return "";
@@ -419,6 +499,7 @@ export const NewInvoiceDialog = ({
   prefillFromListing = false,
   listingParentId,
   listingSource,
+  listingParentKind,
   jobs,
   onInvoiceSaved,
   isViewMode = false,
@@ -494,6 +575,23 @@ export const NewInvoiceDialog = ({
   const billToSyncedJobIdRef = useRef<string | number | null>(null);
   const listingPrefillAppliedRef = useRef(false);
   const listingParentBillingSyncedRef = useRef<string | null>(null);
+  const listingParentKindFromEntityRef = useRef<EntityKind | null>(null);
+
+  const resolveListingParentKindForPayload = useCallback((): EntityKind | null => {
+    return (
+      listingParentKind ??
+      listingParentKindFromEntityRef.current ??
+      (listingSource === "contractors"
+        ? "contractor"
+        : listingSource === "customers"
+          ? "customer"
+          : null)
+    );
+  }, [listingParentKind, listingSource]);
+
+  useEffect(() => {
+    listingParentKindFromEntityRef.current = listingParentKind ?? null;
+  }, [listingParentId, listingParentKind]);
   /** Latest notes text for API payloads (avoids stale closure if send runs before state flushes). */
   const invoiceNotesRef = useRef<string | null>(null);
   const [invalidHeaderKeys, setInvalidHeaderKeys] = useState<string[]>([]);
@@ -752,8 +850,18 @@ export const NewInvoiceDialog = ({
       );
       if (!entity) return false;
 
+      const resolvedKind =
+        listingParentKind ?? resolveEntityKind(entity) ?? null;
+      if (resolvedKind) {
+        listingParentKindFromEntityRef.current = resolvedKind;
+      }
+
       const { customerName, customerAddress, billToAddress } =
-        resolveListingParentInvoiceFields(entity, listingSource);
+        resolveListingParentInvoiceFields(
+          entity,
+          listingSource,
+          resolvedKind,
+        );
 
       listingParentBillingSyncedRef.current = listingParentId;
       setInlineInvoiceData((prev) => ({
@@ -768,7 +876,7 @@ export const NewInvoiceDialog = ({
       console.error("Failed to prefill billing from listing parent:", error);
       return false;
     }
-  }, [listingParentId, listingSource]);
+  }, [listingParentId, listingSource, listingParentKind]);
 
   // Auto-fill billing when only customer/contractor selected (no job in dropdown)
   useEffect(() => {
@@ -1132,6 +1240,16 @@ export const NewInvoiceDialog = ({
           customerId = resolveCustomerIdFromJob(createModeJob);
           console.log("Create mode - customer_id from jobRow:", customerId);
         }
+      } else {
+        ({ customerId, contractorId, isContractBased } =
+          withListingParentEntityIds(
+            customerId,
+            contractorId,
+            isContractBased,
+            listingParentId,
+            resolveListingParentKindForPayload(),
+            listingSource,
+          ));
       }
 
       if (!customerId && !contractorId) {
@@ -1683,6 +1801,7 @@ export const NewInvoiceDialog = ({
       const subtotal = calculateInvoiceSubtotal();
 
       const invoiceItemRows = getFilledLineItemRows(inlineInvoiceData.lineItems);
+      const payloadJobId = resolvePayloadJobId(inlineInvoiceData.jobId);
 
       const customProducts = invoiceItemRows.map((item: any) => {
         const base = {
@@ -1693,7 +1812,7 @@ export const NewInvoiceDialog = ({
           jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
           stock_quantity: item.qty,
           unit: "unit",
-          job_id: Number(inlineInvoiceData.jobId),
+          ...(payloadJobId != null ? { job_id: payloadJobId } : {}),
           unit_cost: item.rate,
           jdp_price: item.rate,
           estimated_price: item.estimatedPrice || 0,
@@ -1764,6 +1883,22 @@ export const NewInvoiceDialog = ({
         customerId = !isContractBased
           ? resolveCustomerIdFromJob(draftJob)
           : null;
+
+        ({ customerId, contractorId, isContractBased } =
+          withListingParentEntityIds(
+            customerId,
+            contractorId,
+            isContractBased,
+            listingParentId,
+            resolveListingParentKindForPayload(),
+            listingSource,
+          ));
+      }
+
+      if (!customerId && !contractorId) {
+        toast.error("Customer or contractor is required");
+        setSavingDraft(false);
+        return;
       }
 
       const emailForDraft =
@@ -1806,9 +1941,7 @@ export const NewInvoiceDialog = ({
         String(inlineInvoiceData.customerAddress || "").trim();
 
       const payload: any = {
-        ...(inlineInvoiceData.jobId
-          ? { job_id: Number(inlineInvoiceData.jobId) }
-          : {}),
+        ...(payloadJobId != null ? { job_id: payloadJobId } : {}),
         estimate_title:
           inlineInvoiceData.project ||
           draftJob?.title ||
@@ -1940,6 +2073,7 @@ const validateLineItems = (lineItems: any[] = []) => {
       const subtotal = calculateInvoiceSubtotal();
 
       const invoiceItemRows = getFilledLineItemRows(inlineInvoiceData.lineItems);
+      const payloadJobId = resolvePayloadJobId(inlineInvoiceData.jobId);
 
       const customProducts = invoiceItemRows.map((item: any) => {
         const base = {
@@ -1950,7 +2084,7 @@ const validateLineItems = (lineItems: any[] = []) => {
           jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
           stock_quantity: item.qty,
           unit: "unit",
-          job_id: Number(inlineInvoiceData.jobId),
+          ...(payloadJobId != null ? { job_id: payloadJobId } : {}),
           unit_cost: item.rate,
           jdp_price: item.rate,
           estimated_price: item.estimatedPrice || 0,
@@ -2025,6 +2159,22 @@ const validateLineItems = (lineItems: any[] = []) => {
         customerId = !isContractBased
           ? resolveCustomerIdFromJob(previewJob)
           : null;
+
+        ({ customerId, contractorId, isContractBased } =
+          withListingParentEntityIds(
+            customerId,
+            contractorId,
+            isContractBased,
+            listingParentId,
+            resolveListingParentKindForPayload(),
+            listingSource,
+          ));
+      }
+
+      if (!customerId && !contractorId) {
+        toast.error("Customer or contractor is required");
+        setSendingInvoice(false);
+        return;
       }
 
       const emailForPreview =
@@ -2067,9 +2217,7 @@ const validateLineItems = (lineItems: any[] = []) => {
         String(inlineInvoiceData.customerAddress || "").trim();
 
       const payload: any = {
-        ...(inlineInvoiceData.jobId
-          ? { job_id: Number(inlineInvoiceData.jobId) }
-          : {}),
+        ...(payloadJobId != null ? { job_id: payloadJobId } : {}),
         estimate_title:
           inlineInvoiceData.project ||
           previewJob?.title ||
@@ -2207,6 +2355,7 @@ const validateLineItems = (lineItems: any[] = []) => {
     setQuickbookActionLoading(action);
     try {
       const invoiceItemRows = getFilledLineItemRows(inlineInvoiceData.lineItems);
+      const payloadJobId = resolvePayloadJobId(inlineInvoiceData.jobId);
 
       const customProducts = invoiceItemRows.map((item: any) => {
         const base = {
@@ -2217,7 +2366,7 @@ const validateLineItems = (lineItems: any[] = []) => {
           jdp_sku: `JDP-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
           stock_quantity: item.qty,
           unit: "unit",
-          job_id: Number(inlineInvoiceData.jobId),
+          ...(payloadJobId != null ? { job_id: payloadJobId } : {}),
           unit_cost: item.rate,
           jdp_price: item.rate,
           estimated_price: item.estimatedPrice || 0,
@@ -2245,15 +2394,29 @@ const validateLineItems = (lineItems: any[] = []) => {
         currentJob,
       );
 
-      const isContractBased = isJobContractBased(selectedJobFromList);
-
-      const customerId = !isContractBased
+      let isContractBased = isJobContractBased(selectedJobFromList);
+      let customerId = !isContractBased
         ? resolveCustomerIdFromJob(selectedJobFromList)
         : null;
-
-      const contractorId = isContractBased
+      let contractorId = isContractBased
         ? resolveContractorIdFromJob(selectedJobFromList)
         : null;
+
+      ({ customerId, contractorId, isContractBased } =
+        withListingParentEntityIds(
+          customerId,
+          contractorId,
+          isContractBased,
+          listingParentId,
+          resolveListingParentKindForPayload(),
+          listingSource,
+        ));
+
+      if (!customerId && !contractorId) {
+        toast.error("Customer or contractor is required");
+        setQuickbookActionLoading(null);
+        return;
+      }
 
       const qbEmail = selectedJobFromList
         ? resolveInvoiceEmailFromJob(selectedJobFromList, isContractBased) ||
@@ -2262,7 +2425,7 @@ const validateLineItems = (lineItems: any[] = []) => {
         : currentJob?.email || "customer@example.com";
 
       const payload: any = {
-        job_id: Number(inlineInvoiceData.jobId),
+        ...(payloadJobId != null ? { job_id: payloadJobId } : {}),
         invoice_type: mapInvoiceTypeToAPI(selectedInvoiceType),
         estimate_title:
           inlineInvoiceData.project ||
@@ -2549,13 +2712,15 @@ const validateLineItems = (lineItems: any[] = []) => {
   const handleSave = async () => {
     setLoading(true);
     try {
+      const payloadJobId = resolvePayloadJobId(newInvoice.jobId);
+
       const laborPayload =
         newInvoice.labor?.map((l) => ({
           full_name: l.laborName,
           email: l.email || "customer@example.com",
           hours_worked: l.hours,
           hourly_rate: l.hourlyRate,
-          job_id: Number(newInvoice.jobId),
+          ...(payloadJobId != null ? { job_id: payloadJobId } : {}),
           is_custom: true,
         })) || [];
 
@@ -2566,7 +2731,7 @@ const validateLineItems = (lineItems: any[] = []) => {
           supplier_sku: i.sku || "",
           jdp_sku: i.jdp_sku || "SKU-DEFAULT",
           stock_quantity: i.quantity,
-          job_id: Number(newInvoice.jobId),
+          ...(payloadJobId != null ? { job_id: payloadJobId } : {}),
           unit: i.unit ? i.unit.toString() : "1",
           is_custom: false,
           unit_cost: i.unitPrice,
@@ -2600,7 +2765,7 @@ const validateLineItems = (lineItems: any[] = []) => {
         issue_date: newInvoice.issueDate || "",
         due_date: newInvoice.dueDate || "",
 
-        job_id: Number(newInvoice.jobId),
+        ...(payloadJobId != null ? { job_id: payloadJobId } : {}),
 
         // additional_cost: newInvoice.additionalCosts?.length
         //   ? {

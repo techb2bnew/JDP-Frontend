@@ -9,6 +9,7 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
+import type { EntityKind } from "@/lib/resolveEntityKind";
 
 export type ListingEstimateSource = "customers" | "contractors" | null;
 
@@ -16,10 +17,12 @@ interface EstimatePrefillContextType {
   listingEstimateJobId: string | null;
   listingEstimateParentId: string | null;
   listingEstimateSource: ListingEstimateSource;
+  listingEstimateParentKind: EntityKind | null;
   setListingEstimateSelection: (
     jobId: string | null,
     parentId: string | null,
     source: ListingEstimateSource,
+    parentKind: EntityKind | null,
   ) => void;
 }
 
@@ -42,22 +45,29 @@ export function useListingEstimatePrefillSync(
   selectedParent: string | null,
   selectedJob: string | null,
   selectedSubJob: string | null,
+  parentEntityKind: EntityKind | null,
 ) {
   const { setListingEstimateSelection } = useEstimatePrefill();
 
   useEffect(() => {
     const effectiveJobId = selectedSubJob || selectedJob;
-    setListingEstimateSelection(effectiveJobId, selectedParent, source);
+    setListingEstimateSelection(
+      effectiveJobId,
+      selectedParent,
+      source,
+      parentEntityKind,
+    );
   }, [
     selectedParent,
     selectedJob,
     selectedSubJob,
     source,
+    parentEntityKind,
     setListingEstimateSelection,
   ]);
 
   useEffect(() => {
-    return () => setListingEstimateSelection(null, null, null);
+    return () => setListingEstimateSelection(null, null, null, null);
   }, [setListingEstimateSelection]);
 }
 
@@ -66,16 +76,20 @@ export function EstimatePrefillProvider({ children }: { children: ReactNode }) {
   const [listingEstimateParentId, setParentId] = useState<string | null>(null);
   const [listingEstimateSource, setSource] =
     useState<ListingEstimateSource>(null);
+  const [listingEstimateParentKind, setParentKind] =
+    useState<EntityKind | null>(null);
 
   const setListingEstimateSelection = useCallback(
     (
       jobId: string | null,
       parentId: string | null,
       source: ListingEstimateSource,
+      parentKind: EntityKind | null,
     ) => {
       setJobId(jobId);
       setParentId(parentId);
       setSource(source);
+      setParentKind(parentKind);
     },
     [],
   );
@@ -85,12 +99,14 @@ export function EstimatePrefillProvider({ children }: { children: ReactNode }) {
       listingEstimateJobId,
       listingEstimateParentId,
       listingEstimateSource,
+      listingEstimateParentKind,
       setListingEstimateSelection,
     }),
     [
       listingEstimateJobId,
       listingEstimateParentId,
       listingEstimateSource,
+      listingEstimateParentKind,
       setListingEstimateSelection,
     ],
   );

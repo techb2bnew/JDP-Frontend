@@ -73,7 +73,7 @@ import {
   annotateJobsForListing,
   sortEntitiesByRecentJobActivity,
 } from '@/lib/entityListingRecentActivity'
-import { resolveEntityKind } from '@/lib/resolveEntityKind'
+import { resolveEntityKind, type EntityKind } from '@/lib/resolveEntityKind'
 
 interface Job {
   id: number
@@ -973,12 +973,6 @@ export function ContractorListingPage() {
   const [selectedContractor, setSelectedContractor] = useState<string | null>(null)
   const [selectedJob, setSelectedJob] = useState<string | null>(null)
   const [selectedSubJob, setSelectedSubJob] = useState<string | null>(null)
-  useListingEstimatePrefillSync(
-    'contractors',
-    selectedContractor,
-    selectedJob,
-    selectedSubJob,
-  )
   const [showContractorDetails, setShowContractorDetails] = useState(false)
   const [enhancedJobData, setEnhancedJobData] = useState<any>(null)
   const [expandedContractors, setExpandedContractors] = useState<Set<string>>(new Set())
@@ -1229,6 +1223,32 @@ export function ContractorListingPage() {
   // Pagination - use API pagination
   const totalPages = Math.ceil(totalContractors / itemsPerPage)
   const displayContractors = filteredContractors
+
+  const listingParentEntityKind = useMemo((): EntityKind | null => {
+    if (!selectedContractor) return null
+    const entity =
+      pinnedListingContractor?.id?.toString?.() === selectedContractor
+        ? pinnedListingContractor
+        : contractors.find((c) => c.id?.toString?.() === selectedContractor) ||
+          filteredContractors.find(
+            (c) => c.id?.toString?.() === selectedContractor,
+          ) ||
+          null
+    return resolveEntityKind(entity) ?? 'contractor'
+  }, [
+    selectedContractor,
+    pinnedListingContractor,
+    contractors,
+    filteredContractors,
+  ])
+
+  useListingEstimatePrefillSync(
+    'contractors',
+    selectedContractor,
+    selectedJob,
+    selectedSubJob,
+    listingParentEntityKind,
+  )
 
   // Fetch contractors when page or page size changes (single effect — duplicate [currentPage] blocks were removed)
   useEffect(() => {

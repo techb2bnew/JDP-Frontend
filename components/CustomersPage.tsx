@@ -97,7 +97,7 @@ import {
   annotateJobsForListing,
   sortEntitiesByRecentJobActivity,
 } from "@/lib/entityListingRecentActivity";
-import { resolveEntityKind } from "@/lib/resolveEntityKind";
+import { resolveEntityKind, type EntityKind } from "@/lib/resolveEntityKind";
 import {
   ADDRESS_AUTOCOMPLETE_OPTIONS,
   ADDRESS_SEARCH_PLACEHOLDER,
@@ -191,18 +191,33 @@ function resolveCustomerJobNavigation(
 const mapApiCustomerToListingEntity = (
   apiCustomer: any,
   jobs: any[] = [],
-) => ({
-  id: apiCustomer.id,
-  customer_name: apiCustomer.customer_name || "",
-  name: apiCustomer.customer_name || "",
-  email: apiCustomer.email || "",
-  phone: apiCustomer.phone || "",
-  company_name: apiCustomer.company_name || "",
-  address: apiCustomer.address || "",
-  created_at: apiCustomer.created_at || "",
-  jobs,
-  total_jobs: jobs.length,
-});
+) => {
+  const kind = resolveEntityKind(apiCustomer) ?? "customer";
+  return {
+    id: apiCustomer.id,
+    customer_name: apiCustomer.customer_name || "",
+    name: apiCustomer.customer_name || "",
+    email: apiCustomer.email || "",
+    phone: apiCustomer.phone || "",
+    company_name: apiCustomer.company_name || "",
+    address: apiCustomer.address || "",
+    created_at: apiCustomer.created_at || "",
+    tag: apiCustomer.tag || kind,
+    type: apiCustomer.type || kind,
+    customer_type: apiCustomer.customer_type || kind,
+    jobs,
+    total_jobs: jobs.length,
+  };
+};
+
+function mapListingEntityKindFields(entity: any) {
+  const kind = resolveEntityKind(entity) ?? "customer";
+  return {
+    tag: entity.tag || kind,
+    type: entity.type || kind,
+    customer_type: entity.customer_type || kind,
+  };
+}
 
 export function CustomersPage() {
   const { hasPermission } = usePermissions();
@@ -259,12 +274,6 @@ export function CustomersPage() {
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
   const [selectedSubJob, setSelectedSubJob] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
-  useListingEstimatePrefillSync(
-    "customers",
-    selectedCustomer,
-    selectedJob,
-    selectedSubJob,
-  );
   const [enhancedJobData, setEnhancedJobData] = useState<any>(null);
   const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(
     new Set(),
@@ -279,6 +288,35 @@ export function CustomersPage() {
   /** Cross-page URL target — pinned to top of sidebar so they stay visible outside page 1. */
   const [pinnedListingCustomer, setPinnedListingCustomer] =
     useState<any | null>(null);
+
+  const listingParentEntityKind = useMemo((): EntityKind | null => {
+    if (!selectedCustomer) return null;
+    const entity =
+      pinnedListingCustomer?.id?.toString?.() === selectedCustomer
+        ? pinnedListingCustomer
+        : paginatedCustomers.find(
+            (c) => c.id?.toString?.() === selectedCustomer,
+          ) ||
+          customersWithJobs.find(
+            (c) => c.id?.toString?.() === selectedCustomer,
+          ) ||
+          null;
+    return resolveEntityKind(entity) ?? "customer";
+  }, [
+    selectedCustomer,
+    pinnedListingCustomer,
+    paginatedCustomers,
+    customersWithJobs,
+  ]);
+
+  useListingEstimatePrefillSync(
+    "customers",
+    selectedCustomer,
+    selectedJob,
+    selectedSubJob,
+    listingParentEntityKind,
+  );
+
   const [jobDeleteTarget, setJobDeleteTarget] = useState<{
     id: string;
     title: string;
@@ -1517,9 +1555,7 @@ export function CustomersPage() {
               id: customerId,
               customer_name: customer.customer_name || "",
               name: customer.customer_name || "",
-              tag: customer.tag || "customer",
-              type: customer.type || "customer",
-              customer_type: customer.customer_type || "customer",
+              ...mapListingEntityKindFields(customer),
               email: customer.email || "",
               phone: customer.phone || "",
               company_name: customer.company_name || "",
@@ -1644,9 +1680,7 @@ export function CustomersPage() {
             id: customer.id,
             customer_name: customer.customer_name || "",
             name: customer.customer_name || "",
-            tag: customer.tag || "customer",
-            type: customer.type || "customer",
-            customer_type: customer.customer_type || "",
+            ...mapListingEntityKindFields(customer),
             email: customer.email || "",
             phone: customer.phone || "",
             company_name: customer.company_name || "",
