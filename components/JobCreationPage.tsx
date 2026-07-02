@@ -111,8 +111,8 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
   const [currentStep, setCurrentStep] = useState(1)
   const [selectedCustomerName, setSelectedCustomerName] = useState('')
   const [selectedContractorName, setSelectedContractorName] = useState('')
-  const [selectedLeadLaborNames, setSelectedLeadLaborNames] = useState<string[]>([])
-  const [selectedLaborNames, setSelectedLaborNames] = useState<string[]>([])
+  const [selectedLeadLaborItems, setSelectedLeadLaborItems] = useState<any[]>([])
+  const [selectedLaborItems, setSelectedLaborItems] = useState<any[]>([])
   /** Job Review step: expand full description when longer than two lines */
   const [jobReviewDescriptionExpanded, setJobReviewDescriptionExpanded] = useState(false)
   const [jobReviewDescriptionNeedsToggle, setJobReviewDescriptionNeedsToggle] = useState(false)
@@ -766,24 +766,21 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     item?.labor_code ??
     fallbackId
 
-  const handleLeadLaborChange = (selectedIds: string[], selectedItems: any[]) => {
-    setFormData(prev => ({ ...prev, assignedLeadLabor: selectedIds }))
+  const buildOrderedLaborItems = (selectedIds: string[], selectedItems: any[]) => {
     const byId = new Map(
       selectedItems.map(it => [String(it?.id ?? it), it])
     )
-    setSelectedLeadLaborNames(
-      selectedIds.map(id => laborSelectionDisplayName(byId.get(String(id)), id))
-    )
+    return selectedIds.map(id => byId.get(String(id)) ?? { id, name: id })
+  }
+
+  const handleLeadLaborChange = (selectedIds: string[], selectedItems: any[]) => {
+    setFormData(prev => ({ ...prev, assignedLeadLabor: selectedIds }))
+    setSelectedLeadLaborItems(buildOrderedLaborItems(selectedIds, selectedItems))
   }
 
   const handleLaborChange = (selectedIds: string[], selectedItems: any[]) => {
     setFormData(prev => ({ ...prev, assignedLabor: selectedIds }))
-    const byId = new Map(
-      selectedItems.map(it => [String(it?.id ?? it), it])
-    )
-    setSelectedLaborNames(
-      selectedIds.map(id => laborSelectionDisplayName(byId.get(String(id)), id))
-    )
+    setSelectedLaborItems(buildOrderedLaborItems(selectedIds, selectedItems))
   }
 
   const resolveSelectedEntityType = (
@@ -1531,6 +1528,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
                 <AutoScrollMultiSelect
                   selectedValues={formData.assignedLeadLabor}
+                  selectedObjects={selectedLeadLaborItems}
                   onSelectionChange={handleLeadLaborChange}
                   placeholder="Select lead labor"
                   fetchData={apiClient.getLeadLabor}
@@ -1549,6 +1547,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
                 <AutoScrollMultiSelect
                   selectedValues={formData.assignedLabor}
+                  selectedObjects={selectedLaborItems}
                   onSelectionChange={handleLaborChange}
                   placeholder="Select labor"
                   fetchData={apiClient.getLabor}
@@ -1810,9 +1809,9 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               <div>
                 <h4 className="font-medium text-[#2b2b2b] mb-2">Assigned Lead Labor ({formData.assignedLeadLabor.length})</h4>
                 <div className="flex flex-wrap gap-1">
-                  {formData.assignedLeadLabor.map((id, index) => (
-                    <Badge key={id} className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
-                      {selectedLeadLaborNames[index] ?? `ID: ${id}`}
+                  {selectedLeadLaborItems.map((item) => (
+                    <Badge key={String(item.id)} className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                      {laborSelectionDisplayName(item, String(item.id))}
                     </Badge>
                   ))}
                 </div>
@@ -1823,9 +1822,9 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
               <div>
                 <h4 className="font-medium text-[#2b2b2b] mb-2">Assigned Labor ({formData.assignedLabor.length})</h4>
                 <div className="flex flex-wrap gap-1">
-                  {formData.assignedLabor.map((id, index) => (
-                    <Badge key={id} className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
-                      {selectedLaborNames[index] ?? `ID: ${id}`}
+                  {selectedLaborItems.map((item) => (
+                    <Badge key={String(item.id)} className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                      {laborSelectionDisplayName(item, String(item.id))}
                     </Badge>
                   ))}
                 </div>

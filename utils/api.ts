@@ -294,11 +294,10 @@ export const apiClient = {
       type: (job.job_type === "service_based"
         ? "service-based"
         : "contract-based") as "service-based" | "contract-based",
-      status: (job.status === "active"
-        ? "pending"
-        : job.status === "in_progress"
+      status:
+        job.status === "in_progress"
           ? "in-progress"
-          : job.status) as "pending" | "in-progress" | "completed" | "cancelled",
+          : job.status,
       assignedLeadLabor: job.assigned_lead_labor
         ? job.assigned_lead_labor.map((ll: any) => ll.id.toString())
         : [],
@@ -393,11 +392,9 @@ export const apiClient = {
         type:
           job.job_type,
         status:
-          job.status === "active"
-            ? "pending"
-            : job.status === "in_progress"
-              ? "in-progress"
-              : job.status,
+          job.status === "in_progress"
+            ? "in-progress"
+            : job.status,
         assignedLeadLabor: job.assigned_lead_labor
           ? job.assigned_lead_labor.map((ll: any) => ll.id.toString())
           : [],

@@ -752,7 +752,7 @@ export function ContractorDetailsPage({
                   startDate: (subJob as any).created_at,
                   dueDate: subJob.due_date,
                   priority: (subJob as any).priority,
-                  status: subJob.status,
+                  status: jobData.status ?? subJob.status,
                   progress: (subJob as any).progress || 0,
                   labor_timesheets:
                     jobData.labor_timesheets ||
@@ -858,7 +858,7 @@ export function ContractorDetailsPage({
                   startDate: (selectedJobData as any).created_at,
                   dueDate: selectedJobData.due_date,
                   priority: (selectedJobData as any).priority,
-                  status: selectedJobData.status,
+                  status: jobData.status ?? selectedJobData.status,
                   progress: (selectedJobData as any).progress || 0,
                   labor_timesheets:
                     jobData.labor_timesheets ||

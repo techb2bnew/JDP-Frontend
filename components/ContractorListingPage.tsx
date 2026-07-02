@@ -3651,7 +3651,7 @@ export function ContractorListingPage() {
                       startDate: subJob.created_at,
                       dueDate: subJob.due_date,
                       priority: subJob.priority,
-                      status: subJob.status,
+                      status: jobData.status ?? subJob.status,
                       progress: subJob.progress || 0,
                       // Include labor timesheet data - use enhanced data if available
                       labor_timesheets: jobData.labor_timesheets || subJob.labor_timesheets || [],
@@ -3754,7 +3754,7 @@ export function ContractorListingPage() {
                       startDate: selectedJobData.created_at,
                       dueDate: selectedJobData.due_date,
                       priority: selectedJobData.priority,
-                      status: selectedJobData.status,
+                      status: jobData.status ?? selectedJobData.status,
                       progress: selectedJobData.progress || 0,
                       // Include labor timesheet data - use enhanced data if available
                       labor_timesheets: jobData.labor_timesheets || selectedJobData.labor_timesheets || [],

@@ -1373,6 +1373,7 @@ export function JobDetailsPage({
     customInvoiceType: "",
     paymentPercentage: 0,
     estimateTotal: 0,
+    totalLaborCost: null as number | null,
     paymentHistory: [] as any[],
   });
 
@@ -3547,6 +3548,50 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
     }).format(amount);
   };
 
+  const getEstimateDisplayTotal = (estimate?: {
+    total_amount?: number | string | null;
+    total_labor_cost?: number | string | null;
+  }) => {
+    const materialTotal = Number(estimate?.total_amount) || 0;
+    const laborTotal = Number(estimate?.total_labor_cost) || 0;
+    return materialTotal + laborTotal;
+  };
+
+  const resolveInvoiceLaborCost = (
+    laborCost?: number | string | null,
+  ): number => Number(laborCost) || 0;
+
+  const hasApiLaborCost = (laborCost?: number | string | null): boolean => {
+    if (laborCost === undefined || laborCost === null) return false;
+    return resolveInvoiceLaborCost(laborCost) > 0;
+  };
+
+  const buildInvoiceTotalsSummaryHtml = (
+    materialTotal: number,
+    laborCost?: number | string | null,
+  ) => {
+    const labor = resolveInvoiceLaborCost(laborCost);
+    const showLabor = hasApiLaborCost(laborCost);
+    const grand = materialTotal + (showLabor ? labor : 0);
+    let html = `
+      <div style="display:flex;justify-content:space-between;margin-top:0;min-width:220px;font-size:14px;color:#4b5563;">
+        <span>Total:</span>
+        <span style="font-weight:700;color:#1f2937;">$${materialTotal.toFixed(2)}</span>
+      </div>`;
+    if (showLabor) {
+      html += `
+        <div style="display:flex;justify-content:space-between;margin-top:8px;min-width:220px;font-size:14px;color:#4b5563;">
+          <span>Total Labor Cost:</span>
+          <span>$${labor.toFixed(2)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px;min-width:220px;font-size:14px;color:#4b5563;">
+          <span>Total Material + Labor:</span>
+          <span style="font-weight:700;color:#1f2937;">$${grand.toFixed(2)}</span>
+        </div>`;
+    }
+    return html;
+  };
+
   const formatCurrencyWholeUSD = (amount: number) =>
     new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -3603,6 +3648,17 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
       return sum + (item.total || 0);
     }, 0);
   };
+
+  const calculateInvoiceGrandTotal = (): number =>
+    calculateInvoiceSubtotal() +
+    (hasApiLaborCost(inlineInvoiceData.totalLaborCost)
+      ? resolveInvoiceLaborCost(inlineInvoiceData.totalLaborCost)
+      : 0);
+
+  const calculateInvoiceBalanceDue = (): number =>
+    (hasApiLaborCost(inlineInvoiceData.totalLaborCost)
+      ? calculateInvoiceGrandTotal()
+      : calculateInvoiceSubtotal()) - (inlineInvoiceData.paymentCredits || 0);
 
   const addCustomInvoiceType = (customType: string) => {
     if (customType) {
@@ -4002,7 +4058,10 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
         })(),
         customInvoiceType: invoiceData.custom_invoice_type || "",
         paymentPercentage: 0,
-        estimateTotal: invoiceData.total_amount || 0,
+        estimateTotal: getEstimateDisplayTotal(invoiceData),
+        totalLaborCost: hasApiLaborCost(invoiceData.total_labor_cost)
+          ? resolveInvoiceLaborCost(invoiceData.total_labor_cost)
+          : null,
         paymentHistory: [],
       });
 
@@ -4076,6 +4135,9 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
       customInvoiceType: invoice.custom_invoice_type || "",
       paymentPercentage: 0,
       estimateTotal: invoice.total || 0,
+      totalLaborCost: hasApiLaborCost(invoice.total_labor_cost)
+        ? resolveInvoiceLaborCost(invoice.total_labor_cost)
+        : null,
       paymentHistory: [],
     });
 
@@ -5356,11 +5418,10 @@ const handlePrintInvoice = async (invoice: any) => {
           </table>
 
           <div style="display:flex; justify-content:flex-end; margin-top:20px;">
-            <div style="text-align:right;">
-              <div style="font-weight:700; font-size:20px; color:#1f2937;">
-                $${(invoice.total_amount || 0).toFixed(2)}
-              </div>
-            </div>
+            ${buildInvoiceTotalsSummaryHtml(
+              Number(invoice.total_amount) || 0,
+              invoice.total_labor_cost,
+            )}
           </div>
 
           <div style="display:flex; justify-content:flex-end; margin-top:16px;">
@@ -5380,7 +5441,10 @@ const handlePrintInvoice = async (invoice: any) => {
                   Balance Due:
                 </span>
                 <span style="font-weight:700; font-size:14px; color:#374151;">
-                  $${parseFloat(invoice.balance_due || (invoice.total_amount || 0).toString()).toFixed(2)}
+                  $${parseFloat(
+                    invoice.balance_due ||
+                      getEstimateDisplayTotal(invoice).toString(),
+                  ).toFixed(2)}
                 </span>
               </div>
             </div>
@@ -5914,6 +5978,7 @@ const handlePrintInvoice = async (invoice: any) => {
         customInvoiceType: "",
         paymentPercentage: 0,
         estimateTotal: 0,
+        totalLaborCost: null,
         paymentHistory: [],
       });
       setInvoiceValidationErrors({});
@@ -6319,6 +6384,7 @@ const handlePrintInvoice = async (invoice: any) => {
         customInvoiceType: "",
         paymentPercentage: 0,
         estimateTotal: 0,
+        totalLaborCost: null,
         paymentHistory: [],
       });
       setInvoiceValidationErrors({});
@@ -6719,7 +6785,10 @@ const handlePrintInvoice = async (invoice: any) => {
           return "";
         })(),
         paymentPercentage: 0,
-        estimateTotal: estimateData.total_amount || 0,
+        estimateTotal: getEstimateDisplayTotal(estimateData),
+        totalLaborCost: hasApiLaborCost(estimateData.total_labor_cost)
+          ? resolveInvoiceLaborCost(estimateData.total_labor_cost)
+          : null,
         paymentHistory: [],
       });
 
@@ -7927,6 +7996,7 @@ const handlePrintInvoice = async (invoice: any) => {
                         customInvoiceType: "",
                         paymentPercentage: 0,
                         estimateTotal: 0,
+                        totalLaborCost: null,
                         paymentHistory: [] as any[],
                       });
                       setEditingInvoiceId(null);
@@ -8462,6 +8532,39 @@ const handlePrintInvoice = async (invoice: any) => {
                               )}
                             </span>
                           </div>
+                          {hasApiLaborCost(inlineInvoiceData.totalLaborCost) && (
+                            <>
+                              <div className="flex items-center gap-4 mt-2">
+                                <span className="text-xl font-bold">
+                                  Total Labor Cost
+                                </span>
+                                <span className="text-2xl font-bold">
+                                  $
+                                  {resolveInvoiceLaborCost(
+                                    inlineInvoiceData.totalLaborCost,
+                                  ).toLocaleString("en-US", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-4 mt-2">
+                                <span className="text-xl font-bold">
+                                  Total Material + Labor
+                                </span>
+                                <span className="text-2xl font-bold">
+                                  $
+                                  {calculateInvoiceGrandTotal().toLocaleString(
+                                    "en-US",
+                                    {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    },
+                                  )}
+                                </span>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                       <div className="text-center text-sm text-blue-500 font-bold">
@@ -8555,6 +8658,7 @@ const handlePrintInvoice = async (invoice: any) => {
                             customInvoiceType: "",
                             paymentPercentage: 0,
                             estimateTotal: 0,
+                            totalLaborCost: null,
                             paymentHistory: [] as any[],
                           });
                         }}
@@ -8694,7 +8798,7 @@ const handlePrintInvoice = async (invoice: any) => {
                       <div className="flex items-center gap-3">
                         <div className="text-right">
                           <p className="font-semibold text-lg text-foreground">
-                            {formatCurrency(invoice.total_amount || 0)}
+                            {formatCurrency(getEstimateDisplayTotal(invoice))}
                           </p>
                           <Badge
                             className={`mt-1 ${getStatusBadgeColor(invoice.status)}`}
@@ -10582,7 +10686,7 @@ const handlePrintInvoice = async (invoice: any) => {
                     </p>
                     <p>
                       <span className="font-medium">Amount:</span>{" "}
-                      {formatCurrency(selectedInvoice.total_amount)}
+                      {formatCurrency(getEstimateDisplayTotal(selectedInvoice))}
                     </p>
                     <p>
                       <span className="font-medium">Status:</span>
@@ -11010,18 +11114,38 @@ const handlePrintInvoice = async (invoice: any) => {
             </tbody>
           </table>
 
-          {/* Subtotal */}
-          <div className="flex justify-end mt-3">
-            <div className="text-right">
-              <div className="font-bold text-base">
-                ${calculateInvoiceSubtotal().toFixed(2)}
-              </div>
-            </div>
-          </div>
-
-          {/* Payments/Credits and Balance Due */}
+          {/* Totals, Payments/Credits and Balance Due */}
           <div className="flex justify-end mt-3">
             <div className="text-right w-60">
+              <div className="flex justify-between mb-1.5">
+                <span className="text-sm text-gray-600">Total:</span>
+                <span className="text-sm text-gray-900">
+                  ${calculateInvoiceSubtotal().toFixed(2)}
+                </span>
+              </div>
+              {hasApiLaborCost(inlineInvoiceData.totalLaborCost) && (
+                <>
+                  <div className="flex justify-between mb-1.5">
+                    <span className="text-sm text-gray-600">
+                      Total Labor Cost:
+                    </span>
+                    <span className="text-sm text-gray-600">
+                      $
+                      {resolveInvoiceLaborCost(
+                        inlineInvoiceData.totalLaborCost,
+                      ).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between mb-1.5">
+                    <span className="text-sm text-gray-600">
+                      Total Material + Labor:
+                    </span>
+                    <span className="text-sm text-gray-600">
+                      ${calculateInvoiceGrandTotal().toFixed(2)}
+                    </span>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between mb-1.5">
                 <span className="text-sm text-gray-600">
                   Payments / Credits:
@@ -11033,11 +11157,7 @@ const handlePrintInvoice = async (invoice: any) => {
               <div className="flex justify-between bg-gray-100 px-3 py-2 rounded">
                 <span className="font-bold text-sm">Balance Due:</span>
                 <span className="font-bold text-sm">
-                  $
-                  {(
-                    calculateInvoiceSubtotal() -
-                    (inlineInvoiceData.paymentCredits || 0)
-                  ).toFixed(2)}
+                  ${calculateInvoiceBalanceDue().toFixed(2)}
                 </span>
               </div>
             </div>
@@ -11148,6 +11268,7 @@ const handlePrintInvoice = async (invoice: any) => {
               customInvoiceType: "",
               paymentPercentage: 0,
               estimateTotal: 0,
+              totalLaborCost: null,
               paymentHistory: [] as any[],
             });
           }

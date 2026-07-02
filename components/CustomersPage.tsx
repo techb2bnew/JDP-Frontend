@@ -2338,7 +2338,7 @@ export function CustomersPage() {
                         startDate: subJob.created_at,
                         dueDate: subJob.due_date,
                         priority: subJob.priority,
-                        status: subJob.status,
+                        status: jobData.status ?? subJob.status,
                         progress: subJob.progress || 0,
                         labor_timesheets: subJob.labor_timesheets || [],
                         assigned_labor_ids: subJob.assigned_labor_ids,
@@ -2435,7 +2435,7 @@ export function CustomersPage() {
                         startDate: selectedJobData.created_at,
                         dueDate: selectedJobData.due_date,
                         priority: selectedJobData.priority,
-                        status: selectedJobData.status,
+                        status: jobData.status ?? selectedJobData.status,
                         progress: selectedJobData.progress || 0,
                         labor_timesheets:
                           selectedJobData.labor_timesheets || [],
