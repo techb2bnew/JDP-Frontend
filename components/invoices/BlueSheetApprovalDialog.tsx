@@ -124,6 +124,7 @@ interface BlueSheetApprovalDialogProps {
   onApprovalComplete: (approvedItem: BlueSheetItem) => void
   selectedBlueSheetIds?: number[]
   onBluesheetsRefresh?: () => void | Promise<void>
+  onEstimatesRefresh?: () => void | Promise<void>
 }
 
 export function BlueSheetApprovalDialog({
@@ -134,6 +135,7 @@ export function BlueSheetApprovalDialog({
   onApprovalComplete,
   selectedBlueSheetIds,
   onBluesheetsRefresh,
+  onEstimatesRefresh,
 }: BlueSheetApprovalDialogProps) {
   console.log('Dialog render', { isOpen, blueSheet })
   const [supplierInvoice, setSupplierInvoice] = useState<SupplierInvoice | null>(null)
@@ -1132,6 +1134,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
 
     await apiClient.createEstimate(estimatePayload);
     await apiClient.approveBluesheet(finalBlueSheet.id, "approved");
+    await onEstimatesRefresh?.();
     onApprovalComplete(finalBlueSheet);
     if(action === "send"){
      toast.success("Invoice Sent from Quickbook Successfullly");
@@ -3250,6 +3253,9 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                           onInvoiceTypeChange={setSelectedInvoiceType}
                           defaultInvoiceType="Progressive Invoice"
                           onDone={onClose}
+                          onInvoiceSaved={() => {
+                            void onEstimatesRefresh?.();
+                          }}
                           onLineItemsSync={syncCustomInvoiceLineItemsToBlueSheet}
                         />
                       </div>

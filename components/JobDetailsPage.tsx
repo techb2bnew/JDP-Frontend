@@ -6167,7 +6167,17 @@ const handlePrintInvoice = async (invoice: any) => {
     try {
       // Prepare API payload
       const subtotal = calculateInvoiceSubtotal();
-      const total = subtotal; // You can add tax calculation here if needed
+      const sentInvoiceId = editingInvoiceId || estimates[0]?.id;
+      const estimateFromList = estimates.find(
+        (e: any) => sentInvoiceId && Number(e.id) === Number(sentInvoiceId),
+      );
+      const laborCost = hasApiLaborCost(inlineInvoiceData.totalLaborCost)
+        ? resolveInvoiceLaborCost(inlineInvoiceData.totalLaborCost)
+        : hasApiLaborCost(estimateFromList?.total_labor_cost)
+          ? resolveInvoiceLaborCost(estimateFromList?.total_labor_cost)
+          : 0;
+      const includeLabor = laborCost > 0;
+      const total = subtotal + (includeLabor ? laborCost : 0);
       const notesTextForEmail = getInvoiceNotesForPayload();
 
       const payload = {
@@ -6225,11 +6235,12 @@ const handlePrintInvoice = async (invoice: any) => {
         }),
         subtotal: subtotal.toFixed(2),
         total: total.toFixed(2),
+        ...(includeLabor ? { total_labor_cost: laborCost } : {}),
         dueDate: inlineInvoiceData.dueDate || "",
         rep: inlineInvoiceData.rep || "JDP",
         paymentCredits: inlineInvoiceData.paymentCredits || 0,
         balanceDue: (
-          subtotal - (inlineInvoiceData.paymentCredits || 0)
+          total - (inlineInvoiceData.paymentCredits || 0)
         ).toFixed(2),
         notes: notesTextForEmail
           ? notesTextForEmail.split("\n").filter((note) => note.trim())
@@ -6290,13 +6301,11 @@ const handlePrintInvoice = async (invoice: any) => {
 
       toast.success("Invoice sent successfully to customer!");
 
-      const sentInvoiceId = Number(
-        editingInvoiceId || estimates[0]?.id,
-      );
-      if (sentInvoiceId) {
+      const sentInvoiceIdNum = Number(sentInvoiceId);
+      if (sentInvoiceIdNum) {
         setEstimates((prev) =>
           prev.map((item: any) =>
-            Number(item.id) === sentInvoiceId
+            Number(item.id) === sentInvoiceIdNum
               ? { ...item, status: "sent" }
               : item,
           ),
@@ -11328,6 +11337,7 @@ const handlePrintInvoice = async (invoice: any) => {
           selectedBlueSheetForReview ? [selectedBlueSheetForReview] : []
         }
         onBluesheetsRefresh={refreshJobBluesheetsList}
+        onEstimatesRefresh={fetchEstimates}
         onApprovalComplete={() => {
           setIsBlueSheetDialogOpen(false);
           setSelectedBlueSheetForReview(null);

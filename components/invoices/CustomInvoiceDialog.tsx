@@ -24,6 +24,7 @@ import InvoiceLineItemsManager from '../common/invoice-line-items/InvoiceLineIte
 import {
   createDefaultEmptyLineItems,
   getFilledLineItemRows,
+  roundMoney,
   validateInvoiceLineItemsForSubmit,
 } from '../common/invoice-line-items/lineItemHelpers'
 // import { formatCurrency, formatDate } from '../../utils/invoiceUtils'
@@ -1356,7 +1357,7 @@ console.log(totalAmount,"amounttt");
             item: item.item,
             description: item.description,
             rate: rateNum,
-            total: qtyNum * rateNum,
+            total: roundMoney(qtyNum * rateNum),
           };
         }),
         notes: getInvoiceNotesForSendPayload(effectiveInlineInvoiceData.notes),

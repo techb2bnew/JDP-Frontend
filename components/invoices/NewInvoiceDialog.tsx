@@ -53,6 +53,7 @@ import {
   buildInvoicePreviewRows,
   getFilledLineItemRows,
   hasAtLeastOneFilledLineItem,
+  roundMoney,
   toPayloadStockQuantity,
   validateInvoiceLineItemsForSubmit,
 } from "../common/invoice-line-items/lineItemHelpers";
@@ -1358,7 +1359,7 @@ export const NewInvoiceDialog = ({
               parentHeaderName: item.parentHeaderName || null,
               description: item.description,
               rate: rateNum,
-              total: qtyNum * rateNum,
+              total: roundMoney(qtyNum * rateNum),
               is_custom: item.isCustomProduct === true,
             };
           }),

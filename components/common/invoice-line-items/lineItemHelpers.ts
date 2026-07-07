@@ -1,5 +1,9 @@
 export const DEFAULT_EMPTY_LINE_ITEM_COUNT = 5;
 
+/** Round currency to 2 decimal places for API payloads. */
+export const roundMoney = (value: number | string | null | undefined): number =>
+  Number((Number(value) || 0).toFixed(2));
+
 const STANDALONE_GROUP_KEY_PREFIX = "standalone_";
 
 /** Virtual UI-only groups for items without a custom header. */
