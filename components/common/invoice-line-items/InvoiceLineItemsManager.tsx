@@ -551,6 +551,9 @@ const handleUpdateLineItem = (rowId: string, field: string, value: any) => {
         if (isJobDetail || useRateForLineTotal) {
           // qty × rate (jdp_price) — match backend / Job Details invoice
           updated.total = Number((qty * rate).toFixed(2));
+          if (field === "qty") {
+            updated.material_used = qty;
+          }
         } else {
           const priceToUse =
             Number(updated.estimatedPrice) > 0

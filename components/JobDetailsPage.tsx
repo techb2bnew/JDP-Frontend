@@ -2894,6 +2894,7 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
           supplier_sku: i.sku || "",
           jdp_sku: i.jdp_sku || "SKU-DEFAULT",
           stock_quantity: i.quantity,
+          material_used: Number(i.quantity) || 0,
           job_id: Number(newInvoice.jobId),
           unit: i.unit ? i.unit.toString() : "1",
           is_custom: true,
@@ -3689,6 +3690,35 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
     return Number((qtyNum * rateNum).toFixed(2));
   };
 
+  const getPreviewLineItemQty = (item: any): number =>
+    Number(item?.material_used ?? item?.qty ?? item?.stock_quantity ?? 0);
+
+  const getPreviewLineItemAmount = (item: any): number => {
+    const qtyNum = getPreviewLineItemQty(item);
+    const rateNum = Number(
+      item?.rate ?? item?.jdp_price ?? item?.unit_cost ?? 0,
+    );
+    return Number((qtyNum * rateNum).toFixed(2));
+  };
+
+  const calculatePreviewInvoiceSubtotal = (): number =>
+    (inlineInvoiceData.lineItems || []).reduce((sum, item) => {
+      if (item.type === "header") return sum;
+      return sum + getPreviewLineItemAmount(item);
+    }, 0);
+
+  const calculatePreviewInvoiceGrandTotal = (): number =>
+    calculatePreviewInvoiceSubtotal() +
+    (hasApiLaborCost(inlineInvoiceData.totalLaborCost)
+      ? resolveInvoiceLaborCost(inlineInvoiceData.totalLaborCost)
+      : 0);
+
+  const calculatePreviewInvoiceBalanceDue = (): number =>
+    (hasApiLaborCost(inlineInvoiceData.totalLaborCost)
+      ? calculatePreviewInvoiceGrandTotal()
+      : calculatePreviewInvoiceSubtotal()) -
+    (inlineInvoiceData.paymentCredits || 0);
+
   const calculateInvoiceSubtotal = (): number => {
     return inlineInvoiceData.lineItems.reduce((sum, item) => {
       if (item.type === "header") return sum;
@@ -3947,6 +3977,7 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
           description: product.description || "",
           rate,
           estimatedPrice,
+          material_used: qty,
           total: Number((qty * rate).toFixed(2)),
           showSearchResults: false,
           searchQuery: "",
@@ -5992,7 +6023,13 @@ const handlePrintInvoice = async (invoice: any) => {
         );
         toast.success("Invoice updated successfully!");
       } else {
-        await apiClient.createEstimate(payload as any);
+        await apiClient.createEstimate({
+          ...payload,
+          custom_products: customProducts.map((product, index) => ({
+            ...product,
+            material_used: Number(validLineItems[index]?.qty) || 0,
+          })),
+        } as any);
         toast.success("Invoice saved as draft!");
       }
 
@@ -6181,7 +6218,13 @@ const handlePrintInvoice = async (invoice: any) => {
           payload as any,
         );
       } else {
-        const response = await apiClient.createEstimate(payload as any);
+        const response = await apiClient.createEstimate({
+          ...payload,
+          custom_products: customProducts.map((product, index) => ({
+            ...product,
+            material_used: Number(validLineItems[index]?.qty) || 0,
+          })),
+        } as any);
         setEditingInvoiceId(response.id);
       }
 
@@ -6468,7 +6511,10 @@ const handlePrintInvoice = async (invoice: any) => {
       const customProducts = sanitizeCustomProductsForPayload(
         inlineInvoiceData.lineItems,
         Number(jobId),
-      );
+      ).map((product) => ({
+        ...product,
+        material_used: Number(product.stock_quantity) || 0,
+      }));
 
       const selectedInvoiceType =
         inlineInvoiceData.invoiceType === "Custom"
@@ -6697,6 +6743,16 @@ const handlePrintInvoice = async (invoice: any) => {
     products.forEach((product: any) => {
       const headerName = product.parent_header_name || null;
 
+      const rate = Number(product.jdp_price || product.unit_cost || 0);
+      const totalCost = Number(product.total_cost) || 0;
+      const materialUsed =
+        product.material_used != null &&
+        String(product.material_used).trim() !== ""
+          ? Number(product.material_used)
+          : rate > 0 && totalCost > 0
+            ? Number((totalCost / rate).toFixed(2))
+            : Number(product.stock_quantity) || 1;
+
       const baseItem = {
         id: createRowKey(),
         type: "item",
@@ -6705,6 +6761,7 @@ const handlePrintInvoice = async (invoice: any) => {
         parentHeaderKey: null,
         parentHeaderName: headerName,
         qty: product.stock_quantity || 1,
+        material_used: materialUsed,
         item: product.product_name || "",
         description: product.description || "",
         rate: product.jdp_price || product.unit_cost || 0,
@@ -6713,12 +6770,7 @@ const handlePrintInvoice = async (invoice: any) => {
           product.jdp_price ||
           product.unit_cost ||
           0,
-        total: Number(
-          (
-            (product.stock_quantity || 1) *
-            Number(product.jdp_price || product.unit_cost || 0)
-          ).toFixed(2),
-        ),
+        total: Number((materialUsed * rate).toFixed(2)),
         searchQuery: "",
         showSearchResults: false,
         supplierId: product.supplier_id || 1,
@@ -11058,7 +11110,7 @@ const handlePrintInvoice = async (invoice: any) => {
                 const normalizedItems = lineItems
                   .filter((item: any) => item.type !== "header")
                   .map((item: any) => {
-                    const qty = item.qty ?? item.stock_quantity ?? 0;
+                    const qty = getPreviewLineItemQty(item);
                     const rate = item.rate ?? item.jdp_price ?? item.unit_cost ?? 0;
                     return {
                       ...item,
@@ -11067,7 +11119,7 @@ const handlePrintInvoice = async (invoice: any) => {
                       rate,
                       estimatedPrice:
                         item.estimatedPrice ?? item.estimated_price ?? 0,
-                      total: getLineItemAmount({
+                      total: getPreviewLineItemAmount({
                         ...item,
                         qty,
                         rate,
@@ -11170,7 +11222,7 @@ const handlePrintInvoice = async (invoice: any) => {
               <div className="flex justify-between mb-1.5">
                 <span className="text-sm text-gray-600">Total:</span>
                 <span className="text-sm text-gray-900">
-                  ${calculateInvoiceSubtotal().toFixed(2)}
+                  ${calculatePreviewInvoiceSubtotal().toFixed(2)}
                 </span>
               </div>
               {hasApiLaborCost(inlineInvoiceData.totalLaborCost) && (
@@ -11191,7 +11243,7 @@ const handlePrintInvoice = async (invoice: any) => {
                       Total Material + Labor:
                     </span>
                     <span className="text-sm text-gray-600">
-                      ${calculateInvoiceGrandTotal().toFixed(2)}
+                      ${calculatePreviewInvoiceGrandTotal().toFixed(2)}
                     </span>
                   </div>
                 </>
@@ -11207,7 +11259,7 @@ const handlePrintInvoice = async (invoice: any) => {
               <div className="flex justify-between bg-gray-100 px-3 py-2 rounded">
                 <span className="font-bold text-sm">Balance Due:</span>
                 <span className="font-bold text-sm">
-                  ${calculateInvoiceBalanceDue().toFixed(2)}
+                  ${calculatePreviewInvoiceBalanceDue().toFixed(2)}
                 </span>
               </div>
             </div>
