@@ -56,6 +56,8 @@ interface InvoiceLineItemsManagerProps {
   fetchProducts: (query: string) => void;
   getFilteredProducts: (query: string) => ProductType[];
   onSelectProductData?: (rowId: string, product: ProductType) => void;
+  /** When true, row/footer totals use qty × rate (jdp_price), not estimated price. */
+  useRateForLineTotal?: boolean;
   isJobDetail?:boolean
   invalidHeaderKeys?:string[]
   setInvalidHeaderKeys?: () => void;
@@ -323,6 +325,7 @@ const InvoiceLineItemsManager = ({
   getFilteredProducts,
   onSelectProductData,
   isJobDetail=false,
+  useRateForLineTotal = false,
   invalidHeaderKeys,
   setInvalidHeaderKeys,
   invalidLineItemIds,
@@ -544,12 +547,17 @@ const handleUpdateLineItem = (rowId: string, field: string, value: any) => {
         ["qty", "rate", "estimatedPrice"].includes(field)
       ) {
         const qty = Number(updated.qty) || 0;
-        const priceToUse =
-          Number(updated.estimatedPrice) > 0
-            ? Number(updated.estimatedPrice)
-            : Number(updated.rate) || 0;
-
-        updated.total = qty * priceToUse;
+        const rate = Number(updated.rate) || 0;
+        if (isJobDetail || useRateForLineTotal) {
+          // qty × rate (jdp_price) — match backend / Job Details invoice
+          updated.total = Number((qty * rate).toFixed(2));
+        } else {
+          const priceToUse =
+            Number(updated.estimatedPrice) > 0
+              ? Number(updated.estimatedPrice)
+              : rate;
+          updated.total = qty * priceToUse;
+        }
       }
 
       return updated;
@@ -934,6 +942,11 @@ const handleRemoveLineItem = (rowId: string) => {
   const calculateSubtotal = (): number => {
     return lineItems.reduce((sum, item) => {
       if (item.type === "header") return sum;
+      if (useRateForLineTotal || isJobDetail) {
+        const qty = Number(item.qty) || 0;
+        const rate = Number(item.rate) || 0;
+        return sum + Number((qty * rate).toFixed(2));
+      }
       return sum + (Number(item.total) || 0);
     }, 0);
   };

@@ -304,17 +304,24 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
               existingMaterial?.unit_cost ??
               0
           ),
+          jdp_price: Number(
+            item.rate ??
+              item.jdp_price ??
+              existingMaterial?.jdp_price ??
+              item.unit_cost ??
+              existingMaterial?.unit_cost ??
+              0
+          ),
           total_cost:
-            Number(item.total ?? existingMaterial?.total_cost ?? 0) ||
             Number(item.qty || 1) *
-              Number(
-                item.estimatedPrice && Number(item.estimatedPrice) > 0
-                  ? item.estimatedPrice
-                  : item.rate ??
-                      item.unit_cost ??
-                      existingMaterial?.unit_cost ??
-                      0
-              ),
+            Number(
+              item.rate ??
+                item.jdp_price ??
+                existingMaterial?.jdp_price ??
+                item.unit_cost ??
+                existingMaterial?.unit_cost ??
+                0
+            ),
 
           supplier_order_id:
             item.supplier_order_id || existingMaterial?.supplier_order_id || "",

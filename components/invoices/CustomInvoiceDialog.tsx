@@ -454,7 +454,7 @@ export const CustomInvoiceDialog = ({
                       const qty = Number(product.stock_quantity) || 1
                       const rate = Number(product.jdp_price || product.unit_cost || 0)
                       const estimatedPrice = Number(product.estimated_price || 0)
-                      const total = Number(product.total_cost || qty * (estimatedPrice > 0 ? estimatedPrice : rate) || 0)
+                      const total = Number((qty * rate).toFixed(2))
                       console.log(product,"product");
                       
                       return {
@@ -536,8 +536,17 @@ export const CustomInvoiceDialog = ({
 console.log(totalAmount,"amounttt");
 
   // Invoice Helper Functions
+  const getLineItemAmount = (item: any): number => {
+    const qtyNum = Number(item?.qty || 0);
+    const rateNum = Number(item?.rate || 0);
+    return Number((qtyNum * rateNum).toFixed(2));
+  };
+
   const calculateInvoiceSubtotal = () => {
-    return inlineInvoiceData.lineItems.reduce((sum, item) => sum + item.total, 0)
+    return inlineInvoiceData.lineItems.reduce((sum, item) => {
+      if (item.type === "header") return sum;
+      return sum + getLineItemAmount(item);
+    }, 0);
   }
 
   
@@ -550,11 +559,7 @@ console.log(totalAmount,"amounttt");
         if (item.id === itemId) {
           const updated = { ...item, [field]: value }
           if (field === 'qty' || field === 'estimatedPrice' || field === 'rate') {
-            // Use estimated price if available, otherwise use rate
-            const priceToUse = updated.estimatedPrice && updated.estimatedPrice > 0
-              ? updated.estimatedPrice
-              : updated.rate
-            updated.total = (updated.qty || 0) * priceToUse
+            updated.total = getLineItemAmount(updated)
           }
           return updated
         }
@@ -683,7 +688,6 @@ console.log(totalAmount,"amounttt");
         const estimatedPrice = Number(
           product.estimatedPrice || product.jdpPrice || 0,
         );
-        const priceToUse = estimatedPrice > 0 ? estimatedPrice : rate;
 
         return {
           ...item,
@@ -693,7 +697,7 @@ console.log(totalAmount,"amounttt");
           description: product.description || "",
           rate,
           estimatedPrice,
-          total: (item.qty || 1) * priceToUse,
+          total: getLineItemAmount({ ...item, rate, qty: item.qty || 1 }),
           showSearchResults: false,
           searchQuery: "",
           supplierId: product.supplierId || selectedSupplierId || 1,
@@ -995,14 +999,7 @@ console.log(totalAmount,"amounttt");
             unit_cost: Number(item.unit_cost || item.rate || 0),
             jdp_price: Number(item.rate || 0),
             estimated_price: Number(item.estimatedPrice || 0),
-            total_cost:
-              Number(item.total || 0) ||
-              (Number(item.qty) || 1) *
-                Number(
-                  item.estimatedPrice && Number(item.estimatedPrice) > 0
-                    ? item.estimatedPrice
-                    : item.rate || 0,
-                ),
+            total_cost: getLineItemAmount(item),
             is_custom: treatedAsCustom,
 
             // group/header support
@@ -1289,12 +1286,14 @@ console.log(totalAmount,"amounttt");
             }
           })
         } else {
-          lineItemsSource = effectiveInlineInvoiceData.lineItems.map((item: any) => ({
+          lineItemsSource = effectiveInlineInvoiceData.lineItems
+            .filter((item: any) => item.type !== "header")
+            .map((item: any) => ({
             qty: item.qty,
             item: item.item || '',
             description: item.description || '',
             rate: item.rate || 0,
-            total: item.total || 0,
+            total: getLineItemAmount(item),
           }))
         }
       }
@@ -1970,6 +1969,7 @@ console.log(totalAmount,"amounttt");
               onSelectProductData={(rowId, product) => {
                 selectProduct(rowId, product);
               }}
+              useRateForLineTotal
               summaryLaborTotal={viewInvoiceData?.labor_total_cost}
             />
           </div>

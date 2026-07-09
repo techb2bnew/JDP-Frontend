@@ -3561,6 +3561,47 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
     laborCost?: number | string | null,
   ): number => Number(laborCost) || 0;
 
+  const getInvoiceCustomerDisplayName = (): string => {
+    if (job.type === "contract-based") {
+      return (
+        contractorData?.name ||
+        contractorData?.contractor_name ||
+        inlineInvoiceData.customerName ||
+        job.contractorName ||
+        "Contractor"
+      );
+    }
+
+    return (
+      customerData?.name ||
+      customerData?.customer_name ||
+      inlineInvoiceData.customerName ||
+      job.customerName ||
+      job.customer?.customer_name ||
+      job.customer?.name ||
+      "Customer"
+    );
+  };
+
+  const getInvoiceCustomerDisplayAddress = (): string => {
+    if (job.type === "contract-based") {
+      return (
+        contractorData?.address ||
+        contractorData?.contractor_address ||
+        inlineInvoiceData.customerAddress ||
+        ""
+      );
+    }
+
+    return (
+      customerData?.address ||
+      customerData?.customer_address ||
+      inlineInvoiceData.customerAddress ||
+      job.customer?.address ||
+      ""
+    );
+  };
+
   const hasApiLaborCost = (laborCost?: number | string | null): boolean => {
     if (laborCost === undefined || laborCost === null) return false;
     return resolveInvoiceLaborCost(laborCost) > 0;
@@ -3642,10 +3683,16 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
   // const calculateInvoiceSubtotal = (): number => {
   //   return inlineInvoiceData.lineItems.reduce((sum, item) => sum + (item.total || 0), 0)
   // }
+  const getLineItemAmount = (item: any): number => {
+    const qtyNum = Number(item?.qty || 0);
+    const rateNum = Number(item?.rate || 0);
+    return Number((qtyNum * rateNum).toFixed(2));
+  };
+
   const calculateInvoiceSubtotal = (): number => {
     return inlineInvoiceData.lineItems.reduce((sum, item) => {
       if (item.type === "header") return sum;
-      return sum + (item.total || 0);
+      return sum + getLineItemAmount(item);
     }, 0);
   };
 
@@ -3692,19 +3739,15 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
       );
       if (customer) {
         setCustomerData(customer);
-        // Update customer address in inline invoice data
         const newAddress = customer.address || customer.customer_address || "";
+        const newName =
+          customer.name || customer.customer_name || job.customerName || "";
 
-        // Force update with setTimeout to ensure state update
-        setTimeout(() => {
-          setInlineInvoiceData((prev) => {
-            const updated = {
-              ...prev,
-              customerAddress: newAddress,
-            };
-            return updated;
-          });
-        }, 100);
+        setInlineInvoiceData((prev) => ({
+          ...prev,
+          customerAddress: newAddress || prev.customerAddress,
+          customerName: newName || prev.customerName,
+        }));
       } else {
         setCustomerData(null);
       }
@@ -3727,21 +3770,19 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
       );
       if (contractor) {
         setContractorData(contractor);
-        console.log(contractor, "contractor");
-        // Update contractor address in inline invoice data
         const newAddress =
           contractor.address || contractor.contractor_address || "";
-        console.log(newAddress, "newAddress");
-        // Force update with setTimeout to ensure state update
-        setTimeout(() => {
-          setInlineInvoiceData((prev) => {
-            const updated = {
-              ...prev,
-              customerAddress: newAddress,
-            };
-            return updated;
-          });
-        }, 100);
+        const newName =
+          contractor.name ||
+          contractor.contractor_name ||
+          job.contractorName ||
+          "";
+
+        setInlineInvoiceData((prev) => ({
+          ...prev,
+          customerAddress: newAddress || prev.customerAddress,
+          customerName: newName || prev.customerName,
+        }));
       } else {
         setContractorData(null);
       }
@@ -3906,7 +3947,7 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
           description: product.description || "",
           rate,
           estimatedPrice,
-          total: qty * estimatedPrice,
+          total: Number((qty * rate).toFixed(2)),
           showSearchResults: false,
           searchQuery: "",
           supplierId: product.supplierId || selectedSupplierId || 1,
@@ -4094,21 +4135,25 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
       dueDate: invoice.due_date || "",
       paymentCredits: invoice.payment_credits || 0,
       balanceDue: invoice.balance_due || "",
-      lineItems: invoice.products?.map((product: any) => ({
-        id: Math.random().toString(36).substring(2, 9),
-        productId: product.id,
-        qty: product.stock_quantity || 1,
-        item: product.product_name || "",
-        description: product.description || "",
-        rate: product.jdp_price || 0,
-        estimatedPrice: product.estimated_price || 0,
-        total: product.total_cost || 0,
-        searchQuery: "",
-        showSearchResults: false,
-        supplierId: product.supplier_id || 1,
-        isCustomProduct: true,
-        estimate_product_id: product.estimate_product_id || null,
-      })) || createDefaultEmptyLineItems(5),
+      lineItems: invoice.products?.map((product: any) => {
+        const qty = product.stock_quantity || 1;
+        const rate = product.jdp_price || 0;
+        return {
+          id: Math.random().toString(36).substring(2, 9),
+          productId: product.id,
+          qty,
+          item: product.product_name || "",
+          description: product.description || "",
+          rate,
+          estimatedPrice: product.estimated_price || 0,
+          total: Number((Number(qty) * Number(rate)).toFixed(2)),
+          searchQuery: "",
+          showSearchResults: false,
+          supplierId: product.supplier_id || 1,
+          isCustomProduct: true,
+          estimate_product_id: product.estimate_product_id || null,
+        };
+      }) || createDefaultEmptyLineItems(5),
       notes:
         (invoice.notes ?? invoice.description) ||
         "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
@@ -4194,8 +4239,13 @@ const buildGroupedInvoiceRowsForPrint = (products: any[] = []) => {
       qty: Number(item.stock_quantity || item.qty || 1),
       item: productName,
       description: item.description || "",
-      rate: Number(item.unit_cost || item.jdp_price || item.rate || 0),
-      total: Number(item.total_cost || item.total || 0),
+      rate: Number(item.jdp_price || item.unit_cost || item.rate || 0),
+      total: Number(
+        (
+          Number(item.stock_quantity || item.qty || 1) *
+          Number(item.jdp_price || item.unit_cost || item.rate || 0)
+        ).toFixed(2),
+      ),
       parent_header_name: headerName,
     };
 
@@ -5879,7 +5929,7 @@ const handlePrintInvoice = async (invoice: any) => {
           unit_cost: item.rate,
           jdp_price: item.rate,
           estimated_price: item.estimatedPrice || 0,
-          total_cost: item.total,
+          total_cost: getLineItemAmount(item),
           is_custom: item.isCustomProduct === true,
           section_name: item.headerName || null,
           section_type: item.type ? "room_header" : null,
@@ -6013,7 +6063,7 @@ const handlePrintInvoice = async (invoice: any) => {
         unit_cost: Number(lineItem.rate || 0),
         jdp_price: Number(lineItem.rate || 0),
         estimated_price: Number(lineItem.estimatedPrice || 0),
-        total_cost: Number(lineItem.total || 0),
+        total_cost: getLineItemAmount(lineItem),
         is_custom: !!lineItem.isCustomProduct,
 
         // NEW FIELDS FOR BACKEND
@@ -6069,7 +6119,7 @@ const handlePrintInvoice = async (invoice: any) => {
           unit_cost: item.rate,
           jdp_price: item.rate,
           estimated_price: item.estimatedPrice || 0,
-          total_cost: item.total,
+          total_cost: getLineItemAmount(item),
           is_custom: item.isCustomProduct === true,
           // NEW FIELDS FOR BACKEND
           section_name: item.headerName || null,
@@ -6165,8 +6215,34 @@ const handlePrintInvoice = async (invoice: any) => {
   const handleSendFromPreview = async () => {
     setIsLoading(true);
     try {
-      // Prepare API payload
-      const subtotal = calculateInvoiceSubtotal();
+      // Prepare API payload — item amounts and footer totals must both use qty × rate
+      const mappedSendItems = (inlineInvoiceData.lineItems || [])
+        // Only send rows that actually have an item name filled.
+        // Empty seeded rows should not affect payload calculations.
+        .filter((item: any) => {
+          if (item.type === "header") return false;
+          return String(item.item || "").trim() !== "";
+        })
+        .map((item: any) => {
+          const qtyNum = Number(item.qty || 0);
+          const rateNum = Number(item.rate || 0);
+          const amountNum = getLineItemAmount(item);
+
+          return {
+            quantity: String(qtyNum),
+            item: item.item || "",
+            description: item.description || "",
+            rate: rateNum.toFixed(2),
+            amount: amountNum.toFixed(2),
+            parent_header_name:
+              item.parentHeaderName || item.parent_header_name || null,
+          };
+        });
+      const subtotal = Number(
+        mappedSendItems
+          .reduce((sum, item) => sum + Number(item.amount), 0)
+          .toFixed(2),
+      );
       const sentInvoiceId = editingInvoiceId || estimates[0]?.id;
       const estimateFromList = estimates.find(
         (e: any) => sentInvoiceId && Number(e.id) === Number(sentInvoiceId),
@@ -6177,7 +6253,9 @@ const handlePrintInvoice = async (invoice: any) => {
           ? resolveInvoiceLaborCost(estimateFromList?.total_labor_cost)
           : 0;
       const includeLabor = laborCost > 0;
-      const total = subtotal + (includeLabor ? laborCost : 0);
+      const total = Number(
+        (subtotal + (includeLabor ? laborCost : 0)).toFixed(2),
+      );
       const notesTextForEmail = getInvoiceNotesForPayload();
 
       const payload = {
@@ -6192,47 +6270,26 @@ const handlePrintInvoice = async (invoice: any) => {
         ),
         ...(job.type === "contract-based"
           ? {
-              customerName: inlineInvoiceData.customerName || "Contractor",
+              customerName: getInvoiceCustomerDisplayName(),
               customerEmail:
                 contractorData?.email || job.email || "contractor@example.com",
-              customerAddress: inlineInvoiceData.customerAddress || "",
+              customerAddress: getInvoiceCustomerDisplayAddress(),
             }
           : {
-              customerName: inlineInvoiceData.customerName || "Customer",
+              customerName: getInvoiceCustomerDisplayName(),
               customerEmail:
                 customerData?.email ||
                 job.customer?.email ||
                 job.customerEmail ||
                 "customer@example.com",
-              customerAddress: inlineInvoiceData.customerAddress || "",
+              customerAddress: getInvoiceCustomerDisplayAddress(),
             }),
         billToAddress: inlineInvoiceData.billToAddressEnabled
           ? inlineInvoiceData.billToAddress || ""
           : "",
         poNumber: inlineInvoiceData.poNumber || "",
         projectName: inlineInvoiceData.project || job.title || "",
-        items: (inlineInvoiceData.lineItems || [])
-        // Only send rows that actually have an item name filled.
-        // Empty seeded rows should not affect payload calculations.
-        .filter((item: any) => {
-          if (item.type === "header") return false;
-          return String(item.item || "").trim() !== "";
-        })
-        .map((item: any) => {
-          const qtyNum = Number(item.qty || 0);
-          const rateNum = Number(item.rate || 0);
-          const amountNum = qtyNum * rateNum;
-
-          return {
-            quantity: String(qtyNum),
-            item: item.item || "",
-            description: item.description || "",
-            rate: rateNum.toFixed(2),
-            amount: amountNum.toFixed(2),
-            parent_header_name:
-              item.parentHeaderName || item.parent_header_name || null,
-          };
-        }),
+        items: mappedSendItems,
         subtotal: subtotal.toFixed(2),
         total: total.toFixed(2),
         ...(includeLabor ? { total_labor_cost: laborCost } : {}),
@@ -6650,19 +6707,18 @@ const handlePrintInvoice = async (invoice: any) => {
         qty: product.stock_quantity || 1,
         item: product.product_name || "",
         description: product.description || "",
-        rate: product.unit_cost || product.jdp_price || 0,
+        rate: product.jdp_price || product.unit_cost || 0,
         estimatedPrice:
           product.estimated_price ||
-          product.unit_cost ||
           product.jdp_price ||
+          product.unit_cost ||
           0,
-        total:
-          product.total_cost ??
-          (product.stock_quantity || 1) *
-            (product.estimated_price ||
-              product.unit_cost ||
-              product.jdp_price ||
-              0),
+        total: Number(
+          (
+            (product.stock_quantity || 1) *
+            Number(product.jdp_price || product.unit_cost || 0)
+          ).toFixed(2),
+        ),
         searchQuery: "",
         showSearchResults: false,
         supplierId: product.supplier_id || 1,
@@ -8311,15 +8367,7 @@ const handlePrintInvoice = async (invoice: any) => {
                       </Label>
                       <div className="border border-gray-300 p-4 min-h-[120px]">
                         <Input
-                          value={
-                            job.type === "contract-based"
-                              ? contractorData?.name ||
-                                contractorData?.contractor_name ||
-                                inlineInvoiceData.customerName
-                              : customerData?.name ||
-                                customerData?.customer_name ||
-                                inlineInvoiceData.customerName
-                          }
+                          value={getInvoiceCustomerDisplayName()}
                           onChange={(e) =>
                             setInlineInvoiceData((prev) => ({
                               ...prev,
@@ -8336,13 +8384,7 @@ const handlePrintInvoice = async (invoice: any) => {
                         />
                         <Textarea
                           key={`customer-address-${inlineInvoiceData.customerAddress}`}
-                          value={
-                            job.type === "contract-based"
-                              ? contractorData?.address ||
-                                contractorData?.contractor_address ||
-                                inlineInvoiceData.customerAddress
-                              : inlineInvoiceData.customerAddress
-                          }
+                          value={getInvoiceCustomerDisplayAddress()}
                           onChange={(e) => {
                             setInlineInvoiceData((prev) => ({
                               ...prev,
@@ -10900,7 +10942,7 @@ const handlePrintInvoice = async (invoice: any) => {
                 #
               </div>
               <div className="text-sm border border-gray-800 px-4 py-2 w-[160px]">
-                {InvoioiceNumber}
+                {inlineInvoiceData.estimateNumber}
               </div>
             </div>
           </div>
@@ -10925,19 +10967,10 @@ const handlePrintInvoice = async (invoice: any) => {
         </div>
         <div className="mb-4 border border-gray-800 px-3 py-2">
           <div className="font-semibold text-sm">
-            {job.type === "contract-based"
-              ? contractorData?.name ||
-                contractorData?.contractor_name ||
-                "Contractor"
-              : customerData?.customer_name ||
-                customerData?.company_name ||
-                inlineInvoiceData.customerName ||
-                "Customer"}
+            {getInvoiceCustomerDisplayName()}
           </div>
           <div className="text-gray-600 text-sm leading-5">
-            {job.type === "contract-based"
-              ? contractorData?.address || inlineInvoiceData.customerAddress || ""
-              : customerData?.address || inlineInvoiceData.customerAddress || ""}
+            {getInvoiceCustomerDisplayAddress()}
           </div>
         </div>
 
@@ -11024,16 +11057,24 @@ const handlePrintInvoice = async (invoice: any) => {
 
                 const normalizedItems = lineItems
                   .filter((item: any) => item.type !== "header")
-                  .map((item: any) => ({
-                    ...item,
-                    qty: item.qty ?? item.stock_quantity ?? 0,
-                    item: item.item ?? item.product_name ?? "-",
-                    rate: item.rate ?? item.unit_cost ?? 0,
-                    estimatedPrice:
-                      item.estimatedPrice ?? item.estimated_price ?? 0,
-                    total: item.total ?? item.total_cost ?? 0,
-                    parent_header_name: getHeaderName(item),
-                  }));
+                  .map((item: any) => {
+                    const qty = item.qty ?? item.stock_quantity ?? 0;
+                    const rate = item.rate ?? item.jdp_price ?? item.unit_cost ?? 0;
+                    return {
+                      ...item,
+                      qty,
+                      item: item.item ?? item.product_name ?? "-",
+                      rate,
+                      estimatedPrice:
+                        item.estimatedPrice ?? item.estimated_price ?? 0,
+                      total: getLineItemAmount({
+                        ...item,
+                        qty,
+                        rate,
+                      }),
+                      parent_header_name: getHeaderName(item),
+                    };
+                  });
 
                 const directItems = normalizedItems.filter(
                   (item: any) => !item.parent_header_name,
