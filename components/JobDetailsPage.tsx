@@ -8901,7 +8901,7 @@ const handlePrintInvoice = async (invoice: any) => {
                       <div className="flex items-center gap-3">
                         <div className="text-right">
                           <p className="font-semibold text-lg text-foreground">
-                            {formatCurrency(getEstimateDisplayTotal(invoice))}
+                            {formatCurrency(Number(invoice.total_amount) || 0)}
                           </p>
                           <Badge
                             className={`mt-1 ${getStatusBadgeColor(invoice.status)}`}
