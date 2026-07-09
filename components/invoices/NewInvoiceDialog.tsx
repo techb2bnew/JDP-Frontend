@@ -376,6 +376,97 @@ function resolveInvoiceEmailFromJob(job: any, contractBased: boolean): string {
   return e != null && String(e).trim() !== "" ? String(e).trim() : "";
 }
 
+function resolveEmailFromPartyEntity(
+  entity: any,
+  contractBased: boolean,
+): string {
+  if (!entity) return "";
+  const data = entity?.data ?? entity;
+  const e = contractBased
+    ? data?.email ?? data?.contractor_email
+    : data?.email ?? data?.customer_email;
+  return e != null && String(e).trim() !== "" ? String(e).trim() : "";
+}
+
+async function fetchPartyEmailById(
+  partyId: number,
+  contractBased: boolean,
+): Promise<string> {
+  try {
+    const entity = contractBased
+      ? await apiClient.getContractorById(String(partyId))
+      : await apiClient.getCustomerById(String(partyId));
+    return resolveEmailFromPartyEntity(entity, contractBased);
+  } catch (error) {
+    console.error("Failed to fetch party email:", error);
+    return "";
+  }
+}
+
+async function resolveInvoiceRecipientEmail(options: {
+  isViewMode: boolean;
+  viewInvoiceData: any;
+  job: any | null;
+  isContractBased: boolean;
+  customerId: number | null;
+  contractorId: number | null;
+  listingParentId?: string;
+  listingSource?: ListingParentSource;
+  currentJob?: any;
+  fallbackPlaceholder?: string;
+}): Promise<string> {
+  const {
+    isViewMode,
+    viewInvoiceData,
+    job,
+    isContractBased,
+    customerId,
+    contractorId,
+    listingParentId,
+    listingSource,
+    currentJob,
+    fallbackPlaceholder = "customer@example.com",
+  } = options;
+
+  if (isViewMode && viewInvoiceData) {
+    const email =
+      (isContractBased
+        ? viewInvoiceData.contractor?.email
+        : viewInvoiceData.customer?.email) || viewInvoiceData.email_address;
+    if (email && String(email).trim()) return String(email).trim();
+  }
+
+  if (job) {
+    const fromJob = resolveInvoiceEmailFromJob(job, isContractBased);
+    if (fromJob) return fromJob;
+    if (job.email && String(job.email).trim()) return String(job.email).trim();
+  }
+
+  const partyId = isContractBased ? contractorId : customerId;
+  if (partyId) {
+    const fromParty = await fetchPartyEmailById(partyId, isContractBased);
+    if (fromParty) return fromParty;
+  }
+
+  if (listingParentId && listingSource) {
+    const entity = await fetchListingParentEntity(
+      listingParentId,
+      listingSource,
+    );
+    const fromListing = resolveEmailFromPartyEntity(
+      entity,
+      listingSource === "contractors" || isContractBased,
+    );
+    if (fromListing) return fromListing;
+  }
+
+  if (currentJob?.email && String(currentJob.email).trim()) {
+    return String(currentJob.email).trim();
+  }
+
+  return fallbackPlaceholder;
+}
+
 function resolveInvoiceLocationFromJob(
   job: any,
   contractBased: boolean,
@@ -1302,23 +1393,17 @@ export const NewInvoiceDialog = ({
         throw new Error("No authentication token found");
       }
 
-      // Get customer / contractor email
-      let customerEmail = "customer@example.com";
-      if (isViewMode && viewInvoiceData) {
-        customerEmail =
-          (isContractBased
-            ? viewInvoiceData.contractor?.email
-            : viewInvoiceData.customer?.email) ||
-          viewInvoiceData.email_address ||
-          "customer@example.com";
-      } else if (createModeJob) {
-        const partyEmail = resolveInvoiceEmailFromJob(
-          createModeJob,
-          isContractBased,
-        );
-        customerEmail =
-          partyEmail || createModeJob.email || "customer@example.com";
-      }
+      const customerEmail = await resolveInvoiceRecipientEmail({
+        isViewMode,
+        viewInvoiceData,
+        job: createModeJob,
+        isContractBased,
+        customerId,
+        contractorId,
+        listingParentId,
+        listingSource,
+        currentJob,
+      });
 
       const payload: any = {
         estimateNumber: inlineInvoiceData.estimateNumber || "Draft",
@@ -1532,7 +1617,6 @@ export const NewInvoiceDialog = ({
           const estimatedPrice = Number(
             product.estimatedPrice || product.jdpPrice || 0,
           );
-          const priceToUse = estimatedPrice > 0 ? estimatedPrice : rate;
 
           return {
             ...item,
@@ -1543,7 +1627,7 @@ export const NewInvoiceDialog = ({
             description: product.description || "",
             rate,
             estimatedPrice,
-            total: (item.qty || 1) * priceToUse,
+            total: Number(((item.qty || 1) * rate).toFixed(2)),
             showSearchResults: false,
             searchQuery: "",
             supplierId: product.supplierId || selectedSupplierId || 1,
@@ -1922,18 +2006,17 @@ export const NewInvoiceDialog = ({
         return;
       }
 
-      const emailForDraft =
-        isViewMode && viewInvoiceData
-          ? (isContractBased
-              ? viewInvoiceData.contractor?.email
-              : viewInvoiceData.customer?.email) ||
-            viewInvoiceData.email_address ||
-            "customer@example.com"
-          : draftJob
-            ? resolveInvoiceEmailFromJob(draftJob, isContractBased) ||
-              draftJob.email ||
-              "customer@example.com"
-            : currentJob?.email || "customer@example.com";
+      const emailForDraft = await resolveInvoiceRecipientEmail({
+        isViewMode,
+        viewInvoiceData,
+        job: draftJob,
+        isContractBased,
+        customerId,
+        contractorId,
+        listingParentId,
+        listingSource,
+        currentJob,
+      });
 
       const billToForDraft = inlineInvoiceData.billToAddressEnabled
         ? inlineInvoiceData.billToAddress ||
@@ -2198,18 +2281,17 @@ const validateLineItems = (lineItems: any[] = []) => {
         return;
       }
 
-      const emailForPreview =
-        isViewMode && viewInvoiceData
-          ? (isContractBased
-              ? viewInvoiceData.contractor?.email
-              : viewInvoiceData.customer?.email) ||
-            viewInvoiceData.email_address ||
-            "customer@example.com"
-          : previewJob
-            ? resolveInvoiceEmailFromJob(previewJob, isContractBased) ||
-              previewJob.email ||
-              "customer@example.com"
-            : currentJob?.email || "customer@example.com";
+      const emailForPreview = await resolveInvoiceRecipientEmail({
+        isViewMode,
+        viewInvoiceData,
+        job: previewJob,
+        isContractBased,
+        customerId,
+        contractorId,
+        listingParentId,
+        listingSource,
+        currentJob,
+      });
 
       const billToForPreview = inlineInvoiceData.billToAddressEnabled
         ? inlineInvoiceData.billToAddress ||
@@ -2439,11 +2521,17 @@ const validateLineItems = (lineItems: any[] = []) => {
         return;
       }
 
-      const qbEmail = selectedJobFromList
-        ? resolveInvoiceEmailFromJob(selectedJobFromList, isContractBased) ||
-          selectedJobFromList.email ||
-          "customer@example.com"
-        : currentJob?.email || "customer@example.com";
+      const qbEmail = await resolveInvoiceRecipientEmail({
+        isViewMode: false,
+        viewInvoiceData: null,
+        job: selectedJobFromList,
+        isContractBased,
+        customerId,
+        contractorId,
+        listingParentId,
+        listingSource,
+        currentJob,
+      });
 
       const payload: any = {
         ...(payloadJobId != null ? { job_id: payloadJobId } : {}),
@@ -3654,6 +3742,7 @@ const validateLineItems = (lineItems: any[] = []) => {
               ) : (
                 <InvoiceLineItemsManager
                   lineItems={inlineInvoiceData.lineItems}
+                  useRateForLineTotal
                   invalidHeaderKeys={invalidHeaderKeys}
                   setInvalidHeaderKeys={setInvalidHeaderKeys}
                   setLineItems={(updater) =>
