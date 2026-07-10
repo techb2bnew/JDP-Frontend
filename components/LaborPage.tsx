@@ -15,6 +15,12 @@ import { AutoSuggestInput } from './ui/auto-suggest-input'
 import { toast } from 'sonner'
 import { getAuthToken, handleTokenRevocation } from '../utils/globalApiHandler'
 import { getYesterdayLocalDateString, validateDobValue } from '../utils/dobValidation'
+import {
+  getValidationToastMessage,
+  validateAddressValue,
+  validateRequiredNameEmailAddress,
+  formatEmailForListing,
+} from '../utils/staffEntityFormValidation'
 import { getCompactPaginationItems } from '@/utils/pagination'
 import { 
   Plus, 
@@ -351,19 +357,15 @@ const getAvailabilityBadge = (availability: string) => {
   const handleCreate = async () => {
     if (isCreatingLabor) return
 
-    const errors: Record<string, string> = {};
-    if (!formData.full_name.trim()) errors.full_name = 'Full name is required';
-    if (!formData.email.trim()) {
-      errors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      errors.email = 'Please enter a valid email address';
-    }
-    if (!formData.address.trim()) {
-      errors.address = 'Address is required';
-    }
+    const errors = validateRequiredNameEmailAddress({
+      full_name: formData.full_name,
+      email: formData.email,
+      address: formData.address,
+      nameFieldKey: "full_name",
+    });
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
-      toast.error('Please enter full name, email, and address');
+      toast.error(getValidationToastMessage(errors));
       return;
     }
 
@@ -482,19 +484,15 @@ const getAvailabilityBadge = (availability: string) => {
   const handleUpdate = async () => {
     if (!editingLabor) return
 
-    const updateErrors: Record<string, string> = {};
-    if (!formData.full_name.trim()) updateErrors.full_name = 'Full name is required';
-    if (!formData.email.trim()) {
-      updateErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      updateErrors.email = 'Please enter a valid email address';
-    }
-    if (!formData.address.trim()) {
-      updateErrors.address = 'Address is required';
-    }
+    const updateErrors = validateRequiredNameEmailAddress({
+      full_name: formData.full_name,
+      email: formData.email,
+      address: formData.address,
+      nameFieldKey: "full_name",
+    });
     if (Object.keys(updateErrors).length > 0) {
       setValidationErrors(updateErrors);
-      toast.error('Please enter full name, email, and address');
+      toast.error(getValidationToastMessage(updateErrors));
       return;
     }
 
@@ -901,7 +899,7 @@ const fetchLeadLabourData = async () => {
         const mappedData = responseData.data.data.map((item: any) => ({
           id: item.users?.id,
           full_name: item.users?.full_name || 'N/A',
-          email: item.users?.email || 'N/A',
+          email: formatEmailForListing(item.users?.email || 'N/A'),
           phone: item.users?.phone || 'N/A',
           role: item.users?.role || 'Lead Labor'
         }));
@@ -944,7 +942,7 @@ const fetchLaborData = async (page: number = 1, limit: number = 10) => {
           id: item.id.toString(),
           laborId: item.labor_code,
           name: item.users?.full_name || 'N/A',
-          email: item.users?.email || 'N/A',
+          email: formatEmailForListing(item.users?.email || 'N/A'),
           phone: item.users?.phone || 'N/A',
           address: item.address || '',
           trade: item.trade || '',
@@ -997,7 +995,7 @@ const fetchBySearchLabor = async () => {
       userId: labor.user_id,
       laborCode: labor.labor_code || 'N/A',
       name: labor.users?.full_name || 'N/A',
-      email: labor.users?.email || 'N/A',
+      email: formatEmailForListing(labor.users?.email || 'N/A'),
       phone: labor.users?.phone || 'N/A',
       role: labor.users?.role || 'N/A',
       status: labor.users?.status || 'N/A',
@@ -1059,7 +1057,7 @@ useEffect(() => {
         id: item.id?.toString() || '',
         laborId: item.labor_code,
         name: item.users?.full_name || 'N/A',
-        email: item.users?.email || 'N/A',
+        email: formatEmailForListing(item.users?.email || 'N/A'),
         phone: item.users?.phone || 'N/A',
         address: item.address || '',
         trade: item.trade || '',
@@ -1304,18 +1302,27 @@ const fetchLaborById = async (id: string) => {
             const address = resolveFormattedPlaceAddress(place);
             if (address) {
               setFormData({ ...formData, address });
-              if (validationErrors.address) {
-                setValidationErrors({ ...validationErrors, address: "" });
-              }
+              setValidationErrors((prev) => {
+                const addressError = validateAddressValue(address);
+                if (addressError) return { ...prev, address: addressError };
+                const next = { ...prev };
+                delete next.address;
+                return next;
+              });
             }
           }}
           value={formData.address}
           onChange={(e: any) => {
             const value = e.target.value;
             setFormData({ ...formData, address: value });
-            if (validationErrors.address) {
-              setValidationErrors({ ...validationErrors, address: "" });
-            }
+            setValidationErrors((prev) => {
+              if (!prev.address) return prev;
+              const addressError = validateAddressValue(value);
+              if (addressError) return { ...prev, address: addressError };
+              const next = { ...prev };
+              delete next.address;
+              return next;
+            });
           }}
           placeholder={ADDRESS_SEARCH_PLACEHOLDER}
           className={`w-full h-10 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
@@ -1745,7 +1752,7 @@ const fetchLaborById = async (id: string) => {
                     <TableCell>
                       <div>
                         <div className="text-sm font-medium text-[#2b2b2b]/80">{labor.name}</div>
-                        <div className="text-xs text-gray-500">{labor.email}</div>
+                        <div className="text-xs text-gray-500 normal-case">{formatEmailForListing(labor.email)}</div>
                       </div>
                     </TableCell>
                     <TableCell>

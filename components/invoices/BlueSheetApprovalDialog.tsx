@@ -127,6 +127,69 @@ interface BlueSheetApprovalDialogProps {
   onEstimatesRefresh?: () => void | Promise<void>
 }
 
+function formatLaborWorkedHours(totalHours: string): string {
+  const m = String(totalHours).match(/^(\d+)h(\d+)m$/);
+  if (!m) return String(totalHours);
+  const h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  if (h === 0 && min === 0) return "0 min";
+  if (h === 0) return `${min} min`;
+  if (min === 0) return `${h} hr`;
+  return `${h} hr ${min} min`;
+}
+
+function formatLaborEntryLabel(entry: any): string {
+  const name = String(entry?.employee_name || entry?.role || "Labor")
+    .split(" ")
+    .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+
+  const time = entry?.total_hours
+    ? formatLaborWorkedHours(entry.total_hours)
+    : null;
+  const timeLabel = time ? `${time} worked` : null;
+
+  let dateLabel: string | null = null;
+  if (entry?.updated_at) {
+    try {
+      dateLabel = new Date(entry.updated_at).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
+      dateLabel = String(entry.updated_at);
+    }
+  }
+
+  return [name, timeLabel, dateLabel].filter(Boolean).join(" • ");
+}
+
+function getBlueSheetLaborSources(
+  selectedBlueSheets: BlueSheetItem[] | undefined,
+  blueSheet: BlueSheetItem | null,
+): BlueSheetItem[] {
+  if (selectedBlueSheets && selectedBlueSheets.length > 0) {
+    return selectedBlueSheets;
+  }
+  return blueSheet ? [blueSheet] : [];
+}
+
+function buildLaborGroupsByBlueSheet(
+  laborSources: BlueSheetItem[],
+): Array<{ bsId: string | number; labors: any[] }> {
+  const groups: Array<{ bsId: string | number; labors: any[] }> = [];
+  laborSources.forEach((bs) => {
+    const bsId =
+      (bs as any).id ?? (bs as any).blueSheetId ?? (bs as any).bluesheet_id;
+    const labors = Array.isArray(bs.labor_entries) ? bs.labor_entries : [];
+    if (labors.length > 0 && bsId != null) {
+      groups.push({ bsId, labors });
+    }
+  });
+  return groups;
+}
+
 export function BlueSheetApprovalDialog({
   isOpen,
   onClose,
@@ -2340,17 +2403,86 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                             <tbody>
                               {currentBlueSheet.material_entries.length ===
                               0 ? (
-                                <tr className="border-t border-gray-100 bg-white">
-                                  <td
-                                    colSpan={5}
-                                    className="py-4 px-3 text-center text-sm text-gray-500"
-                                  >
-                                    No material data in this BlueSheet
-                                  </td>
-                                  {isBlueSheetEditMode &&
-                                    currentBlueSheet.material_entries.length >
-                                      1 && <td />}
-                                </tr>
+                                (() => {
+                                  const laborGroups = buildLaborGroupsByBlueSheet(
+                                    getBlueSheetLaborSources(
+                                      selectedBlueSheets,
+                                      blueSheet,
+                                    ),
+                                  );
+
+                                  if (laborGroups.length === 0) {
+                                    return (
+                                      <tr className="border-t border-gray-100 bg-white">
+                                        <td
+                                          colSpan={5}
+                                          className="py-4 px-3 text-center text-sm text-gray-500"
+                                        >
+                                          No material data in this BlueSheet
+                                        </td>
+                                        {isBlueSheetEditMode &&
+                                          currentBlueSheet.material_entries
+                                            .length > 1 && <td />}
+                                      </tr>
+                                    );
+                                  }
+
+                                  return laborGroups.map(
+                                    ({ bsId, labors }, groupIdx) => (
+                                      <React.Fragment key={String(bsId)}>
+                                        {labors.map((l: any, i: number) => (
+                                          <tr
+                                            key={l.id ?? `${bsId}-${i}`}
+                                            className="border-t border-gray-100 hover:bg-gray-50/50"
+                                          >
+                                            {i === 0 && (
+                                              <td
+                                                className="py-2 px-3 border-r-2 border-gray-400 w-10 bg-gray-50"
+                                                rowSpan={labors.length}
+                                              >
+                                                <span className="text-[11px] font-bold text-black">
+                                                  BS-{bsId}
+                                                </span>
+                                              </td>
+                                            )}
+                                            <td className="py-2 px-3">
+                                              <span className="font-small text-[#1a1a2e]">
+                                                {formatLaborEntryLabel(l)}
+                                              </span>
+                                            </td>
+                                            <td className="py-2 px-2 text-center">
+                                              <span className="font-medium">
+                                                1
+                                              </span>
+                                            </td>
+                                            <td className="py-2 px-3 text-right">
+                                              {formatCurrency(
+                                                l.hourly_rate ?? 0,
+                                              )}
+                                            </td>
+                                            <td className="py-2 px-3 text-right font-semibold text-[#00A1FF]">
+                                              {formatCurrency(
+                                                l.total_cost ?? 0,
+                                              )}
+                                            </td>
+                                            {isBlueSheetEditMode &&
+                                              currentBlueSheet.material_entries
+                                                .length > 1 && <td />}
+                                          </tr>
+                                        ))}
+                                        {groupIdx <
+                                          laborGroups.length - 1 && (
+                                          <tr>
+                                            <td
+                                              colSpan={99}
+                                              className="p-0 border-b-2 border-gray-400"
+                                            />
+                                          </tr>
+                                        )}
+                                      </React.Fragment>
+                                    ),
+                                  );
+                                })()
                               ) : (
                                 currentBlueSheet.material_entries.map(
                                   (item: any, idx: number) => {
@@ -2631,41 +2763,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                               )}
                                               <td className="py-2 px-3">
                                                 <span className="font-small text-[#1a1a2e]">
-                                                  {(() => {
-                                                    const name = (l.employee_name || l.role || "Labor")
-                                                      .split(" ")
-                                                      .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
-                                                      .join(" ");
-
-                                                    const formatTime = (t: string) => {
-                                                      const m = t.match(/^(\d+)h(\d+)m$/);
-                                                      if (!m) return t;
-                                                      const h = parseInt(m[1]);
-                                                      const min = parseInt(m[2]);
-                                                      if (h === 0 && min === 0) return "0 min";
-                                                      if (h === 0) return `${min} min`;
-                                                      if (min === 0) return `${h} hr`;
-                                                      return `${h} hr ${min} min`;
-                                                    };
-
-                                                    const formatDate = (d: string) => {
-                                                      try {
-                                                        return new Date(d).toLocaleDateString("en-GB", {
-                                                          day: "numeric",
-                                                          month: "short",
-                                                          year: "numeric",
-                                                        });
-                                                      } catch {
-                                                        return d;
-                                                      }
-                                                    };
-
-                                                    const time = l.total_hours ? formatTime(l.total_hours) : null;
-                                                    const date = l.updated_at ? formatDate(l.updated_at) : null;
-
-                                                    const timeLabel = time ? `${time} worked` : null;
-                                                    return [name, timeLabel, date].filter(Boolean).join(" • ");
-                                                  })()}
+                                                  {formatLaborEntryLabel(l)}
                                                 </span>
                                               </td>
                                               <td className="py-2 px-2 text-center">

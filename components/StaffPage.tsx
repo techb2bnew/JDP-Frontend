@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { globalApiCall, getAuthToken, handleTokenRevocation } from '../utils/globalApiHandler'
 import { getYesterdayLocalDateString, validateDobValue } from '../utils/dobValidation'
+import { getValidationToastMessage, formatEmailForListing } from '../utils/staffEntityFormValidation'
 import { getCompactPaginationItems } from '../utils/pagination'
 import PhoneInput from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
@@ -463,7 +464,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
         const transformedStaff = responseData.data.data.map((apiStaff: any) => ({
           id: apiStaff.id.toString(),
           name: apiStaff.users?.full_name || '',
-          email: apiStaff.users?.email || '',
+          email: formatEmailForListing(apiStaff.users?.email || ''),
           phone: apiStaff.users?.phone || '',
           dob: apiStaff.dob || '',
           address: apiStaff.address || '',
@@ -679,61 +680,52 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
 
    const validateForm = () => {
     const errors: {[key: string]: string} = {}
-    let isValid = true
 
     // Validate all required fields
     if (!formData.name.trim()) {
       errors.name = 'Name is required'
-      isValid = false
     } else if (!/^[a-zA-Z\s]{2,}$/.test(formData.name.trim())) {
       errors.name = 'Name must be at least 2 characters and contain only letters/spaces'
-      isValid = false
     }
 
     if (!formData.email.trim()) {
       errors.email = 'Email is required'
-      isValid = false
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
       errors.email = 'Invalid email address'
-      isValid = false
     }
 
     if (formData.dob.trim()) {
       const dobError = validateDobValue(formData.dob)
       if (dobError) {
         errors.dob = dobError
-        isValid = false
       }
     }
 
     if (formData.position.trim() && formData.position.trim().length < 2) {
       errors.position = 'Position must be at least 2 characters'
-      isValid = false
     }
 
     if (formData.department.trim() && formData.department.trim().length < 2) {
       errors.department = 'Department must be at least 2 characters'
-      isValid = false
     }
 
     if (!formData.address.trim()) {
       errors.address = 'Address is required'
-      isValid = false
     } else if (formData.address.trim().length < 5) {
       errors.address = 'Address must be at least 5 characters'
-      isValid = false
     }
 
     setValidationErrors(errors)
-    return isValid
+    return {
+      valid: Object.keys(errors).length === 0,
+      errors,
+    }
   }
 
   const handleSubmit = async () => {
-     if (!validateForm()) {
-      const dobError = formData.dob.trim() ? validateDobValue(formData.dob) : null
-      if (dobError) {
-        toast.error(dobError)
-      }
+     const { valid, errors } = validateForm()
+     if (!valid) {
+      toast.error(getValidationToastMessage(errors))
       return
     }
     let loadingToastId: string | number | undefined
@@ -992,7 +984,7 @@ const fetchBySearchStaff = async () => {
       id: staff.id,
       userId: staff.user_id,
       name: staff.users?.full_name || 'N/A',
-      email: staff.users?.email || 'N/A',
+      email: formatEmailForListing(staff.users?.email || 'N/A'),
       phone: staff.users?.phone || 'N/A',
       role: staff.users?.role || 'N/A',
       status: staff.users?.status || 'N/A',
@@ -1045,7 +1037,7 @@ useEffect(() => {
         id: staff.id,
         userId: staff.user_id,
         name: staff.users?.full_name || 'N/A',
-        email: staff.users?.email || 'N/A',
+        email: formatEmailForListing(staff.users?.email || 'N/A'),
         phone: staff.users?.phone || 'N/A',
         role: staff.users?.role || 'N/A',
         status: staff.users?.status || 'N/A',
@@ -1252,7 +1244,7 @@ useEffect(() => {
                   <TableCell className="text-sm text-[#2b2b2b]/80 pl-6">#{member.id}</TableCell>
                   <TableCell className="text-sm text-[#2b2b2b]/80 font-medium">{member.name}</TableCell>
                   <TableCell className="text-sm text-[#2b2b2b]/80">{member.phone}</TableCell>
-                  <TableCell className="text-sm text-gray-900">{member.email}</TableCell>
+                  <TableCell className="text-sm text-gray-900 normal-case">{formatEmailForListing(member.email)}</TableCell>
                   <TableCell className="text-sm text-gray-900 max-w-xs truncate">{member.address}</TableCell>
                   <TableCell className="text-sm text-[#2b2b2b]/80">{member.position}</TableCell>
                   <TableCell className="text-sm text-[#2b2b2b]/80">{member.department}</TableCell>

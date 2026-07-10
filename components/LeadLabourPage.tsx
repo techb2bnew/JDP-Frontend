@@ -16,6 +16,12 @@ import { toast } from 'sonner'
 import { LeadLabourDetailsPage } from './LeadLabourDetailsPage'
 import { getAuthToken, handleTokenRevocation } from '../utils/globalApiHandler'
 import { getYesterdayLocalDateString, validateDobValue } from '../utils/dobValidation'
+import {
+  getValidationToastMessage,
+  validateAddressValue,
+  validateRequiredNameEmailAddress,
+  formatEmailForListing,
+} from '../utils/staffEntityFormValidation'
 import { getCompactPaginationItems } from '@/utils/pagination'
 import {
   Plus,
@@ -352,7 +358,7 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     id: item.id,
     leadLabourId: item.labor_code || item.lead_labour_code || 'N/A',
     name: item.users?.full_name || item.full_name || 'N/A',
-    email: item.users?.email || item.email || 'N/A',
+    email: formatEmailForListing(item.users?.email || item.email || 'N/A'),
     phone: item.users?.phone || item.phone || 'N/A',
     dob: item.dob || '',
     address: item.address || '',
@@ -454,19 +460,15 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
   const handleCreate = async () => {
     if (isCreatingLeadLabour) return
 
-    const errors: Record<string, string> = {};
-    if (!formData.name.trim()) errors.name = 'Name is required';
-    if (!formData.email.trim()) {
-      errors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      errors.email = 'Please enter a valid email address';
-    }
-    if (!formData.address.trim()) {
-      errors.address = 'Address is required';
-    }
+    const errors = validateRequiredNameEmailAddress({
+      name: formData.name,
+      email: formData.email,
+      address: formData.address,
+      nameFieldKey: "name",
+    });
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
-      toast.error('Please enter full name, email, and address');
+      toast.error(getValidationToastMessage(errors));
       return;
     }
 
@@ -643,19 +645,15 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
   const handleUpdate = async () => {
     if (!editingLeadLabour) return
 
-    const updateErrors: Record<string, string> = {};
-    if (!formData.name.trim()) updateErrors.name = 'Name is required';
-    if (!formData.email.trim()) {
-      updateErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      updateErrors.email = 'Please enter a valid email address';
-    }
-    if (!formData.address.trim()) {
-      updateErrors.address = 'Address is required';
-    }
+    const updateErrors = validateRequiredNameEmailAddress({
+      name: formData.name,
+      email: formData.email,
+      address: formData.address,
+      nameFieldKey: "name",
+    });
     if (Object.keys(updateErrors).length > 0) {
       setValidationErrors(updateErrors);
-      toast.error('Please enter full name, email, and address');
+      toast.error(getValidationToastMessage(updateErrors));
       return;
     }
 
@@ -877,73 +875,116 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
     }
   }
 
+  const getDocumentFileName = (
+    file: File | { name: string; url: string },
+  ): string => {
+    const raw = file instanceof File ? file.name : file.name;
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
+  };
+
+  const getDocumentFileUrl = (
+    file: File | { name: string; url: string },
+  ): string => {
+    return file instanceof File ? URL.createObjectURL(file) : file.url;
+  };
+
+  const isImageDocument = (
+    file: File | { name: string; url: string },
+  ): boolean => {
+    if (file instanceof File) return file.type.startsWith("image/");
+    return /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
+  };
+
+  const isPdfDocument = (
+    file: File | { name: string; url: string },
+  ): boolean => {
+    if (file instanceof File) {
+      return (
+        file.type === "application/pdf" || /\.pdf$/i.test(file.name)
+      );
+    }
+    return /\.pdf$/i.test(file.name);
+  };
+
+  const FILE_PREVIEW_HEIGHT = "h-36";
+
   const FileUploadArea = ({ type, label, accept, error }: { type: 'idProof' | 'photo' | 'resume', label: string, accept: string, error?: string }) => {
     const currentFile = formData.documents[type]
-    const isImageFile = currentFile && (
-      (currentFile instanceof File && currentFile.type.startsWith('image/')) ||
-      (!(currentFile instanceof File) && currentFile && (currentFile as any).name && /\.(jpg|jpeg|png|gif)$/i.test((currentFile as any).name))
-    )
+    const previewBoxClass = `relative w-full ${FILE_PREVIEW_HEIGHT} overflow-hidden rounded-lg border-2 border-dashed border-gray-300`
 
     return (
-      <div className="space-y-2">
+      <div className="flex flex-col space-y-2">
         <Label>{label}</Label>
 
         {currentFile ? (
-          <div className="relative border-2 border-dashed rounded-lg p-4">
-            {isImageFile ? (
-              <div className="relative">
-                <Image
-                  src={currentFile instanceof File ? URL.createObjectURL(currentFile) : (currentFile as any).url}
-                  alt="Preview"
-                  className="w-full h-32 object-cover rounded-lg"
-                  width={168}
-                  height={63}
-
-
-                />
-                {/* <img 
-                  src={currentFile instanceof File ? URL.createObjectURL(currentFile) : (currentFile as any).url} 
-                  alt="Preview" 
-                  className="w-full h-32 object-cover rounded-lg"
-                /> */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleFileUpload(type, null)
-                  }}
-                  className="absolute  top-0 right-0   bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
+          <div className={previewBoxClass}>
+            {isImageDocument(currentFile) ? (
+              <Image
+                src={getDocumentFileUrl(currentFile)}
+                alt="Preview"
+                className="h-full w-full object-cover"
+                width={320}
+                height={144}
+              />
             ) : (
-              <div className="relative p-2 bg-gray-50 rounded flex items-center justify-center gap-3">
-                <div className="flex items-center justify-center">
-                  <FileText className="h-6 w-6 text-gray-400" />
-                </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleFileUpload(type, null)
-                  }}
-                  className="  bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+              <div className="flex h-full flex-col items-center justify-center gap-2 bg-slate-50 px-3 py-3">
+                <div
+                  className={`flex h-14 w-12 items-center justify-center rounded-md border ${
+                    isPdfDocument(currentFile)
+                      ? "border-red-100 bg-red-50"
+                      : "border-blue-100 bg-blue-50"
+                  }`}
                 >
-                  <X className="h-4 w-4" />
-                </button>
+                  <FileText
+                    className={`h-7 w-7 ${
+                      isPdfDocument(currentFile)
+                        ? "text-red-500"
+                        : "text-blue-500"
+                    }`}
+                  />
+                </div>
+                <p
+                  className="w-full px-1 text-center text-xs font-medium text-gray-700 line-clamp-2 break-all"
+                  title={getDocumentFileName(currentFile)}
+                >
+                  {getDocumentFileName(currentFile)}
+                </p>
+                <a
+                  href={getDocumentFileUrl(currentFile)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 text-xs text-[#00A1FF] hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  View file
+                </a>
               </div>
             )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleFileUpload(type, null)
+              }}
+              className="absolute top-2 right-2 z-10 rounded-full bg-red-500 p-1 text-white transition-colors hover:bg-red-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
         ) : (
           <div
-            className={`border-2 border-dashed rounded-lg p-6 text-center hover:border-[#00A1FF] transition-colors cursor-pointer ${error ? 'border-red-300' : 'border-gray-300'
-              }`}
+            className={`${previewBoxClass} flex cursor-pointer flex-col items-center justify-center text-center transition-colors hover:border-[#00A1FF] ${
+              error ? "border-red-300" : ""
+            }`}
             onClick={() => document.getElementById(`file-${type}`)?.click()}
           >
-            <Download className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+            <Download className="mx-auto mb-2 h-8 w-8 text-gray-400" />
             <p className="text-sm text-gray-600">Upload file here</p>
-            <p className="text-xs text-gray-500 mt-1">or click to browse</p>
+            <p className="mt-1 text-xs text-gray-500">or click to browse</p>
             <input
               id={`file-${type}`}
               type="file"
@@ -957,27 +998,8 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
           </div>
         )}
 
-        {editingLeadLabour && editingLeadLabour.documents?.[type] && 
-         (!formData.documents[type] || (formData.documents[type] && !(formData.documents[type] instanceof File))) && (
-          <div className="mt-2">
-            
-            {editingLeadLabour.documents[type]!.name && !/\.(jpg|jpeg|png|gif)$/i.test(editingLeadLabour.documents[type]!.name) && (
-              <div className="p-4 bg-gray-50 rounded-lg border flex items-center gap-2">
-                <FileText className="h-6 w-6 text-gray-400" />
-                <a 
-                  href={editingLeadLabour.documents[type]!.url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-sm text-blue-600 hover:underline"
-                >
-                  {editingLeadLabour.documents[type]!.name}
-                </a>
-              </div>
-            )}
-          </div>
-        )}
         {error && (
-          <p className="text-sm text-red-500 mt-1">{error}</p>
+          <p className="mt-1 text-sm text-red-500">{error}</p>
         )}
       </div>
     )
@@ -1538,18 +1560,27 @@ useEffect(() => {
                 const address = resolveFormattedPlaceAddress(place);
                 if (address) {
                   setFormData({ ...formData, address });
-                  if (validationErrors.address) {
-                    setValidationErrors({ ...validationErrors, address: "" });
-                  }
+                  setValidationErrors((prev) => {
+                    const addressError = validateAddressValue(address);
+                    if (addressError) return { ...prev, address: addressError };
+                    const next = { ...prev };
+                    delete next.address;
+                    return next;
+                  });
                 }
               }}
               value={formData.address}
               onChange={(e: any) => {
                 const value = e.target.value;
                 setFormData({ ...formData, address: value });
-                if (validationErrors.address) {
-                  setValidationErrors({ ...validationErrors, address: "" });
-                }
+                setValidationErrors((prev) => {
+                  if (!prev.address) return prev;
+                  const addressError = validateAddressValue(value);
+                  if (addressError) return { ...prev, address: addressError };
+                  const next = { ...prev };
+                  delete next.address;
+                  return next;
+                });
               }}
               className={`w-full h-10 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
                 validationErrors.address ? "border-red-500" : ""
@@ -1962,7 +1993,7 @@ useEffect(() => {
                     <TableCell>
                       <div>
                         <div className="text-sm font-medium text-[#2b2b2b]/80">{labour.name}</div>
-                        <div className="text-xs text-gray-500">{labour.email}</div>
+                        <div className="text-xs text-gray-500 normal-case">{formatEmailForListing(labour.email)}</div>
                       </div>
                     </TableCell>
                     <TableCell>

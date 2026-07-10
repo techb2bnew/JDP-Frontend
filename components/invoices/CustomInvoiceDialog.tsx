@@ -951,14 +951,27 @@ console.log(totalAmount,"amounttt");
       Array.isArray(blueSheet?.material_entries) &&
       blueSheet.material_entries.length > 0;
 
-    if (validLineItems.length === 0 && !hasBlueSheetMaterials) {
+    const hasBlueSheetLabor = laborEntriesTotalFromBlueSheet > 0;
+    const isLaborOnlyBlueSheet =
+      !hasBlueSheetMaterials && hasBlueSheetLabor;
+
+    if (
+      validLineItems.length === 0 &&
+      !hasBlueSheetMaterials &&
+      !hasBlueSheetLabor
+    ) {
       errors.lineItems = "Please add at least one product item with name";
     }
-       
+
     if (!validateHeaderGroupsBeforeSubmit(inlineInvoiceData.lineItems)) {
       return;
     }
-      if (!validateLineItems(inlineInvoiceData.lineItems)) return;
+    if (
+      !isLaborOnlyBlueSheet &&
+      !validateLineItems(inlineInvoiceData.lineItems)
+    ) {
+      return;
+    }
 
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);

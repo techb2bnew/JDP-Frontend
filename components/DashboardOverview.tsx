@@ -74,13 +74,37 @@ import {
   DateObject,
 } from "react-multi-date-picker";
 import { normalizeSingleRangeSelection, sortedDatesFromPickerRange } from "@/utils/dateRangeSelection";
+import { usePermissions } from "../contexts/PermissionContext";
 
+const SIDEBAR_PERMISSION_ACTIONS = ["view", "create", "edit", "delete"] as const;
 
+type QuickActionPermission =
+  | { kind: "module"; module: string }
+  | { kind: "staff" };
 
+type QuickAction = {
+  title: string;
+  icon: typeof Users;
+  color: string;
+  path: string;
+  permission?: QuickActionPermission;
+};
 
-const quickActions = [
-  { title: "Customer", icon: Users, color: "bg-green-500", path: "customers" },
-  { title: "Contractor", icon: Briefcase, color: "bg-blue-500", path: "contractors" },
+const quickActions: QuickAction[] = [
+  {
+    title: "Customer",
+    icon: Users,
+    color: "bg-green-500",
+    path: "customers",
+    permission: { kind: "module", module: "customers" },
+  },
+  {
+    title: "Contractor",
+    icon: Briefcase,
+    color: "bg-blue-500",
+    path: "contractors",
+    permission: { kind: "module", module: "contractors" },
+  },
   {
     title: "Generate Invoice",
     icon: FileText,
@@ -92,14 +116,22 @@ const quickActions = [
     icon: BarChart3,
     color: "bg-orange-500",
     path: "analytics",
+    permission: { kind: "module", module: "reports" },
   },
   {
     title: "Manage Staff",
     icon: UserCheck,
     color: "bg-red-500",
     path: "staff",
+    permission: { kind: "staff" },
   },
-  { title: "Orders", icon: Package, color: "bg-indigo-500", path: "orders" },
+  {
+    title: "Orders",
+    icon: Package,
+    color: "bg-indigo-500",
+    path: "orders",
+    permission: { kind: "module", module: "orders" },
+  },
 ];
 
 
@@ -107,6 +139,7 @@ const quickActions = [
 export function DashboardOverview() {
   const [selectedTimeframe, setSelectedTimeframe] = useState("7days");
   const router = useRouter();
+  const { hasAnyPermission } = usePermissions();
   const [isKpiLoading, setIsKpiLoading] = useState(true);
   const [summary, setSummary] = useState<{
     total_revenue: number;
@@ -431,6 +464,26 @@ export function DashboardOverview() {
       fetchRevenueAnalytics();
     }
   }, [dateFrom, dateTo, selectedRanges]);
+
+  const canShowQuickAction = (action: QuickAction): boolean => {
+    if (!action.permission) return true;
+
+    if (action.permission.kind === "staff") {
+      return (
+        hasAnyPermission("labour", [...SIDEBAR_PERMISSION_ACTIONS]) ||
+        hasAnyPermission("lead_labour", [...SIDEBAR_PERMISSION_ACTIONS]) ||
+        hasAnyPermission("staff", [...SIDEBAR_PERMISSION_ACTIONS]) ||
+        hasAnyPermission("suppliers", [...SIDEBAR_PERMISSION_ACTIONS])
+      );
+    }
+
+    return hasAnyPermission(action.permission.module, [
+      ...SIDEBAR_PERMISSION_ACTIONS,
+    ]);
+  };
+
+  const visibleQuickActions = quickActions.filter(canShowQuickAction);
+
   return (
     <div className="space-y-6">
       {/* Welcome Header */}
@@ -471,11 +524,11 @@ export function DashboardOverview() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {quickActions.map((action, index) => {
+            {visibleQuickActions.map((action) => {
               const Icon = action.icon;
               return (
                 <Button
-                  key={index}
+                  key={action.path}
                   variant="outline"
                   onClick={() => router.push(`/${action.path}`)}
                   className="h-20 flex flex-col gap-2 hover:scale-105 transition-transform duration-200 border-dashed hover:bg-muted/50"
