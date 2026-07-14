@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -95,6 +95,7 @@ import { TableListPagination } from "./common/TableListPagination";
 import {
   annotateEntitiesForListing,
   annotateJobsForListing,
+  mergeListingJobs,
   sortEntitiesByRecentJobActivity,
 } from "@/lib/entityListingRecentActivity";
 import { resolveEntityKind, type EntityKind } from "@/lib/resolveEntityKind";
@@ -135,8 +136,13 @@ const normalizeJobsPayload = (data: unknown): any[] => {
   return [];
 };
 
-const jobBelongsToCustomer = (job: any, customerId: string) =>
-  String(job.customer_id ?? job.customer?.id ?? "") === String(customerId);
+const jobBelongsToParent = (job: any, parentId: string) => {
+  const id = String(parentId);
+  return (
+    String(job.customer_id ?? job.customer?.id ?? "") === id ||
+    String(job.contractor_id ?? job.contractor?.id ?? "") === id
+  );
+};
 
 /** Resolve customer + main/sub job for deep-link (?customerId=&jobId=). */
 function resolveCustomerJobNavigation(
@@ -347,12 +353,24 @@ export function CustomersPage() {
     const jobId = searchParams?.get("jobId") || "";
     const estimateId = searchParams?.get("estimateId") || "";
     const customerId = searchParams?.get("customerId") || "";
+    const actionRaw = (searchParams?.get("action") || "").trim().toLowerCase();
+    const action =
+      actionRaw === "edit" || actionRaw === "delete" ? actionRaw : "";
     return {
       jobId: jobId.trim(),
       estimateId: estimateId.trim(),
       customerId: customerId.trim(),
+      action,
     };
   }, [searchParams]);
+
+  const clearUrlActionParam = useCallback(() => {
+    const params = new URLSearchParams(searchParams?.toString() ?? "");
+    if (!params.has("action")) return;
+    params.delete("action");
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [searchParams, pathname, router]);
 
   // Fix Google Autocomplete dropdown z-index and pointer events for modal
   useEffect(() => {
@@ -679,7 +697,7 @@ export function CustomersPage() {
     try {
       const allJobs = await fetchAllJobsBulk();
       const filtered = allJobs.filter((job) =>
-        jobBelongsToCustomer(job, customerId),
+        jobBelongsToParent(job, customerId),
       );
       if (filtered.length > 0) {
         return annotateJobsForListing(filtered);
@@ -833,6 +851,51 @@ export function CustomersPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusFromUrl.customerId, focusFromUrl.jobId]);
+
+  // Cross-page edit/delete: ?customerId=&action=edit|delete → open popup on this page
+  useEffect(() => {
+    const customerId = focusFromUrl.customerId;
+    const action = focusFromUrl.action;
+    if (!customerId || !action || focusFromUrl.jobId) return;
+
+    let cancelled = false;
+
+    (async () => {
+      if (action === "edit") {
+        try {
+          setCurrentAction("edit");
+          setEditingCustomer({ id: customerId });
+          await fetchCustomerById(customerId);
+          if (cancelled) return;
+          setShowAddCustomerModal(true);
+        } catch (error) {
+          console.error("URL edit customer failed:", error);
+        } finally {
+          if (!cancelled) clearUrlActionParam();
+        }
+        return;
+      }
+
+      if (action === "delete") {
+        const entity =
+          findListingCustomer(customerId) || {
+            id: customerId,
+            tag: "customer",
+            type: "customer",
+            customer_type: "customer",
+          };
+        if (cancelled) return;
+        setCustomerToDelete(entity);
+        setShowDeleteAlert(true);
+        clearUrlActionParam();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusFromUrl.customerId, focusFromUrl.action, focusFromUrl.jobId]);
 
   // After page fetch, merge page row into pin without dropping jobs fetched for off-page users
   useEffect(() => {
@@ -1484,9 +1547,9 @@ export function CustomersPage() {
       try {
         setIsLoadingCustomers(true);
 
-        // Step 1: Fetch paginated customers
+        // include_jobs brings contractor jobs; bulk getJobsByCustomer brings timestamps for badges
         const customersResponse = await globalApiCall(
-          `${apiBaseUrl}/customer/getCustomers?page=${currentPage}&limit=${itemsPerPage}`,
+          `${apiBaseUrl}/customer/getCustomers?include_jobs=true&page=${currentPage}&limit=${itemsPerPage}`,
           {
             method: "GET",
           },
@@ -1503,7 +1566,7 @@ export function CustomersPage() {
           // Update pagination state
           setTotalCustomers(totalCustomersFromApi);
 
-          // Step 2: Fetch jobs by customer
+          // Bulk jobs (timestamps + customer-linked jobs)
           let jobsByCustomer: any[] = [];
           try {
             const jobsResponse = await globalApiCall(
@@ -1526,19 +1589,32 @@ export function CustomersPage() {
             // Continue even if jobs fetch fails
           }
 
-          // Step 3: Create a map of customer_id to jobs
-          const jobsMap = new Map<number, any[]>();
-          jobsByCustomer.forEach((job: any) => {
-            const customerId = job.customer_id || job.customer?.id;
-            if (!customerId) return;
-
-            if (!jobsMap.has(customerId)) {
-              jobsMap.set(customerId, []);
+          // Map jobs by customer_id OR contractor_id (mixed list)
+          const jobsMap = new Map<number | string, any[]>();
+          const addJobToParentMap = (parentId: unknown, job: any) => {
+            if (parentId == null || parentId === "") return;
+            const numeric = Number(parentId);
+            const key = Number.isFinite(numeric) ? numeric : String(parentId);
+            if (!jobsMap.has(key)) {
+              jobsMap.set(key, []);
             }
-            jobsMap.get(customerId)!.push(job);
+            const list = jobsMap.get(key)!;
+            const jobId = job?.id;
+            if (
+              jobId != null &&
+              list.some((existing) => existing?.id === jobId)
+            ) {
+              return;
+            }
+            list.push(job);
+          };
+
+          jobsByCustomer.forEach((job: any) => {
+            addJobToParentMap(job.customer_id ?? job.customer?.id, job);
+            addJobToParentMap(job.contractor_id ?? job.contractor?.id, job);
           });
 
-          // Step 4: Merge customers with their jobs
+          // Merge customers with their jobs
           let allCustomers: any[] = [];
 
           if (customersData.data.customers) {
@@ -1547,9 +1623,23 @@ export function CustomersPage() {
             allCustomers = customersData.data;
           }
 
+          const getJobsForParent = (parentId: unknown) => {
+            if (parentId == null || parentId === "") return [];
+            const numeric = Number(parentId);
+            if (Number.isFinite(numeric) && jobsMap.has(numeric)) {
+              return jobsMap.get(numeric) || [];
+            }
+            return jobsMap.get(String(parentId)) || [];
+          };
+
           const customersWithJobsArray = allCustomers.map((customer: any) => {
             const customerId = customer.id;
-            const customerJobs = jobsMap.get(customerId) || [];
+            const embeddedJobs = Array.isArray(customer.jobs)
+              ? customer.jobs
+              : [];
+            const mappedJobs = getJobsForParent(customerId);
+            // Union: contractor jobs from include_jobs + timestamps from bulk
+            const customerJobs = mergeListingJobs(embeddedJobs, mappedJobs);
 
             return {
               id: customerId,
@@ -1560,7 +1650,8 @@ export function CustomersPage() {
               phone: customer.phone || "",
               company_name: customer.company_name || "",
               address: customer.address || "",
-              created_at: customer.created_at || "",
+              created_at: customer.created_at || customer.createdAt || "",
+              updated_at: customer.updated_at || customer.updatedAt || "",
               jobs: customerJobs,
               total_jobs: customerJobs.length,
             };
@@ -1588,14 +1679,16 @@ export function CustomersPage() {
           setPaginatedCustomers(sortedWithRecent);
           setAllCustomersWithJobs(sortedWithRecent);
 
-          // URL deep-link: attach jobs from bulk map when user is not on page 1
+          // URL deep-link: attach merged jobs when user is not on page 1
           const urlCustomerId = searchParams?.get("customerId")?.trim();
           if (urlCustomerId) {
-            const numericId = Number(urlCustomerId);
-            const urlJobs =
-              jobsMap.get(numericId) ||
-              jobsMap.get(Number(urlCustomerId) as unknown as number) ||
-              [];
+            const fromPage = allCustomers.find(
+              (c: any) => c.id?.toString?.() === urlCustomerId,
+            );
+            const urlJobs = mergeListingJobs(
+              fromPage?.jobs,
+              getJobsForParent(urlCustomerId),
+            );
             if (urlJobs.length > 0) {
               const annotatedUrlJobs = annotateJobsForListing(urlJobs);
               setPinnedListingCustomer((prev: any) => {
@@ -1749,6 +1842,14 @@ export function CustomersPage() {
   };
 
   const handleEditCustomer = async (customer: any) => {
+    // Cross-entity: open edit on contractors page
+    if (resolveEntityKind(customer) === "contractor") {
+      router.push(
+        `/contractors?contractorId=${customer.id}&action=edit`,
+      );
+      return;
+    }
+
     try {
       setCurrentAction("edit");
       setEditingCustomer(customer);
@@ -1767,6 +1868,14 @@ export function CustomersPage() {
   };
 
   const handleDeleteCustomerClick = (customer: any) => {
+    // Cross-entity: open delete on contractors page
+    if (resolveEntityKind(customer) === "contractor") {
+      router.push(
+        `/contractors?contractorId=${customer.id}&action=delete`,
+      );
+      return;
+    }
+
     setCustomerToDelete(customer);
     setShowDeleteAlert(true);
   };

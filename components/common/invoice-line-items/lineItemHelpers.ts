@@ -97,6 +97,26 @@ export function isFilledLineItemRow(row: any): boolean {
   return productId != null && productId !== "";
 }
 
+/**
+ * Catalog product id for API payloads (createEstimate / sendInvoice).
+ * UI row `id` is a random client key — never send that as the product id.
+ */
+export function resolveLineItemProductPayloadId(item: any): string | number | null {
+  const isCustom =
+    item?.isCustomProduct === true || item?.is_custom === true;
+  const productId =
+    item?.productId ?? item?.product_id ?? item?.estimate_product_id ?? null;
+  if (
+    !isCustom &&
+    productId != null &&
+    productId !== "" &&
+    Number(productId) !== 0
+  ) {
+    return productId;
+  }
+  return null;
+}
+
 /** Row has partial data but no item name (should show field error). */
 export function isStartedLineItemRow(row: any): boolean {
   if (!row || row.type === "header") return false;

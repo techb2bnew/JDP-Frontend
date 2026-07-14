@@ -53,6 +53,7 @@ import {
   buildInvoicePreviewRows,
   getFilledLineItemRows,
   hasAtLeastOneFilledLineItem,
+  resolveLineItemProductPayloadId,
   roundMoney,
   toPayloadStockQuantity,
   validateInvoiceLineItemsForSubmit,
@@ -1175,14 +1176,18 @@ export const NewInvoiceDialog = ({
                         ? "Final Invoice"
                         : "Estimate",
             lineItems:
-              viewInvoiceData.products?.map((product: any, index: number) => ({
+              (
+                (viewInvoiceData as any).custom_products ??
+                viewInvoiceData.products
+              )?.map((product: any, index: number) => ({
                 id: `item-${index}`,
                 type: "item",
                 headerKey: null,
                 headerName: "",
                 // parentHeaderKey: product.parent_header_key || null,
                 parentHeaderName: product.parent_header_name || null,
-                productId: product.id,
+                productId: product.product_id ?? product.id ?? null,
+                estimate_product_id: product.product_id ?? product.id ?? null,
                 qty: product.stock_quantity || 1,
                 item: product.product_name || "",
                 description: product.description || "",
@@ -1192,7 +1197,7 @@ export const NewInvoiceDialog = ({
                 searchQuery: "",
                 showSearchResults: false,
                 supplierId: product.supplier_id || 1,
-                isCustomProduct: true,
+                isCustomProduct: product.is_custom === true,
               })) || [],
           };
 
@@ -1430,13 +1435,13 @@ export const NewInvoiceDialog = ({
         dueDate: inlineInvoiceData.dueDate || "",
         paymentCredits: inlineInvoiceData.paymentCredits || 0,
         balanceDue: inlineInvoiceData.balanceDue || "",
-        lineItems: inlineInvoiceData.lineItems
-          .filter((item: any) => item.type !== "header")
-          .map((item: any) => {
+        lineItems: getFilledLineItemRows(inlineInvoiceData.lineItems).map(
+          (item: any) => {
             const qtyNum = Number(item.qty || 0);
             const rateNum = Number(item.rate || 0);
+            const productPayloadId = resolveLineItemProductPayloadId(item);
             return {
-              id: item.id,
+              id: productPayloadId ?? item.id,
               qty: qtyNum,
               item: item.item,
               type: item.type,
@@ -1447,7 +1452,8 @@ export const NewInvoiceDialog = ({
               total: roundMoney(qtyNum * rateNum),
               is_custom: item.isCustomProduct === true,
             };
-          }),
+          },
+        ),
         notes: getInvoiceNotesForPayload(),
         invoice_description: INVOICE_DESCRIPTION,
         signatureText: inlineInvoiceData.signatureText || "",
@@ -1928,8 +1934,9 @@ export const NewInvoiceDialog = ({
           parent_header_name: item.parentHeaderName || null,
         } as any;
 
-        if (!item.isCustomProduct && item.productId) {
-          base.id = item.productId;
+        const productPayloadId = resolveLineItemProductPayloadId(item);
+        if (productPayloadId != null) {
+          base.id = productPayloadId;
         }
 
         return base;
@@ -2199,8 +2206,9 @@ const validateLineItems = (lineItems: any[] = []) => {
           parent_header_name: item.parentHeaderName || null,
         } as any;
 
-        if (!item.isCustomProduct && item.productId) {
-          base.id = item.productId;
+        const productPayloadId = resolveLineItemProductPayloadId(item);
+        if (productPayloadId != null) {
+          base.id = productPayloadId;
         }
 
         return base;
@@ -2479,8 +2487,9 @@ const validateLineItems = (lineItems: any[] = []) => {
           parent_header_name: item.parentHeaderName || null,
         } as any;
 
-        if (!item.isCustomProduct && item.productId) {
-          base.id = item.productId;
+        const productPayloadId = resolveLineItemProductPayloadId(item);
+        if (productPayloadId != null) {
+          base.id = productPayloadId;
         }
         return base;
       });

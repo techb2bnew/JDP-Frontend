@@ -1052,12 +1052,24 @@ export function ContractorListingPage() {
     const contractorId = searchParams?.get('contractorId') || ''
     const jobId = searchParams?.get('jobId') || ''
     const estimateId = searchParams?.get('estimateId') || ''
+    const actionRaw = (searchParams?.get('action') || '').trim().toLowerCase()
+    const action =
+      actionRaw === 'edit' || actionRaw === 'delete' ? actionRaw : ''
     return {
       contractorId: contractorId.trim(),
       jobId: jobId.trim(),
       estimateId: estimateId.trim(),
+      action,
     }
   }, [searchParams])
+
+  const clearUrlActionParam = () => {
+    const params = new URLSearchParams(searchParams?.toString() ?? '')
+    if (!params.has('action')) return
+    params.delete('action')
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }
 
   // Fix Google Autocomplete dropdown z-index and prevent Dialog close
   useEffect(() => {
@@ -1342,44 +1354,110 @@ export function ContractorListingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, itemsPerPage])
 
-  // Fetch contractor by ID for editing
-  const fetchContractorById = async (contractorId: string) => {
-    try {
-      const response = await globalApiCall(`${apiBaseUrl}/contractor/getContractorById/${contractorId}`, {
-        method: 'GET'
-      })
+  const openContractorEditModal = (contractorData: any) => {
+    setContractFormData({
+      contractor_name:
+        contractorData.contractor_name ||
+        contractorData.customer_name ||
+        contractorData.name ||
+        '',
+      email: contractorData.email || '',
+      phone: normalizePhoneToE164(String(contractorData.phone || '')),
+      address: contractorData.address || '',
+      note: '',
+      company_name: contractorData.company_name || '',
+      status: contractorData.status || 'active',
+    })
+    setEditingContractor(contractorData)
+    setIsEditMode(true)
+    setShowCreateContractModal(true)
+  }
 
+  // Fetch contractor by ID for editing (same fallbacks as URL select)
+  const fetchContractorById = async (
+    contractorId: string,
+    options?: { silent?: boolean },
+  ): Promise<boolean> => {
+    const fromList = findListingContractor(contractorId)
+    if (fromList && resolveEntityKind(fromList) !== 'customer') {
+      openContractorEditModal(fromList)
+      return true
+    }
+
+    try {
+      const response = await globalApiCall(
+        `${apiBaseUrl}/contractor/getContractorById/${contractorId}`,
+        { method: 'GET' },
+      )
       const responseData = await response.json()
       console.log('Get Contractor by ID API Response:', responseData)
 
       if (responseData.success && responseData.data) {
-        const contractorData = responseData.data
-        setContractFormData({
-          contractor_name: contractorData.contractor_name || '',
-          email: contractorData.email || '',
-          phone: normalizePhoneToE164(contractorData.phone || ''),
-          address: contractorData.address || '',
-          note: '',
-          company_name: contractorData.company_name || '',
-          status: contractorData.status || 'active'
-        })
-        setEditingContractor(contractorData)
-        setIsEditMode(true)
-        setShowCreateContractModal(true)
-      } else {
-        toast.error(responseData.message || 'Failed to fetch contractor data')
+        openContractorEditModal(responseData.data)
+        return true
       }
     } catch (error) {
       console.error('Error fetching contractor by ID:', error)
-      if (!(error instanceof Error && error.message?.includes('Session expired'))) {
-        toast.error('Failed to fetch contractor data')
+      if (error instanceof Error && error.message?.includes('Session expired')) {
+        return false
       }
     }
+
+    // Mixed list: some "contractors" only resolve via customer API
+    try {
+      const response = await globalApiCall(
+        `${apiBaseUrl}/customer/getCustomerById/${contractorId}`,
+        { method: 'GET' },
+      )
+      const responseData = await response.json()
+      if (responseData.success && responseData.data) {
+        openContractorEditModal(responseData.data)
+        return true
+      }
+    } catch (error) {
+      console.error('Customer fallback for contractor edit failed:', error)
+    }
+
+    try {
+      const loaded = await loadContractorForUrlSelection(contractorId)
+      if (loaded && resolveEntityKind(loaded) !== 'customer') {
+        openContractorEditModal(loaded)
+        return true
+      }
+      // Loaded via customer map with no kind tag — still usable for edit form
+      if (loaded) {
+        openContractorEditModal(loaded)
+        return true
+      }
+    } catch (error) {
+      console.error('Load contractor for edit failed:', error)
+    }
+
+    if (!options?.silent) {
+      toast.error('Failed to fetch contractor data')
+    }
+    return false
   }
 
   // Handle edit contractor
-  const handleEditContractor = (contractorId: string) => {
-    fetchContractorById(contractorId)
+  const handleEditContractor = (contractor: any) => {
+    // Cross-entity: open edit on customers page
+    if (resolveEntityKind(contractor) === 'customer') {
+      router.push(`/customers?customerId=${contractor.id}&action=edit`)
+      return
+    }
+    fetchContractorById(contractor.id.toString())
+  }
+
+  // Handle delete contractor
+  const handleDeleteContractor = (contractor: any) => {
+    // Cross-entity: open delete on customers page
+    if (resolveEntityKind(contractor) === 'customer') {
+      router.push(`/customers?customerId=${contractor.id}&action=delete`)
+      return
+    }
+    setContractorToDelete(contractor)
+    setShowDeleteAlert(true)
   }
 
   // Handle view contractor
@@ -1470,12 +1548,6 @@ export function ContractorListingPage() {
   const handleSwitchToEdit = () => {
     setIsViewMode(false)
     setIsEditMode(true)
-  }
-
-  // Handle delete contractor
-  const handleDeleteContractor = (contractor: any) => {
-    setContractorToDelete(contractor)
-    setShowDeleteAlert(true)
   }
 
   // Confirm delete contractor
@@ -2041,7 +2113,10 @@ export function ContractorListingPage() {
       const entry = await loadContractorForUrlSelection(contractorId)
       if (cancelled) return
       if (!entry) {
-        toast.error('Could not load contractor')
+        // Edit/delete effect owns error messaging when action is present
+        if (!focusFromUrl.action) {
+          toast.error('Could not load contractor')
+        }
         return
       }
       selectContractor(contractorId)
@@ -2052,6 +2127,56 @@ export function ContractorListingPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusFromUrl.contractorId, focusFromUrl.jobId])
+
+  // Cross-page edit/delete: ?contractorId=&action=edit|delete → open popup on this page
+  useEffect(() => {
+    const contractorId = focusFromUrl.contractorId
+    const action = focusFromUrl.action
+    if (!contractorId || !action || focusFromUrl.jobId) return
+
+    let cancelled = false
+
+    ;(async () => {
+      if (action === 'edit') {
+        try {
+          const opened = await fetchContractorById(contractorId, {
+            silent: true,
+          })
+          if (cancelled) return
+          if (!opened) {
+            toast.error('Failed to fetch contractor data')
+          }
+        } catch (error) {
+          console.error('URL edit contractor failed:', error)
+          if (!cancelled) {
+            toast.error('Failed to fetch contractor data')
+          }
+        } finally {
+          if (!cancelled) clearUrlActionParam()
+        }
+        return
+      }
+
+      if (action === 'delete') {
+        const entity =
+          findListingContractor(contractorId) ||
+          (await loadContractorForUrlSelection(contractorId)) || {
+            id: contractorId,
+            tag: 'contractor',
+            type: 'contractor',
+          }
+        if (cancelled) return
+        setContractorToDelete(entity)
+        setShowDeleteAlert(true)
+        clearUrlActionParam()
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusFromUrl.contractorId, focusFromUrl.action, focusFromUrl.jobId])
 
   // After page fetch, merge page row into pin without dropping jobs fetched for off-page users
   useEffect(() => {
@@ -3442,9 +3567,7 @@ export function ContractorListingPage() {
               totalItems={totalContractors}
               onSelectJob={handleSelectJob}
               onSelectSubJob={handleSelectSubJob}
-              onEditParent={(contractor) =>
-                handleEditContractor(contractor.id.toString())
-              }
+              onEditParent={(contractor) => handleEditContractor(contractor)}
               onDeleteParent={(contractor) => handleDeleteContractor(contractor)}
               hasEditPermission={hasPermission("contractors", "edit")}
               hasDeletePermission={hasPermission("contractors", "delete")}

@@ -323,18 +323,18 @@ const cellClass = isInvalidItem
                                 Rate:
                               </span>{" "}
                               $
-                              {(product.jdpPrice || product.rate || 0).toFixed(
-                                2,
-                              )}
+                              {Number(
+                                product.jdpPrice || product.rate || 0,
+                              ).toFixed(2)}
                             </span>
 
-                            {!!product.estimatedPrice &&
-                              product.estimatedPrice > 0 && (
+                            {Number(product.estimatedPrice) > 0 && (
                                 <span className="text-slate-600">
                                   <span className="font-medium text-slate-700">
                                     Est:
                                   </span>{" "}
-                                  ${product.estimatedPrice.toFixed(2)}
+                                  $
+                                  {Number(product.estimatedPrice).toFixed(2)}
                                 </span>
                               )}
                           </div>
@@ -428,7 +428,7 @@ const cellClass = isInvalidItem
       <td
         className={`border border-gray-300 px-3 py-1 text-right font-medium text-xs ${cellClass}`}
       >
-        ${(lineItem.total || 0).toFixed(2)}
+        ${Number(lineItem.total || 0).toFixed(2)}
       </td>
 
       <td

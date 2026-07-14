@@ -130,6 +130,77 @@ export function annotateJobsForListing(jobs: any[] | undefined): any[] {
   });
 }
 
+/**
+ * Merge embedded (include_jobs) + bulk job lists by id.
+ * Keeps contractor jobs that only exist in embeds, while preferring bulk timestamps
+ * so Recently Added / Updated badges stay correct.
+ */
+export function mergeListingJobs(
+  embedded: any[] | undefined,
+  mapped: any[] | undefined,
+): any[] {
+  const a = Array.isArray(embedded) ? embedded : [];
+  const b = Array.isArray(mapped) ? mapped : [];
+  if (!a.length) return b;
+  if (!b.length) return a;
+
+  const byId = new Map<string, any>();
+  const order: string[] = [];
+
+  const pickDate = (...vals: unknown[]) => {
+    for (const v of vals) {
+      if (v == null || v === "") continue;
+      if (parseTimeMs(v)) return v;
+    }
+    return vals.find((v) => v != null && v !== "") ?? "";
+  };
+
+  const subJobsOf = (job: any) => {
+    const raw = job?.subJobs ?? job?.sub_jobs;
+    return Array.isArray(raw) ? raw : [];
+  };
+
+  const mergeOne = (job: any) => {
+    if (!job || job.id == null) return;
+    const key = String(job.id);
+    const prev = byId.get(key);
+    if (!prev) {
+      byId.set(key, { ...job });
+      order.push(key);
+      return;
+    }
+    const subJobs =
+      subJobsOf(job).length > 0
+        ? subJobsOf(job)
+        : subJobsOf(prev).length > 0
+          ? subJobsOf(prev)
+          : [];
+    byId.set(key, {
+      ...prev,
+      ...job,
+      created_at: pickDate(
+        createdAtOf(prev),
+        createdAtOf(job),
+        prev.created_at,
+        job.created_at,
+      ),
+      updated_at: pickDate(
+        updatedAtOf(prev),
+        updatedAtOf(job),
+        prev.updated_at,
+        job.updated_at,
+      ),
+      subJobs,
+    });
+  };
+
+  // Bulk first (richer timestamps), then embedded (adds contractor-only jobs)
+  for (const job of b) mergeOne(job);
+  for (const job of a) mergeOne(job);
+
+  return order.map((id) => byId.get(id)!);
+}
+
 /** Annotate entities based on their rank: 2 -> Added, 1 -> Updated. */
 export function annotateEntitiesForListing<T extends ListingEntity>(
   list: T[],
