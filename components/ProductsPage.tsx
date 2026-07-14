@@ -560,7 +560,7 @@ useEffect(() => {
     // if (!formData.supplierCostPrice || formData.supplierCostPrice <= 0) {
     //   errors.supplierCostPrice = 'Supplier cost price must be greater than 0';
     // }
-    if (!formData.markupPercentage || formData.markupPercentage < 0) {
+    if (formData.markupPercentage < 0) {
       errors.markupPercentage = 'Markup percentage must be 0 or greater';
     }
 
@@ -1928,7 +1928,7 @@ useEffect(() => {
       <div>
         <Label htmlFor="markupPercentage" className="flex items-center gap-1">
           Markup Percentage *
-          {configurationData?.markup_percentage &&
+          {Number(configurationData?.markup_percentage) > 0 &&
             formData.markupPercentage === configurationData.markup_percentage && (
               <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded ml-2">
                 From Config
@@ -1942,12 +1942,18 @@ useEffect(() => {
             type="number"
             step="1"
             min="0"
-            value={formData.markupPercentage === 0 ? '' : formData.markupPercentage}
+            value={
+              formData.markupPercentage > 0 ? formData.markupPercentage : ""
+            }
             onChange={(e) => {
-              setFormData(prev => ({ ...prev, markupPercentage: parseInt(e.target.value) || 0 }));
-              clearValidationError('markupPercentage');
+              const raw = e.target.value;
+              setFormData((prev) => ({
+                ...prev,
+                markupPercentage: raw === "" ? 0 : parseInt(raw, 10) || 0,
+              }));
+              clearValidationError("markupPercentage");
             }}
-            placeholder="0"
+            placeholder=""
             className={`pr-8 ${validationErrors.markupPercentage ? 'border-red-500' : ''}`}
             required
             // readOnly
@@ -1956,7 +1962,7 @@ useEffect(() => {
         {validationErrors.markupPercentage && (
           <p className="text-red-500 text-sm mt-1">{validationErrors.markupPercentage}</p>
         )}
-        {configurationData?.markup_percentage &&
+        {Number(configurationData?.markup_percentage) > 0 &&
           formData.markupPercentage === configurationData.markup_percentage && (
             <p className="text-green-600 text-xs mt-1">
               ✓ Loaded from Configuration ({configurationData.markup_percentage}%)

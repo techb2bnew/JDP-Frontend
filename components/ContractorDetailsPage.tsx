@@ -75,12 +75,15 @@ interface ContractorDetailsPageProps {
   onBack: () => void;
   /** When jobs are deleted/updated here, parent listing can refetch (e.g. contractors sidebar). */
   onJobsMutated?: () => void;
+  /** List mixes customers + contractors; prefer matching details API. */
+  parentEntityKind?: "customer" | "contractor" | null;
 }
 
 export function ContractorDetailsPage({
   contractorId,
   onBack,
   onJobsMutated,
+  parentEntityKind = null,
 }: ContractorDetailsPageProps) {
   const [contractor, setContractor] = useState<ContractorDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -125,6 +128,72 @@ export function ContractorDetailsPage({
 
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 
+  const mapToDetails = (data: any, jobsFallback: Job[] = []): ContractorDetails => {
+    const jobs =
+      Array.isArray(data?.jobs) && data.jobs.length > 0
+        ? data.jobs
+        : jobsFallback;
+    return {
+      id: data.id,
+      contractor_name:
+        data.contractor_name || data.customer_name || data.name || "N/A",
+      company_name: data.company_name || "N/A",
+      email: data.email || "N/A",
+      phone: data.phone || "N/A",
+      address: data.address || "N/A",
+      status: data.status || "inactive",
+      created_at: data.created_at || new Date().toISOString(),
+      total_jobs:
+        data.statistics?.total_jobs ?? data.total_jobs ?? jobs.length ?? 0,
+      completed_jobs:
+        data.statistics?.completed_jobs ?? data.completed_jobs ?? 0,
+      ongoing_jobs: data.statistics?.ongoing_jobs ?? data.ongoing_jobs ?? 0,
+      total_revenue:
+        data.statistics?.total_estimated_cost ?? data.total_revenue ?? 0,
+      jobs,
+    };
+  };
+
+  const fetchJobsForParent = async (id: string): Promise<Job[]> => {
+    try {
+      const jobsResult = await apiClient.getJobsByCustomer(id);
+      const jobsData = jobsResult?.data;
+      if (Array.isArray(jobsData)) return jobsData;
+      if (Array.isArray(jobsData?.jobs)) return jobsData.jobs;
+      if (Array.isArray(jobsData?.data)) return jobsData.data;
+      return [];
+    } catch {
+      return [];
+    }
+  };
+
+  const fetchAsContractor = async (
+    id: string,
+  ): Promise<ContractorDetails | null> => {
+    const response = await globalApiCall(
+      `${apiBaseUrl}/contractor/getContractorById/${id}?include_jobs=true`,
+      { method: "GET" },
+    );
+    const responseData = await response.json();
+    if (responseData.success && responseData.data) {
+      return mapToDetails(responseData.data);
+    }
+    return null;
+  };
+
+  const fetchAsCustomer = async (
+    id: string,
+  ): Promise<ContractorDetails | null> => {
+    const response = await globalApiCall(
+      `${apiBaseUrl}/customer/getCustomerById/${id}`,
+      { method: "GET" },
+    );
+    const responseData = await response.json();
+    if (!responseData.success || !responseData.data) return null;
+    const jobs = await fetchJobsForParent(id);
+    return mapToDetails(responseData.data, jobs);
+  };
+
   const fetchContractorDetails = async (options?: { force?: boolean }) => {
     if (!contractorId) return;
 
@@ -139,61 +208,49 @@ export function ContractorDetailsPage({
     }
 
     const id = contractorId;
+    const preferCustomer = parentEntityKind === "customer";
     const promise = (async () => {
       try {
         setIsLoading(true);
 
-        const response = await globalApiCall(
-          `${apiBaseUrl}/contractor/getContractorById/${id}?include_jobs=true`,
-          {
-            method: "GET",
-          },
-        );
+        let details: ContractorDetails | null = null;
+        if (preferCustomer) {
+          try {
+            details = await fetchAsCustomer(id);
+          } catch (e) {
+            console.error("Customer details fetch failed:", e);
+          }
+          if (!details) {
+            try {
+              details = await fetchAsContractor(id);
+            } catch (e) {
+              console.error("Contractor details fallback failed:", e);
+            }
+          }
+        } else {
+          try {
+            details = await fetchAsContractor(id);
+          } catch (e) {
+            console.error("Contractor details fetch failed:", e);
+          }
+          if (!details) {
+            try {
+              details = await fetchAsCustomer(id);
+            } catch (e) {
+              console.error("Customer details fallback failed:", e);
+            }
+          }
+        }
 
-        const responseData = await response.json();
-        console.log("Contractor Details API Response:", responseData);
-
-        if (responseData.success && responseData.data) {
-          const contractorData = responseData.data;
-
-          setContractor({
-            id: contractorData.id,
-            contractor_name: contractorData.contractor_name || "N/A",
-            company_name: contractorData.company_name || "N/A",
-            email: contractorData.email || "N/A",
-            phone: contractorData.phone || "N/A",
-            address: contractorData.address || "N/A",
-            status: contractorData.status || "inactive",
-            created_at: contractorData.created_at || new Date().toISOString(),
-            total_jobs:
-              contractorData.statistics?.total_jobs ??
-              contractorData.total_jobs ??
-              contractorData.jobs?.length ??
-              0,
-            completed_jobs:
-              contractorData.statistics?.completed_jobs ??
-              contractorData.completed_jobs ??
-              0,
-            ongoing_jobs:
-              contractorData.statistics?.ongoing_jobs ??
-              contractorData.ongoing_jobs ??
-              0,
-            total_revenue:
-              contractorData.statistics?.total_estimated_cost ??
-              contractorData.total_revenue ??
-              0,
-            jobs: contractorData.jobs || [],
-          });
-
-          // Reset to first page whenever fresh contractor data loads
+        if (details) {
+          setContractor(details);
           setJobsPage(1);
           setSubJobsPageByJobId({});
         } else {
-          console.error("Invalid contractor details API response:", responseData);
           setContractor(null);
         }
       } catch (error) {
-        console.error("Error fetching contractor details:", error);
+        console.error("Error fetching parent details:", error);
         setContractor(null);
       } finally {
         setIsLoading(false);
@@ -251,13 +308,14 @@ export function ContractorDetailsPage({
 
   useEffect(() => {
     if (contractorId) {
-      fetchContractorDetails();
+      fetchContractorDetails({ force: true });
       void fetchContractorActivity(contractorId);
     } else {
       setContractorActivity([]);
       setContractorActivityPage(1);
     }
-  }, [contractorId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contractorId, parentEntityKind]);
 
   const selectedJobData = selectedJob
     ? contractor?.jobs?.find((j: any) => j.id.toString() === selectedJob)

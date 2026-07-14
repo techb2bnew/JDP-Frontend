@@ -1015,6 +1015,7 @@ export function ContractorListingPage() {
   const [isLoadingContractors, setIsLoadingContractors] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const hadNonEmptySearchRef = useRef(false)
+  const hasAutoSelectedRef = useRef(false)
   const contractorsListFetchRef = useRef<{
     key: string
     promise: Promise<void>
@@ -1573,16 +1574,23 @@ export function ContractorListingPage() {
     }
   }, [contractors])
 
-  // Auto-select first contractor when contractors are loaded (skip when URL targets a specific contractor)
+  // Auto-select list index 0 once after first load (no URL deep-link)
   useEffect(() => {
-    if (focusFromUrl.contractorId || focusFromUrl.jobId) return
-    if (contractors.length > 0 && !selectedContractor) {
-      const firstContractor = contractors[0]
-      if (firstContractor && firstContractor.id) {
-        selectContractor(firstContractor.id.toString())
-      }
+    if (focusFromUrl.contractorId || focusFromUrl.jobId) {
+      hasAutoSelectedRef.current = true
+      return
     }
-  }, [contractors, focusFromUrl.contractorId, focusFromUrl.jobId])
+    if (isLoadingContractors) return
+    if (hasAutoSelectedRef.current) return
+    if (contractors.length === 0) return
+
+    const first = filteredContractors[0] || contractors[0]
+    if (!first?.id) return
+
+    hasAutoSelectedRef.current = true
+    selectContractor(first.id.toString())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contractors.length, isLoadingContractors, focusFromUrl.contractorId, focusFromUrl.jobId])
 
   // Validation function
   const validateForm = () => {
@@ -1988,7 +1996,8 @@ export function ContractorListingPage() {
   const handleSelectParent = (parentId: string) => {
     const entity = findListingContractor(parentId)
 
-    if (entity?.customer_type?.trim().toLowerCase() === 'customer') {
+    // Manual click: customers navigate to /customers (unchanged). Page-load uses selectContractor instead.
+    if (resolveEntityKind(entity) === 'customer') {
       router.push(`/customers?customerId=${parentId}`)
       return
     }
@@ -1997,7 +2006,7 @@ export function ContractorListingPage() {
 
   const handleSelectJob = (jobId: string, parentId: string) => {
     const entity = findListingContractor(parentId)
-    if (entity?.customer_type?.trim().toLowerCase() === 'customer') {
+    if (resolveEntityKind(entity) === 'customer') {
       router.push(`/customers?customerId=${parentId}&jobId=${jobId}`)
       return
     }
@@ -2010,7 +2019,7 @@ export function ContractorListingPage() {
     parentId: string,
   ) => {
     const entity = findListingContractor(parentId)
-    if (entity?.customer_type?.trim().toLowerCase() === 'customer') {
+    if (resolveEntityKind(entity) === 'customer') {
       router.push(`/customers?customerId=${parentId}&jobId=${subJobId}`)
       return
     }
@@ -3516,6 +3525,7 @@ export function ContractorListingPage() {
             <div>
               <ContractorDetailsPage
                 contractorId={selectedContractor}
+                parentEntityKind={listingParentEntityKind}
                 onBack={handleBackFromContractorDetails}
                 onJobsMutated={() => void fetchContractorsData({ force: true })}
               />
