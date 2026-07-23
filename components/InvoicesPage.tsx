@@ -360,7 +360,7 @@ const handleEditInvoice = (invoice: any) => {
                 <div style="font-size:16px;font-weight:bold;">ESTIMATE</div>
               </div>
               <div style="background:#fff;color:#374151;padding:16px;text-align:center;border:2px solid #e5e7eb;width:150px;">
-                <div style="font-size:16px;font-weight:bold;">${new Date(invoiceData?.estimate_date || new Date()).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</div>
+                <div style="font-size:16px;font-weight:bold;">${new Date(invoiceData?.estimate_date || new Date()).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}</div>
               </div>
             </div>
           </div>
@@ -426,7 +426,7 @@ const handleEditInvoice = (invoice: any) => {
               <tr>
                 <td style="border:1px solid #d1d5db;padding:8px 12px;font-size:14px;color:#374151;">${invoiceData?.rep || 'JDP'}</td>
                 <td style="border:1px solid #d1d5db;padding:8px 12px;font-size:14px;color:#374151;">
-                  ${invoiceData?.due_date ? new Date(invoiceData.due_date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : 'N/A'}
+                  ${invoiceData?.due_date ? new Date(invoiceData.due_date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : 'N/A'}
                 </td>
               </tr>
             </tbody>
@@ -1264,14 +1264,14 @@ const handleEditInvoice = (invoice: any) => {
                                   {invoice.created_at
                                     ? new Date(
                                         invoice.created_at,
-                                      ).toLocaleDateString()
+                                      ).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })
                                     : "N/A"}
                                 </TableCell>
                                 <TableCell>
                                   {invoice.due_date
                                     ? new Date(
                                         invoice.due_date,
-                                      ).toLocaleDateString()
+                                      ).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })
                                     : "-"}
                                 </TableCell>
                                 <TableCell className="font-medium">

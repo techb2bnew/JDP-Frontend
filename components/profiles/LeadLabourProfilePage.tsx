@@ -411,7 +411,7 @@ export function LeadLabourProfilePage() {
                             <h4 className="font-medium">ID Proof</h4>
                             {profile.documents.idProof ? (
                               <p className="text-sm text-muted-foreground">
-                                {profile.documents.idProof.fileName} • Uploaded {new Date(profile.documents.idProof.uploadDate).toLocaleDateString()}
+                                {profile.documents.idProof.fileName} • Uploaded {new Date(profile.documents.idProof.uploadDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}
                               </p>
                             ) : (
                               <p className="text-sm text-muted-foreground">No document uploaded</p>
@@ -442,10 +442,10 @@ export function LeadLabourProfilePage() {
                             {profile.documents.drivingLicense ? (
                               <div>
                                 <p className="text-sm text-muted-foreground">
-                                  {profile.documents.drivingLicense.fileName} • Uploaded {new Date(profile.documents.drivingLicense.uploadDate).toLocaleDateString()}
+                                  {profile.documents.drivingLicense.fileName} • Uploaded {new Date(profile.documents.drivingLicense.uploadDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}
                                 </p>
                                 <p className="text-sm text-muted-foreground">
-                                  License: {profile.documents.drivingLicense.licenseNumber} • Expires: {new Date(profile.documents.drivingLicense.expiryDate).toLocaleDateString()}
+                                  License: {profile.documents.drivingLicense.licenseNumber} • Expires: {new Date(profile.documents.drivingLicense.expiryDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}
                                 </p>
                               </div>
                             ) : (
@@ -476,7 +476,7 @@ export function LeadLabourProfilePage() {
                             <h4 className="font-medium">Resume</h4>
                             {profile.documents.resume ? (
                               <p className="text-sm text-muted-foreground">
-                                {profile.documents.resume.fileName} • Uploaded {new Date(profile.documents.resume.uploadDate).toLocaleDateString()}
+                                {profile.documents.resume.fileName} • Uploaded {new Date(profile.documents.resume.uploadDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}
                               </p>
                             ) : (
                               <p className="text-sm text-muted-foreground">No document uploaded</p>
@@ -595,7 +595,7 @@ export function LeadLabourProfilePage() {
                     <TableBody>
                       {filteredLeaveRecords.map((record) => (
                         <TableRow key={record.id}>
-                          <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
+                          <TableCell>{new Date(record.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}</TableCell>
                           <TableCell className="capitalize">{record.leaveType.replace('-', ' ')}</TableCell>
                           <TableCell>{record.reason}</TableCell>
                           <TableCell>
@@ -696,7 +696,7 @@ export function LeadLabourProfilePage() {
                     <TableBody>
                       {profile.timesheet.map((entry) => (
                         <TableRow key={entry.date}>
-                          <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
+                          <TableCell>{new Date(entry.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}</TableCell>
                           <TableCell>{entry.inTime || '-'}</TableCell>
                           <TableCell>{entry.outTime || '-'}</TableCell>
                           <TableCell>

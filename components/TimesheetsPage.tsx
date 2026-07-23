@@ -370,7 +370,7 @@ const formatWeekRange = (weekStr: string) => {
       const currentYear = new Date().getFullYear();
       const startDate = parse(`${match[1]} ${currentYear}`, 'MMM d yyyy', new Date());
       const endDate = parse(`${match[2]} ${currentYear}`, 'MMM d yyyy', new Date());
-      return `Week of ${format(startDate, 'EEE, MMM d, yyyy')} - ${format(endDate, 'EEE, MMM d, yyyy')}`;
+      return `Week of ${format(startDate, 'MM/dd/yy')} - ${format(endDate, 'MM/dd/yy')}`;
     } catch {
       return weekStr;
     }
@@ -390,7 +390,7 @@ const getWeekDays = (weekStr: string) => {
         const day = addDays(weekStart, i);
         return {
           date: day,
-          dateStr: format(day, 'EEE, MMM d, yyyy'),
+          dateStr: format(day, 'MM/dd/yy'),
           dayName: format(day, 'EEEE'),
           dayShort: format(day, 'EEE')
         };
@@ -652,7 +652,7 @@ const handleExportTimesheets = async () => {
     const hourlyRate = item.hourly_rate;
     const totalPay = item.weekly_payment || (totalHours * hourlyRate);
     const isPaid = item.status.toLowerCase() === 'approved';
-    const paymentDate = isPaid ? format(new Date(), 'MMM d, yyyy') : '-';
+    const paymentDate = isPaid ? format(new Date(), 'MM/dd/yy') : '-';
     return [
       item.employee,
       item.week,
@@ -782,7 +782,7 @@ const handleExportTimesheets = async () => {
                   </p>
                   {selectedTimesheet.status.toLowerCase() === 'approved' && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      {format(new Date(), 'EEE, MMM d, yyyy')}
+                      {format(new Date(), 'MM/dd/yy')}
                     </p>
                   )}
                 </div>
@@ -1104,7 +1104,7 @@ const handleExportTimesheets = async () => {
                     const hourlyRate = item.hourly_rate; // Use API value or default
                     const totalPay = item.weekly_payment || (totalHours * hourlyRate);
                     const isPaid = item.status.toLowerCase() === 'approved';
-                    const paymentDate = isPaid ? format(new Date(), 'MMM d, yyyy') : '-';
+                    const paymentDate = isPaid ? format(new Date(), 'MM/dd/yy') : '-';
                     
                     return (
                       <TableRow key={`timesheet-${index}-${item.employee}-${item.job}-${item.week}`} className="odd:bg-white even:bg-slate-50">

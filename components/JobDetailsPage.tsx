@@ -703,7 +703,7 @@ export function JobDetailsPage({
     return date.toLocaleDateString("en-US", {
       month: "2-digit",
       day: "2-digit",
-      year: "numeric",
+      year: "2-digit",
     });
   };
 
@@ -3991,9 +3991,9 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
 };
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      year: "2-digit",
     });
   };
 
@@ -4003,7 +4003,7 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
     return d.toLocaleDateString("en-US", {
       month: "2-digit",
       day: "2-digit",
-      year: "numeric",
+      year: "2-digit",
     });
   };
 
@@ -4385,7 +4385,7 @@ const escapeHtml = (value: any) =>
 //                     ${new Date(inlineInvoiceData.date).toLocaleDateString("en-US", {
 //                       month: "2-digit",
 //                       day: "2-digit",
-//                       year: "numeric",
+//                       year: "2-digit",
 //                     })}
 //                   </div>
 //                 </div>
@@ -4599,7 +4599,7 @@ const escapeHtml = (value: any) =>
 //                         ? new Date(inlineInvoiceData.dueDate).toLocaleDateString("en-US", {
 //                             month: "2-digit",
 //                             day: "2-digit",
-//                             year: "numeric",
+//                             year: "2-digit",
 //                           })
 //                         : "10/17/2025"
 //                     }
@@ -5125,7 +5125,7 @@ const handlePrintInvoice = async (invoice: any) => {
                   ${new Date(inlineInvoiceData.date).toLocaleDateString("en-US", {
                     month: "2-digit",
                     day: "2-digit",
-                    year: "numeric",
+                    year: "2-digit",
                   })}
                 </div>
               </div>
@@ -5339,7 +5339,7 @@ const handlePrintInvoice = async (invoice: any) => {
                       ? new Date(inlineInvoiceData.dueDate).toLocaleDateString("en-US", {
                           month: "2-digit",
                           day: "2-digit",
-                          year: "numeric",
+                          year: "2-digit",
                         })
                       : "10/17/2025"
                   }
@@ -6308,7 +6308,7 @@ const handlePrintInvoice = async (invoice: any) => {
           {
             month: "2-digit",
             day: "2-digit",
-            year: "numeric",
+            year: "2-digit",
           },
         ),
         ...(job.type === "contract-based"
@@ -10981,7 +10981,7 @@ const handlePrintInvoice = async (invoice: any) => {
                 {new Date(inlineInvoiceData.date).toLocaleDateString("en-US", {
                   month: "2-digit",
                   day: "2-digit",
-                  year: "numeric",
+                  year: "2-digit",
                 })}
               </div>
             </div>
@@ -11069,7 +11069,7 @@ const handlePrintInvoice = async (invoice: any) => {
                     new Date().toLocaleDateString("en-US", {
                       month: "2-digit",
                       day: "2-digit",
-                      year: "numeric",
+                      year: "2-digit",
                     })}
                 </td>
               </tr>

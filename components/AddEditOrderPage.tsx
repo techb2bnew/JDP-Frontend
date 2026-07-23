@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 
+const JOBS_PAGE_LIMIT = 10
 
 export function AddEditOrderPage() {
   const router = useRouter()
@@ -59,6 +60,11 @@ export function AddEditOrderPage() {
   const [showJobResults, setShowJobResults] = useState(false)
   const [selectedJob, setSelectedJob] = useState<any>(null)
   const [isLoadingJobs, setIsLoadingJobs] = useState(false)
+  const [isLoadingMoreJobs, setIsLoadingMoreJobs] = useState(false)
+  const [jobsPage, setJobsPage] = useState(1)
+  const [jobsTotalPages, setJobsTotalPages] = useState(1)
+  const [jobsHasMore, setJobsHasMore] = useState(false)
+  const jobsSearchQueryRef = useRef('')
 
   const [supplierSearch, setSupplierSearch] = useState('')
   const [supplierList, setSupplierList] = useState<any[]>([])
@@ -216,19 +222,110 @@ export function AddEditOrderPage() {
     }
   }
 
-  const fetchJobList = async (searchQuery: string = '') => {
+  const parseJobsListResponse = (response: any) => {
+    let jobs: any[] = []
+    if (Array.isArray(response?.data?.jobs)) {
+      jobs = response.data.jobs
+    } else if (Array.isArray(response?.data)) {
+      jobs = response.data
+    } else if (Array.isArray(response?.data?.data)) {
+      jobs = response.data.data
+    }
+
+    const pagination = response?.data?.pagination
+    const totalPages =
+      Number(pagination?.totalPages ?? response?.totalPages ?? 1) || 1
+    const currentPage =
+      Number(pagination?.page ?? response?.currentPage ?? 1) || 1
+
+    return { jobs, totalPages, currentPage }
+  }
+
+  const fetchJobList = useCallback(async (
+    searchQuery: string = '',
+    page: number = 1,
+    append = false
+  ) => {
+    const trimmedQuery = searchQuery.trim()
+    jobsSearchQueryRef.current = trimmedQuery
+
     try {
-      setIsLoadingJobs(true)
-      const response = await apiClient.searchJobsByQuery(searchQuery, 1, 10)
-      const jobsData = response.data?.jobs || response.data || []
-      setJobList(jobsData)
+      if (page === 1) {
+        setIsLoadingJobs(true)
+      } else {
+        setIsLoadingMoreJobs(true)
+      }
+
+      let response: any
+      if (trimmedQuery) {
+        response = await apiClient.searchJobsByQuery(trimmedQuery, page, JOBS_PAGE_LIMIT)
+      } else {
+        // Default listing without search — use getJobs so full job objects are available
+        const apiResponse = await globalApiCall(
+          `${apiBaseUrl}/job/getJobs?page=${page}&limit=${JOBS_PAGE_LIMIT}`,
+          { method: 'GET' }
+        )
+        response = await apiResponse.json()
+      }
+
+      // Ignore stale responses if the search query changed while fetching
+      if (jobsSearchQueryRef.current !== trimmedQuery) return
+
+      const { jobs, totalPages, currentPage } = parseJobsListResponse(response)
+
+      setJobList((prev) => {
+        const merged = append ? [...prev, ...jobs] : jobs
+        const seen = new Set<string>()
+        return merged.filter((job) => {
+          const id = String(job?.id ?? '')
+          if (!id || seen.has(id)) return false
+          seen.add(id)
+          return true
+        })
+      })
+      setJobsPage(currentPage)
+      setJobsTotalPages(totalPages)
+      setJobsHasMore(currentPage < totalPages)
     } catch (error) {
       console.error('Error fetching jobs:', error)
-      setJobList([])
+      if (!append) {
+        setJobList([])
+      }
+      setJobsPage(1)
+      setJobsTotalPages(1)
+      setJobsHasMore(false)
     } finally {
       setIsLoadingJobs(false)
+      setIsLoadingMoreJobs(false)
     }
-  }
+  }, [apiBaseUrl])
+
+  const handleJobsDropdownScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+      const nearBottom = scrollHeight - scrollTop - clientHeight < 50
+
+      if (
+        !nearBottom ||
+        !jobsHasMore ||
+        isLoadingJobs ||
+        isLoadingMoreJobs ||
+        jobsPage >= jobsTotalPages
+      ) {
+        return
+      }
+
+      void fetchJobList(jobsSearchQueryRef.current, jobsPage + 1, true)
+    },
+    [
+      jobsHasMore,
+      isLoadingJobs,
+      isLoadingMoreJobs,
+      jobsPage,
+      jobsTotalPages,
+      fetchJobList,
+    ]
+  )
 
   const fetchSupplierList = async (searchQuery: string = '') => {
     try {
@@ -636,10 +733,9 @@ export function AddEditOrderPage() {
                       onFocus={() => {
                         if (selectedJob) {
                           setJobSearch(selectedJob.job_title || selectedJob.title || '')
-                        } else {
-                          fetchJobList('')
-                          setShowJobResults(true)
                         }
+                        fetchJobList('')
+                        setShowJobResults(true)
                       }}
                       onBlur={() => {
                         setTimeout(() => setShowJobResults(false), 200)
@@ -649,33 +745,44 @@ export function AddEditOrderPage() {
                     />
                     <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     {showJobResults && (
-                      <div className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1">
-                        {isLoadingJobs ? (
+                      <div
+                        className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1"
+                        onScroll={handleJobsDropdownScroll}
+                      >
+                        {isLoadingJobs && jobList.length === 0 ? (
                           <div className="p-3 flex items-center justify-center">
                             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mr-2"></div>
                             <span className="text-sm text-muted-foreground">Loading jobs...</span>
                           </div>
                         ) : jobList.length > 0 ? (
-                          jobList.map((job: any) => (
-                            <div
-                              key={job.id}
-                              onMouseDown={(e) => {
-                                e.preventDefault()
-                                handleJobSelection(job)
-                                if (validationErrors.job_id) {
-                                  setValidationErrors(prev => {
-                                    const newErrors = { ...prev }
-                                    delete newErrors.job_id
-                                    return newErrors
-                                  })
-                                }
-                              }}
-                              className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100"
-                            >
-                              <div className="font-medium">{job.job_title || job.title}</div>
-                              <div className="text-sm text-muted-foreground">{getJobPartyDisplayName(job)}</div>
-                            </div>
-                          ))
+                          <>
+                            {jobList.map((job: any) => (
+                              <div
+                                key={job.id}
+                                onMouseDown={(e) => {
+                                  e.preventDefault()
+                                  handleJobSelection(job)
+                                  if (validationErrors.job_id) {
+                                    setValidationErrors(prev => {
+                                      const newErrors = { ...prev }
+                                      delete newErrors.job_id
+                                      return newErrors
+                                    })
+                                  }
+                                }}
+                                className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100"
+                              >
+                                <div className="font-medium">{job.job_title || job.title}</div>
+                                <div className="text-sm text-muted-foreground">{getJobPartyDisplayName(job)}</div>
+                              </div>
+                            ))}
+                            {isLoadingMoreJobs && (
+                              <div className="p-3 flex items-center justify-center border-t border-gray-100">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                                <span className="text-xs text-muted-foreground">Loading more jobs...</span>
+                              </div>
+                            )}
+                          </>
                         ) : (
                           <div className="p-3 text-sm text-muted-foreground text-center">No jobs found</div>
                         )}

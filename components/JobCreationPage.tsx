@@ -1792,7 +1792,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                   <span className="text-gray-600">Due Date:</span>
                   <span className="font-medium">
                     {formData.dueDate
-                      ? new Date(formData.dueDate).toLocaleDateString()
+                      ? new Date(formData.dueDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })
                       : 'Not specified'}
                   </span>
                 </div>

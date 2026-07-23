@@ -144,13 +144,13 @@ export function ProductDetailsView({ product }: Props) {
         <div>
           <Label className="text-sm font-medium text-gray-700 mb-2 block">Created At</Label>
           <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-            {product?.created_at ? new Date(product.created_at).toLocaleDateString() : 'Not available'}
+            {product?.created_at ? new Date(product.created_at).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : 'Not available'}
           </div>
         </div>
         <div>
           <Label className="text-sm font-medium text-gray-700 mb-2 block">Last Updated</Label>
           <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-gray-900">
-            {product?.updated_at ? new Date(product.updated_at).toLocaleDateString() : 'Not available'}
+            {product?.updated_at ? new Date(product.updated_at).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : 'Not available'}
           </div>
         </div>
       </div>

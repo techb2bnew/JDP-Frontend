@@ -1417,7 +1417,7 @@ export const NewInvoiceDialog = ({
           {
             month: "2-digit",
             day: "2-digit",
-            year: "numeric",
+            year: "2-digit",
           },
         ),
         customerName: inlineInvoiceData.customerName || "Customer",
@@ -4071,7 +4071,7 @@ const validateLineItems = (lineItems: any[] = []) => {
                           {
                             month: "2-digit",
                             day: "2-digit",
-                            year: "numeric",
+                            year: "2-digit",
                           },
                         )}
                       </div>

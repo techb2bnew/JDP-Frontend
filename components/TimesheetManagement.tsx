@@ -195,7 +195,7 @@ export function TimesheetManagement({ onBack, jobs }: TimesheetManagementProps) 
     const endDate = new Date(date)
     endDate.setDate(date.getDate() + 6)
 
-    return `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+    return `${date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })} - ${endDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}`
   }
 
   const uniqueEmployees = Array.from(new Set(timesheets.map(t => t.employeeName)))

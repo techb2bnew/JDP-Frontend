@@ -637,7 +637,7 @@ export function StaffProfilePage() {
                     <TableBody>
                       {filteredLeaveRecords.map((record) => (
                         <TableRow key={record.id}>
-                          <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
+                          <TableCell>{new Date(record.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}</TableCell>
                           <TableCell className="capitalize">{record.leaveType.replace('-', ' ')}</TableCell>
                           <TableCell>{record.reason}</TableCell>
                           <TableCell>
@@ -738,7 +738,7 @@ export function StaffProfilePage() {
                     <TableBody>
                       {profile.timesheet.map((entry) => (
                         <TableRow key={entry.date}>
-                          <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
+                          <TableCell>{new Date(entry.date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}</TableCell>
                           <TableCell>{entry.inTime || '-'}</TableCell>
                           <TableCell>{entry.outTime || '-'}</TableCell>
                           <TableCell>

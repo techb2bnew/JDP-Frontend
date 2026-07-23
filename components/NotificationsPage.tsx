@@ -255,11 +255,7 @@ export function NotificationsPage() {
       if (diffInDays < 7) return `${diffInDays} days ago`
 
       // Format as local date
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
-      })
+      return date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })
     } catch {
       return timestamp
     }

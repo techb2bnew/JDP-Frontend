@@ -1323,11 +1323,7 @@ console.log(totalAmount,"amounttt");
         // Header details
         estimateNumber: effectiveInlineInvoiceData.estimateNumber || viewInvoiceData?.invoice_number || 'Draft',
         estimateDate: new Date(effectiveInlineInvoiceData.date || viewInvoiceData?.estimate_date || new Date().toISOString())
-          .toLocaleDateString('en-US', {
-            month: '2-digit',
-            day: '2-digit',
-            year: 'numeric',
-          }),
+          .toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }),
         customerName:
           effectiveInlineInvoiceData.customerName ||
           viewInvoiceData?.contractor?.contractor_name ||

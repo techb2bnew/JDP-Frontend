@@ -498,11 +498,7 @@ export function ContractorDetailsPage({
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString("en-US", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      });
+      return date.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" });
     } catch {
       return "N/A";
     }
@@ -521,11 +517,7 @@ export function ContractorDetailsPage({
     try {
       const date = new Date(dateString);
       if (Number.isNaN(date.getTime())) return "N/A";
-      return date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "2-digit",
-        year: "numeric",
-      });
+      return date.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" });
     } catch {
       return "N/A";
     }

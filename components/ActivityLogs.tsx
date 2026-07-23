@@ -14,7 +14,8 @@ type ActivityType =
   | "lead_assigned"
   | "labor_assigned"
   | "bluesheet_submitted"
-  | "material_ordered";
+  | "material_ordered"
+  | "purchase_order_created";
 
 type ActivityLogItem = {
   id: string;
@@ -120,6 +121,63 @@ type ApiInvoiceActivity = {
   sent_by_user?: ApiUser | null;
 };
 
+type ApiOrderActivityItem = {
+  order_id: number;
+  order_number: string;
+  status?: string;
+  payment_status?: string | null;
+  order_date?: string;
+  delivery_date?: string | null;
+  total_items?: number;
+  subtotal?: number;
+  total_amount?: number;
+  created_at?: string;
+  updated_at?: string;
+  created_by_user?: ApiUser | null;
+  supplier?: {
+    id?: number;
+    name?: string;
+    company_name?: string;
+    supplier_code?: string;
+    contact_person?: string;
+  } | null;
+  customer?: {
+    id?: number;
+    name?: string;
+    email?: string;
+    phone?: string;
+  } | null;
+  lead_labour?: {
+    id?: number;
+    labor_code?: string;
+  } | null;
+  order_items?: Array<{
+    id: number;
+    product_id?: number;
+    product_name?: string;
+    quantity?: number;
+    total_price?: number;
+  }>;
+};
+
+type ApiOrder = {
+  id: number;
+  order_number: string;
+  status?: string;
+  order_date?: string;
+  total_items?: number;
+  total_amount?: number;
+  total_amount_formatted?: string;
+  created_at?: string;
+  created_by_user?: ApiUser | null;
+  supplier?: {
+    id?: number;
+    company_name?: string;
+    supplier_code?: string;
+    contact_person?: string;
+  } | null;
+};
+
 type ApiBlueSheetSubmittedBy = {
   bluesheet_id: number;
   submitted_at: string;
@@ -133,6 +191,7 @@ type ApiActivityAudit = {
   lead_labor_assigned_by?: ApiUser;
   bluesheet_submitted_by?: ApiBlueSheetSubmittedBy[];
   invoice_activity?: ApiInvoiceActivity[];
+  order_activity?: ApiOrderActivityItem[];
 };
 
 type JobActivityApiResponse = {
@@ -167,6 +226,7 @@ type JobActivityApiResponse = {
     assigned_labor?: ApiAssignedLabor[];
     assigned_lead_labor?: ApiAssignedLeadLabor[];
     bluesheets?: ApiBlueSheet[];
+    orders?: ApiOrder[];
     activity_audit?: ApiActivityAudit;
   };
   statusCode: number;
@@ -177,24 +237,21 @@ const activityPriority: Record<ActivityType, number> = {
   lead_assigned: 2,
   labor_assigned: 3,
   labour_hours_logged: 4,
-  material_ordered: 5,
-  bluesheet_submitted: 6,
-  invoice_generated: 7,
-  status_updated: 8,
-  job_updated: 9,
-  job_started: 10,
-  document_uploaded: 11,
+  purchase_order_created: 5,
+  material_ordered: 6,
+  bluesheet_submitted: 7,
+  invoice_generated: 8,
+  status_updated: 9,
+  job_updated: 10,
+  job_started: 11,
+  document_uploaded: 12,
 };
 
 const formatDateLabel = (dateString?: string) => {
   if (!dateString) return "";
   const date = new Date(dateString);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  return date.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" });
 };
 
 const getTypeStyles = (type: ActivityType) => {
@@ -442,6 +499,29 @@ const getTypeStyles = (type: ActivityType) => {
               strokeLinecap="round"
               strokeLinejoin="round"
               d="M20 13V7a2 2 0 00-2-2h-3V3H9v2H6a2 2 0 00-2 2v6m16 0l-2.586 2.586a2 2 0 01-1.414.586H8a2 2 0 01-1.414-.586L4 13m16 0V9a2 2 0 00-2-2h-1M4 13V9a2 2 0 012-2h1"
+            />
+          </svg>
+        ),
+      };
+
+    case "purchase_order_created":
+      return {
+        iconBg: "bg-fuchsia-500",
+        cardBg: "bg-fuchsia-50",
+        cardBorder: "border-fuchsia-100",
+        icon: (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4 text-white"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
             />
           </svg>
         ),
@@ -722,6 +802,103 @@ const mapApiResponseToActivities = (
       });
     });
   }
+
+  const formatOrderAmount = (amount?: number, formatted?: string) => {
+    if (formatted) return formatted;
+    if (typeof amount === "number" && !Number.isNaN(amount)) {
+      return `$${amount.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+    }
+    return null;
+  };
+
+  // Prefer activity_audit.order_activity; fall back to data.orders
+  const orderActivities: Array<{
+    orderId: number;
+    orderNumber: string;
+    status?: string;
+    totalItems?: number;
+    amountLabel: string | null;
+    supplierName?: string | null;
+    createdBy?: ApiUser | null;
+    sortDate?: string;
+  }> = [];
+
+  if (activityAudit?.order_activity?.length) {
+    activityAudit.order_activity.forEach((order) => {
+      orderActivities.push({
+        orderId: order.order_id,
+        orderNumber: order.order_number,
+        status: order.status,
+        totalItems: order.total_items,
+        amountLabel: formatOrderAmount(order.total_amount),
+        supplierName:
+          order.supplier?.name ||
+          order.supplier?.company_name ||
+          order.supplier?.supplier_code ||
+          null,
+        createdBy: order.created_by_user,
+        sortDate: order.created_at || order.order_date,
+      });
+    });
+  } else if (payload.orders?.length) {
+    payload.orders.forEach((order) => {
+      orderActivities.push({
+        orderId: order.id,
+        orderNumber: order.order_number,
+        status: order.status,
+        totalItems: order.total_items,
+        amountLabel: formatOrderAmount(
+          order.total_amount,
+          order.total_amount_formatted
+        ),
+        supplierName:
+          order.supplier?.company_name ||
+          order.supplier?.supplier_code ||
+          null,
+        createdBy: order.created_by_user,
+        sortDate: order.created_at || order.order_date,
+      });
+    });
+  }
+
+  orderActivities.forEach((order, index) => {
+    const createdBy = resolveActor(
+      order.createdBy,
+      job.updated_by_user,
+      job.updated_by_name,
+      job.created_by_user,
+      job.created_by_name,
+    );
+    const sortDate = order.sortDate || job.updated_at || job.created_at;
+    const itemCount =
+      typeof order.totalItems === "number"
+        ? `${order.totalItems} item${order.totalItems === 1 ? "" : "s"}`
+        : null;
+    const details = [
+      order.supplierName ? `supplier ${order.supplierName}` : null,
+      itemCount,
+      order.amountLabel,
+      order.status ? `status "${order.status.replace(/_/g, " ")}"` : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    result.push({
+      id: `purchase-order-${order.orderId}-${index}`,
+      title: "Purchase Order Created",
+      description: `${createdBy} created purchase order ${order.orderNumber}${
+        details ? ` (${details})` : ""
+      }.`,
+      dateLabel: formatDateLabel(sortDate),
+      userName: createdBy,
+      type: "purchase_order_created",
+      sortDate,
+      priority: activityPriority.purchase_order_created,
+    });
+  });
 
   if (payload.bluesheets?.length) {
     payload.bluesheets.forEach((sheet) => {

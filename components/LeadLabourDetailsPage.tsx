@@ -122,11 +122,7 @@ const formatDate = (dateString?: string) => {
   try {
     const date = new Date(dateString)
     if (Number.isNaN(date.getTime())) return dateString
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
+    return date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })
   } catch {
     return dateString
   }

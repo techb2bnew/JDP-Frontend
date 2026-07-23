@@ -69,7 +69,7 @@ export const InvoiceTemplate = ({ invoice, invoiceId }: InvoiceTemplateProps) =>
   if (!invoiceData) return <p>No invoice found</p>;
 
   const fmtMoney = (n: number | string | undefined) => `$${Number(n || 0).toFixed(2)}`;
-  const fmtDate = (d?: string) => (d ? new Date(d).toLocaleDateString() : 'N/A');
+  const fmtDate = (d?: string) => (d ? new Date(d).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : 'N/A');
 
   return (
     <div className="bg-white p-8">

@@ -612,7 +612,7 @@ export function OrdersPage() {
         o.customerName,
         o.contractorName ?? "",
         o.status?.charAt(0).toUpperCase() + o.status?.slice(1),
-        new Date(o.orderDate).toLocaleDateString()
+        new Date(o.orderDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })
       ]);
 
       // @ts-ignore
@@ -690,11 +690,7 @@ export function OrdersPage() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    })
+    return new Date(dateString).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })
   }
 
   // Search handlers for Add Order Modal

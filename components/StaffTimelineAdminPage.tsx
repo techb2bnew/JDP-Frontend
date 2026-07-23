@@ -203,7 +203,7 @@ export function StaffTimelineAdminPage() {
         try {
           const startDate = parse(parts[0], 'yyyy-MM-dd', new Date());
           const endDate = parse(parts[1], 'yyyy-MM-dd', new Date());
-          return `Week of ${format(startDate, 'EEE, MMM d, yyyy')} - ${format(endDate, 'EEE, MMM d, yyyy')}`;
+          return `Week of ${format(startDate, 'MM/dd/yy')} - ${format(endDate, 'MM/dd/yy')}`;
         } catch {
           return weekStr;
         }

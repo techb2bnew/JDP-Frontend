@@ -152,11 +152,7 @@ function formatLaborEntryLabel(entry: any): string {
   let dateLabel: string | null = null;
   if (entry?.updated_at) {
     try {
-      dateLabel = new Date(entry.updated_at).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      });
+      dateLabel = new Date(entry.updated_at).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" });
     } catch {
       dateLabel = String(entry.updated_at);
     }
@@ -3178,7 +3174,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                   Created on{" "}
                                   {new Date(
                                     currentBlueSheet.created_at,
-                                  ).toLocaleDateString()}
+                                  ).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}
                                 </p>
                               </div>
                               <div>

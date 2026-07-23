@@ -99,7 +99,7 @@ export function BlueSheetSelectionModal({
         new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount)
 
     const formatDate = (d: string) => {
-        try { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
+        try { return new Date(d).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) }
         catch { return d }
     }
 

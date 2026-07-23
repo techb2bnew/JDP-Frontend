@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Edit, Trash2 } from "lucide-react";
 import {
   resolveEntityKind,
@@ -152,6 +152,79 @@ export default function CommonEntityListing({
     return () => clearTimeout(debounceTimeout);
   }, [searchInput, searchDebounceMs, onSearchChange]);
 
+  // When searching: hoist name matches to top (parent / job / sub-job).
+  // Default listing order is untouched when search is empty.
+  const searchTerm = searchInput.trim().toLowerCase();
+
+  const nameMatchesSearch = (name?: string | null) => {
+    if (!searchTerm) return false;
+    return (name || "").toLowerCase().includes(searchTerm);
+  };
+
+  /** Stable partition: matches first, preserve relative order within each group. */
+  const hoistNameMatches = <T,>(items: T[], getName: (item: T) => string) => {
+    if (!searchTerm || items.length <= 1) return items;
+    const matches: T[] = [];
+    const rest: T[] = [];
+    for (const item of items) {
+      if (nameMatchesSearch(getName(item))) matches.push(item);
+      else rest.push(item);
+    }
+    return [...matches, ...rest];
+  };
+
+  const getJobTitle = (job: JobType) => job.job_title || job.title || "";
+  const getSubJobTitle = (subJob: {
+    job_title?: string;
+    title?: string;
+  }) => subJob.job_title || subJob.title || "";
+
+  const sortJobsForDisplay = (jobs: JobType[]) => {
+    // Default: most recently touched first
+    const byRecent = [...jobs].sort((a, b) => {
+      const ts = (j: JobType) =>
+        Math.max(
+          j.updated_at ? new Date(j.updated_at).getTime() : 0,
+          j.created_at ? new Date(j.created_at).getTime() : 0,
+        );
+      return ts(b) - ts(a);
+    });
+    return hoistNameMatches(byRecent, getJobTitle);
+  };
+
+  const sortSubJobsForDisplay = (
+    subJobs: NonNullable<JobType["subJobs"]>,
+  ) => hoistNameMatches(subJobs, getSubJobTitle);
+
+  const displayData = useMemo(() => {
+    if (!searchTerm) return data;
+
+    const parentNameMatches: EntityType[] = [];
+    const jobOrSubJobMatches: EntityType[] = [];
+    const rest: EntityType[] = [];
+
+    for (const entity of data) {
+      const parentName = getParentName(entity) || "";
+      if (nameMatchesSearch(parentName)) {
+        parentNameMatches.push(entity);
+        continue;
+      }
+
+      const jobs = entity.jobs || [];
+      const hasJobOrSubJobMatch = jobs.some((job) => {
+        if (nameMatchesSearch(getJobTitle(job))) return true;
+        return (job.subJobs || []).some((subJob) =>
+          nameMatchesSearch(getSubJobTitle(subJob)),
+        );
+      });
+
+      if (hasJobOrSubJobMatch) jobOrSubJobMatches.push(entity);
+      else rest.push(entity);
+    }
+
+    return [...parentNameMatches, ...jobOrSubJobMatches, ...rest];
+  }, [data, searchTerm, getParentName]);
+
   const truncateWords = (value?: string, maxWords = 2) => {
     if (!value) return "";
     const words = value.trim().split(/\s+/);
@@ -229,7 +302,7 @@ export default function CommonEntityListing({
   const shouldShowFooter =
     !!footer &&
     !isLoading &&
-    data.length > 0 &&
+    displayData.length > 0 &&
     typeof itemsPerPage === "number" &&
     typeof totalItems === "number" &&
     totalItems > itemsPerPage;
@@ -254,12 +327,12 @@ export default function CommonEntityListing({
               <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-sky-500"></div>
               <span className="ml-2 text-sm text-slate-500">Loading...</span>
             </div>
-          ) : data.length === 0 ? (
+          ) : displayData.length === 0 ? (
             <div className="py-10 text-center text-sm text-slate-500">
               {emptyText}
             </div>
           ) : (
-            data.map((entity) => {
+            displayData.map((entity) => {
               const parentId = entity.id.toString();
               const entityJobs = entity.jobs || [];
               const entityTypeLabel = resolveEntityTypeLabel(entity);
@@ -393,14 +466,7 @@ export default function CommonEntityListing({
                     {hasJobs && (
                       <CollapsibleContent className="px-1.5 pb-2.5 pt-1.5">
                         <div className="relative ml-1.5 min-w-0 border-l-2 border-sky-100 pl-2">
-                          {[...entityJobs].sort((a, b) => {
-                            const ts = (j: JobType) =>
-                              Math.max(
-                                j.updated_at ? new Date(j.updated_at).getTime() : 0,
-                                j.created_at ? new Date(j.created_at).getTime() : 0,
-                              );
-                            return ts(b) - ts(a);
-                          }).map((job) => {
+                          {sortJobsForDisplay(entityJobs).map((job) => {
                             const jobId = job.id.toString();
                             const hasSubJobs =
                               job.subJobs && job.subJobs.length > 0;
@@ -490,7 +556,10 @@ export default function CommonEntityListing({
                                   {hasSubJobs && (
                                     <CollapsibleContent className="mt-1.5 pl-2">
                                       <div className="relative min-w-0 border-l-2 border-cyan-100 pl-2">
-                                        {job.subJobs?.map((subJob) => {
+                                        {(job.subJobs
+                                          ? sortSubJobsForDisplay(job.subJobs)
+                                          : []
+                                        ).map((subJob) => {
                                           const subJobId = subJob.id.toString();
                                           const isSubJobSelected =
                                             selectedSubJob === subJobId;
