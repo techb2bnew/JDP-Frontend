@@ -1370,6 +1370,44 @@ export const apiClient = {
 
     return response.json();
   },
+
+  // Search Products by Supplier (order form product select)
+  searchProductsBySupplier: async (
+    supplierId: number | string,
+    query: string = "",
+  ) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const token = getAuthToken();
+
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const response = await fetch(
+      `${apiBaseUrl}/products/searchProductsBySupplier`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          supplier_id: Number(supplierId),
+          q: query ?? "",
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.message || "Failed to search products by supplier",
+      );
+    }
+
+    return response.json();
+  },
+
   // Search Jobs by Query
   searchJobsByQuery: async (query: string, page = 1, limit = 10) => {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;

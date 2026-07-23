@@ -21,6 +21,7 @@ import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 
 const JOBS_PAGE_LIMIT = 10
+const LIST_PAGE_LIMIT = 10
 
 export function AddEditOrderPage() {
   const router = useRouter()
@@ -49,11 +50,23 @@ export function AddEditOrderPage() {
   const [leadLaborList, setLeadLaborList] = useState<any[]>([])
   const [showLeadLaborResults, setShowLeadLaborResults] = useState(false)
   const [selectedLeadLabor, setSelectedLeadLabor] = useState<any>(null)
+  const [isLoadingLeadLabor, setIsLoadingLeadLabor] = useState(false)
+  const [isLoadingMoreLeadLabor, setIsLoadingMoreLeadLabor] = useState(false)
+  const [leadLaborPage, setLeadLaborPage] = useState(1)
+  const [leadLaborTotalPages, setLeadLaborTotalPages] = useState(1)
+  const [leadLaborHasMore, setLeadLaborHasMore] = useState(false)
+  const leadLaborSearchQueryRef = useRef('')
 
   const [customerSearch, setCustomerSearch] = useState('')
   const [customerList, setCustomerList] = useState<any[]>([])
   const [showCustomerResults, setShowCustomerResults] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false)
+  const [isLoadingMoreCustomers, setIsLoadingMoreCustomers] = useState(false)
+  const [customersPage, setCustomersPage] = useState(1)
+  const [customersTotalPages, setCustomersTotalPages] = useState(1)
+  const [customersHasMore, setCustomersHasMore] = useState(false)
+  const customersSearchQueryRef = useRef('')
 
   const [jobSearch, setJobSearch] = useState('')
   const [jobList, setJobList] = useState<any[]>([])
@@ -70,6 +83,12 @@ export function AddEditOrderPage() {
   const [supplierList, setSupplierList] = useState<any[]>([])
   const [showSupplierResults, setShowSupplierResults] = useState(false)
   const [selectedSupplier, setSelectedSupplier] = useState<any>(null)
+  const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false)
+  const [isLoadingMoreSuppliers, setIsLoadingMoreSuppliers] = useState(false)
+  const [suppliersPage, setSuppliersPage] = useState(1)
+  const [suppliersTotalPages, setSuppliersTotalPages] = useState(1)
+  const [suppliersHasMore, setSuppliersHasMore] = useState(false)
+  const suppliersSearchQueryRef = useRef('')
 
   const [productSearch, setProductSearch] = useState('')
   const [productList, setProductList] = useState<any[]>([])
@@ -196,31 +215,227 @@ export function AddEditOrderPage() {
   }
 
   // Search handlers
-  const fetchLeadLaborList = async (searchQuery: string = '') => {
-    try {
-      const response = searchQuery 
-        ? await apiClient.searchLeadLaborByQuery(searchQuery, 1, 10)
-        : await apiClient.getLeadLabor(1, 10)
-      const leadLaborData = response.data?.leadLabor || response.data?.data || []
-      setLeadLaborList(leadLaborData)
-    } catch (error) {
-      console.error('Error fetching lead labor:', error)
-      setLeadLaborList([])
+  const parsePaginatedListResponse = (
+    response: any,
+    listKeys: string[] = [],
+  ) => {
+    let items: any[] = []
+    for (const key of listKeys) {
+      if (Array.isArray(response?.data?.[key])) {
+        items = response.data[key]
+        break
+      }
     }
+    if (!items.length && Array.isArray(response?.data?.data)) {
+      items = response.data.data
+    } else if (!items.length && Array.isArray(response?.data)) {
+      items = response.data
+    }
+
+    const pagination = response?.data?.pagination
+    const totalPages =
+      Number(pagination?.totalPages ?? response?.totalPages ?? 1) || 1
+    const currentPage =
+      Number(
+        pagination?.page ??
+          pagination?.currentPage ??
+          response?.currentPage ??
+          1,
+      ) || 1
+
+    return { items, totalPages, currentPage }
   }
 
-  const fetchCustomerList = async (searchQuery: string = '') => {
+  const fetchLeadLaborList = useCallback(async (
+    searchQuery: string = '',
+    page: number = 1,
+    append = false,
+  ) => {
+    const trimmedQuery = searchQuery.trim()
+    leadLaborSearchQueryRef.current = trimmedQuery
+
     try {
-      const response = searchQuery 
-        ? await apiClient.searchCutomerByQuery(searchQuery, 1, 10)
-        : await apiClient.getAllCustomers()
-      const customersData = response.data?.customers || response.data || []
-      setCustomerList(customersData)
+      if (page === 1) {
+        setIsLoadingLeadLabor(true)
+      } else {
+        setIsLoadingMoreLeadLabor(true)
+      }
+
+      let response: any
+      if (trimmedQuery) {
+        response = await apiClient.searchLeadLaborByQuery(
+          trimmedQuery,
+          page,
+          LIST_PAGE_LIMIT,
+        )
+      } else {
+        // Default listing — raw endpoint keeps full user objects
+        const apiResponse = await globalApiCall(
+          `${apiBaseUrl}/lead-labor/getAllLeadLabor?page=${page}&limit=${LIST_PAGE_LIMIT}`,
+          { method: 'GET' },
+        )
+        response = await apiResponse.json()
+      }
+
+      if (leadLaborSearchQueryRef.current !== trimmedQuery) return
+
+      const { items, totalPages, currentPage } = parsePaginatedListResponse(
+        response,
+        ['leadLabor', 'lead_labor', 'leadLabours'],
+      )
+
+      setLeadLaborList((prev) => {
+        const merged = append ? [...prev, ...items] : items
+        const seen = new Set<string>()
+        return merged.filter((item) => {
+          const id = String(item?.id ?? '')
+          if (!id || seen.has(id)) return false
+          seen.add(id)
+          return true
+        })
+      })
+      setLeadLaborPage(currentPage)
+      setLeadLaborTotalPages(totalPages)
+      setLeadLaborHasMore(currentPage < totalPages)
+    } catch (error) {
+      console.error('Error fetching lead labor:', error)
+      if (!append) {
+        setLeadLaborList([])
+      }
+      setLeadLaborPage(1)
+      setLeadLaborTotalPages(1)
+      setLeadLaborHasMore(false)
+    } finally {
+      setIsLoadingLeadLabor(false)
+      setIsLoadingMoreLeadLabor(false)
+    }
+  }, [apiBaseUrl])
+
+  const handleLeadLaborDropdownScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+      const nearBottom = scrollHeight - scrollTop - clientHeight < 50
+
+      if (
+        !nearBottom ||
+        !leadLaborHasMore ||
+        isLoadingLeadLabor ||
+        isLoadingMoreLeadLabor ||
+        leadLaborPage >= leadLaborTotalPages
+      ) {
+        return
+      }
+
+      void fetchLeadLaborList(
+        leadLaborSearchQueryRef.current,
+        leadLaborPage + 1,
+        true,
+      )
+    },
+    [
+      leadLaborHasMore,
+      isLoadingLeadLabor,
+      isLoadingMoreLeadLabor,
+      leadLaborPage,
+      leadLaborTotalPages,
+      fetchLeadLaborList,
+    ],
+  )
+
+  const fetchCustomerList = useCallback(async (
+    searchQuery: string = '',
+    page: number = 1,
+    append = false,
+  ) => {
+    const trimmedQuery = searchQuery.trim()
+    customersSearchQueryRef.current = trimmedQuery
+
+    try {
+      if (page === 1) {
+        setIsLoadingCustomers(true)
+      } else {
+        setIsLoadingMoreCustomers(true)
+      }
+
+      let response: any
+      if (trimmedQuery) {
+        response = await apiClient.searchCutomerByQuery(
+          trimmedQuery,
+          page,
+          LIST_PAGE_LIMIT,
+        )
+      } else {
+        const apiResponse = await globalApiCall(
+          `${apiBaseUrl}/customer/getCustomers?page=${page}&limit=${LIST_PAGE_LIMIT}`,
+          { method: 'GET' },
+        )
+        response = await apiResponse.json()
+      }
+
+      if (customersSearchQueryRef.current !== trimmedQuery) return
+
+      const { items, totalPages, currentPage } = parsePaginatedListResponse(
+        response,
+        ['customers'],
+      )
+
+      setCustomerList((prev) => {
+        const merged = append ? [...prev, ...items] : items
+        const seen = new Set<string>()
+        return merged.filter((item) => {
+          const id = String(item?.id ?? '')
+          if (!id || seen.has(id)) return false
+          seen.add(id)
+          return true
+        })
+      })
+      setCustomersPage(currentPage)
+      setCustomersTotalPages(totalPages)
+      setCustomersHasMore(currentPage < totalPages)
     } catch (error) {
       console.error('Error fetching customers:', error)
-      setCustomerList([])
+      if (!append) {
+        setCustomerList([])
+      }
+      setCustomersPage(1)
+      setCustomersTotalPages(1)
+      setCustomersHasMore(false)
+    } finally {
+      setIsLoadingCustomers(false)
+      setIsLoadingMoreCustomers(false)
     }
-  }
+  }, [apiBaseUrl])
+
+  const handleCustomersDropdownScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+      const nearBottom = scrollHeight - scrollTop - clientHeight < 50
+
+      if (
+        !nearBottom ||
+        !customersHasMore ||
+        isLoadingCustomers ||
+        isLoadingMoreCustomers ||
+        customersPage >= customersTotalPages
+      ) {
+        return
+      }
+
+      void fetchCustomerList(
+        customersSearchQueryRef.current,
+        customersPage + 1,
+        true,
+      )
+    },
+    [
+      customersHasMore,
+      isLoadingCustomers,
+      isLoadingMoreCustomers,
+      customersPage,
+      customersTotalPages,
+      fetchCustomerList,
+    ],
+  )
 
   const parseJobsListResponse = (response: any) => {
     let jobs: any[] = []
@@ -327,33 +542,120 @@ export function AddEditOrderPage() {
     ]
   )
 
-  const fetchSupplierList = async (searchQuery: string = '') => {
+  const fetchSupplierList = useCallback(async (
+    searchQuery: string = '',
+    page: number = 1,
+    append = false,
+  ) => {
+    const trimmedQuery = searchQuery.trim()
+    suppliersSearchQueryRef.current = trimmedQuery
+
     try {
-      const response = searchQuery 
-        ? await apiClient.searchSuppliersByQuery(searchQuery, 1, 10)
-        : await apiClient.getAllSuppliers()
-      const suppliersData = response.data?.suppliers || []
-      setSupplierList(suppliersData)
+      if (page === 1) {
+        setIsLoadingSuppliers(true)
+      } else {
+        setIsLoadingMoreSuppliers(true)
+      }
+
+      let response: any
+      if (trimmedQuery) {
+        response = await apiClient.searchSuppliersByQuery(
+          trimmedQuery,
+          page,
+          LIST_PAGE_LIMIT,
+        )
+      } else {
+        const apiResponse = await globalApiCall(
+          `${apiBaseUrl}/suppliers/getAllSuppliers?page=${page}&limit=${LIST_PAGE_LIMIT}`,
+          { method: 'GET' },
+        )
+        response = await apiResponse.json()
+      }
+
+      if (suppliersSearchQueryRef.current !== trimmedQuery) return
+
+      const { items, totalPages, currentPage } = parsePaginatedListResponse(
+        response,
+        ['suppliers'],
+      )
+
+      setSupplierList((prev) => {
+        const merged = append ? [...prev, ...items] : items
+        const seen = new Set<string>()
+        return merged.filter((item) => {
+          const id = String(item?.id ?? '')
+          if (!id || seen.has(id)) return false
+          seen.add(id)
+          return true
+        })
+      })
+      setSuppliersPage(currentPage)
+      setSuppliersTotalPages(totalPages)
+      setSuppliersHasMore(currentPage < totalPages)
     } catch (error) {
       console.error('Error fetching suppliers:', error)
-      setSupplierList([])
+      if (!append) {
+        setSupplierList([])
+      }
+      setSuppliersPage(1)
+      setSuppliersTotalPages(1)
+      setSuppliersHasMore(false)
+    } finally {
+      setIsLoadingSuppliers(false)
+      setIsLoadingMoreSuppliers(false)
     }
-  }
+  }, [apiBaseUrl])
+
+  const handleSuppliersDropdownScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+      const nearBottom = scrollHeight - scrollTop - clientHeight < 50
+
+      if (
+        !nearBottom ||
+        !suppliersHasMore ||
+        isLoadingSuppliers ||
+        isLoadingMoreSuppliers ||
+        suppliersPage >= suppliersTotalPages
+      ) {
+        return
+      }
+
+      void fetchSupplierList(
+        suppliersSearchQueryRef.current,
+        suppliersPage + 1,
+        true,
+      )
+    },
+    [
+      suppliersHasMore,
+      isLoadingSuppliers,
+      isLoadingMoreSuppliers,
+      suppliersPage,
+      suppliersTotalPages,
+      fetchSupplierList,
+    ],
+  )
 
   const fetchProductList = async (searchQuery: string = '') => {
-    try {
-      if (searchQuery) {
-        const response = await apiClient.searchProductsByQuery(searchQuery)
-        const productsData = response.data?.products || response.data || []
-        setProductList(productsData)
-      } else {
-        const response = await globalApiCall(`${apiBaseUrl}/products/getAllProducts?page=1&limit=10`, {
-          method: 'GET'
-        })
-        const responseData = await response.json()
-        const productsData = responseData.data?.products || responseData.data || []
-        setProductList(productsData)
+    const supplierId =
+      orderFormData.supplier_id || selectedSupplier?.id
+
+    if (!supplierId) {
+      setProductList([])
+      if (searchQuery.trim()) {
+        toast.error('Please select a supplier first')
       }
+      return
+    }
+
+    try {
+      const response = await apiClient.searchProductsBySupplier(
+        supplierId,
+        searchQuery.trim(),
+      )
+      const productsData = response.data?.products || response.data || []
+      setProductList(Array.isArray(productsData) ? productsData : [])
     } catch (error) {
       console.error('Error fetching products:', error)
       setProductList([])
@@ -825,12 +1127,11 @@ export function AddEditOrderPage() {
                       onFocus={() => {
                         if (selectedLeadLabor) {
                           // Use user.full_name (singular), not users.full_name
-                          const selectedName = selectedLeadLabor.user?.full_name || selectedLeadLabor.users?.full_name || selectedLeadLabor.labor_code || ''
+                          const selectedName = selectedLeadLabor.user?.full_name || selectedLeadLabor.users?.full_name || selectedLeadLabor.name || selectedLeadLabor.labor_code || ''
                           setLeadLaborSearch(selectedName)
-                        } else {
-                          fetchLeadLaborList('')
-                          setShowLeadLaborResults(true)
                         }
+                        fetchLeadLaborList('')
+                        setShowLeadLaborResults(true)
                       }}
                       onBlur={() => {
                         setTimeout(() => setShowLeadLaborResults(false), 200)
@@ -839,31 +1140,67 @@ export function AddEditOrderPage() {
                       className={`pr-10 ${validationErrors.lead_labour_id ? 'border-red-500' : ''}`}
                     />
                     <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    {showLeadLaborResults && leadLaborList.length > 0 && (
-                      <div className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1">
-                        {leadLaborList.map((leadLabor: any) => (
-                          <div
-                            key={leadLabor.id}
-                            onMouseDown={(e) => {
-                              e.preventDefault()
-                              setSelectedLeadLabor(leadLabor)
-                              setOrderFormData(prev => ({ ...prev, lead_labour_id: leadLabor.id?.toString() || '' }))
-                              setShowLeadLaborResults(false)
-                              setLeadLaborSearch(leadLabor.users?.full_name || leadLabor.name || leadLabor.labor_code || '')
-                              if (validationErrors.lead_labour_id) {
-                                setValidationErrors(prev => {
-                                  const newErrors = { ...prev }
-                                  delete newErrors.lead_labour_id
-                                  return newErrors
-                                })
-                              }
-                            }}
-                            className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100"
-                          >
-                            <div className="font-medium">{leadLabor.users?.full_name || leadLabor.name || leadLabor.labor_code}</div>
-                            <div className="text-sm text-muted-foreground">{leadLabor.labor_code || leadLabor.users?.email}</div>
+                    {showLeadLaborResults && (
+                      <div
+                        className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1"
+                        onScroll={handleLeadLaborDropdownScroll}
+                      >
+                        {isLoadingLeadLabor && leadLaborList.length === 0 ? (
+                          <div className="p-3 flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mr-2"></div>
+                            <span className="text-sm text-muted-foreground">Loading lead labor...</span>
                           </div>
-                        ))}
+                        ) : leadLaborList.length > 0 ? (
+                          <>
+                            {leadLaborList.map((leadLabor: any) => (
+                              <div
+                                key={leadLabor.id}
+                                onMouseDown={(e) => {
+                                  e.preventDefault()
+                                  setSelectedLeadLabor(leadLabor)
+                                  setOrderFormData(prev => ({ ...prev, lead_labour_id: leadLabor.id?.toString() || '' }))
+                                  setShowLeadLaborResults(false)
+                                  setLeadLaborSearch(
+                                    leadLabor.user?.full_name ||
+                                      leadLabor.users?.full_name ||
+                                      leadLabor.name ||
+                                      leadLabor.labor_code ||
+                                      '',
+                                  )
+                                  if (validationErrors.lead_labour_id) {
+                                    setValidationErrors(prev => {
+                                      const newErrors = { ...prev }
+                                      delete newErrors.lead_labour_id
+                                      return newErrors
+                                    })
+                                  }
+                                }}
+                                className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100"
+                              >
+                                <div className="font-medium">
+                                  {leadLabor.user?.full_name ||
+                                    leadLabor.users?.full_name ||
+                                    leadLabor.name ||
+                                    leadLabor.labor_code}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  {leadLabor.labor_code ||
+                                    leadLabor.user?.email ||
+                                    leadLabor.users?.email ||
+                                    leadLabor.email}
+                                </div>
+                              </div>
+                            ))}
+                            {isLoadingMoreLeadLabor && (
+                              <div className="p-3 flex items-center justify-center border-t border-gray-100">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                                <span className="text-xs text-muted-foreground">Loading more...</span>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="p-3 text-sm text-muted-foreground text-center">No lead labor found</div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -903,10 +1240,9 @@ export function AddEditOrderPage() {
                       onFocus={() => {
                         if (selectedCustomer) {
                           setCustomerSearch(selectedCustomer.customer_name || selectedCustomer.company_name || selectedCustomer.name || '')
-                        } else {
-                          fetchCustomerList('')
-                          setShowCustomerResults(true)
                         }
+                        fetchCustomerList('')
+                        setShowCustomerResults(true)
                       }}
                       onBlur={() => {
                         setTimeout(() => setShowCustomerResults(false), 200)
@@ -915,31 +1251,51 @@ export function AddEditOrderPage() {
                       className={`pr-10 ${validationErrors.customer_id ? 'border-red-500' : ''}`}
                     />
                     <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    {showCustomerResults && customerList.length > 0 && (
-                      <div className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1">
-                        {customerList.map((customer: any) => (
-                          <div
-                            key={customer.id}
-                            onMouseDown={(e) => {
-                              e.preventDefault()
-                              setSelectedCustomer(customer)
-                              setOrderFormData(prev => ({ ...prev, customer_id: customer.id?.toString() || '' }))
-                              setShowCustomerResults(false)
-                              setCustomerSearch(customer.customer_name || customer.company_name || customer.name || '')
-                              if (validationErrors.customer_id) {
-                                setValidationErrors(prev => {
-                                  const newErrors = { ...prev }
-                                  delete newErrors.customer_id
-                                  return newErrors
-                                })
-                              }
-                            }}
-                            className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100"
-                          >
-                            <div className="font-medium">{customer.customer_name || customer.company_name || customer.name}</div>
-                            <div className="text-sm text-muted-foreground">{customer.email || customer.phone}</div>
+                    {showCustomerResults && (
+                      <div
+                        className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1"
+                        onScroll={handleCustomersDropdownScroll}
+                      >
+                        {isLoadingCustomers && customerList.length === 0 ? (
+                          <div className="p-3 flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mr-2"></div>
+                            <span className="text-sm text-muted-foreground">Loading customers...</span>
                           </div>
-                        ))}
+                        ) : customerList.length > 0 ? (
+                          <>
+                            {customerList.map((customer: any) => (
+                              <div
+                                key={customer.id}
+                                onMouseDown={(e) => {
+                                  e.preventDefault()
+                                  setSelectedCustomer(customer)
+                                  setOrderFormData(prev => ({ ...prev, customer_id: customer.id?.toString() || '' }))
+                                  setShowCustomerResults(false)
+                                  setCustomerSearch(customer.customer_name || customer.company_name || customer.name || '')
+                                  if (validationErrors.customer_id) {
+                                    setValidationErrors(prev => {
+                                      const newErrors = { ...prev }
+                                      delete newErrors.customer_id
+                                      return newErrors
+                                    })
+                                  }
+                                }}
+                                className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100"
+                              >
+                                <div className="font-medium">{customer.customer_name || customer.company_name || customer.name}</div>
+                                <div className="text-sm text-muted-foreground">{customer.email || customer.phone}</div>
+                              </div>
+                            ))}
+                            {isLoadingMoreCustomers && (
+                              <div className="p-3 flex items-center justify-center border-t border-gray-100">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                                <span className="text-xs text-muted-foreground">Loading more...</span>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="p-3 text-sm text-muted-foreground text-center">No customers found</div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -963,6 +1319,8 @@ export function AddEditOrderPage() {
                         if (selectedSupplier && value !== (selectedSupplier.company_name || selectedSupplier.fullName || selectedSupplier.name || '')) {
                           setSelectedSupplier(null)
                           setOrderFormData(prev => ({ ...prev, supplier_id: '' }))
+                          setProductList([])
+                          setShowProductResults(false)
                         }
                         setShowSupplierResults(true)
                         if (value && value.length > 0) {
@@ -981,10 +1339,9 @@ export function AddEditOrderPage() {
                       onFocus={() => {
                         if (selectedSupplier) {
                           setSupplierSearch(selectedSupplier.company_name || selectedSupplier.fullName || selectedSupplier.name || '')
-                        } else {
-                          fetchSupplierList('')
-                          setShowSupplierResults(true)
                         }
+                        fetchSupplierList('')
+                        setShowSupplierResults(true)
                       }}
                       onBlur={() => {
                         setTimeout(() => setShowSupplierResults(false), 200)
@@ -993,31 +1350,53 @@ export function AddEditOrderPage() {
                       className={`pr-10 ${validationErrors.supplier_id ? 'border-red-500' : ''}`}
                     />
                     <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    {showSupplierResults && supplierList.length > 0 && (
-                      <div className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1">
-                        {supplierList.map((supplier: any) => (
-                          <div
-                            key={supplier.id}
-                            onMouseDown={(e) => {
-                              e.preventDefault()
-                              setSelectedSupplier(supplier)
-                              setOrderFormData(prev => ({ ...prev, supplier_id: supplier.id?.toString() || '' }))
-                              setShowSupplierResults(false)
-                              setSupplierSearch(supplier.company_name || supplier.fullName || supplier.name || '')
-                              if (validationErrors.supplier_id) {
-                                setValidationErrors(prev => {
-                                  const newErrors = { ...prev }
-                                  delete newErrors.supplier_id
-                                  return newErrors
-                                })
-                              }
-                            }}
-                            className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100"
-                          >
-                            <div className="font-medium">{supplier.company_name || supplier.fullName || supplier.name}</div>
-                            <div className="text-sm text-muted-foreground">{supplier.users?.email || supplier.email}</div>
+                    {showSupplierResults && (
+                      <div
+                        className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1"
+                        onScroll={handleSuppliersDropdownScroll}
+                      >
+                        {isLoadingSuppliers && supplierList.length === 0 ? (
+                          <div className="p-3 flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mr-2"></div>
+                            <span className="text-sm text-muted-foreground">Loading suppliers...</span>
                           </div>
-                        ))}
+                        ) : supplierList.length > 0 ? (
+                          <>
+                            {supplierList.map((supplier: any) => (
+                              <div
+                                key={supplier.id}
+                                onMouseDown={(e) => {
+                                  e.preventDefault()
+                                  setSelectedSupplier(supplier)
+                                  setOrderFormData(prev => ({ ...prev, supplier_id: supplier.id?.toString() || '' }))
+                                  setShowSupplierResults(false)
+                                  setSupplierSearch(supplier.company_name || supplier.fullName || supplier.name || '')
+                                  setProductList([])
+                                  setProductSearch('')
+                                  if (validationErrors.supplier_id) {
+                                    setValidationErrors(prev => {
+                                      const newErrors = { ...prev }
+                                      delete newErrors.supplier_id
+                                      return newErrors
+                                    })
+                                  }
+                                }}
+                                className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100"
+                              >
+                                <div className="font-medium">{supplier.company_name || supplier.fullName || supplier.name}</div>
+                                <div className="text-sm text-muted-foreground">{supplier.users?.email || supplier.email}</div>
+                              </div>
+                            ))}
+                            {isLoadingMoreSuppliers && (
+                              <div className="p-3 flex items-center justify-center border-t border-gray-100">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                                <span className="text-xs text-muted-foreground">Loading more...</span>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="p-3 text-sm text-muted-foreground text-center">No suppliers found</div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1141,32 +1520,42 @@ export function AddEditOrderPage() {
                     className={`pr-10 ${validationErrors.cartItems ? 'border-red-500' : ''}`}
                   />
                   <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  {showProductResults && productList.length > 0 && (
+                  {showProductResults && (
                     <div className="absolute z-50 w-full bg-white border border-gray-300 shadow-lg max-h-60 overflow-y-auto mt-1">
-                      {productList
-                        .filter((p: any) => !selectedProducts.find(sp => sp.id === p.id))
-                        .map((product: any) => (
-                          <div
-                            key={product.id}
-                            onMouseDown={(e) => {
-                              e.preventDefault()
-                              handleProductSelection(product)
-                              if (validationErrors.cartItems) {
-                                setValidationErrors(prev => {
-                                  const newErrors = { ...prev }
-                                  delete newErrors.cartItems
-                                  return newErrors
-                                })
-                              }
-                            }}
-                            className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100"
-                          >
-                            <div className="font-medium">{product.product_name || product.name}</div>
-                            <div className="text-sm text-muted-foreground">
-                              {product.jdp_sku || product.sku || product.supplier_sku} • ${product.unit_cost || product.jdp_price || 0}
+                      {!(orderFormData.supplier_id || selectedSupplier?.id) ? (
+                        <div className="p-3 text-sm text-muted-foreground text-center">
+                          Please select a supplier first
+                        </div>
+                      ) : productList.filter((p: any) => !selectedProducts.find(sp => sp.id === p.id)).length > 0 ? (
+                        productList
+                          .filter((p: any) => !selectedProducts.find(sp => sp.id === p.id))
+                          .map((product: any) => (
+                            <div
+                              key={product.id}
+                              onMouseDown={(e) => {
+                                e.preventDefault()
+                                handleProductSelection(product)
+                                if (validationErrors.cartItems) {
+                                  setValidationErrors(prev => {
+                                    const newErrors = { ...prev }
+                                    delete newErrors.cartItems
+                                    return newErrors
+                                  })
+                                }
+                              }}
+                              className="p-3 hover:bg-primary/5 cursor-pointer border-b border-gray-100"
+                            >
+                              <div className="font-medium">{product.product_name || product.name}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {product.jdp_sku || product.sku || product.supplier_sku} • ${product.unit_cost || product.jdp_price || 0}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))
+                      ) : (
+                        <div className="p-3 text-sm text-muted-foreground text-center">
+                          No products found
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
