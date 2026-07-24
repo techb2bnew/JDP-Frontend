@@ -10,6 +10,12 @@ type ActivityType =
   | "labour_hours_logged"
   | "document_uploaded"
   | "invoice_generated"
+  | "invoice_created"
+  | "invoice_paid"
+  | "invoice_cancelled"
+  | "invoice_updated"
+  | "estimate_approved"
+  | "estimate_rejected"
   | "status_updated"
   | "lead_assigned"
   | "labor_assigned"
@@ -119,6 +125,14 @@ type ApiInvoiceActivity = {
   invoice_link?: string;
   qb_invoice_id?: string | null;
   sent_by_user?: ApiUser | null;
+  created_at?: string;
+  updated_at?: string;
+  approved_at?: string;
+  rejected_at?: string;
+  paid_at?: string;
+  cancelled_at?: string;
+  created_by_user?: ApiUser | null;
+  updated_by_user?: ApiUser | null;
 };
 
 type ApiOrderActivityItem = {
@@ -240,7 +254,13 @@ const activityPriority: Record<ActivityType, number> = {
   purchase_order_created: 5,
   material_ordered: 6,
   bluesheet_submitted: 7,
+  invoice_created: 8,
   invoice_generated: 8,
+  estimate_approved: 8,
+  estimate_rejected: 8,
+  invoice_paid: 8,
+  invoice_cancelled: 8,
+  invoice_updated: 8,
   status_updated: 9,
   job_updated: 10,
   job_started: 11,
@@ -384,6 +404,141 @@ const getTypeStyles = (type: ActivityType) => {
               strokeLinecap="round"
               strokeLinejoin="round"
               d="M9 14l2 2 4-4M7 4h10a2 2 0 012 2v12l-3-2-2 2-2-2-2 2-3-2V6a2 2 0 012-2z"
+            />
+          </svg>
+        ),
+      };
+
+    case "invoice_created":
+      return {
+        iconBg: "bg-pink-500",
+        cardBg: "bg-pink-50",
+        cardBorder: "border-pink-100",
+        icon: (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4 text-white"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 4v16m8-8H4"
+            />
+          </svg>
+        ),
+      };
+
+    case "invoice_paid":
+      return {
+        iconBg: "bg-green-600",
+        cardBg: "bg-green-50",
+        cardBorder: "border-green-100",
+        icon: (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4 text-white"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 10v2m0-2c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+        ),
+      };
+
+    case "estimate_approved":
+      return {
+        iconBg: "bg-emerald-600",
+        cardBg: "bg-emerald-50",
+        cardBorder: "border-emerald-100",
+        icon: (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4 text-white"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M5 13l4 4L19 7"
+            />
+          </svg>
+        ),
+      };
+
+    case "estimate_rejected":
+      return {
+        iconBg: "bg-red-500",
+        cardBg: "bg-red-50",
+        cardBorder: "border-red-100",
+        icon: (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4 text-white"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        ),
+      };
+
+    case "invoice_cancelled":
+      return {
+        iconBg: "bg-gray-500",
+        cardBg: "bg-gray-50",
+        cardBorder: "border-gray-200",
+        icon: (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4 text-white"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <circle cx="12" cy="12" r="8" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 9l6 6" />
+          </svg>
+        ),
+      };
+
+    case "invoice_updated":
+      return {
+        iconBg: "bg-amber-600",
+        cardBg: "bg-amber-50",
+        cardBorder: "border-amber-100",
+        icon: (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4 text-white"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
             />
           </svg>
         ),
@@ -647,6 +802,79 @@ const resolveActor = (
   return "Unknown user";
 };
 
+/** "EST-2026-009" -> "Estimate"; any other prefix (PRO/DOWN/ROUGH/FINAL invoice numbers) -> "Invoice". */
+const getInvoiceDocumentLabel = (invoiceNumber?: string): string => {
+  const prefix = (invoiceNumber || "").split("-")[0]?.toUpperCase();
+  return prefix === "EST" ? "Estimate" : "Invoice";
+};
+
+/**
+ * The API currently exposes each estimate/invoice's *current* status (plus
+ * when it was last sent) rather than a full event log, so one entry maps to
+ * one timeline item reflecting that current status. If the backend later
+ * adds created_at/approved_at/rejected_at/paid_at/cancelled_at timestamps,
+ * those are already picked up above for sorting.
+ */
+const buildInvoiceActivityContent = (
+  invoice: ApiInvoiceActivity,
+  docLabel: string,
+  actor: string,
+): { type: ActivityType; title: string; description: string } => {
+  const status = (invoice.status || "").toLowerCase();
+  const recipient = formatIfEmail(invoice.invoice_sent_to);
+
+  switch (status) {
+    case "paid":
+      return {
+        type: "invoice_paid",
+        title: `${docLabel} Paid`,
+        description: `${docLabel} ${invoice.invoice_number} was marked as paid.`,
+      };
+    case "approved":
+      return {
+        type: "estimate_approved",
+        title: `${docLabel} Approved`,
+        description: `${docLabel} ${invoice.invoice_number} was approved.`,
+      };
+    case "rejected":
+    case "declined":
+      return {
+        type: "estimate_rejected",
+        title: `${docLabel} Rejected`,
+        description: `${docLabel} ${invoice.invoice_number} was rejected.`,
+      };
+    case "cancelled":
+    case "canceled":
+      return {
+        type: "invoice_cancelled",
+        title: `${docLabel} Cancelled`,
+        description: `${docLabel} ${invoice.invoice_number} was cancelled.`,
+      };
+    case "draft":
+      return {
+        type: "invoice_created",
+        title: `${docLabel} Created`,
+        description: `${actor} created ${docLabel.toLowerCase()} ${invoice.invoice_number}.`,
+      };
+    case "sent":
+      return {
+        type: "invoice_generated",
+        title: `${docLabel} Sent`,
+        description: `${actor} sent ${docLabel.toLowerCase()} ${invoice.invoice_number}${
+          recipient ? ` to ${recipient}` : ""
+        }.`,
+      };
+    default:
+      return {
+        type: "invoice_updated",
+        title: `${docLabel} Updated`,
+        description: `${docLabel} ${invoice.invoice_number} status changed to "${
+          invoice.status || "unknown"
+        }".`,
+      };
+  }
+};
+
 const mapApiResponseToActivities = (
   response: JobActivityApiResponse
 ): ActivityLogItem[] => {
@@ -779,26 +1007,42 @@ const mapApiResponseToActivities = (
 
   if (activityAudit?.invoice_activity?.length) {
     activityAudit.invoice_activity.forEach((invoice, index) => {
-      const sentBy = resolveActor(
+      const actor = resolveActor(
         invoice.sent_by_user,
+        invoice.updated_by_user,
+        invoice.created_by_user,
         job.updated_by_user,
         job.updated_by_name,
         job.created_by_user,
         job.created_by_name,
       );
-      const sortDate = invoice.invoice_sent_at || job.updated_at || job.created_at;
+      const sortDate =
+        invoice.updated_at ||
+        invoice.approved_at ||
+        invoice.rejected_at ||
+        invoice.paid_at ||
+        invoice.cancelled_at ||
+        invoice.invoice_sent_at ||
+        invoice.created_at ||
+        job.updated_at ||
+        job.created_at;
+
+      const docLabel = getInvoiceDocumentLabel(invoice.invoice_number);
+      const { type, title, description } = buildInvoiceActivityContent(
+        invoice,
+        docLabel,
+        actor,
+      );
 
       result.push({
         id: `invoice-${invoice.estimate_id}-${index}`,
-        title: "Invoice Sent",
-        description: `${sentBy} sent invoice ${invoice.invoice_number} to ${
-          formatIfEmail(invoice.invoice_sent_to) || "the customer"
-        }.`,
+        title,
+        description,
         dateLabel: formatDateLabel(sortDate),
-        userName: sentBy,
-        type: "invoice_generated",
+        userName: actor,
+        type,
         sortDate,
-        priority: activityPriority.invoice_generated,
+        priority: activityPriority[type],
       });
     });
   }

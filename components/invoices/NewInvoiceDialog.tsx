@@ -731,6 +731,7 @@ export const NewInvoiceDialog = ({
     customInvoiceType: "",
     paymentPercentage: 0,
     estimateTotal: 0,
+    totalLaborCost: null as number | null,
     paymentHistory: [] as any[],
   });
 
@@ -1111,6 +1112,14 @@ export const NewInvoiceDialog = ({
     }
   }, [currentJob, jobId]);
 
+  // In view mode the job search input is disabled and never receives a
+  // focus/change event, so sync its display text from the loaded job here.
+  useEffect(() => {
+    if (isViewMode && selectedJob) {
+      setJobSearch(selectedJob.title || selectedJob.job_title || "");
+    }
+  }, [isViewMode, selectedJob]);
+
   // Populate data from viewInvoiceData (used for preview/custom flows)
   useEffect(() => {
     if (viewInvoiceData) {
@@ -1159,6 +1168,13 @@ export const NewInvoiceDialog = ({
             dueDate: viewInvoiceData.due_date || "",
             paymentCredits: viewInvoiceData.payment_credits || 0,
             balanceDue: viewInvoiceData.balance_due || "",
+            totalLaborCost: hasApiLaborCost(
+              (viewInvoiceData as any).total_labor_cost,
+            )
+              ? resolveInvoiceLaborCost(
+                  (viewInvoiceData as any).total_labor_cost,
+                )
+              : null,
             notes:
               ((viewInvoiceData as any).notes ??
                 (viewInvoiceData as any).description) ||
@@ -1284,6 +1300,56 @@ export const NewInvoiceDialog = ({
 
   const taxAmount = Number((subtotal * taxRate).toFixed(2));
   const totalAmount = Number((subtotal + taxAmount).toFixed(2));
+
+  const hasApiLaborCost = (laborCost?: number | string | null): boolean => {
+    if (laborCost === undefined || laborCost === null) return false;
+    return Number(laborCost) > 0;
+  };
+
+  const resolveInvoiceLaborCost = (
+    laborCost?: number | string | null,
+  ): number => Number(laborCost) || 0;
+
+  /**
+   * View-mode line items (loaded from viewInvoiceData) carry a
+   * parent_header_name/parentHeaderName per item instead of interspersed
+   * "header" type rows, so group them the same way JobDetailsPage's invoice
+   * preview does.
+   */
+  const groupLineItemsByParentHeader = (lineItems: any[]) => {
+    const getHeaderName = (item: any) =>
+      item.parent_header_name || item.parentHeaderName || null;
+
+    const normalizedItems = (lineItems || [])
+      .filter((item: any) => item.type !== "header")
+      .map((item: any) => ({
+        ...item,
+        parent_header_name: getHeaderName(item),
+      }));
+
+    const directItems = normalizedItems.filter(
+      (item: any) => !item.parent_header_name,
+    );
+
+    const groupedMap = normalizedItems.reduce(
+      (acc: Record<string, any[]>, item: any) => {
+        const headerName = item.parent_header_name;
+        if (!headerName) return acc;
+        if (!acc[headerName]) acc[headerName] = [];
+        acc[headerName].push(item);
+        return acc;
+      },
+      {},
+    );
+
+    return [
+      ...directItems,
+      ...Object.entries(groupedMap).flatMap(([headerName, items]) => [
+        { id: `header-${headerName}`, type: "synthetic-header", headerName },
+        ...items,
+      ]),
+    ];
+  };
 
   // Invoice Helper Functions
   // const calculateInvoiceSubtotal = () => {
@@ -3094,7 +3160,18 @@ const validateLineItems = (lineItems: any[] = []) => {
                     Date
                   </Label>
                   <Input
-                    value={inlineInvoiceData.date}
+                    value={
+                      isViewMode && inlineInvoiceData.date
+                        ? new Date(inlineInvoiceData.date).toLocaleDateString(
+                            "en-US",
+                            {
+                              month: "2-digit",
+                              day: "2-digit",
+                              year: "2-digit",
+                            },
+                          )
+                        : inlineInvoiceData.date
+                    }
                     onChange={(e) =>
                       setInlineInvoiceData((prev) => ({
                         ...prev,
@@ -3131,6 +3208,13 @@ const validateLineItems = (lineItems: any[] = []) => {
 
             {/* Job Selection */}
 
+            {(!isViewMode ||
+              Boolean(
+                viewInvoiceData?.job_id ||
+                  viewInvoiceData?.job ||
+                  selectedJob ||
+                  inlineInvoiceData.jobId,
+              )) && (
             <div className="border border-gray-300 p-3">
               <div className="mb-4">
                 <Label className="block bg-gray-600 text-white px-3 py-2 text-xs font-semibold">
@@ -3288,6 +3372,7 @@ const validateLineItems = (lineItems: any[] = []) => {
                 </div>
               </div>
             </div>
+            )}
 
             {/* Bill To Section */}
             <div className="mb-4">
@@ -3667,9 +3752,16 @@ const validateLineItems = (lineItems: any[] = []) => {
 
                     <tbody>
                       {(() => {
-                        const orderedRows = buildInvoicePreviewRows(
+                        const explicitHeaderRows = buildInvoicePreviewRows(
                           inlineInvoiceData.lineItems || [],
                         );
+                        const orderedRows = explicitHeaderRows.some(
+                          (row: any) => row.type === "synthetic-header",
+                        )
+                          ? explicitHeaderRows
+                          : groupLineItemsByParentHeader(
+                              inlineInvoiceData.lineItems || [],
+                            );
 
                         return orderedRows.map(
                           (lineItem: any, index: number) => {
@@ -3775,40 +3867,102 @@ const validateLineItems = (lineItems: any[] = []) => {
               )}
 
               {isViewMode &&
-                (isFilledPaymentCredits(inlineInvoiceData.paymentCredits) ||
-                  isFilledBalanceDue(inlineInvoiceData.balanceDue)) && (
-                <div className="flex justify-end mt-3">
-                  <div className="text-right min-w-[200px]">
-                    {isFilledPaymentCredits(
-                      inlineInvoiceData.paymentCredits,
-                    ) && (
-                      <div className="flex justify-between mb-1.5">
-                        <span className="text-sm text-gray-700">
-                          Payments / Credits:
-                        </span>
-                        <span className="text-sm text-gray-700">
-                          $
-                          {formatCurrencyAmount(
-                            inlineInvoiceData.paymentCredits,
-                          )}
-                        </span>
-                      </div>
-                    )}
+                hasApiLaborCost(inlineInvoiceData.totalLaborCost) &&
+                (() => {
+                  const laborCost = resolveInvoiceLaborCost(
+                    inlineInvoiceData.totalLaborCost,
+                  );
+                  const grandTotal = subtotal + laborCost;
+                  const paymentCredits =
+                    Number(inlineInvoiceData.paymentCredits) || 0;
+                  const computedBalanceDue = grandTotal - paymentCredits;
 
-                    {isFilledBalanceDue(inlineInvoiceData.balanceDue) && (
-                      <div className="flex justify-between bg-gray-100 px-3 py-2 rounded">
-                        <span className="font-bold text-sm text-gray-700">
-                          Balance Due:
-                        </span>
-                        <span className="font-bold text-sm text-gray-700">
-                          $
-                          {formatCurrencyAmount(inlineInvoiceData.balanceDue)}
-                        </span>
+                  return (
+                    <div className="flex justify-end mt-3">
+                      <div className="text-right min-w-[200px]">
+                        <div className="flex justify-between mb-1.5">
+                          <span className="text-sm text-gray-700">
+                            Total:
+                          </span>
+                          <span className="text-sm text-gray-700">
+                            ${subtotal.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between mb-1.5">
+                          <span className="text-sm text-gray-700">
+                            Total Labor Cost:
+                          </span>
+                          <span className="text-sm text-gray-700">
+                            ${laborCost.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between mb-1.5">
+                          <span className="text-sm text-gray-700">
+                            Total Material + Labor:
+                          </span>
+                          <span className="text-sm text-gray-700">
+                            ${grandTotal.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between mb-1.5">
+                          <span className="text-sm text-gray-700">
+                            Payments / Credits:
+                          </span>
+                          <span className="text-sm text-gray-700">
+                            ${paymentCredits.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between bg-gray-100 px-3 py-2 rounded">
+                          <span className="font-bold text-sm text-gray-700">
+                            Balance Due:
+                          </span>
+                          <span className="font-bold text-sm text-gray-700">
+                            ${computedBalanceDue.toFixed(2)}
+                          </span>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </div>
-              )}
+                    </div>
+                  );
+                })()}
+
+              {isViewMode &&
+                !hasApiLaborCost(inlineInvoiceData.totalLaborCost) &&
+                (() => {
+                  const paymentCredits =
+                    Number(inlineInvoiceData.paymentCredits) || 0;
+                  const computedBalanceDue = subtotal - paymentCredits;
+
+                  return (
+                    <div className="flex justify-end mt-3">
+                      <div className="text-right min-w-[200px]">
+                        <div className="flex justify-between mb-1.5">
+                          <span className="text-sm text-gray-700">
+                            Total:
+                          </span>
+                          <span className="text-sm text-gray-700">
+                            ${subtotal.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between mb-1.5">
+                          <span className="text-sm text-gray-700">
+                            Payments / Credits:
+                          </span>
+                          <span className="text-sm text-gray-700">
+                            ${paymentCredits.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between bg-gray-100 px-3 py-2 rounded">
+                          <span className="font-bold text-sm text-gray-700">
+                            Balance Due:
+                          </span>
+                          <span className="font-bold text-sm text-gray-700">
+                            ${computedBalanceDue.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
               {!isViewMode && (
                 <div className="flex justify-end mt-3">

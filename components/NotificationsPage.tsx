@@ -122,6 +122,10 @@ export function NotificationsPage() {
   const [jobSearchTerm, setJobSearchTerm] = useState('')
   const [jobResults, setJobResults] = useState<any[]>([])
   const [isLoadingJobs, setIsLoadingJobs] = useState(false)
+  const [isLoadingMoreJobs, setIsLoadingMoreJobs] = useState(false)
+  const [jobsPage, setJobsPage] = useState(1)
+  const [jobsTotalPages, setJobsTotalPages] = useState(1)
+  const [jobsHasMore, setJobsHasMore] = useState(false)
   const [selectedJobs, setSelectedJobs] = useState<any[]>([])
   const [showJobDropdown, setShowJobDropdown] = useState(false)
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || ''
@@ -306,13 +310,30 @@ export function NotificationsPage() {
   }, [fetchRoles])
 
   const fetchJobsForNotification = useCallback(
-    async (query: string) => {
+    async (query: string, page: number = 1, append: boolean = false) => {
       try {
-        setIsLoadingJobs(true)
-        // Always use search API, even with empty query
-        const response = await apiClient.searchJobsByQuery(query || '', 1, 10)
+        if (page === 1) {
+          setIsLoadingJobs(true)
+        } else {
+          setIsLoadingMoreJobs(true)
+        }
+        const trimmedQuery = query.trim()
+        // Empty query -> default job listing; non-empty -> search API
+        // (search API doesn't return results for an empty "q")
+        const response = trimmedQuery
+          ? await apiClient.searchJobsByQuery(trimmedQuery, page, 10)
+          : await apiClient.getJobs(page, 10)
 
-        const jobs = response.data?.jobs || response.data || []
+        let jobs: any[] = []
+        if (Array.isArray(response?.data?.jobs)) {
+          jobs = response.data.jobs
+        } else if (Array.isArray(response?.data)) {
+          jobs = response.data
+        } else if (Array.isArray(response?.data?.data)) {
+          jobs = response.data.data
+        } else if (Array.isArray(response?.jobs)) {
+          jobs = response.jobs
+        }
 
         const transformedJobs = jobs.map((job: any) => ({
           id: job.id?.toString() || '',
@@ -338,15 +359,68 @@ export function NotificationsPage() {
           assigned_lead_labor_ids: job.assigned_lead_labor_ids,
         }))
 
-        setJobResults(transformedJobs)
+        const paginationInfo = response?.data?.pagination
+        const totalPages =
+          Number(paginationInfo?.totalPages ?? response?.totalPages ?? 1) || 1
+        const currentPage =
+          Number(paginationInfo?.page ?? response?.currentPage ?? page) ||
+          page
+
+        setJobResults((prev) => {
+          const merged = append ? [...prev, ...transformedJobs] : transformedJobs
+          const seen = new Set<string>()
+          return merged.filter((job) => {
+            const id = String(job?.id ?? '')
+            if (!id || seen.has(id)) return false
+            seen.add(id)
+            return true
+          })
+        })
+        setJobsPage(currentPage)
+        setJobsTotalPages(totalPages)
+        setJobsHasMore(currentPage < totalPages)
       } catch (error) {
         console.error('Error fetching jobs for notifications:', error)
-        setJobResults([])
+        if (!append) {
+          setJobResults([])
+        }
+        setJobsPage(1)
+        setJobsTotalPages(1)
+        setJobsHasMore(false)
       } finally {
         setIsLoadingJobs(false)
+        setIsLoadingMoreJobs(false)
       }
     },
     []
+  )
+
+  const handleJobsDropdownScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+      const nearBottom = scrollHeight - scrollTop - clientHeight < 50
+
+      if (
+        !nearBottom ||
+        !jobsHasMore ||
+        isLoadingJobs ||
+        isLoadingMoreJobs ||
+        jobsPage >= jobsTotalPages
+      ) {
+        return
+      }
+
+      void fetchJobsForNotification(jobSearchTerm, jobsPage + 1, true)
+    },
+    [
+      jobsHasMore,
+      isLoadingJobs,
+      isLoadingMoreJobs,
+      jobsPage,
+      jobsTotalPages,
+      jobSearchTerm,
+      fetchJobsForNotification,
+    ]
   )
 
   // Debounced job search
@@ -355,7 +429,7 @@ export function NotificationsPage() {
 
     const trimmed = jobSearchTerm.trim()
     const timeout = setTimeout(() => {
-      fetchJobsForNotification(trimmed)
+      fetchJobsForNotification(trimmed, 1, false)
     }, 400)
 
     return () => clearTimeout(timeout)
@@ -1517,7 +1591,10 @@ export function NotificationsPage() {
                       <Search className="absolute left-2.5 top-[20px] h-4 w-4 -translate-y-1/2 text-gray-400" />
 
                       {showJobDropdown && (
-                        <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                        <div
+                          className="absolute z-20 mt-1 max-h-[180px] w-full overflow-auto rounded-md border border-gray-200 bg-white shadow-lg"
+                          onScroll={handleJobsDropdownScroll}
+                        >
                           {isLoadingJobs ? (
                             <div className="p-3 text-sm text-gray-500">
                               Searching jobs...
@@ -1548,18 +1625,8 @@ export function NotificationsPage() {
                                 >
                                   <Checkbox
                                     checked={isSelected}
-                                    onCheckedChange={() => {
-                                      if (isSelected) {
-                                        setSelectedJobs((prev) =>
-                                          prev.filter((j) => j.id !== job.id),
-                                        );
-                                      } else {
-                                        setSelectedJobs((prev) => [
-                                          ...prev,
-                                          job,
-                                        ]);
-                                      }
-                                    }}
+                                    className="pointer-events-none"
+                                    tabIndex={-1}
                                   />
                                   <Briefcase className="mt-0.5 h-4 w-4 text-gray-500" />
                                   <div className="flex-1">
@@ -1577,6 +1644,11 @@ export function NotificationsPage() {
                                 </button>
                               );
                             })
+                          )}
+                          {isLoadingMoreJobs && (
+                            <div className="p-3 text-center text-xs text-gray-500">
+                              Loading more jobs...
+                            </div>
                           )}
                         </div>
                       )}
