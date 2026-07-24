@@ -93,6 +93,7 @@ export function AddEditOrderPage() {
   const [productSearch, setProductSearch] = useState('')
   const [productList, setProductList] = useState<any[]>([])
   const [showProductResults, setShowProductResults] = useState(false)
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false)
   const [selectedProducts, setSelectedProducts] = useState<any[]>([])
   const [productQuantities, setProductQuantities] = useState<Record<number, number>>({})
 
@@ -643,6 +644,7 @@ export function AddEditOrderPage() {
 
     if (!supplierId) {
       setProductList([])
+      setIsLoadingProducts(false)
       if (searchQuery.trim()) {
         toast.error('Please select a supplier first')
       }
@@ -650,6 +652,7 @@ export function AddEditOrderPage() {
     }
 
     try {
+      setIsLoadingProducts(true)
       const response = await apiClient.searchProductsBySupplier(
         supplierId,
         searchQuery.trim(),
@@ -659,6 +662,8 @@ export function AddEditOrderPage() {
     } catch (error) {
       console.error('Error fetching products:', error)
       setProductList([])
+    } finally {
+      setIsLoadingProducts(false)
     }
   }
 
@@ -1525,6 +1530,11 @@ export function AddEditOrderPage() {
                       {!(orderFormData.supplier_id || selectedSupplier?.id) ? (
                         <div className="p-3 text-sm text-muted-foreground text-center">
                           Please select a supplier first
+                        </div>
+                      ) : isLoadingProducts ? (
+                        <div className="p-3 flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mr-2"></div>
+                          <span className="text-sm text-muted-foreground">Loading products...</span>
                         </div>
                       ) : productList.filter((p: any) => !selectedProducts.find(sp => sp.id === p.id)).length > 0 ? (
                         productList

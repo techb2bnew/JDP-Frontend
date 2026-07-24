@@ -3611,27 +3611,51 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
   const buildInvoiceTotalsSummaryHtml = (
     materialTotal: number,
     laborCost?: number | string | null,
+    paymentCredits: number = 0,
+    balanceDue?: number,
   ) => {
     const labor = resolveInvoiceLaborCost(laborCost);
     const showLabor = hasApiLaborCost(laborCost);
     const grand = materialTotal + (showLabor ? labor : 0);
-    let html = `
-      <div style="display:flex;justify-content:space-between;margin-top:0;min-width:220px;font-size:14px;color:#4b5563;">
+    const resolvedBalanceDue =
+      typeof balanceDue === "number"
+        ? balanceDue
+        : (showLabor ? grand : materialTotal) - (paymentCredits || 0);
+
+    let rows = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;width:100%;font-size:14px;color:#4b5563;">
         <span>Total:</span>
-        <span style="font-weight:700;color:#1f2937;">$${materialTotal.toFixed(2)}</span>
+        <span style="color:#111827;">$${materialTotal.toFixed(2)}</span>
       </div>`;
+
     if (showLabor) {
-      html += `
-        <div style="display:flex;justify-content:space-between;margin-top:8px;min-width:220px;font-size:14px;color:#4b5563;">
+      rows += `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;width:100%;font-size:14px;color:#4b5563;">
           <span>Total Labor Cost:</span>
-          <span>$${labor.toFixed(2)}</span>
+          <span style="color:#4b5563;">$${labor.toFixed(2)}</span>
         </div>
-        <div style="display:flex;justify-content:space-between;margin-top:8px;min-width:220px;font-size:14px;color:#4b5563;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;width:100%;font-size:14px;color:#4b5563;">
           <span>Total Material + Labor:</span>
-          <span style="font-weight:700;color:#1f2937;">$${grand.toFixed(2)}</span>
+          <span style="color:#4b5563;">$${grand.toFixed(2)}</span>
         </div>`;
     }
-    return html;
+
+    rows += `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;width:100%;font-size:14px;color:#4b5563;">
+        <span>Payments / Credits:</span>
+        <span style="color:#4b5563;">$${(paymentCredits || 0).toFixed(2)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;width:100%;font-size:14px;color:#4b5563;">
+        <span >Balance Due:</span>
+        <span style="color:#4b5563;">$${resolvedBalanceDue.toFixed(2)}</span>
+      </div>`;
+
+    return `
+      <div style="display:flex;justify-content:flex-end;margin-top:20px;width:100%;">
+        <div style="width:240px;max-width:100%;text-align:left;">
+          ${rows}
+        </div>
+      </div>`;
   };
 
   const formatCurrencyWholeUSD = (amount: number) =>
@@ -4256,9 +4280,10 @@ const buildGroupedInvoiceRowsForPrint = (products: any[] = []) => {
   const groupedMap: Record<string, any[]> = {};
 
   products.forEach((item: any) => {
-    const productName = String(item.product_name || item.item || "").trim();
+    // Match View Invoice: skip header rows and blank product placeholders
+    if (item?.type === "header") return;
 
-    // print me blank/header placeholder product rows skip kar do
+    const productName = String(item.product_name || item.item || "").trim();
     if (!productName) return;
 
     const headerName =
@@ -4266,17 +4291,23 @@ const buildGroupedInvoiceRowsForPrint = (products: any[] = []) => {
       item.parentHeaderName ||
       null;
 
+    // Same qty/rate/total helpers as View Invoice preview
+    const qty = getPreviewLineItemQty(item);
+    const rate = Number(
+      item?.rate ?? item?.jdp_price ?? item?.unit_cost ?? 0,
+    );
+    const total = getPreviewLineItemAmount({
+      ...item,
+      qty,
+      rate,
+    });
+
     const normalizedItem = {
-      qty: Number(item.stock_quantity || item.qty || 1),
+      qty,
       item: productName,
       description: item.description || "",
-      rate: Number(item.jdp_price || item.unit_cost || item.rate || 0),
-      total: Number(
-        (
-          Number(item.stock_quantity || item.qty || 1) *
-          Number(item.jdp_price || item.unit_cost || item.rate || 0)
-        ).toFixed(2),
-      ),
+      rate,
+      total,
       parent_header_name: headerName,
     };
 
@@ -5055,6 +5086,30 @@ const handlePrintInvoice = async (invoice: any) => {
   console.log(invoice, "invoice");
 
   try {
+    // Same data source as View Invoice popup
+    const response = await apiClient.getEstimateById(invoice.id);
+    const invoiceData = response?.data || response;
+
+    // Same line-item build + totals logic as View Invoice preview
+    const lineItems =
+      invoiceData.products && invoiceData.products.length > 0
+        ? buildLineItemsFromProducts(invoiceData.products)
+        : [];
+
+    const groupedPrintRows = buildGroupedInvoiceRowsForPrint(lineItems);
+
+    const materialTotal = lineItems.reduce((sum: number, item: any) => {
+      if (item.type === "header") return sum;
+      return sum + getPreviewLineItemAmount(item);
+    }, 0);
+
+    const laborCost = invoiceData.total_labor_cost;
+    const paymentCredits = Number(invoiceData.payment_credits || 0);
+    const balanceDue =
+      (hasApiLaborCost(laborCost)
+        ? materialTotal + resolveInvoiceLaborCost(laborCost)
+        : materialTotal) - paymentCredits;
+
     const tempElement = document.createElement("div");
     tempElement.id = "temp-invoice-preview";
     tempElement.style.position = "absolute";
@@ -5067,10 +5122,6 @@ const handlePrintInvoice = async (invoice: any) => {
     tempElement.style.fontFamily = "Arial, sans-serif";
     tempElement.style.lineHeight = "1.2";
     tempElement.style.boxSizing = "border-box";
-
-    const groupedPrintRows = buildGroupedInvoiceRowsForPrint(
-      invoice.products || []
-    );
 
     const invoiceHtml = `
       <div style="
@@ -5144,7 +5195,7 @@ const handlePrintInvoice = async (invoice: any) => {
                   font-weight:700;
                   text-transform:capitalize;
                 ">
-                  ${invoice.invoice_type || "Estimate"} #
+                  ${invoiceData.invoice_type || invoice.invoice_type || "Estimate"} #
                 </div>
                 <div style="
                   background:#fff;
@@ -5158,7 +5209,7 @@ const handlePrintInvoice = async (invoice: any) => {
                   font-size:16px;
                   font-weight:700;
                 ">
-                  ${InvoioiceNumber || "INV-2025-029"}
+                  ${invoiceData.invoice_number || invoice.invoice_number || InvoioiceNumber || "INV-2025-029"}
                 </div>
               </div>
             </div>
@@ -5498,38 +5549,12 @@ const handlePrintInvoice = async (invoice: any) => {
             </tbody>
           </table>
 
-          <div style="display:flex; justify-content:flex-end; margin-top:20px;">
-            ${buildInvoiceTotalsSummaryHtml(
-              Number(invoice.total_amount) || 0,
-              invoice.total_labor_cost,
-            )}
-          </div>
-
-          <div style="display:flex; justify-content:flex-end; margin-top:16px;">
-            <div style="text-align:right; min-width:220px;">
-              <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-                <span style="font-size:14px; color:#374151;">Payments / Credits:</span>
-                <span style="font-size:14px; color:#374151;">$${(invoice.payment_credits || 0).toFixed(2)}</span>
-              </div>
-              <div style="
-                display:flex;
-                justify-content:space-between;
-                background:#f3f4f6;
-                padding:10px 12px;
-                border-radius:4px;
-              ">
-                <span style="font-weight:700; font-size:14px; color:#374151;">
-                  Balance Due:
-                </span>
-                <span style="font-weight:700; font-size:14px; color:#374151;">
-                  $${parseFloat(
-                    invoice.balance_due ||
-                      getEstimateDisplayTotal(invoice).toString(),
-                  ).toFixed(2)}
-                </span>
-              </div>
-            </div>
-          </div>
+          ${buildInvoiceTotalsSummaryHtml(
+            materialTotal,
+            laborCost,
+            paymentCredits,
+            balanceDue,
+          )}
         </div>
 
         <div style="
