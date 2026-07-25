@@ -292,7 +292,11 @@ export function BlueSheetApprovalDialog({
       invoiceApprovalNotesRef.current = seedNotes
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
-  }, [isOpen, blueSheet]);
+    // Keyed on the BlueSheet id (not the `blueSheet` object reference) so an
+    // incidental parent re-render that creates a new `blueSheet` object for
+    // the same record doesn't wipe out in-progress edits (e.g. a newly added
+    // custom header + product in the Final Review step) before they're saved.
+  }, [isOpen, getBlueSheetId(blueSheet)]);
 
   useEffect(() => {
     invoiceApprovalNotesRef.current = String(invoiceApprovalNotes ?? "");
