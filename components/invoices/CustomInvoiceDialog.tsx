@@ -1189,6 +1189,9 @@ console.log(totalAmount,"amounttt");
         description: p.description || "",
         rate: p.jdp_price || p.unit_cost || 0,
         total: p.total_cost || 0,
+        type: "item",
+        parentHeaderKey: null,
+        parentHeaderName: p.parent_header_name || p.section_name || null,
       }));
 
       await sendInvoiceToCustomer(
@@ -1219,7 +1222,16 @@ console.log(totalAmount,"amounttt");
   // Send invoice to customer function
   const sendInvoiceToCustomer = async (
     invoiceId: number,
-    lineItemsOverride?: { qty: number; item: string; description: string; rate: number; total: number }[],
+    lineItemsOverride?: {
+      qty: number
+      item: string
+      description: string
+      rate: number
+      total: number
+      type?: string
+      parentHeaderKey?: string | null
+      parentHeaderName?: string | null
+    }[],
     inlineInvoiceOverride?: any
   ) => {
     try {
@@ -1280,12 +1292,21 @@ console.log(totalAmount,"amounttt");
         currentJob?.email ||
         'customer@example.com';
  
-      let lineItemsSource: { qty: number; item: string; description: string; rate: number; total: number }[] = []
+      let lineItemsSource: {
+        qty: number
+        item: string
+        description: string
+        rate: number
+        total: number
+        type?: string
+        parentHeaderKey?: string | null
+        parentHeaderName?: string | null
+      }[] = []
       if (lineItemsOverride && lineItemsOverride.length > 0) {
         lineItemsSource = lineItemsOverride
       } else {
         const customProducts = (viewInvoiceData as any)?.custom_products as any[] | undefined
-        if (customProducts && customProducts.length > 0) {          
+        if (customProducts && customProducts.length > 0) {
           lineItemsSource = customProducts.map((p: any) => {
             const qty = Number(p.stock_quantity) || 1
             const rate = Number(p.jdp_price || p.unit_cost || p.estimated_price || p.total_cost || 0)
@@ -1296,6 +1317,9 @@ console.log(totalAmount,"amounttt");
               description: p.description || '',
               rate,
               total,
+              type: 'item',
+              parentHeaderKey: null,
+              parentHeaderName: p.parent_header_name || p.section_name || null,
             }
           })
         } else {
@@ -1307,6 +1331,9 @@ console.log(totalAmount,"amounttt");
             description: item.description || '',
             rate: item.rate || 0,
             total: getLineItemAmount(item),
+            type: item.type || 'item',
+            parentHeaderKey: item.parentHeaderKey || null,
+            parentHeaderName: item.parentHeaderName || null,
           }))
         }
       }
@@ -1363,6 +1390,9 @@ console.log(totalAmount,"amounttt");
           return {
             qty: qtyNum,
             item: item.item,
+            type: item.type || 'item',
+            parentHeaderKey: item.parentHeaderKey || null,
+            parentHeaderName: item.parentHeaderName || null,
             description: item.description,
             rate: rateNum,
             total: roundMoney(qtyNum * rateNum),

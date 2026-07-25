@@ -1476,6 +1476,10 @@ export const NewInvoiceDialog = ({
         currentJob,
       });
 
+      const sendLaborCost = hasApiLaborCost(inlineInvoiceData.totalLaborCost)
+        ? resolveInvoiceLaborCost(inlineInvoiceData.totalLaborCost)
+        : 0;
+
       const payload: any = {
         estimateNumber: inlineInvoiceData.estimateNumber || "Draft",
         estimateDate: new Date(inlineInvoiceData.date).toLocaleDateString(
@@ -1533,7 +1537,8 @@ export const NewInvoiceDialog = ({
             : inlineInvoiceData.invoiceType,
         ),
         subtotal: calculateInvoiceSubtotal(),
-        total: calculateInvoiceSubtotal(),
+        total_labor_cost: sendLaborCost,
+        total: calculateInvoiceSubtotal() + sendLaborCost,
       };
 
       // Add customer_id or contractor_id based on job type
@@ -2393,6 +2398,10 @@ const validateLineItems = (lineItems: any[] = []) => {
           : "") ||
         String(inlineInvoiceData.customerAddress || "").trim();
 
+      const previewLaborCost = hasApiLaborCost(inlineInvoiceData.totalLaborCost)
+        ? resolveInvoiceLaborCost(inlineInvoiceData.totalLaborCost)
+        : 0;
+
       const payload: any = {
         ...(payloadJobId != null ? { job_id: payloadJobId } : {}),
         estimate_title:
@@ -2418,7 +2427,8 @@ const validateLineItems = (lineItems: any[] = []) => {
         status: "draft",
         invoice_type: mapInvoiceTypeToAPI(inlineInvoiceData.invoiceType),
         custom_products: customProducts,
-        total_amount: subtotal,
+        total_labor_cost: previewLaborCost,
+        total_amount: subtotal + previewLaborCost,
         estimate_source_type: estimateCost
           ? "estimate_job"
           : "time_material_job",
@@ -4409,9 +4419,16 @@ const validateLineItems = (lineItems: any[] = []) => {
 
                     <tbody>
                       {(() => {
-                        const orderedRows = buildInvoicePreviewRows(
+                        const explicitHeaderRows = buildInvoicePreviewRows(
                           inlineInvoiceData.lineItems || [],
                         );
+                        const orderedRows = explicitHeaderRows.some(
+                          (row: any) => row.type === "synthetic-header",
+                        )
+                          ? explicitHeaderRows
+                          : groupLineItemsByParentHeader(
+                              inlineInvoiceData.lineItems || [],
+                            );
 
                         return orderedRows.map(
                           (lineItem: any, index: number) => {
@@ -4464,13 +4481,73 @@ const validateLineItems = (lineItems: any[] = []) => {
                     </tbody>
                   </table>
 
-                  <div className="flex justify-end mt-3">
-                    <div className="text-right">
-                      <div className="font-bold text-base">
-                        ${calculateInvoiceSubtotal().toFixed(2)}
+                  {(() => {
+                    const previewSubtotal = calculateInvoiceSubtotal();
+                    const previewPaymentCredits =
+                      Number(inlineInvoiceData.paymentCredits) || 0;
+                    const previewHasLabor = hasApiLaborCost(
+                      inlineInvoiceData.totalLaborCost,
+                    );
+                    const previewLaborCostValue = resolveInvoiceLaborCost(
+                      inlineInvoiceData.totalLaborCost,
+                    );
+                    const previewGrandTotal =
+                      previewSubtotal +
+                      (previewHasLabor ? previewLaborCostValue : 0);
+                    const previewBalanceDue =
+                      previewGrandTotal - previewPaymentCredits;
+
+                    return (
+                      <div className="flex justify-end mt-3">
+                        <div className="text-right min-w-[200px]">
+                          <div className="flex justify-between mb-1.5">
+                            <span className="text-sm text-gray-700">
+                              Total:
+                            </span>
+                            <span className="text-sm text-gray-700">
+                              ${previewSubtotal.toFixed(2)}
+                            </span>
+                          </div>
+                          {previewHasLabor && (
+                            <>
+                              <div className="flex justify-between mb-1.5">
+                                <span className="text-sm text-gray-700">
+                                  Total Labor Cost:
+                                </span>
+                                <span className="text-sm text-gray-700">
+                                  ${previewLaborCostValue.toFixed(2)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between mb-1.5">
+                                <span className="text-sm text-gray-700">
+                                  Total Material + Labor:
+                                </span>
+                                <span className="text-sm text-gray-700">
+                                  ${previewGrandTotal.toFixed(2)}
+                                </span>
+                              </div>
+                            </>
+                          )}
+                          <div className="flex justify-between mb-1.5">
+                            <span className="text-sm text-gray-700">
+                              Payments / Credits:
+                            </span>
+                            <span className="text-sm text-gray-700">
+                              ${previewPaymentCredits.toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between bg-gray-100 px-3 py-2 rounded">
+                            <span className="font-bold text-sm text-gray-700">
+                              Balance Due:
+                            </span>
+                            <span className="font-bold text-sm text-gray-700">
+                              ${previewBalanceDue.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Notes Section */}
