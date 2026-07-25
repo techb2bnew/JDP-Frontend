@@ -1191,23 +1191,29 @@ export function NotificationsPage() {
         // Collect all labor and lead labor IDs from all selected jobs
         const allLaborIds = new Set<number | string>()
         const allLeadLaborIds = new Set<number | string>()
+        const jobsMissingLaborInfo: any[] = []
 
         selectedJobs.forEach((job) => {
           // Try to get IDs from arrays first
           const labor = (job.assignedLabor || []).map((l: any) => l.id).filter(Boolean)
           const leadLabor = (job.assignedLeadLabor || []).map((l: any) => l.id).filter(Boolean)
 
+          let laborFound = false
+          let leadLaborFound = false
+
           // If arrays have data, use them
           if (labor.length > 0) {
             labor.forEach((id: number | string) => allLaborIds.add(id))
+            laborFound = true
           } else if (job.assigned_labor_ids) {
             // Fallback: parse from string if array is empty
             try {
-              const parsed = typeof job.assigned_labor_ids === 'string' 
-                ? JSON.parse(job.assigned_labor_ids) 
+              const parsed = typeof job.assigned_labor_ids === 'string'
+                ? JSON.parse(job.assigned_labor_ids)
                 : job.assigned_labor_ids
               if (Array.isArray(parsed) && parsed.length > 0) {
                 parsed.forEach((id: number | string) => allLaborIds.add(id))
+                laborFound = true
               }
             } catch (e) {
               console.error('Error parsing assigned_labor_ids:', e)
@@ -1216,6 +1222,7 @@ export function NotificationsPage() {
 
           if (leadLabor.length > 0) {
             leadLabor.forEach((id: number | string) => allLeadLaborIds.add(id))
+            leadLaborFound = true
           } else if (job.assigned_lead_labor_ids) {
             // Fallback: parse from string if array is empty
             try {
@@ -1224,19 +1231,66 @@ export function NotificationsPage() {
                 : job.assigned_lead_labor_ids
               if (Array.isArray(parsed) && parsed.length > 0) {
                 parsed.forEach((id: number | string) => allLeadLaborIds.add(id))
+                leadLaborFound = true
               }
             } catch (e) {
               console.error('Error parsing assigned_lead_labor_ids:', e)
             }
           }
+
+          // Job search results don't always include assigned labor/lead labor,
+          // so re-fetch full job details for jobs where nothing was found.
+          if (!laborFound && !leadLaborFound) {
+            jobsMissingLaborInfo.push(job)
+          }
         })
+
+        if (jobsMissingLaborInfo.length > 0) {
+          const authData = localStorage.getItem('jdp_auth')
+          const token = authData ? JSON.parse(authData).token : null
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+          if (token) headers['Authorization'] = `Bearer ${token}`
+
+          await Promise.all(
+            jobsMissingLaborInfo.map(async (job) => {
+              try {
+                const res = await fetch(`${apiBaseUrl}/job/getJobById/${job.id}`, {
+                  method: 'GET',
+                  headers
+                })
+                if (!res.ok) return
+                const result = await res.json()
+                const jobData = result?.data
+                if (!jobData) return
+
+                ;(jobData.assigned_labor || []).forEach((l: any) => {
+                  if (l?.id) allLaborIds.add(l.id)
+                })
+                ;(jobData.assigned_lead_labor || []).forEach((ll: any) => {
+                  if (ll?.id) allLeadLaborIds.add(ll.id)
+                })
+              } catch (e) {
+                console.error('Error fetching job details for notification recipients:', e)
+              }
+            })
+          )
+        }
 
         laborIds = Array.from(allLaborIds)
         leadLaborIds = Array.from(allLeadLaborIds)
-        
+
         // If only one job selected, include job_id
         if (selectedJobs.length === 1) {
           jobId = selectedJobs[0].id
+        }
+
+        if (laborIds.length === 0 && leadLaborIds.length === 0) {
+          setFormErrors((prev) => ({
+            ...prev,
+            roles: 'Selected job(s) have no assigned labor or lead labor to notify'
+          }))
+          setIsSending(false)
+          return
         }
       }
 
