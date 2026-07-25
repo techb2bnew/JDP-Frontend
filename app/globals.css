@@ -193,3 +193,7 @@ body{
   z-index: 0;
   position: relative;
 }
+.job-select-box-1 .select-1-new{
+  height: 130px !important;
+  z-index: 999999999999 !important;
+}

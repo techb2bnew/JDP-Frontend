@@ -208,7 +208,8 @@ export function AutoScrollMultiSelect({
             <div
               ref={scrollContainerRef}
               onScroll={handleScroll}
-              className="max-h-64 overflow-y-auto"
+              className="max-h-64 overflow-y-auto select-1-new"
+              style={{ maxHeight: '200px' }}
             >
               {isLoading ? (
                 <div className="flex items-center justify-center p-4">

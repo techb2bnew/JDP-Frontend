@@ -7377,7 +7377,7 @@ const handlePrintInvoice = async (invoice: any) => {
           {/* Left Column - Job Details */}
           {/* Job Details Card */}
           <div className="w-[70%]">
-            <Card className="gap-0 overflow-hidden">
+            <Card className="gap-0 ">
               <CardHeader className="flex flex-row items-center justify-between bg-gray-100 px-6 py-4 rounded-t-lg">
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
@@ -7651,7 +7651,7 @@ const handlePrintInvoice = async (invoice: any) => {
                   </div>
 
                   {canAssignLeadLabor && (
-                    <div>
+                    <div  className="job-select-box-1">
                     <Label className="flex items-center gap-2 mb-2">
                       <UserCheck className="h-4 w-4 text-[#00A1FF]" />
                       Assigned Lead Labor
@@ -7731,7 +7731,7 @@ const handlePrintInvoice = async (invoice: any) => {
                   )}
 
                   {canAssignLabor && (
-                    <div>
+                    <div className="job-select-box-1">
                     <Label className="flex items-center gap-2 mb-2">
                       <Users className="h-4 w-4 text-[#00A1FF]" />
                       Assigned Labor
