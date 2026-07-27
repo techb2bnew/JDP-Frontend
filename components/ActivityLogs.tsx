@@ -118,6 +118,7 @@ type ApiBlueSheet = {
 
 type ApiInvoiceActivity = {
   estimate_id: number;
+  invoice_type?: string;
   invoice_number: string;
   status: string;
   invoice_sent_at?: string;
@@ -802,77 +803,153 @@ const resolveActor = (
   return "Unknown user";
 };
 
-/** "EST-2026-009" -> "Estimate"; any other prefix (PRO/DOWN/ROUGH/FINAL invoice numbers) -> "Invoice". */
-const getInvoiceDocumentLabel = (invoiceNumber?: string): string => {
+/** Same labels used elsewhere in the app (JobDetailsPage/CustomInvoiceDialog typeMapping). */
+const invoiceTypeLabels: Record<string, string> = {
+  estimate: "Estimate",
+  down_payment: "Down Payment Invoice",
+  proposal_invoice: "Rough Invoice",
+  rough_invoice: "Rough Invoice",
+  progressive_invoice: "Progressive Invoice",
+  final_invoice: "Final Invoice",
+};
+
+/**
+ * Prefer the explicit `invoice_type` the API now returns so the timeline
+ * shows the specific document kind ("Progressive Invoice Sent" instead of
+ * just "Invoice Sent"). Falls back to guessing "Estimate"/"Invoice" from the
+ * invoice number prefix ("EST-...") for older payloads without invoice_type.
+ */
+const getInvoiceDocumentLabel = (
+  invoiceType?: string,
+  invoiceNumber?: string,
+): string => {
+  const type = (invoiceType || "").toLowerCase();
+  if (type) {
+    if (invoiceTypeLabels[type]) return invoiceTypeLabels[type];
+    const titleCased = type
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+    return titleCased.toLowerCase().includes("invoice")
+      ? titleCased
+      : `${titleCased} Invoice`;
+  }
+
   const prefix = (invoiceNumber || "").split("-")[0]?.toUpperCase();
   return prefix === "EST" ? "Estimate" : "Invoice";
 };
 
+type InvoiceActivityEvent = {
+  type: ActivityType;
+  title: string;
+  description: string;
+  sortDate?: string;
+};
+
 /**
- * The API currently exposes each estimate/invoice's *current* status (plus
- * when it was last sent) rather than a full event log, so one entry maps to
- * one timeline item reflecting that current status. If the backend later
- * adds created_at/approved_at/rejected_at/paid_at/cancelled_at timestamps,
- * those are already picked up above for sorting.
+ * The API can report several timestamps on a single estimate/invoice record
+ * (created_at, invoice_sent_at, approved_at, rejected_at, paid_at,
+ * cancelled_at, updated_at). Each one that is present represents a distinct
+ * moment in that document's history, so we emit one timeline entry per
+ * timestamp instead of collapsing everything into just the current status.
  */
-const buildInvoiceActivityContent = (
+const buildInvoiceActivityEvents = (
   invoice: ApiInvoiceActivity,
   docLabel: string,
-  actor: string,
-): { type: ActivityType; title: string; description: string } => {
+  createdByActor: string,
+  sentByActor: string,
+  updatedByActor: string,
+): InvoiceActivityEvent[] => {
   const status = (invoice.status || "").toLowerCase();
   const recipient = formatIfEmail(invoice.invoice_sent_to);
+  const events: InvoiceActivityEvent[] = [];
 
-  switch (status) {
-    case "paid":
-      return {
-        type: "invoice_paid",
-        title: `${docLabel} Paid`,
-        description: `${docLabel} ${invoice.invoice_number} was marked as paid.`,
-      };
-    case "approved":
-      return {
-        type: "estimate_approved",
-        title: `${docLabel} Approved`,
-        description: `${docLabel} ${invoice.invoice_number} was approved.`,
-      };
-    case "rejected":
-    case "declined":
-      return {
-        type: "estimate_rejected",
-        title: `${docLabel} Rejected`,
-        description: `${docLabel} ${invoice.invoice_number} was rejected.`,
-      };
-    case "cancelled":
-    case "canceled":
-      return {
-        type: "invoice_cancelled",
-        title: `${docLabel} Cancelled`,
-        description: `${docLabel} ${invoice.invoice_number} was cancelled.`,
-      };
-    case "draft":
-      return {
-        type: "invoice_created",
-        title: `${docLabel} Created`,
-        description: `${actor} created ${docLabel.toLowerCase()} ${invoice.invoice_number}.`,
-      };
-    case "sent":
-      return {
-        type: "invoice_generated",
-        title: `${docLabel} Sent`,
-        description: `${actor} sent ${docLabel.toLowerCase()} ${invoice.invoice_number}${
-          recipient ? ` to ${recipient}` : ""
-        }.`,
-      };
-    default:
-      return {
-        type: "invoice_updated",
-        title: `${docLabel} Updated`,
-        description: `${docLabel} ${invoice.invoice_number} status changed to "${
-          invoice.status || "unknown"
-        }".`,
-      };
+  if (invoice.created_at) {
+    events.push({
+      type: "invoice_created",
+      title: `${docLabel} Created`,
+      description: `${createdByActor} created ${docLabel.toLowerCase()} ${invoice.invoice_number}.`,
+      sortDate: invoice.created_at,
+    });
   }
+
+  if (invoice.invoice_sent_at) {
+    events.push({
+      type: "invoice_generated",
+      title: `${docLabel} Sent`,
+      description: `${sentByActor} sent ${docLabel.toLowerCase()} ${invoice.invoice_number}${
+        recipient ? ` to ${recipient}` : ""
+      }.`,
+      sortDate: invoice.invoice_sent_at,
+    });
+  }
+
+  if (status === "approved" || invoice.approved_at) {
+    events.push({
+      type: "estimate_approved",
+      title: `${docLabel} Approved`,
+      description: `${docLabel} ${invoice.invoice_number} was approved.`,
+      sortDate: invoice.approved_at || invoice.updated_at,
+    });
+  }
+
+  if (status === "rejected" || status === "declined" || invoice.rejected_at) {
+    events.push({
+      type: "estimate_rejected",
+      title: `${docLabel} Rejected`,
+      description: `${docLabel} ${invoice.invoice_number} was rejected.`,
+      sortDate: invoice.rejected_at || invoice.updated_at,
+    });
+  }
+
+  if (status === "paid" || invoice.paid_at) {
+    events.push({
+      type: "invoice_paid",
+      title: `${docLabel} Paid`,
+      description: `${docLabel} ${invoice.invoice_number} was marked as paid.`,
+      sortDate: invoice.paid_at || invoice.updated_at,
+    });
+  }
+
+  if (status === "cancelled" || status === "canceled" || invoice.cancelled_at) {
+    events.push({
+      type: "invoice_cancelled",
+      title: `${docLabel} Cancelled`,
+      description: `${docLabel} ${invoice.invoice_number} was cancelled.`,
+      sortDate: invoice.cancelled_at || invoice.updated_at,
+    });
+  }
+
+  const hasTerminalEvent = events.some(
+    (e) => e.type !== "invoice_created" && e.type !== "invoice_generated"
+  );
+
+  if (
+    !hasTerminalEvent &&
+    invoice.updated_at &&
+    invoice.updated_at !== invoice.created_at
+  ) {
+    events.push({
+      type: "invoice_updated",
+      title: `${docLabel} Updated`,
+      description: `${updatedByActor} updated ${docLabel.toLowerCase()} ${
+        invoice.invoice_number
+      } (status: "${invoice.status || "unknown"}").`,
+      sortDate: invoice.updated_at,
+    });
+  }
+
+  if (events.length === 0) {
+    events.push({
+      type: "invoice_updated",
+      title: `${docLabel} Updated`,
+      description: `${docLabel} ${invoice.invoice_number} status changed to "${
+        invoice.status || "unknown"
+      }".`,
+      sortDate: invoice.updated_at || invoice.created_at,
+    });
+  }
+
+  return events;
 };
 
 const mapApiResponseToActivities = (
@@ -1007,42 +1084,59 @@ const mapApiResponseToActivities = (
 
   if (activityAudit?.invoice_activity?.length) {
     activityAudit.invoice_activity.forEach((invoice, index) => {
-      const actor = resolveActor(
+      const createdByActor = resolveActor(
+        invoice.created_by_user,
         invoice.sent_by_user,
         invoice.updated_by_user,
+        job.created_by_user,
+        job.created_by_name,
+      );
+      const sentByActor = resolveActor(
+        invoice.sent_by_user,
+        invoice.created_by_user,
+        invoice.updated_by_user,
+        job.updated_by_user,
+        job.updated_by_name,
+      );
+      const updatedByActor = resolveActor(
+        invoice.updated_by_user,
+        invoice.sent_by_user,
         invoice.created_by_user,
         job.updated_by_user,
         job.updated_by_name,
         job.created_by_user,
         job.created_by_name,
       );
-      const sortDate =
-        invoice.updated_at ||
-        invoice.approved_at ||
-        invoice.rejected_at ||
-        invoice.paid_at ||
-        invoice.cancelled_at ||
-        invoice.invoice_sent_at ||
-        invoice.created_at ||
-        job.updated_at ||
-        job.created_at;
 
-      const docLabel = getInvoiceDocumentLabel(invoice.invoice_number);
-      const { type, title, description } = buildInvoiceActivityContent(
+      const docLabel = getInvoiceDocumentLabel(
+        invoice.invoice_type,
+        invoice.invoice_number,
+      );
+      const events = buildInvoiceActivityEvents(
         invoice,
         docLabel,
-        actor,
+        createdByActor,
+        sentByActor,
+        updatedByActor,
       );
 
-      result.push({
-        id: `invoice-${invoice.estimate_id}-${index}`,
-        title,
-        description,
-        dateLabel: formatDateLabel(sortDate),
-        userName: actor,
-        type,
-        sortDate,
-        priority: activityPriority[type],
+      events.forEach((event, eventIndex) => {
+        const sortDate = event.sortDate || job.updated_at || job.created_at;
+        result.push({
+          id: `invoice-${invoice.estimate_id}-${index}-${eventIndex}`,
+          title: event.title,
+          description: event.description,
+          dateLabel: formatDateLabel(sortDate),
+          userName:
+            event.type === "invoice_created"
+              ? createdByActor
+              : event.type === "invoice_generated"
+                ? sentByActor
+                : updatedByActor,
+          type: event.type,
+          sortDate,
+          priority: activityPriority[event.type],
+        });
       });
     });
   }
