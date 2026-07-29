@@ -775,7 +775,7 @@ export function DashboardOverview() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={projectStatusData}
+                    data={projectStatusData.filter((item) => Number(item.value) > 0)}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
@@ -788,11 +788,18 @@ export function DashboardOverview() {
                     dataKey="value"
                     stroke="none"
                   >
-                    {projectStatusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
+                    {projectStatusData
+                      .filter((item) => Number(item.value) > 0)
+                      .map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip
+                    formatter={(value, name) => [
+                      `${Number(value).toFixed(2)}%`,
+                      name,
+                    ]}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>

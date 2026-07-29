@@ -129,10 +129,12 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
     name: '',
     email: '',
     phone: '',
+    contactPerson: '',
     company: '',
-    address: ''
+    address: '',
+    status: 'active'
   })
-  const [entityErrors, setEntityErrors] = useState<{ name?: string; email?: string; phone?: string }>({})
+  const [entityErrors, setEntityErrors] = useState<{ name?: string; email?: string; phone?: string; address?: string; company?: string }>({})
   const [customerRefreshKey, setCustomerRefreshKey] = useState(0)
   const [contractorRefreshKey, setContractorRefreshKey] = useState(0)
   const JOB_ENTITY_SELECT_PAGE_SIZE = 10
@@ -593,8 +595,10 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
       name: '',
       email: '',
       phone: '',
+      contactPerson: '',
       company: '',
       address: '',
+      status: 'active',
     })
     setEntityErrors({})
     setIsAddEntityOpen(true)
@@ -608,17 +612,24 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
       return
     }
 
+    const isCustomer = addEntityType === 'customer'
     const newErrors: typeof entityErrors = {}
     if (!entityForm.name.trim()) {
-      newErrors.name = 'Name is required'
+      newErrors.name = isCustomer ? 'Customer name is required' : 'Contractor name is required'
     }
     if (!entityForm.email.trim()) {
       newErrors.email = 'Email is required'
     } else if (!validateEmail(entityForm.email)) {
-      newErrors.email = 'Please enter a valid email'
+      newErrors.email = 'Please enter a valid email address'
     }
     if (!entityForm.phone.trim()) {
-      newErrors.phone = 'Phone is required'
+      newErrors.phone = 'Phone number is required'
+    }
+    if (!entityForm.company.trim()) {
+      newErrors.company = 'Company name is required'
+    }
+    if (isCustomer && !entityForm.address.trim()) {
+      newErrors.address = 'Address is required'
     }
     setEntityErrors(newErrors)
     if (Object.keys(newErrors).length > 0) {
@@ -638,9 +649,9 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
           company_name: entityForm.company || '',
           email: entityForm.email.toLowerCase(),
           phone: formatPhoneForPayload(entityForm.phone) || '',
-          contact_person: '',
+          contact_person: entityForm.contactPerson || '',
           address: entityForm.address || '',
-          status: 'active',
+          status: entityForm.status || 'active',
           system_ip
         }
         const response = await globalApiCall(`${apiBaseUrl}/customer/createCustomer`, {
@@ -694,7 +705,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
           email: entityForm.email.toLowerCase(),
           phone: formatPhoneForPayload(entityForm.phone) || '',
           address: entityForm.address || '',
-          status: 'active',
+          status: entityForm.status || 'active',
           system_ip
         }
         const response = await globalApiCall(`${apiBaseUrl}/contractor/createContractor`, {
@@ -1654,39 +1665,39 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
             <div>
-              <h4 className="font-medium text-[#2b2b2b] mb-2">Job Information</h4>
+              <h4 className="font-semibold text-[#2b2b2b] mb-2">Job Information</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Type:</span>
+                  <span className="font-semibold text-[#2b2b2b]">Type:</span>
                   <Badge className="bg-[#E6F6FF] text-[#00A1FF] border-[#00A1FF]/20">
                     {formData.type === 'service-based' ? 'Service-Based' : 'Contract-Based'}
                   </Badge>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Title:</span>
-                  <span className="font-medium">{formData.title}</span>
+                  <span className="font-semibold text-[#2b2b2b]">Title:</span>
+                  <span className="text-gray-600">{formData.title}</span>
                 </div>
                 {formData.type === 'service-based' && formData.customer && (
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Customer:</span>
-                    <span className="font-medium">
+                    <span className="font-semibold text-[#2b2b2b]">Customer:</span>
+                    <span className="text-gray-600">
                       {formData.customerName || selectedCustomerName || `Customer ID: ${formData.customer}`}
                     </span>
                   </div>
                 )}
                 {formData.contractor && (
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Contractor:</span>
-                    <span className="font-medium">
+                    <span className="font-semibold text-[#2b2b2b]">Contractor:</span>
+                    <span className="text-gray-600">
                       {formData.contractorName || selectedContractorName || `Contractor ID: ${formData.contractor}`}
                     </span>
                   </div>
-                )} 
+                )}
               </div>
             </div>
 
             <div>
-              <h4 className="font-medium text-[#2b2b2b] mb-2">Description</h4>
+              <h4 className="font-semibold text-[#2b2b2b] mb-2">Description</h4>
               <div
                 ref={jobReviewDescriptionBoxRef}
                 className="relative w-full min-w-0 max-w-full"
@@ -1725,20 +1736,20 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
             {/* Location Information */}
             <div>
-              <h4 className="font-medium text-[#2b2b2b] mb-2">Location Information</h4>
+              <h4 className="font-semibold text-[#2b2b2b] mb-2">Location Information</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Address:</span>
-                  <p className="font-medium">{formData.address}</p>
+                  <span className="font-semibold text-[#2b2b2b]">Address:</span>
+                  <p className="text-gray-600">{formData.address}</p>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">City & Zip:</span>
-                  <p className="font-medium">{formData.cityZip}</p>
+                  <span className="font-semibold text-[#2b2b2b]">City & Zip:</span>
+                  <p className="text-gray-600">{formData.cityZip}</p>
                 </div>
                 {formData.phone && (
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Phone:</span>
-                    <span className="font-medium">{formData.phone}</span>
+                    <span className="font-semibold text-[#2b2b2b]">Phone:</span>
+                    <span className="text-gray-600">{formData.phone}</span>
                   </div>
                 )}
                 {/* {formData.email && (
@@ -1753,29 +1764,29 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             {/* Bill To Information */}
             {(formData.billToAddress || formData.sameAsAddress) && (
               <div>
-                <h4 className="font-medium text-[#2b2b2b] mb-2">Bill To Information</h4>
+                <h4 className="font-semibold text-[#2b2b2b] mb-2">Bill To Information</h4>
                 {formData.sameAsAddress ? (
                   <p className="text-sm text-gray-600">Same as location address</p>
                 ) : (
                   <div className="space-y-2 text-sm">
                     <div>
-                      <span className="text-gray-600">Bill To Address:</span>
-                      <p className="font-medium">{formData.billToAddress}</p>
+                      <span className="font-semibold text-[#2b2b2b]">Bill To Address:</span>
+                      <p className="text-gray-600">{formData.billToAddress}</p>
                     </div>
                     <div>
-                      <span className="text-gray-600">Bill To City & Zip:</span>
-                      <p className="font-medium">{formData.billToCityZip}</p>
+                      <span className="font-semibold text-[#2b2b2b]">Bill To City & Zip:</span>
+                      <p className="text-gray-600">{formData.billToCityZip}</p>
                     </div>
                     {formData.billToPhone && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Bill To Phone:</span>
-                        <span className="font-medium">{formData.billToPhone}</span>
+                        <span className="font-semibold text-[#2b2b2b]">Bill To Phone:</span>
+                        <span className="text-gray-600">{formData.billToPhone}</span>
                       </div>
                     )}
                     {formData.billToEmail && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Bill To Email:</span>
-                        <span className="font-medium">{formData.billToEmail}</span>
+                        <span className="font-semibold text-[#2b2b2b]">Bill To Email:</span>
+                        <span className="text-gray-600">{formData.billToEmail}</span>
                       </div>
                     )}
                   </div>
@@ -1786,19 +1797,19 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
           <div className="space-y-4">
             <div>
-              <h4 className="font-medium text-[#2b2b2b] mb-2">Scheduling & Resources</h4>
+              <h4 className="font-semibold text-[#2b2b2b] mb-2">Scheduling & Resources</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Due Date:</span>
-                  <span className="font-medium">
+                  <span className="font-semibold text-[#2b2b2b]">Due Date:</span>
+                  <span className="text-gray-600">
                     {formData.dueDate
                       ? new Date(formData.dueDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })
                       : 'Not specified'}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Estimated Cost:</span>
-                  <span className="font-medium">
+                  <span className="font-semibold text-[#2b2b2b]">Estimated Cost:</span>
+                  <span className="text-gray-600">
                     {formData.estimatedCost ? `$${formData.estimatedCost.toLocaleString()}` : 'Not specified'}
                   </span>
                 </div>
@@ -1807,7 +1818,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
             {formData.assignedLeadLabor.length > 0 && (
               <div>
-                <h4 className="font-medium text-[#2b2b2b] mb-2">Assigned Lead Labor ({formData.assignedLeadLabor.length})</h4>
+                <h4 className="font-semibold text-[#2b2b2b] mb-2">Assigned Lead Labor ({formData.assignedLeadLabor.length})</h4>
                 <div className="flex flex-wrap gap-1">
                   {selectedLeadLaborItems.map((item) => (
                     <Badge key={String(item.id)} className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
@@ -1820,7 +1831,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
             {formData.assignedLabor.length > 0 && (
               <div>
-                <h4 className="font-medium text-[#2b2b2b] mb-2">Assigned Labor ({formData.assignedLabor.length})</h4>
+                <h4 className="font-semibold text-[#2b2b2b] mb-2">Assigned Labor ({formData.assignedLabor.length})</h4>
                 <div className="flex flex-wrap gap-1">
                   {selectedLaborItems.map((item) => (
                     <Badge key={String(item.id)} className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
@@ -1928,7 +1939,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
           </DialogHeader>
           <div className="grid grid-cols-2 md:grid-cols-2 gap-4 pt-2">
             <div>
-              <Label className="mb-1 block">Name *</Label>
+              <Label className="mb-1 block">{addEntityType === 'customer' ? 'Customer Name' : 'Contractor Name'} *</Label>
               <Input
                 value={entityForm.name}
                 onChange={(e) => {
@@ -1937,14 +1948,15 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                     setEntityErrors(prev => ({ ...prev, name: undefined }))
                   }
                 }}
-                placeholder={addEntityType === 'customer' ? 'Customer name' : 'Contractor name'}
+                placeholder={addEntityType === 'customer' ? 'Enter customer name' : 'Enter contractor name'}
+                className={entityErrors.name ? 'border-red-500' : ''}
               />
               {entityErrors.name && (
                 <p className="mt-1 text-xs text-red-500">{entityErrors.name}</p>
               )}
             </div>
             <div>
-              <Label className="mb-1 block">Email *</Label>
+              <Label className="mb-1 block">Email Address *</Label>
               <Input
                 type="email"
                 value={entityForm.email}
@@ -1954,14 +1966,15 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                     setEntityErrors(prev => ({ ...prev, email: undefined }))
                   }
                 }}
-                placeholder="Email address"
+                placeholder="Enter email address"
+                className={entityErrors.email ? 'border-red-500' : ''}
               />
               {entityErrors.email && (
                 <p className="mt-1 text-xs text-red-500">{entityErrors.email}</p>
               )}
             </div>
             <div>
-              <Label className="mb-1 block">Phone *</Label>
+              <Label className="mb-1 block">Phone Number *</Label>
               <PhoneInput
                 value={entityForm.phone}
                 onChange={(value) => {
@@ -1977,34 +1990,105 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                 countryCallingCodeEditable={false}
                 limitMaxLength
                 placeholder="Phone number"
-                className="border border-gray-300 rounded-md px-2 py-1"
+                className={
+                  entityErrors.phone
+                    ? 'border border-red-500 rounded-md px-2 py-1'
+                    : 'border border-gray-300 rounded-md px-2 py-1'
+                }
               />
               {entityErrors.phone && (
                 <p className="mt-1 text-xs text-red-500">{entityErrors.phone}</p>
               )}
             </div>
-            <div>
-              <Label className="mb-1 block">Company</Label>
-              <Input
-                value={entityForm.company}
-                onChange={(e) => setEntityForm({ ...entityForm, company: e.target.value })}
-                placeholder="Company name"
-              />
-            </div>
-            <div>
-              <Label className="mb-1 block">Address</Label>
+            {addEntityType === 'customer' ? (
+              <div>
+                <Label className="mb-1 block">Contact Person</Label>
+                <Input
+                  value={entityForm.contactPerson}
+                  onChange={(e) => setEntityForm({ ...entityForm, contactPerson: e.target.value })}
+                  placeholder="Enter contact person name"
+                />
+              </div>
+            ) : (
+              <div>
+                <Label className="mb-1 block">Company Name *</Label>
+                <Input
+                  value={entityForm.company}
+                  onChange={(e) => {
+                    setEntityForm({ ...entityForm, company: e.target.value })
+                    if (entityErrors.company) {
+                      setEntityErrors(prev => ({ ...prev, company: undefined }))
+                    }
+                  }}
+                  placeholder="Enter company name"
+                  className={entityErrors.company ? 'border-red-500' : ''}
+                />
+                {entityErrors.company && (
+                  <p className="mt-1 text-xs text-red-500">{entityErrors.company}</p>
+                )}
+              </div>
+            )}
+            <div className="col-span-2">
+              <Label className="mb-1 block">Address{addEntityType === 'customer' ? ' *' : ''}</Label>
               <Autocomplete
                 apiKey={GOOGLE_MAPS_API_KEY}
                 options={ADDRESS_AUTOCOMPLETE_OPTIONS}
                 value={entityForm.address}
-                onChange={(e: any) => setEntityForm({ ...entityForm, address: e.target.value })}
+                onChange={(e: any) => {
+                  setEntityForm({ ...entityForm, address: e.target.value })
+                  if (entityErrors.address) {
+                    setEntityErrors(prev => ({ ...prev, address: undefined }))
+                  }
+                }}
                 onPlaceSelected={(place: any) => {
                   const address = resolveFormattedPlaceAddress(place)
                   setEntityForm({ ...entityForm, address })
+                  if (entityErrors.address) {
+                    setEntityErrors(prev => ({ ...prev, address: undefined }))
+                  }
                 }}
                 placeholder={ADDRESS_SEARCH_PLACEHOLDER}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className={`flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                  addEntityType === 'customer' && entityErrors.address ? 'border-red-500' : 'border-input'
+                }`}
               />
+              {addEntityType === 'customer' && entityErrors.address && (
+                <p className="mt-1 text-xs text-red-500">{entityErrors.address}</p>
+              )}
+            </div>
+            {addEntityType === 'customer' && (
+              <div className="col-span-2">
+                <Label className="mb-1 block">Company Name *</Label>
+                <Input
+                  value={entityForm.company}
+                  onChange={(e) => {
+                    setEntityForm({ ...entityForm, company: e.target.value })
+                    if (entityErrors.company) {
+                      setEntityErrors(prev => ({ ...prev, company: undefined }))
+                    }
+                  }}
+                  placeholder="Enter company name"
+                  className={entityErrors.company ? 'border-red-500' : ''}
+                />
+                {entityErrors.company && (
+                  <p className="mt-1 text-xs text-red-500">{entityErrors.company}</p>
+                )}
+              </div>
+            )}
+            <div className="col-span-2">
+              <Label className="mb-1 block">Status{addEntityType === 'customer' ? ' *' : ''}</Label>
+              <Select
+                value={entityForm.status}
+                onValueChange={(value) => setEntityForm({ ...entityForm, status: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

@@ -20,6 +20,7 @@ import {
   validateAddressValue,
   validateRequiredNameEmailAddress,
   formatEmailForListing,
+  displayOrNA,
 } from '../utils/staffEntityFormValidation'
 import { getCompactPaginationItems } from '@/utils/pagination'
 import { 
@@ -52,6 +53,7 @@ interface Labour {
   name: string
   email: string
   phone: string
+  dob: string
   address: string
   trade: string
   experience: string
@@ -319,19 +321,19 @@ const getAvailabilityBadge = (availability: string) => {
       case 'active':
         return (
           <Badge className="bg-green-50 text-green-600 border-green-200 hover:bg-green-50">
-            Active
+            ACTIVE
           </Badge>
         )
       case 'inactive':
         return (
           <Badge className="bg-red-50 text-red-600 border-red-200 hover:bg-red-50">
-            Inactive
+            INACTIVE
           </Badge>
         )
       default:
         return (
           <Badge className="bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-50">
-            {availability}
+            {(availability || '').toUpperCase()}
           </Badge>
         )
     }
@@ -699,6 +701,7 @@ const getAvailabilityBadge = (availability: string) => {
     'Name',
     'Email',
     'Phone',
+    'DOB',
     'Address',
     'Trade',
     'Experience',
@@ -718,6 +721,7 @@ const getAvailabilityBadge = (availability: string) => {
     labor.name,
     labor.email,
     labor.phone,
+    labor.dob,
     labor.address,
     labor.trade,
     labor.experience,
@@ -944,11 +948,12 @@ const fetchLaborData = async (page: number = 1, limit: number = 10) => {
           name: item.users?.full_name || 'N/A',
           email: formatEmailForListing(item.users?.email || 'N/A'),
           phone: item.users?.phone || 'N/A',
+          dob: item.dob || '',
           address: item.address || '',
           trade: item.trade || '',
           experience: item.experience || '',
           hourlyRate: item.hourly_rate || 0,
-          availability: item.users.status,  
+          availability: item.users.status,
           jobsCompleted: item.assigned_jobs_count, // Default value since not in API
           dateOfJoining: item.date_of_joining || '',
           supervisor: item.supervisor?.full_name || 'N/A',
@@ -1059,6 +1064,7 @@ useEffect(() => {
         name: item.users?.full_name || 'N/A',
         email: formatEmailForListing(item.users?.email || 'N/A'),
         phone: item.users?.phone || 'N/A',
+        dob: item.dob || '',
         address: item.address || '',
         trade: item.trade || '',
         experience: item.experience || '',
@@ -1751,24 +1757,24 @@ const fetchLaborById = async (id: string) => {
                     <TableCell className="text-sm text-[#2b2b2b]/80 pl-6">#{labor.laborId}</TableCell>
                     <TableCell>
                       <div>
-                        <div className="text-sm font-medium text-[#2b2b2b]/80">{labor.name}</div>
-                        <div className="text-xs text-gray-500 normal-case">{formatEmailForListing(labor.email)}</div>
+                        <div className="text-sm font-medium text-[#2b2b2b]/80">{displayOrNA(labor.name)}</div>
+                        <div className="text-xs text-gray-500 normal-case">{displayOrNA(formatEmailForListing(labor.email))}</div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div>
-                        <div className="text-sm text-[#2b2b2b]/80">{labor.phone}</div>
+                        <div className="text-sm text-[#2b2b2b]/80">{displayOrNA(labor.phone)}</div>
                         <div className="text-xs text-gray-500 flex items-center gap-1">
                           <MapPin className="h-3 w-3" />
-                          {labor.address.split(',')[0]}
+                          {displayOrNA(labor.address?.split(',')[0])}
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm text-[#2b2b2b]/80">{labor.trade}</TableCell>
-                    <TableCell className="text-sm text-[#2b2b2b]/80">{labor.experience}</TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80">{displayOrNA(labor.trade)}</TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80">{displayOrNA(labor.experience)}</TableCell>
                     <TableCell className="text-sm text-[#2b2b2b]/80">${labor.hourlyRate}</TableCell>
                     <TableCell className="text-sm text-[#2b2b2b]/80">{labor.jobsCompleted}</TableCell>
-                    <TableCell className="text-sm text-[#2b2b2b]/80">{labor.supervisor}</TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80">{displayOrNA(labor.supervisor)}</TableCell>
                     <TableCell>{getAvailabilityBadge(labor.availability)}</TableCell>
                     <TableCell>
                       <ActionButtonsPopup

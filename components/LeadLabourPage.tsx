@@ -21,6 +21,7 @@ import {
   validateAddressValue,
   validateRequiredNameEmailAddress,
   formatEmailForListing,
+  displayOrNA,
 } from '../utils/staffEntityFormValidation'
 import { getCompactPaginationItems } from '@/utils/pagination'
 import {
@@ -422,19 +423,19 @@ export function LeadLabourPage({ onViewDetails }: LeadLabourPageProps) {
       case 'active':
         return (
           <Badge className="bg-green-50 text-green-600 border-green-200 hover:bg-green-50">
-            Active
+            ACTIVE
           </Badge>
         )
       case 'inactive':
         return (
           <Badge className="bg-red-50 text-red-600 border-red-200 hover:bg-red-50">
-            Inactive
+            INACTIVE
           </Badge>
         )
       default:
         return (
           <Badge className="bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-50">
-            {status}
+            {(status || '').toUpperCase()}
           </Badge>
         )
     }
@@ -1992,27 +1993,27 @@ useEffect(() => {
                     <TableCell className="text-sm text-[#2b2b2b]/80 pl-6">{labour.id}</TableCell>
                     <TableCell>
                       <div>
-                        <div className="text-sm font-medium text-[#2b2b2b]/80">{labour.name}</div>
-                        <div className="text-xs text-gray-500 normal-case">{formatEmailForListing(labour.email)}</div>
+                        <div className="text-sm font-medium text-[#2b2b2b]/80">{displayOrNA(labour.name)}</div>
+                        <div className="text-xs text-gray-500 normal-case">{displayOrNA(formatEmailForListing(labour.email))}</div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div>
-                        <div className="text-sm text-[#2b2b2b]/80">{labour.phone}</div>
+                        <div className="text-sm text-[#2b2b2b]/80">{displayOrNA(labour.phone)}</div>
                         <div className="text-xs text-gray-500 flex items-center gap-1">
                           <MapPin className="h-3 w-3" />
-                          {labour.address.split(',')[0]}
+                          {displayOrNA(labour.address?.split(',')[0])}
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm text-[#2b2b2b]/80">{labour.department}</TableCell>
-                    <TableCell className="text-sm text-[#2b2b2b]/80">{labour.specialization}</TableCell>
-                    <TableCell className="text-sm text-[#2b2b2b]/80">{labour.experience}</TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80">{displayOrNA(labour.department)}</TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80">{displayOrNA(labour.specialization)}</TableCell>
+                    <TableCell className="text-sm text-[#2b2b2b]/80">{displayOrNA(labour.experience)}</TableCell>
                     <TableCell className="text-sm text-[#2b2b2b]/80">
                       {labour.hourly_rate ? `$${Number(labour.hourly_rate)}` : '$0'}
                     </TableCell>                    {/* <TableCell className="text-sm text-[#2b2b2b]/80">{labour.jobsCompleted}</TableCell> */}
                     <TableCell>{getStatusBadge(labour.status || 'active')}</TableCell>
-                    <TableCell className="text-sm text-gray-900">{labour.dateOfJoining}</TableCell>
+                    <TableCell className="text-sm text-gray-900">{displayOrNA(labour.dateOfJoining)}</TableCell>
                     <TableCell>
                       <ActionButtonsPopup
                         onView={() => handleView(labour.id)}

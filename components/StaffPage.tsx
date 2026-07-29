@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { globalApiCall, getAuthToken, handleTokenRevocation } from '../utils/globalApiHandler'
 import { getYesterdayLocalDateString, validateDobValue } from '../utils/dobValidation'
-import { getValidationToastMessage, formatEmailForListing } from '../utils/staffEntityFormValidation'
+import { getValidationToastMessage, formatEmailForListing, displayOrNA } from '../utils/staffEntityFormValidation'
 import { getCompactPaginationItems } from '../utils/pagination'
 import PhoneInput from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
@@ -516,19 +516,19 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
       case 'active':
         return (
           <Badge className="bg-green-50 text-green-600 border-green-200 hover:bg-green-50">
-            Active
+            ACTIVE
           </Badge>
         )
       case 'inactive':
         return (
           <Badge className="bg-red-50 text-red-600 border-red-200 hover:bg-red-50">
-            Inactive
+            INACTIVE
           </Badge>
         )
       default:
         return (
           <Badge className="bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-50">
-            {status}
+            {(status || '').toUpperCase()}
           </Badge>
         )
     }
@@ -929,6 +929,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
     'Address',
     'Position',
     'Department',
+    'DOB',
     'Date of Joining',
     'Status'
   ];
@@ -942,6 +943,7 @@ export function StaffPage({ onViewDetails }: StaffPageProps) {
     member.address,
     member.position,
     member.department,
+    member.dob,
     member.dateOfJoining,
     member.status.toUpperCase()
   ]);
@@ -1242,14 +1244,14 @@ useEffect(() => {
                 paginatedStaff.map((member, index) => (
                 <TableRow key={member.id} className={index % 2 === 1 ? "bg-[#eff4fa]" : ""}>
                   <TableCell className="text-sm text-[#2b2b2b]/80 pl-6">#{member.id}</TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80 font-medium">{member.name}</TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">{member.phone}</TableCell>
-                  <TableCell className="text-sm text-gray-900 normal-case">{formatEmailForListing(member.email)}</TableCell>
-                  <TableCell className="text-sm text-gray-900 max-w-xs truncate">{member.address}</TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">{member.position}</TableCell>
-                  <TableCell className="text-sm text-[#2b2b2b]/80">{member.department}</TableCell>
-                  <TableCell className="text-sm text-gray-900">{member.dob}</TableCell>
-                  <TableCell className="text-sm text-gray-900">{member.dateOfJoining}</TableCell>
+                  <TableCell className="text-sm text-[#2b2b2b]/80 font-medium">{displayOrNA(member.name)}</TableCell>
+                  <TableCell className="text-sm text-[#2b2b2b]/80">{displayOrNA(member.phone)}</TableCell>
+                  <TableCell className="text-sm text-gray-900 normal-case">{displayOrNA(formatEmailForListing(member.email))}</TableCell>
+                  <TableCell className="text-sm text-gray-900 max-w-xs truncate">{displayOrNA(member.address)}</TableCell>
+                  <TableCell className="text-sm text-[#2b2b2b]/80">{displayOrNA(member.position)}</TableCell>
+                  <TableCell className="text-sm text-[#2b2b2b]/80">{displayOrNA(member.department)}</TableCell>
+                  <TableCell className="text-sm text-gray-900">{displayOrNA(member.dob)}</TableCell>
+                  <TableCell className="text-sm text-gray-900">{displayOrNA(member.dateOfJoining)}</TableCell>
                   <TableCell>{getStatusBadge(member.status)}</TableCell>
                   <TableCell>
                     <ActionButtonsPopup

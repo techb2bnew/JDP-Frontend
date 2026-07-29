@@ -37,7 +37,8 @@ import {
   Check,
   Send,
   ArrowLeft,
-  Upload
+  Upload,
+  Search
 } from 'lucide-react'
 import { apiClient } from '@/utils/api'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
@@ -828,6 +829,12 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
   const handleBlueSheetEdit = () => {
     setIsBlueSheetEditMode(prev => {
       const next = !prev
+      if (prev && !next) {
+        // Exiting edit mode without saving — discard any unsaved additions/changes
+        setEditedBlueSheet(JSON.parse(JSON.stringify(blueSheet)))
+        setFilteredProducts([])
+        setActiveRow(null)
+      }
       toast.info(next ? 'BlueSheet edit mode enabled' : 'BlueSheet edit mode disabled')
       return next
     })
@@ -2590,7 +2597,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                               </span>
                                             </td>
                                           )}
-                                          <td className="py-2 px-3">
+                                          <td className="py-2 px-3 relative overflow-visible">
                                             {isBlueSheetEditMode ? (
                                               <div className="relative">
                                                 <Input
@@ -2627,49 +2634,146 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                                         idx,
                                                       );
                                                   }}
-                                                  className="h-8 text-xs"
-                                                  placeholder="Search product..."
+                                                  className="h-8 pr-8 text-xs"
+                                                  placeholder="Search by name, SKU, description, supplier..."
                                                 />
+                                                <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                                                 {activeRow === idx &&
                                                   filteredProducts.length >
                                                     0 && (
                                                     <div
-                                                      className="absolute z-50 bg-white border w-full max-h-36 overflow-y-auto shadow-lg rounded-md mt-0.5"
+                                                      className="absolute left-0 top-full mt-1 z-[999999] w-full min-w-full max-w-full rounded-xl border border-slate-200 bg-white shadow-2xl overflow-hidden"
                                                       onMouseDown={(e) =>
                                                         e.preventDefault()
                                                       }
                                                     >
-                                                      {filteredProducts.map(
-                                                        (product: any) => (
-                                                          <div
-                                                            key={product.id}
-                                                            className="px-2 py-1.5 text-xs hover:bg-blue-50 cursor-pointer border-b border-gray-50"
-                                                            onMouseDown={(
-                                                              e,
-                                                            ) => {
-                                                              e.preventDefault();
-                                                              handleBlueSheetMaterialUpdateAll(
-                                                                idx,
-                                                                product,
+                                                      <div className="max-h-[320px] overflow-y-auto p-2">
+                                                        <div className="space-y-2">
+                                                          {filteredProducts.map(
+                                                            (product: any) => {
+                                                              const jdpSkuVal =
+                                                                String(
+                                                                  product.jdp_sku ||
+                                                                    "",
+                                                                ).trim();
+                                                              const supplierSkuVal =
+                                                                String(
+                                                                  product.supplier_sku ||
+                                                                    "",
+                                                                ).trim();
+                                                              const hasSkuBlock =
+                                                                jdpSkuVal ||
+                                                                supplierSkuVal;
+                                                              const rate =
+                                                                Number(
+                                                                  product.jdp_price ||
+                                                                    product.unit_cost ||
+                                                                    0,
+                                                                );
+                                                              const estimatedPrice =
+                                                                Number(
+                                                                  product.estimated_price ||
+                                                                    0,
+                                                                );
+
+                                                              return (
+                                                                <div
+                                                                  key={
+                                                                    product.id
+                                                                  }
+                                                                  onMouseDown={(
+                                                                    e,
+                                                                  ) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    handleBlueSheetMaterialUpdateAll(
+                                                                      idx,
+                                                                      product,
+                                                                    );
+                                                                  }}
+                                                                  className="rounded-lg border border-slate-100 px-3 py-1.5 hover:bg-slate-50 cursor-pointer transition-colors"
+                                                                >
+                                                                  <div className="min-w-0 flex-1">
+                                                                    <div
+                                                                      className={
+                                                                        hasSkuBlock
+                                                                          ? "mb-1 font-medium text-[13px] text-slate-900"
+                                                                          : "mb-0.5 font-medium text-[13px] text-slate-900"
+                                                                      }
+                                                                    >
+                                                                      {
+                                                                        product.product_name
+                                                                      }
+                                                                    </div>
+
+                                                                    {hasSkuBlock && (
+                                                                      <div className="space-y-0.5 text-[11px] leading-snug text-slate-600">
+                                                                        {jdpSkuVal && (
+                                                                          <div>
+                                                                            <span className="font-medium text-slate-700">
+                                                                              JDP
+                                                                              SKU
+                                                                            </span>
+                                                                            <span className="ml-1 break-all text-slate-800">
+                                                                              {
+                                                                                jdpSkuVal
+                                                                              }
+                                                                            </span>
+                                                                          </div>
+                                                                        )}
+                                                                        {supplierSkuVal && (
+                                                                          <div>
+                                                                            <span className="font-medium text-slate-700">
+                                                                              Supplier
+                                                                              SKU
+                                                                            </span>
+                                                                            <span className="ml-1 break-all text-slate-800">
+                                                                              {
+                                                                                supplierSkuVal
+                                                                              }
+                                                                            </span>
+                                                                          </div>
+                                                                        )}
+                                                                      </div>
+                                                                    )}
+
+                                                                    <div
+                                                                      className={
+                                                                        hasSkuBlock
+                                                                          ? "mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]"
+                                                                          : "mt-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]"
+                                                                      }
+                                                                    >
+                                                                      <span className="text-slate-600">
+                                                                        <span className="font-medium text-slate-700">
+                                                                          Rate:
+                                                                        </span>{" "}
+                                                                        $
+                                                                        {rate.toFixed(
+                                                                          2,
+                                                                        )}
+                                                                      </span>
+
+                                                                      {estimatedPrice >
+                                                                        0 && (
+                                                                        <span className="text-slate-600">
+                                                                          <span className="font-medium text-slate-700">
+                                                                            Est:
+                                                                          </span>{" "}
+                                                                          $
+                                                                          {estimatedPrice.toFixed(
+                                                                            2,
+                                                                          )}
+                                                                        </span>
+                                                                      )}
+                                                                    </div>
+                                                                  </div>
+                                                                </div>
                                                               );
-                                                            }}
-                                                          >
-                                                            <div className="font-medium">
-                                                              {
-                                                                product.product_name
-                                                              }
-                                                            </div>
-                                                            <div className="text-gray-400 text-[10px]">
-                                                              {product.jdp_sku}{" "}
-                                                              ·{" "}
-                                                              {formatCurrency(
-                                                                product.jdp_price ||
-                                                                  0,
-                                                              )}
-                                                            </div>
-                                                          </div>
-                                                        ),
-                                                      )}
+                                                            },
+                                                          )}
+                                                        </div>
+                                                      </div>
                                                     </div>
                                                   )}
                                               </div>
@@ -2707,11 +2811,11 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                               <Input
                                                 type="number"
                                                 step="0.01"
-                                                value={item.jdp_price}
+                                                value={item.unit_cost}
                                                 onChange={(e) =>
                                                   handleBlueSheetMaterialChange(
                                                     idx,
-                                                    "jdp_price",
+                                                    "unit_cost",
                                                     parseFloat(
                                                       e.target.value,
                                                     ) || 0,
@@ -2728,7 +2832,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                             {formatCurrency(
                                               item.total_cost ||
                                                 item.material_used *
-                                                  item.jdp_price,
+                                                  item.unit_cost,
                                             )}
                                           </td>
                                           {isBlueSheetEditMode &&
@@ -3360,6 +3464,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                           onDone={onClose}
                           onInvoiceSaved={() => {
                             void onEstimatesRefresh?.();
+                            void onBluesheetsRefresh?.();
                           }}
                           onLineItemsSync={syncCustomInvoiceLineItemsToBlueSheet}
                         />

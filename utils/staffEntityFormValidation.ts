@@ -89,3 +89,12 @@ export function formatEmailForListing(email: string | null | undefined): string 
   if (raw.toUpperCase() === "N/A") return "N/A";
   return raw.toLowerCase();
 }
+
+/** For table display only: shows "N/A" instead of a blank cell when a field has no value. */
+export function displayOrNA(
+  value: string | number | null | undefined
+): string | number {
+  if (value === null || value === undefined) return "N/A";
+  if (typeof value === "string" && value.trim() === "") return "N/A";
+  return value;
+}

@@ -762,8 +762,9 @@ export const apiClient = {
       throw new Error("No authentication token found");
     }
 
-    const response = await fetch(`${apiBaseUrl}/dashboard/management-stats`, {
+    const response = await fetch(`${apiBaseUrl}/dashboard/management-stats?_t=${Date.now()}`, {
       method: "GET",
+      cache: "no-store",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
@@ -2295,9 +2296,10 @@ export const apiClient = {
     }
 
     const response = await fetch(
-      `${apiBaseUrl}/staff/getStaffStats`,
+      `${apiBaseUrl}/staff/getStaffStats?_t=${Date.now()}`,
       {
         method: "GET",
+        cache: "no-store",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
