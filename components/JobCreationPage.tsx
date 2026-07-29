@@ -703,7 +703,9 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
           contractor_name: entityForm.name,
           company_name: entityForm.company || '',
           email: entityForm.email.toLowerCase(),
-          phone: formatPhoneForPayload(entityForm.phone) || '',
+          // createContractor expects plain E.164 (no hyphen after country code),
+          // unlike createCustomer — matches ContractorListingPage.tsx's working payload.
+          phone: normalizePhoneToE164(entityForm.phone) || '',
           address: entityForm.address || '',
           status: entityForm.status || 'active',
           system_ip
