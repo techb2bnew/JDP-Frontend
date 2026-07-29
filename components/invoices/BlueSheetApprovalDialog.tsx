@@ -2989,7 +2989,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                       <Card className="bg-blue-50/80 border border-blue-200 shadow-sm">
                         <CardContent className="p-4 text-left">
                           <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
+                            <div  className="flex items-center gap-2">
                               <FileText className="h-6 w-6 text-blue-600" />
                               <h4 className="text-xs font-semibold text-blue-900 tracking-wide uppercase">
                                 BlueSheet
