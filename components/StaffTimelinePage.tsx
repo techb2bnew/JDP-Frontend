@@ -56,6 +56,12 @@ export function StaffTimelinePage() {
   const [selectedJob, setSelectedJob] = useState<any | null>(null)
   const [showJobDropdown, setShowJobDropdown] = useState(false)
   const [isLoadingJobs, setIsLoadingJobs] = useState(false)
+  const [isLoadingMoreJobs, setIsLoadingMoreJobs] = useState(false)
+  const [jobsPage, setJobsPage] = useState(1)
+  const [jobsTotalPages, setJobsTotalPages] = useState(1)
+  const [jobsHasMore, setJobsHasMore] = useState(false)
+  const jobsSearchQueryRef = useRef('')
+  const JOBS_PAGE_LIMIT = 20
   const jobDropdownRef = useRef<HTMLDivElement>(null)
 
   // Load FullCalendar CSS
@@ -109,20 +115,65 @@ export function StaffTimelinePage() {
     }
   }
 
-  const fetchJobs = async (query: string = '') => {
+  const fetchJobs = async (query: string = '', page: number = 1, append: boolean = false) => {
+    const trimmedQuery = query.trim()
+    jobsSearchQueryRef.current = trimmedQuery
     try {
-      setIsLoadingJobs(true)
-      const response = await apiClient.searchJobsByQuery(query || '', 1, 20)
-      if (response.success && response.data) {
-        const jobs = Array.isArray(response.data) ? response.data : (response.data.jobs || [])
-        setJobResults(jobs)
+      if (append) {
+        setIsLoadingMoreJobs(true)
+      } else {
+        setIsLoadingJobs(true)
       }
+      const response = trimmedQuery
+        ? await apiClient.searchJobsByQuery(trimmedQuery, page, JOBS_PAGE_LIMIT)
+        : await apiClient.getJobs(page, JOBS_PAGE_LIMIT)
+
+      // `searchJobsByQuery` returns { success, data: { jobs: [...], pagination } } (raw job_title field),
+      // while `getJobs` returns { data: [...], totalPages, currentPage } directly (transformed, uses `title` instead).
+      let jobs: any[] = []
+      if (Array.isArray(response?.data?.jobs)) {
+        jobs = response.data.jobs
+      } else if (Array.isArray(response?.data)) {
+        jobs = response.data
+      }
+
+      const pagination = response?.data?.pagination
+      const totalPages = Number(pagination?.totalPages ?? response?.totalPages ?? 1) || 1
+      const currentPage = Number(pagination?.page ?? response?.currentPage ?? 1) || 1
+
+      setJobResults(prev => (append ? [...prev, ...jobs] : jobs))
+      setJobsPage(currentPage)
+      setJobsTotalPages(totalPages)
+      setJobsHasMore(currentPage < totalPages)
     } catch (error: any) {
       console.error('Error fetching jobs:', error)
-      setJobResults([])
+      if (!append) {
+        setJobResults([])
+        setJobsPage(1)
+        setJobsTotalPages(1)
+        setJobsHasMore(false)
+      }
     } finally {
       setIsLoadingJobs(false)
+      setIsLoadingMoreJobs(false)
     }
+  }
+
+  const handleJobsDropdownScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+    const nearBottom = scrollHeight - scrollTop - clientHeight < 50
+
+    if (
+      !nearBottom ||
+      !jobsHasMore ||
+      isLoadingJobs ||
+      isLoadingMoreJobs ||
+      jobsPage >= jobsTotalPages
+    ) {
+      return
+    }
+
+    void fetchJobs(jobsSearchQueryRef.current, jobsPage + 1, true)
   }
 
   // Close job dropdown when clicking outside
@@ -493,40 +544,51 @@ export function StaffTimelinePage() {
                 <Search className="absolute left-2.5 top-[20px] h-4 w-4 -translate-y-1/2 text-gray-400" />
 
                 {showJobDropdown && (
-                  <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-gray-200 bg-white shadow-lg">
-                    {isLoadingJobs ? (
+                  <div
+                    className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-gray-200 bg-white shadow-lg"
+                    onScroll={handleJobsDropdownScroll}
+                  >
+                    {isLoadingJobs && jobResults.length === 0 ? (
                       <div className="p-3 text-sm text-gray-500">Searching jobs...</div>
                     ) : jobResults.length === 0 ? (
                       <div className="p-3 text-sm text-gray-500">No jobs found</div>
                     ) : (
-                      jobResults.map((job) => (
-                        <button
-                          key={job.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedJob(job)
-                            setJobSearchTerm(job.job_title || 'Untitled Job')
-                            setFormData(prev => ({ ...prev, job_id: job.id }))
-                            setShowJobDropdown(false)
-                            if (formErrors.job_id) {
-                              setFormErrors(prev => ({ ...prev, job_id: '' }))
-                            }
-                          }}
-                          className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
-                        >
-                          <Briefcase className="mt-0.5 h-4 w-4 text-gray-500" />
-                          <div className="flex-1">
-                            <p className="font-medium text-[#2b2b2b]">
-                              {job.job_title || 'Untitled Job'}
-                            </p>
-                            {(job.customerName || job.address) && (
-                              <p className="text-xs text-gray-500">
-                                {[job.customerName, job.address].filter(Boolean).join(' • ')}
+                      <>
+                        {jobResults.map((job) => (
+                          <button
+                            key={job.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedJob(job)
+                              setJobSearchTerm(job.job_title || job.title || 'Untitled Job')
+                              setFormData(prev => ({ ...prev, job_id: job.id }))
+                              setShowJobDropdown(false)
+                              if (formErrors.job_id) {
+                                setFormErrors(prev => ({ ...prev, job_id: '' }))
+                              }
+                            }}
+                            className="flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
+                          >
+                            <Briefcase className="mt-0.5 h-4 w-4 text-gray-500" />
+                            <div className="flex-1">
+                              <p className="font-medium text-[#2b2b2b]">
+                                {job.job_title || job.title || 'Untitled Job'}
                               </p>
-                            )}
+                              {(job.customerName || job.address) && (
+                                <p className="text-xs text-gray-500">
+                                  {[job.customerName, job.address].filter(Boolean).join(' • ')}
+                                </p>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                        {isLoadingMoreJobs && (
+                          <div className="p-3 flex items-center justify-center border-t border-gray-100">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                            <span className="text-xs text-gray-500">Loading more jobs...</span>
                           </div>
-                        </button>
-                      ))
+                        )}
+                      </>
                     )}
                   </div>
                 )}

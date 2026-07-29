@@ -1573,7 +1573,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
         <div className="space-y-4 bg-white shadow-lg p-3">
           <div className="flex items-center gap-2 mb-4">
             <Building className="h-5 w-5 text-[#00A1FF]" />
-            <h3 className="font-bold text-[#2b2b2b]  text-lg">Bill To Information</h3>
+            <h3 className="font-bold text-[#2b2b2b] text-[14.8px]  text-lg">Bill To Information</h3>
           </div>
 
           <div className="flex items-center space-x-2 mb-4">
@@ -1665,7 +1665,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
             <div>
-              <h4 className="font-semibold text-[#2b2b2b] mb-2">Job Information</h4>
+              <h4 className="font-semibold text-[14.8px] text-[#2b2b2b] mb-2">Job Information</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="font-semibold text-[#2b2b2b]">Type:</span>
@@ -1697,7 +1697,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             </div>
 
             <div>
-              <h4 className="font-semibold text-[#2b2b2b] mb-2">Description</h4>
+              <h4 className="font-semibold text-base text-[#2b2b2b] mb-2">Description:</h4>
               <div
                 ref={jobReviewDescriptionBoxRef}
                 className="relative w-full min-w-0 max-w-full"
@@ -1736,7 +1736,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
             {/* Location Information */}
             <div>
-              <h4 className="font-semibold text-[#2b2b2b] mb-2">Location Information</h4>
+              <h4 className="font-semibold text-[14.8px] text-[#2b2b2b] mb-2">Location Information</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="font-semibold text-[#2b2b2b]">Address:</span>
@@ -1764,7 +1764,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
             {/* Bill To Information */}
             {(formData.billToAddress || formData.sameAsAddress) && (
               <div>
-                <h4 className="font-semibold text-[#2b2b2b] mb-2">Bill To Information</h4>
+                <h4 className="font-semibold text-[14.8px] text-[#2b2b2b] mb-2">Bill To Information</h4>
                 {formData.sameAsAddress ? (
                   <p className="text-sm text-gray-600">Same as location address</p>
                 ) : (
@@ -1797,10 +1797,11 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
           <div className="space-y-4">
             <div>
-              <h4 className="font-semibold text-[#2b2b2b] mb-2">Scheduling & Resources</h4>
+              <h4 className="font-semibold text-[14.8px] text-[#2b2b2b] mb-2">Scheduling & Resources</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="font-semibold text-[#2b2b2b]">Due Date:</span>
+                  <Label htmlFor="title">Due Date:</Label>
+                  {/* <span className="font-semibold text-[#2b2b2b]">Due Date:</span> */}
                   <span className="text-gray-600">
                     {formData.dueDate
                       ? new Date(formData.dueDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })
@@ -1808,7 +1809,8 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="font-semibold text-[#2b2b2b]">Estimated Cost:</span>
+                  <Label htmlFor="title">Estimated Cost:</Label>
+                  {/* <span className="font-semibold text-[#2b2b2b]">Estimated Cost:</span> */}
                   <span className="text-gray-600">
                     {formData.estimatedCost ? `$${formData.estimatedCost.toLocaleString()}` : 'Not specified'}
                   </span>
@@ -1818,7 +1820,8 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
             {formData.assignedLeadLabor.length > 0 && (
               <div>
-                <h4 className="font-semibold text-[#2b2b2b] mb-2">Assigned Lead Labor ({formData.assignedLeadLabor.length})</h4>
+                
+                <h4 className="flex font-semibold text-base text-[#2b2b2b] mb-2"><Label className='font-semibold' htmlFor="title">Assigned Lead Labor</Label> ({formData.assignedLeadLabor.length})</h4>
                 <div className="flex flex-wrap gap-1">
                   {selectedLeadLaborItems.map((item) => (
                     <Badge key={String(item.id)} className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
@@ -1831,7 +1834,7 @@ export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) 
 
             {formData.assignedLabor.length > 0 && (
               <div>
-                <h4 className="font-semibold text-[#2b2b2b] mb-2">Assigned Labor ({formData.assignedLabor.length})</h4>
+                <h4 className="flex font-semibold text-base text-[#2b2b2b] mb-2"><Label className='font-semibold' htmlFor="title">Assigned Labor</Label>  ({formData.assignedLabor.length})</h4>
                 <div className="flex flex-wrap gap-1">
                   {selectedLaborItems.map((item) => (
                     <Badge key={String(item.id)} className="bg-blue-50 text-blue-700 border-blue-200 text-xs">

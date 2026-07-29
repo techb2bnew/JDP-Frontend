@@ -515,7 +515,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
     setActiveRow(rowIndex)
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
 
-    if (!query || query.length < 2) {
+    if (!query || query.length < 1) {
       setFilteredProducts([])
       return
     }
@@ -627,6 +627,14 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
   // ─── handleBlueSheetSave ───────────────────────────────────────────────────
   const handleBlueSheetSave = async () => {
     if (!editedBlueSheet) return
+
+    const hasEmptyMaterialRow = editedBlueSheet.material_entries.some(
+      (item: any) => !String(item.material_name || '').trim()
+    )
+    if (hasEmptyMaterialRow) {
+      toast.error('Please select or enter a product for every material row before saving.')
+      return
+    }
 
     try {
       setIsApproving(true)
@@ -2055,7 +2063,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                                         ?.material_entries[
                                                         bsIdx!
                                                       ]?.material_name;
-                                                    if (n && n.length >= 2)
+                                                    if (n && n.length >= 1)
                                                       handleProductSearch(
                                                         n,
                                                         bsIdx!,
@@ -2628,7 +2636,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                                       editedBlueSheet
                                                         ?.material_entries[idx]
                                                         ?.material_name;
-                                                    if (n && n.length >= 2)
+                                                    if (n && n.length >= 1)
                                                       handleProductSearch(
                                                         n,
                                                         idx,
@@ -2825,7 +2833,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
                                                 min="0"
                                               />
                                             ) : (
-                                              formatCurrency(item.jdp_price)
+                                              formatCurrency(item.unit_cost)
                                             )}
                                           </td>
                                           <td className="py-2 px-3 text-right font-semibold text-[#00A1FF]">
