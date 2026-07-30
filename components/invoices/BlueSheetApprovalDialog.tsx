@@ -1145,6 +1145,29 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
       ).toFixed(2),
     );
 
+    // Resolve real ids with the same fallback chain as the working "Send Invoice
+    // Directly" flow (CustomInvoiceDialog), instead of defaulting a missing id to 0.
+    const resolvedCustomerId =
+      finalBlueSheet.job.customer?.id ??
+      (finalBlueSheet.job as any).customer_id ??
+      (finalBlueSheet as any).customer_id ??
+      null;
+    const resolvedContractorId =
+      finalBlueSheet.job.contractor?.id ??
+      (finalBlueSheet.job as any).contractor_id ??
+      (finalBlueSheet as any).contractor_id ??
+      null;
+
+    // job_type can be stale/incorrect on the BlueSheet's embedded job — trust which
+    // id actually resolved over the flag so we never send an empty email/address
+    // pulled from a party (contractor) that doesn't really exist on this job.
+    const effectiveIsContractBased =
+      resolvedCustomerId != null
+        ? false
+        : resolvedContractorId != null
+          ? true
+          : isContractBased;
+
     const bluesheetIds = getSelectedBlueSheetIds();
 
     const estimateNotesPayload =
@@ -1164,7 +1187,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
       priority:
         (finalBlueSheet.job.priority as "low" | "medium" | "high") ||
         "medium",
-      service_type: isContractBased ? "contract_based" : "service_based",
+      service_type: effectiveIsContractBased ? "contract_based" : "service_based",
       invoice_type: selectedInvoiceType || "progressive_invoice",
       status: "draft",
       estimate_date: today,
@@ -1174,25 +1197,40 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
         .slice(-6)}`,
       issue_date: today,
 
-      email_address: isContractBased
+      email_address: effectiveIsContractBased
         ? finalBlueSheet.job.contractor?.email ||
+          finalBlueSheet.job.customer?.email ||
           finalBlueSheet.job.bill_to_email ||
+          (finalBlueSheet.job as any).email ||
           ""
         : finalBlueSheet.job.customer?.email ||
+          finalBlueSheet.job.contractor?.email ||
           finalBlueSheet.job.bill_to_email ||
+          (finalBlueSheet.job as any).email ||
           "",
 
-      bill_to_address: isContractBased
+      bill_to_address: effectiveIsContractBased
         ? finalBlueSheet.job.contractor?.address ||
-          finalBlueSheet.job.bill_to_address ||
-          ""
-        : finalBlueSheet.job.bill_to_address ||
           finalBlueSheet.job.customer?.address ||
+          finalBlueSheet.job.bill_to_address ||
+          (finalBlueSheet.job as any).address ||
+          ""
+        : finalBlueSheet.job.customer?.address ||
+          finalBlueSheet.job.contractor?.address ||
+          finalBlueSheet.job.bill_to_address ||
+          (finalBlueSheet.job as any).address ||
           "",
 
-      ...(isContractBased
-        ? { contractor_id: finalBlueSheet.job.contractor?.id ?? 0 }
-        : { customer_id: finalBlueSheet.job.customer?.id ?? 0 }),
+      // Only send contractor_id when this is actually contract-based AND a real
+      // contractor id exists; always send customer_id when a real one exists —
+      // mirrors the working "Send Invoice Directly" flow instead of defaulting
+      // a missing id to 0.
+      ...(effectiveIsContractBased && resolvedContractorId != null
+        ? { contractor_id: Number(resolvedContractorId) }
+        : {}),
+      ...(resolvedCustomerId != null
+        ? { customer_id: Number(resolvedCustomerId) }
+        : {}),
 
       po_number: `BS-${finalBlueSheet.id}`,
       rep: finalBlueSheet.created_by_user?.full_name || "",
@@ -1201,12 +1239,16 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
       total_labor_cost: totalLaborCost,
       total_amount: totalAmountForEstimate,
 
-      location: isContractBased
+      location: effectiveIsContractBased
         ? finalBlueSheet.job.contractor?.address ||
-          finalBlueSheet.job.bill_to_address ||
-          ""
-        : finalBlueSheet.job.bill_to_address ||
           finalBlueSheet.job.customer?.address ||
+          finalBlueSheet.job.bill_to_address ||
+          (finalBlueSheet.job as any).address ||
+          ""
+        : finalBlueSheet.job.customer?.address ||
+          finalBlueSheet.job.contractor?.address ||
+          finalBlueSheet.job.bill_to_address ||
+          (finalBlueSheet.job as any).address ||
           "",
 
       bluesheet_ids: bluesheetIds,
@@ -1216,6 +1258,15 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
       quickbook_action:
         action === "send" ? "sendtoquickbook" : "sevetoquickbook",
     };
+
+    if (!estimatePayload.email_address) {
+      toast.error("Customer/Contractor email is missing. Please add an email on the job's customer or contractor record before proceeding.");
+      return;
+    }
+    if (!estimatePayload.bill_to_address) {
+      toast.error("Customer/Contractor address is missing. Please add an address on the job's customer or contractor record before proceeding.");
+      return;
+    }
 
     await apiClient.createEstimate(estimatePayload);
     await apiClient.approveBluesheet(finalBlueSheet.id, "approved");

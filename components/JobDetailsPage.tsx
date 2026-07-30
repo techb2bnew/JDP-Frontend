@@ -1358,6 +1358,10 @@ export function JobDetailsPage({
     estimateNumber: "",
     customerName: job.customerName || "",
     customerAddress: "", // Initialize as empty, will be set by fetchCustomerData
+    // Set when duplicating/editing an existing invoice — its own customer_id/contractor_id
+    // takes priority over re-deriving from the job (which can have a stale/mismatched type).
+    customerId: null as number | null,
+    contractorId: null as number | null,
     billToAddress: job.billToAddress || "",
     billToAddressEnabled: true,
     poNumber: "",
@@ -4171,109 +4175,99 @@ const validateHeaderGroupsBeforeSubmit = (lineItems: any[] = []) => {
     }
   };
 
-  const handleDuplicateInvoice = (invoice: any) => {
+  const handleDuplicateInvoice = async (invoice: any) => {
     console.log("Duplicating invoice:", invoice);
 
-    // Populate the inline invoice form with the existing invoice data
-    setInlineInvoiceData({
-      date: invoice.date || new Date().toISOString().split("T")[0],
-      estimateNumber: invoice.estimate_number || "",
-      customerName:
-        invoice.customer_name || invoice.contractor?.contractor_name || "",
-      customerAddress:
-        invoice.customer_address || invoice.contractor?.address || "",
-      billToAddress: invoice.bill_to_address || "",
-      billToAddressEnabled: !!invoice.bill_to_address,
-      poNumber: invoice.po_number || "",
-      project: invoice.estimate_title || "",
-      rep: invoice.rep || "",
-      dueDate: invoice.due_date || "",
-      paymentCredits: invoice.payment_credits || 0,
-      balanceDue: invoice.balance_due || "",
-      lineItems: invoice.products?.map((product: any) => {
-        const qty = product.stock_quantity || 1;
-        const rate = product.jdp_price || 0;
-        return {
-          id: Math.random().toString(36).substring(2, 9),
-          productId: product.id,
-          qty,
-          item: product.product_name || "",
-          description: product.description || "",
-          rate,
-          estimatedPrice: product.estimated_price || 0,
-          total: Number((Number(qty) * Number(rate)).toFixed(2)),
-          searchQuery: "",
-          showSearchResults: false,
-          supplierId: product.supplier_id || 1,
-          isCustomProduct: true,
-          estimate_product_id: product.estimate_product_id || null,
-        };
-      }) || createDefaultEmptyLineItems(5),
-      notes:
-        (invoice.notes ?? invoice.description) ||
-        "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
-      signatureText:
-        invoice.signature_text || "ACCEPTED BY________________DATE_____",
-      invoiceType: (() => {
-        if (!invoice.invoice_type) return "Estimate";
+    try {
+      setIsLoading(true);
 
-        // Map API values to form values
-        const typeMapping: { [key: string]: string } = {
-          down_payment: "Downpayment Invoice",
-          rough_invoice: "Rough Invoice",
-          progressive_invoice: "Progressive Invoice",
-          final_invoice: "Final Invoice",
-          estimate: "Estimate",
-        };
+      // The Transaction History row is a lightweight summary — fetch the full
+      // invoice (with its products) the same way View/Edit Invoice does, so the
+      // duplicate actually carries over the existing invoice's line items.
+      const response = await apiClient.getEstimateById(invoice.id);
+      const invoiceData = response?.data || response;
 
-        return (
-          typeMapping[invoice.invoice_type] ||
-          invoice.invoice_type.charAt(0).toUpperCase() +
-            invoice.invoice_type.slice(1)
-        );
-      })(),
-      customInvoiceType: invoice.custom_invoice_type || "",
-      paymentPercentage: 0,
-      estimateTotal: invoice.total || 0,
-      totalLaborCost: hasApiLaborCost(invoice.total_labor_cost)
-        ? resolveInvoiceLaborCost(invoice.total_labor_cost)
-        : null,
-      paymentHistory: [],
-    });
+      // Populate the inline invoice form with the fetched invoice data
+      setInlineInvoiceData({
+        date: new Date().toISOString().split("T")[0],
+        estimateNumber: "",
+        customerName:
+          invoiceData.customer_name ||
+          invoiceData.contractor?.contractor_name ||
+          "",
+        customerAddress:
+          invoiceData.customer_address || invoiceData.contractor?.address || "",
+        // Carry over the original invoice's own customer/contractor — don't re-derive
+        // from the job, which can disagree with the invoice being duplicated.
+        customerId:
+          invoiceData.customer_id != null
+            ? Number(invoiceData.customer_id)
+            : invoiceData.customer?.id != null
+              ? Number(invoiceData.customer.id)
+              : null,
+        contractorId:
+          invoiceData.contractor_id != null
+            ? Number(invoiceData.contractor_id)
+            : invoiceData.contractor?.id != null
+              ? Number(invoiceData.contractor.id)
+              : null,
+        billToAddress: invoiceData.bill_to_address || "",
+        billToAddressEnabled: !!invoiceData.bill_to_address,
+        poNumber: invoiceData.po_number || "",
+        project: invoiceData.estimate_title || "",
+        rep: invoiceData.rep || "",
+        dueDate: invoiceData.due_date || "",
+        paymentCredits: 0,
+        balanceDue: "",
+        lineItems:
+          invoiceData.products && invoiceData.products.length > 0
+            ? buildLineItemsFromProducts(invoiceData.products)
+            : createDefaultEmptyLineItems(5),
+        notes:
+          (invoiceData.notes ?? invoiceData.description) ||
+          "NOTES\nJDP WILL REQUIRE HALF DOWN UPON SIGNED ESTIMATE",
+        signatureText:
+          invoiceData.signature_text || "ACCEPTED BY________________DATE_____",
+        invoiceType: (() => {
+          if (!invoiceData.invoice_type) return "Estimate";
 
-    const mappedInvoiceType = (() => {
-      if (!invoice.invoice_type) return "Estimate";
+          // Map API values to form values
+          const typeMapping: { [key: string]: string } = {
+            down_payment: "Downpayment Invoice",
+            rough_invoice: "Rough Invoice",
+            progressive_invoice: "Progressive Invoice",
+            final_invoice: "Final Invoice",
+            estimate: "Estimate",
+          };
 
-      const typeMapping: { [key: string]: string } = {
-        down_payment: "Downpayment Invoice",
-        rough_invoice: "Rough Invoice",
-        progressive_invoice: "Progressive Invoice",
-        final_invoice: "Final Invoice",
-        estimate: "Estimate",
-      };
+          return (
+            typeMapping[invoiceData.invoice_type] ||
+            invoiceData.invoice_type.charAt(0).toUpperCase() +
+              invoiceData.invoice_type.slice(1)
+          );
+        })(),
+        customInvoiceType: invoiceData.custom_invoice_type || "",
+        paymentPercentage: 0,
+        estimateTotal: getEstimateDisplayTotal(invoiceData),
+        totalLaborCost: hasApiLaborCost(invoiceData.total_labor_cost)
+          ? resolveInvoiceLaborCost(invoiceData.total_labor_cost)
+          : null,
+        paymentHistory: [],
+      });
 
-      return (
-        typeMapping[invoice.invoice_type] ||
-        invoice.invoice_type.charAt(0).toUpperCase() +
-          invoice.invoice_type.slice(1)
-      );
-    })();
+      // This is a NEW invoice, not an edit of the one being duplicated —
+      // clearing editingInvoiceId ensures "Preview & Send to Customer" creates
+      // a fresh invoice instead of updating the original.
+      setEditingInvoiceId(null);
 
-    console.log("Set invoice type to:", mappedInvoiceType);
-    console.log(
-      "Set customer name to:",
-      invoice.customer_name ||
-        invoice.contractor?.company_name ||
-        invoice.contractor?.email ||
-        "",
-    );
-    console.log(
-      "Set customer address to:",
-      invoice.customer_address || invoice.contractor?.address || "",
-    );
-
-    // Show the inline invoice form
-    setShowInlineInvoiceForm(true);
+      // Show the inline invoice form
+      setShowInlineInvoiceForm(true);
+    } catch (error) {
+      console.error("Error duplicating invoice:", error);
+      toast.error("Failed to load invoice details for duplication");
+    } finally {
+      setIsLoading(false);
+    }
   };
 const buildGroupedInvoiceRowsForPrint = (products: any[] = []) => {
   const directItems: any[] = [];
@@ -6075,6 +6069,8 @@ const handlePrintInvoice = async (invoice: any) => {
         estimateNumber: "",
         customerName: job.customerName || "",
         customerAddress: job.address || "",
+        customerId: null,
+        contractorId: null,
         billToAddress: job.billToAddress || "",
         billToAddressEnabled: true,
         poNumber: "",
@@ -6503,6 +6499,8 @@ const handlePrintInvoice = async (invoice: any) => {
         estimateNumber: "",
         customerName: job.customerName || "",
         customerAddress: job.address || "",
+        customerId: null,
+        contractorId: null,
         billToAddress: job.billToAddress || "",
         billToAddressEnabled: true,
         poNumber: "",
@@ -8645,54 +8643,51 @@ const handlePrintInvoice = async (invoice: any) => {
                           payment.
                         </p>
                       </div>
-                      <div className="flex justify-end mt-4">
-                        <div className="text-right">
-                          <div className="flex items-center gap-4">
-                            <span className="text-xl font-bold">Total</span>
-                            <span className="text-2xl font-bold">
-                              $
-                              {calculateInvoiceSubtotal().toLocaleString(
-                                "en-US",
-                                {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                },
-                              )}
+                      <div className="flex justify-end mt-3">
+                        <div className="text-right w-60">
+                          <div className="flex justify-between mb-1.5">
+                            <span className="text-sm text-gray-600">Total:</span>
+                            <span className="text-sm text-gray-900">
+                              ${calculateInvoiceSubtotal().toFixed(2)}
                             </span>
                           </div>
                           {hasApiLaborCost(inlineInvoiceData.totalLaborCost) && (
                             <>
-                              <div className="flex items-center gap-4 mt-2">
-                                <span className="text-xl font-bold">
-                                  Total Labor Cost
+                              <div className="flex justify-between mb-1.5">
+                                <span className="text-sm text-gray-600">
+                                  Total Labor Cost:
                                 </span>
-                                <span className="text-2xl font-bold">
+                                <span className="text-sm text-gray-600">
                                   $
                                   {resolveInvoiceLaborCost(
                                     inlineInvoiceData.totalLaborCost,
-                                  ).toLocaleString("en-US", {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
+                                  ).toFixed(2)}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-4 mt-2">
-                                <span className="text-xl font-bold">
-                                  Total Material + Labor
+                              <div className="flex justify-between mb-1.5">
+                                <span className="text-sm text-gray-600">
+                                  Total Material + Labor:
                                 </span>
-                                <span className="text-2xl font-bold">
-                                  $
-                                  {calculateInvoiceGrandTotal().toLocaleString(
-                                    "en-US",
-                                    {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    },
-                                  )}
+                                <span className="text-sm text-gray-600">
+                                  ${calculateInvoiceGrandTotal().toFixed(2)}
                                 </span>
                               </div>
                             </>
                           )}
+                          <div className="flex justify-between mb-1.5">
+                            <span className="text-sm text-gray-600">
+                              Payments / Credits:
+                            </span>
+                            <span className="text-sm text-gray-600">
+                              ${(inlineInvoiceData.paymentCredits || 0).toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between bg-gray-100 px-3 py-2 rounded">
+                            <span className="font-bold text-sm">Balance Due:</span>
+                            <span className="font-bold text-sm">
+                              ${calculateInvoiceBalanceDue().toFixed(2)}
+                            </span>
+                          </div>
                         </div>
                       </div>
                       <div className="text-center text-sm text-blue-500 font-bold">
@@ -8769,6 +8764,8 @@ const handlePrintInvoice = async (invoice: any) => {
                             estimateNumber: "",
                             customerName: job.customerName || "",
                             customerAddress: job.address || "",
+                            customerId: null,
+                            contractorId: null,
                             billToAddress: job.billToAddress || "",
                             billToAddressEnabled: true,
                             poNumber: "",
