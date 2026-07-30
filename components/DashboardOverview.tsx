@@ -780,11 +780,7 @@ export function DashboardOverview() {
                     cy="50%"
                     innerRadius={60}
                     outerRadius={100}
-                    paddingAngle={
-                      projectStatusData.filter((item) => Number(item.value) > 0).length > 1
-                        ? 5
-                        : 0
-                    }
+                    paddingAngle={0}
                     dataKey="value"
                     stroke="none"
                   >
