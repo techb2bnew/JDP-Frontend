@@ -1150,6 +1150,7 @@ const handlePermissionChange = (modName: string, act: string, allowed: boolean) 
         const updateData = {
           roleId: parseInt(editingRole.id),
           roleName: apiRoleName,
+          description: formData.description,
           platform: platformValue,
           permissions: compiledPermissions.map(perm => ({
             module: perm.module,

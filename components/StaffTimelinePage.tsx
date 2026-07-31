@@ -360,10 +360,6 @@ export function StaffTimelinePage() {
   }
 
   const handleDelete = async (timesheetId: number) => {
-    if (!confirm('Are you sure you want to delete this timesheet?')) {
-      return
-    }
-
     try {
       setIsLoading(true)
       await apiClient.deleteStaffTimesheet(timesheetId)
@@ -535,9 +531,6 @@ export function StaffTimelinePage() {
                   }}
                   onFocus={() => {
                     setShowJobDropdown(true)
-                    if (jobResults.length === 0) {
-                      fetchJobs('')
-                    }
                   }}
                   className="pl-8"
                 />

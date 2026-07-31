@@ -100,13 +100,8 @@ interface JobCreationPageProps {
 export function JobCreationPage({ onBack, onJobCreated }: JobCreationPageProps) {
   const router = useRouter()
   const { hasPermission } = usePermissions()
-  const canAssignLeadLabor =
-    hasPermission('jobs', 'assign') ||
-    hasPermission('jobs', 'assigned leader') ||
-    hasPermission('jobs', 'assigned lead labor')
-  const canAssignLabor =
-    hasPermission('jobs', 'assign') ||
-    hasPermission('jobs', 'assigned labor')
+  const canAssignLeadLabor = hasPermission('assigned_lead_labour', 'assign')
+  const canAssignLabor = hasPermission('assigned_labour', 'assign')
   const showAssignedSection = canAssignLeadLabor || canAssignLabor
   const [currentStep, setCurrentStep] = useState(1)
   const [selectedCustomerName, setSelectedCustomerName] = useState('')

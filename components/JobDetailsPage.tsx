@@ -362,13 +362,8 @@ export function JobDetailsPage({
   
 
   const { hasPermission } = usePermissions();
-  const canAssignLeadLabor =
-    hasPermission("jobs", "assign") ||
-    hasPermission("jobs", "assigned leader") ||
-    hasPermission("jobs", "assigned lead labor");
-  const canAssignLabor =
-    hasPermission("jobs", "assign") ||
-    hasPermission("jobs", "assigned labor");
+  const canAssignLeadLabor = hasPermission("assigned_lead_labour", "assign");
+  const canAssignLabor = hasPermission("assigned_labour", "assign");
 
   // Find the job from your jobs array or use sample data
   const job =
