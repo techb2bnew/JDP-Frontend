@@ -25,6 +25,7 @@ import {
   bluesheetMaterialToImportable,
   buildLineItemRowsFromImportSelections,
   estimateProductToImportable,
+  mergeDuplicateProductSelections,
   partitionImportedProductsByDuplicate,
   type ImportableLabor,
   type ImportableProduct,
@@ -302,21 +303,43 @@ export default function ImportProductsDialog({
 
     if (productEntries.length === 0 && laborItems.length === 0) return;
 
+    // Same product picked from more than one source (e.g. two Estimates) —
+    // merge into one entry with quantities summed instead of two rows. Only
+    // applies to products with no room/header of their own: a product that
+    // belongs to a room (e.g. "Kitchen") always stays inside that room's
+    // group as its own row, even if the same product also appears elsewhere.
+    const standaloneEntries = productEntries.filter((entry) => !entry.headerName);
+    const roomGroupedEntries = productEntries.filter((entry) => !!entry.headerName);
+
+    const mergedStandalone = mergeDuplicateProductSelections(standaloneEntries);
+    const mergedDuplicateCount = mergedStandalone.reduce(
+      (sum, entry) => sum + (entry.mergedCount - 1),
+      0,
+    );
+
+    const mergedProductEntries = [
+      ...mergedStandalone.map(({ product, headerName }) => ({ product, headerName })),
+      ...roomGroupedEntries,
+    ];
+
     const { toImport, duplicates } = partitionImportedProductsByDuplicate(
-      productEntries.map((entry) => entry.product),
+      mergedProductEntries.map((entry) => entry.product),
       existingLineItems,
     );
     const toImportKeys = new Set(toImport.map((product) => product.key));
-    const filteredProductEntries = productEntries.filter((entry) =>
+    const filteredProductEntries = mergedProductEntries.filter((entry) =>
       toImportKeys.has(entry.product.key),
     );
 
     if (filteredProductEntries.length === 0 && laborItems.length === 0) {
-      if (duplicates.length > 0) {
-        toast(
-          `${duplicates.length} product(s) already in this invoice were skipped`,
-        );
+      const notes: string[] = [];
+      if (mergedDuplicateCount > 0) {
+        notes.push(`${mergedDuplicateCount} duplicate selection(s) merged`);
       }
+      if (duplicates.length > 0) {
+        notes.push(`${duplicates.length} product(s) already in this invoice were skipped`);
+      }
+      if (notes.length > 0) toast(notes.join(". "));
       return;
     }
 
@@ -329,10 +352,16 @@ export default function ImportProductsDialog({
     onImport(rows);
 
     const importedCount = filteredProductEntries.length + laborItems.length;
+    const notes: string[] = [];
+    if (mergedDuplicateCount > 0) {
+      notes.push(`merged ${mergedDuplicateCount} duplicate selection(s)`);
+    }
     if (duplicates.length > 0) {
-      toast(
-        `Imported ${importedCount} item(s). ${duplicates.length} duplicate product(s) were skipped.`,
-      );
+      notes.push(`skipped ${duplicates.length} already in invoice`);
+    }
+
+    if (notes.length > 0) {
+      toast(`Imported ${importedCount} item(s) (${notes.join(", ")}).`);
     } else {
       toast.success(`Imported ${importedCount} item(s).`);
     }

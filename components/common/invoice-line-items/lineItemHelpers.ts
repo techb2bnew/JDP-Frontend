@@ -481,6 +481,53 @@ export function buildLineItemRowsFromImportSelections({
 }
 
 /**
+ * Same product picked from more than one source in a single import batch
+ * (e.g. the same catalog product selected from two different Estimates)
+ * collapses into one entry with quantities/totals summed, instead of
+ * producing duplicate rows. Matched by catalog product id, or by name for
+ * custom/no-id products. Keeps the first occurrence's room/header.
+ */
+export function mergeDuplicateProductSelections(
+  entries: { product: ImportableProduct; headerName: string | null }[],
+): { product: ImportableProduct; headerName: string | null; mergedCount: number }[] {
+  const dedupeKeyFor = (product: ImportableProduct) =>
+    product.productId != null && String(product.productId).trim() !== ""
+      ? `id:${product.productId}`
+      : `name:${String(product.name || "").trim().toLowerCase()}`;
+
+  const order: string[] = [];
+  const merged = new Map<
+    string,
+    { product: ImportableProduct; headerName: string | null; mergedCount: number }
+  >();
+
+  entries.forEach((entry) => {
+    const key = dedupeKeyFor(entry.product);
+    const existing = merged.get(key);
+
+    if (!existing) {
+      merged.set(key, {
+        product: entry.product,
+        headerName: entry.headerName,
+        mergedCount: 1,
+      });
+      order.push(key);
+      return;
+    }
+
+    existing.product = {
+      ...existing.product,
+      qty: existing.product.qty + entry.product.qty,
+      total: roundMoney(existing.product.total + entry.product.total),
+    };
+    existing.headerName = existing.headerName || entry.headerName;
+    existing.mergedCount += 1;
+  });
+
+  return order.map((key) => merged.get(key)!);
+}
+
+/**
  * Skip products already present in `existingLineItems` (matched by catalog
  * product id, or by name when custom/no id) so re-importing the same source
  * doesn't duplicate rows. Labor entries are never treated as duplicates of
