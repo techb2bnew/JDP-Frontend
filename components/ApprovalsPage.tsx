@@ -139,6 +139,9 @@ export function ApprovalsPage({
   const [selectionTarget, setSelectionTarget] = useState<ApiBlueSheetItem | null>(null)
   const [selectedBlueSheets, setSelectedBlueSheets] = useState<any[]>([])
   const deepLinkHandledRef = useRef(false)
+  // Jobs we've just approved locally — kept "approved" even if a refetch briefly
+  // returns stale (not-yet-committed) data, so the stat cards never flicker/revert.
+  const locallyApprovedJobIdsRef = useRef<Set<number>>(new Set())
   console.log(blueSheets, "bluesheets");
   console.log(selectedBlueSheet, "selectedBlueSheet")
   // Fetch bluesheets from API
@@ -154,7 +157,9 @@ export function ApprovalsPage({
           ...item,
           id: item.latest_bluesheet_id,
           date: item.latest_bluesheet_date,
-          status: item.approved_by ? 'approved' : 'pending',
+          status: (item.approved_by || locallyApprovedJobIdsRef.current.has(item.job_id))
+            ? 'approved'
+            : 'pending',
           created_by_user: item.submitted_by,
           notes: '',
           additional_charges: 0,
@@ -328,6 +333,9 @@ export function ApprovalsPage({
     try {
       setIsApproving(true)
       await apiClient.approveBulkBluesheet([id], 'approved')
+      if (approveTarget.job_id != null) {
+        locallyApprovedJobIdsRef.current.add(approveTarget.job_id)
+      }
       setBlueSheets(blueSheets.map(item =>
         item.id === id ? {
           ...item,
@@ -378,6 +386,9 @@ export function ApprovalsPage({
   }
 
   const handleApprovalComplete = (approvedItem: any) => {
+    if (approvedItem?.job_id != null) {
+      locallyApprovedJobIdsRef.current.add(approvedItem.job_id)
+    }
     setBlueSheets(blueSheets.map(item =>
       item.job_id === approvedItem.job_id ? {
         ...item,

@@ -2248,7 +2248,9 @@ export function CustomersPage() {
               }
               itemsPerPage={itemsPerPage}
               getStatusIcon={getStatusIcon}
-              totalItems={totalCustomers}
+              totalItems={
+                searchTerm.trim() ? customersWithJobs.length : totalCustomers
+              }
               footer={
                 <div className="mx-auto text-center">
                   <div className="mb-3 text-sm text-slate-600">
@@ -3217,7 +3219,7 @@ export function CustomersPage() {
       >
         <DialogContent
           className="max-w-2xl overflow-visible"
-          style={{ zIndex: 100 }}
+          style={{ zIndex: 50 }}
           onInteractOutside={(e) => {
             // Prevent modal close when clicking on autocomplete dropdown
             const target = e.target as HTMLElement;

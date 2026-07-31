@@ -331,6 +331,45 @@ const handleEditInvoice = (invoice: any) => {
       console.log('Products data:', invoiceData?.products);
       console.log('Total amount:', invoiceData?.total_amount);
       
+      // Group products under their custom headers, same grouping order used
+      // by the invoice view page (ungrouped items first, then each header's items).
+      const buildInvoiceLineItemsHtml = (products: any[] = []) => {
+        const renderItemRow = (p: any) => `
+                <tr class="pdf-row" style="border-bottom:1px solid #e5e7eb;">
+                  <td style="border:1px solid #d1d5db;padding:12px 16px;font-size:14px;font-weight:500;">${p.stock_quantity || p.quantity || 1}</td>
+                  <td style="border:1px solid #d1d5db;padding:12px 16px;font-weight:600;font-size:14px;">${p.product_name || p.name || 'Item'}</td>
+                  <td style="border:1px solid #d1d5db;padding:12px 16px;font-size:13px;color:#6b7280;line-height:1.4;">${p.description || ''}</td>
+                  <td style="border:1px solid #d1d5db;padding:12px 16px;text-align:right;font-size:14px;font-weight:500;">$${(p.estimated_price || p.unit_cost || p.rate || 0).toFixed(2)}</td>
+                  <td style="border:1px solid #d1d5db;padding:12px 16px;text-align:right;font-weight:600;font-size:14px;">$${(p.total_cost || p.total || 0).toFixed(2)}</td>
+                </tr>`;
+
+        const renderHeaderRow = (headerName: string) => `
+                <tr class="pdf-row">
+                  <td colspan="5" style="padding:0;border:1px solid #d1d5db;">
+                    <div style="background:#1f2937;color:#fff;padding-left:16px;font-size:14px;font-weight:600;padding-bottom:15px;">${headerName}</div>
+                  </td>
+                </tr>`;
+
+        const directItems = products.filter(
+          (p: any) => !(p.parent_header_name || p.parentHeaderName)
+        );
+        const headerMap = new Map<string, any[]>();
+        products.forEach((p: any) => {
+          const headerName = p.parent_header_name || p.parentHeaderName;
+          if (!headerName) return;
+          if (!headerMap.has(headerName)) headerMap.set(headerName, []);
+          headerMap.get(headerName)!.push(p);
+        });
+
+        let rowsHtml = directItems.map(renderItemRow).join('');
+        headerMap.forEach((items, headerName) => {
+          rowsHtml += renderHeaderRow(headerName);
+          rowsHtml += items.map(renderItemRow).join('');
+        });
+
+        return rowsHtml;
+      };
+
       // Create temp container (same as JobDetailsPage)
       const tempElement = document.createElement('div');
       tempElement.id = 'temp-invoice-preview';
@@ -446,15 +485,7 @@ const handleEditInvoice = (invoice: any) => {
               </tr>
             </thead>
             <tbody>
-              ${invoiceData?.products?.map((p: any) => `
-                <tr style="border-bottom:1px solid #e5e7eb;">
-                  <td style="border:1px solid #d1d5db;padding:12px 16px;font-size:14px;font-weight:500;">${p.stock_quantity || p.quantity || 1}</td>
-                  <td style="border:1px solid #d1d5db;padding:12px 16px;font-weight:600;font-size:14px;">${p.product_name || p.name || 'Item'}</td>
-                  <td style="border:1px solid #d1d5db;padding:12px 16px;font-size:13px;color:#6b7280;line-height:1.4;">${p.description || ''}</td>
-                  <td style="border:1px solid #d1d5db;padding:12px 16px;text-align:right;font-size:14px;font-weight:500;">$${(p.estimated_price || p.unit_cost || p.rate || 0).toFixed(2)}</td>
-                  <td style="border:1px solid #d1d5db;padding:12px 16px;text-align:right;font-weight:600;font-size:14px;">$${(p.total_cost || p.total || 0).toFixed(2)}</td>
-                </tr>
-              `).join('') || ''}
+              ${buildInvoiceLineItemsHtml(invoiceData?.products || [])}
             </tbody>
           </table>
  
@@ -479,14 +510,14 @@ const handleEditInvoice = (invoice: any) => {
         </div>
  
         <!-- Notes -->
-        <div style="border-top:2px solid #e5e7eb;padding-top:20px;margin-bottom:32px;">
+        <div class="pdf-avoid-break" style="border-top:2px solid #e5e7eb;padding-top:20px;margin-bottom:32px;">
           <div style="background:#f3f4f6;padding:16px;border-radius:6px;text-align:center;border:1px solid #e5e7eb;">
             <div style="font-size:14px;font-weight:500;white-space:pre-line;color:#374151;">${invoiceData?.notes || 'Final payment to complete project billing'}</div>
           </div>
         </div>
  
         <!-- Acceptance -->
-        <div style="margin-bottom:32px;page-break-inside:avoid;">
+        <div class="pdf-avoid-break" style="margin-bottom:32px;page-break-inside:avoid;">
           <div style="font-size:11px;color:#6b7280;margin-bottom:32px;line-height:1.5;">
             <p style="margin:0;">
               JDP is not responsible for repair of lamps & landscaping, house owner utilities including cables,
@@ -532,9 +563,19 @@ const handleEditInvoice = (invoice: any) => {
       tempElement.innerHTML = invoiceHtml;
       document.body.appendChild(tempElement);
 
-      // Header height in CSS px
-      const headerEl = tempElement.querySelector('#print-header') as HTMLElement | null;
-      const headerCssPx = Math.ceil(headerEl?.getBoundingClientRect().height || 0);
+      const rootRect = tempElement.getBoundingClientRect();
+
+      // Elements that must never be sliced in half across a page break
+      // (line-item rows, custom header banners, notes, signature block).
+      const avoidEls = Array.from(
+        tempElement.querySelectorAll('.pdf-row, .pdf-avoid-break')
+      ) as HTMLElement[];
+      const avoidZonesCss = avoidEls
+        .map((el) => {
+          const r = el.getBoundingClientRect();
+          return { top: r.top - rootRect.top, bottom: r.bottom - rootRect.top };
+        })
+        .sort((a, b) => a.top - b.top);
 
       // Render to canvas
       const canvas = await html2canvas(tempElement, {
@@ -551,74 +592,65 @@ const handleEditInvoice = (invoice: any) => {
         windowHeight: tempElement.scrollHeight
       });
 
-      // ------ FIX 1: convert CSS px -> SCALED canvas px ------
-      const scaleX = canvas.width / tempElement.scrollWidth;
-
-      // page-top → header-bottom tak ka full band (CSS px)
-      const rootRect = tempElement.getBoundingClientRect();
-      const headRect = headerEl?.getBoundingClientRect();
-      const headerBandCssPx = Math.max(
-        1,
-        Math.ceil(((headRect?.bottom ?? 0) - rootRect.top))   // includes top whitespace
-      );
-
-      // SCALED canvas px
-      const headerPxScaled = Math.max(1, Math.round(headerBandCssPx * scaleX));
-
-      // Slice header (use scaled px)
-      let headerImgData: string | null = null;
-      if (headerPxScaled > 0) {
-        const headerCanvas = document.createElement('canvas');
-        headerCanvas.width = canvas.width;
-        headerCanvas.height = headerPxScaled;
-        const hctx = headerCanvas.getContext('2d')!;
-        // slice: page top (y=0) to header bottom
-        hctx.drawImage(canvas, 0, 0, canvas.width, headerPxScaled, 0, 0, canvas.width, headerPxScaled);
-        headerImgData = headerCanvas.toDataURL('image/png');
-      }
-
       const imageData = canvas.toDataURL('image/png');
 
       // PDF sizing
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgWidth = 210;                 // A4 width (mm)
       const footerSpace = 21;               // reserve bottom
-      const pageHeight = 295 - footerSpace; // usable page height
+      const pageHeightMM = 295 - footerSpace; // usable page height
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-      const pxToMm = imgWidth / canvas.width;
+      const cssPxToMM = imgWidth / tempElement.scrollWidth;
 
-      // ------ FIX 2: header reserve with padding ------
-      const headerHeightMM = headerPxScaled * pxToMm; // includes top whitespace
-      const headerReserveMM = headerHeightMM;       // pad ki zaroorat nahi
-      const pageContentHeightMM = pageHeight - headerReserveMM;
-
-      let heightLeft = imgHeight;
-
-      // First page (full tall image as before)
-      pdf.addImage(imageData, 'PNG', 0, 0, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      // Next pages
-      while (heightLeft > 0.1) {
-        const position = heightLeft - imgHeight; // negative offset of tall image
-        pdf.addPage();
-
-        // Draw page content shifted just below headerReserve
-        // content ko header band ke turant baad start karo
-        const contentYOffset = headerReserveMM;
-        pdf.addImage(imageData, 'PNG', 0, position + contentYOffset, imgWidth, imgHeight);
-
-        // top band ko white mask (safety)
-        pdf.setFillColor(255, 255, 255);
-        pdf.rect(0, 0, imgWidth, headerReserveMM, 'F');
-
-        // header band (full-width) bilkul top se draw
-        if (headerImgData && headerHeightMM > 0) {
-          pdf.addImage(headerImgData, 'PNG', 0, 0, imgWidth, headerHeightMM);
+      // Snap a target CSS-px cut point so it never lands inside a row/block —
+      // if it would, push the whole element to the next page instead.
+      const snapToSafeBoundary = (targetCssY: number): number => {
+        for (const zone of avoidZonesCss) {
+          if (targetCssY > zone.top + 0.5 && targetCssY < zone.bottom - 0.5) {
+            return zone.top;
+          }
         }
+        return targetCssY;
+      };
 
-        heightLeft -= pageContentHeightMM;
+      const totalCssHeight = tempElement.scrollHeight;
+      const pageCssHeight = pageHeightMM / cssPxToMM;
+
+      // Cumulative CSS-px break points between pages — always between rows, never through one.
+      // The logo/estimate header is normal flowing content, so it only ever appears on page 1.
+      const breakpoints: number[] = [0];
+      let cursor = 0;
+      let guard = 0;
+      while (cursor < totalCssHeight - 0.5 && guard < 1000) {
+        guard++;
+        const rawTarget = cursor + pageCssHeight;
+        let safeTarget = Math.min(rawTarget, totalCssHeight);
+        if (safeTarget < totalCssHeight - 0.5) {
+          const snapped = snapToSafeBoundary(safeTarget);
+          safeTarget = snapped > cursor + 1 ? snapped : rawTarget;
+        }
+        breakpoints.push(safeTarget);
+        cursor = safeTarget;
+      }
+
+      // Draw each page: just the content slice for that page, no repeated header.
+      for (let page = 0; page < breakpoints.length - 1; page++) {
+        const sliceTopCss = breakpoints[page];
+        const sliceBottomCss = breakpoints[page + 1];
+        const sliceHeightMM = (sliceBottomCss - sliceTopCss) * cssPxToMM;
+
+        if (page > 0) pdf.addPage();
+
+        const imagePositionMM = -sliceTopCss * cssPxToMM;
+        pdf.addImage(imageData, 'PNG', 0, imagePositionMM, imgWidth, imgHeight);
+
+        // Mask anything below this page's actual content so a shortened slice
+        // (from snapping to a safe boundary) never bleeds/duplicates onto the next page.
+        if (sliceHeightMM < 295) {
+          pdf.setFillColor(255, 255, 255);
+          pdf.rect(0, sliceHeightMM, imgWidth, 295 - sliceHeightMM, 'F');
+        }
       }
 
       // Open + print
@@ -1188,8 +1220,8 @@ const handleEditInvoice = (invoice: any) => {
                         <SelectItem value="all">All Status</SelectItem>
                         <SelectItem value="draft">Draft</SelectItem>
                         <SelectItem value="sent">Sent</SelectItem> 
-                        <SelectItem value="aprroved">Approved</SelectItem> 
-                        <SelectItem value="mark_as_paid">Mark As Paid</SelectItem> 
+                        <SelectItem value="approved">Approved</SelectItem> 
+                        <SelectItem value="paid">Mark As Paid</SelectItem> 
                       </SelectContent>
                     </Select>
                     <Select value={invoiceTypeFilter} onValueChange={setInvoiceTypeFilter}>

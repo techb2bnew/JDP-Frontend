@@ -145,14 +145,17 @@ const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const endDate = '2025-09-26'
 
 
-const fetchAlltimesheets = async () => {
+const fetchAlltimesheets = async (page: number = currentPage) => {
   try {
     setIsLoading(true);
     // Use searchTimesheets API if employee filter is selected
     const nameParam = employeeFilter && employeeFilter !== 'all' ? employeeFilter : null;
     let response;
+    // getAllTimesheets() has no page/limit params — it always returns every
+    // record, so that branch needs client-side slicing below.
+    const isServerPaginated = !!nameParam;
     if (nameParam) {
-      response = await apiClient.searchTimesheetsByQuery('', 1, 10, null, null, nameParam, null);
+      response = await apiClient.searchTimesheetsByQuery('', page, itemsPerPage, null, null, nameParam, null);
     } else {
       response = await apiClient.getAllTimesheets();
       // Store all employees when fetching without filters
@@ -164,14 +167,14 @@ const fetchAlltimesheets = async () => {
     console.log('API Response:', response); // Debug log
     const timesheets = response.data.dashboard_timesheets || [];
     const period = response.data.period || { start_date: '', end_date: '', week_range: '' };
-    
+
     const transformedTimesheets = timesheets.map((item: any) => ({
       employee: item.employee || 'N/A',
       job: item.job || 'N/A',
-      jobCode: item.job ? item.job.split('(')[1]?.replace(')', '') || 'N/A' : 'N/A', 
+      jobCode: item.job ? item.job.split('(')[1]?.replace(')', '') || 'N/A' : 'N/A',
       week: item.week || '',
-      jobId: item.job_id?.toString() || '', 
-      laborId: item.labor_id?.toString() || '', 
+      jobId: item.job_id?.toString() || '',
+      laborId: item.labor_id?.toString() || '',
       lead_labor_id:item.lead_labor_id?.toString()|| '',
       mon: item.mon || '0h',
       tue: item.tue || '0h',
@@ -190,13 +193,23 @@ const fetchAlltimesheets = async () => {
 
     console.log('Transformed timesheets:', transformedTimesheets); // Debug log
     console.log('Setting filteredTimesheets to:', transformedTimesheets.length, 'items'); // Debug log
-    setTimesheets(response.data); 
-    setFilteredTimesheets(transformedTimesheets); 
+    setTimesheets(response.data);
+
+    if (isServerPaginated) {
+      setTotalTimesheets(response.data?.pagination?.total_records ?? transformedTimesheets.length);
+      setFilteredTimesheets(transformedTimesheets);
+    } else {
+      // No server-side pagination on this endpoint — paginate the full list locally.
+      setTotalTimesheets(transformedTimesheets.length);
+      const start = (page - 1) * itemsPerPage;
+      setFilteredTimesheets(transformedTimesheets.slice(start, start + itemsPerPage));
+    }
   } catch (error) {
     console.error('Error fetching timesheets:', error);
-    setFilteredTimesheets([]); 
+    setFilteredTimesheets([]);
+    setTotalTimesheets(0);
   } finally {
-    setIsLoading(false); 
+    setIsLoading(false);
   }
 };
 
@@ -219,15 +232,30 @@ const fetchAlltimesheets = async () => {
 // Common function for timesheet status updates
 const updateTimesheetStatus = async (item: TimesheetItem, status: 'Approved' | 'Draft') => {
   try {
+    // This row's own week, e.g. "2026-07-27 - 2026-08-02" — not the (possibly
+    // multi-week, when a date-range filter is active) global `timesheets.period`,
+    // which would silently approve the wrong week for this row.
+    const [weekStartDate, weekEndDate] = String(item.week || '')
+      .split(' - ')
+      .map((s) => s.trim());
+
+    const jobId = item.jobId || item.job_id || null;
+    
+    if (!jobId) {
+      const { toast } = await import('sonner');
+      toast.error('This entry has no associated job and cannot be approved.');
+      return;
+    }
+
     setIsLoading(true);
 
     const payload = {
-      jobId: item.jobId || item.job_id || 0,
-      startDate: timesheets?.period.start_date || '2025-09-20',
-      endDate: timesheets?.period.end_date || '2025-09-26',
+      jobId,
+      startDate: weekStartDate || timesheets?.period.start_date || '2025-09-20',
+      endDate: weekEndDate || timesheets?.period.end_date || '2025-09-26',
       status: status,
       laborId: item.laborId || item.labor_id || null,
-      lead_labor_id: item.lead_labor_id || item.lead_labor_id || null,
+      lead_labor_id: item.lead_labor_id || null,
     };
 
     if (payload.laborId) payload.lead_labor_id = null;
@@ -404,7 +432,7 @@ const getWeekDays = (weekStr: string) => {
 
 
 
-const fetchBySearchTimesheets = async () => {
+const fetchBySearchTimesheets = async (page: number = currentPage) => {
   if (!searchTerm.trim()) return;
 
   setIsLoadingTimesheets(true);
@@ -412,7 +440,7 @@ const fetchBySearchTimesheets = async () => {
   try {
     const nameParam = employeeFilter && employeeFilter !== 'all' ? employeeFilter : null;
     const statusParam = statusFilter && statusFilter !== 'all' ? statusFilter : null;
-    const response = await apiClient.searchTimesheetsByQuery(searchTerm.trim(), 1, 10, null, null, nameParam, statusParam);
+    const response = await apiClient.searchTimesheetsByQuery(searchTerm.trim(), page, itemsPerPage, null, null, nameParam, statusParam);
     console.log('Search API Response:', response); // Debug log
     const timesheetsData = response.data;
     const timesheets = timesheetsData?.dashboard_timesheets || [];
@@ -440,10 +468,10 @@ const fetchBySearchTimesheets = async () => {
       weekly_payment: item.weekly_payment || null,
     }));
 
-    console.log('Search transformed timesheets:', transformedTimesheets); 
-    setFilteredTimesheets(transformedTimesheets); 
-    setTimesheets(timesheetsData); 
-    setTotalTimesheets(transformedTimesheets.length);
+    console.log('Search transformed timesheets:', transformedTimesheets);
+    setFilteredTimesheets(transformedTimesheets);
+    setTimesheets(timesheetsData);
+    setTotalTimesheets(timesheetsData?.pagination?.total_records ?? transformedTimesheets.length);
   } catch (err) {
     console.error('Timesheet search error:', err);
     setFilteredTimesheets([]); 
@@ -465,18 +493,21 @@ const fetchBySearchTimesheets = async () => {
 
 useEffect(() => {
   const debounceTimeout = setTimeout(() => {
+    // Filters changed — always restart pagination at page 1 (pass it explicitly
+    // rather than relying on currentPage state, which may not have flushed yet).
+    setCurrentPage(1);
     if (!searchTerm.trim()) {
       // Only fetch all timesheets if no status filter is applied
       if (statusFilter === 'all') {
-        fetchAlltimesheets();
+        fetchAlltimesheets(1);
       } else {
         // Use the status filter logic
-        fetchTimesheetsByFilters();
+        fetchTimesheetsByFilters(1);
       }
     } else {
-      fetchBySearchTimesheets(); 
+      fetchBySearchTimesheets(1);
     }
-  }, 500); 
+  }, 500);
 
   return () => clearTimeout(debounceTimeout);
 }, [searchTerm, statusFilter, employeeFilter]);
@@ -484,11 +515,28 @@ useEffect(() => {
 // Add new useEffect for date range changes
 useEffect(() => {
   if (dateRange.from && dateRange.to) {
-    fetchTimesheetsByDateRange();
+    setCurrentPage(1);
+    fetchTimesheetsByDateRange(1);
   }
 }, [dateRange]);
 
-const fetchTimesheetsByFilters = async () => {
+// Prev/Next changes currentPage — refetch (or re-slice) that page using
+// whichever filter is currently active. Page 1 is already fetched by the
+// filter effects above, so skip it here to avoid a duplicate request.
+useEffect(() => {
+  if (currentPage === 1) return;
+  if (dateRange.from && dateRange.to) {
+    fetchTimesheetsByDateRange(currentPage);
+  } else if (searchTerm.trim()) {
+    fetchBySearchTimesheets(currentPage);
+  } else if (statusFilter !== 'all') {
+    fetchTimesheetsByFilters(currentPage);
+  } else {
+    fetchAlltimesheets(currentPage);
+  }
+}, [currentPage]);
+
+const fetchTimesheetsByFilters = async (page: number = currentPage) => {
   if (searchTerm.trim()) return;
 
   setIsLoadingTimesheets(true);
@@ -496,13 +544,16 @@ const fetchTimesheetsByFilters = async () => {
   try {
     const nameParam = employeeFilter && employeeFilter !== 'all' ? employeeFilter : null;
     let response;
+    let isServerPaginated = true;
     if (statusFilter !== 'all') {
-      response = await apiClient.searchTimesheetsByStatus(statusFilter, 1, 10, nameParam);
+      response = await apiClient.searchTimesheetsByStatus(statusFilter, page, itemsPerPage, nameParam);
     } else {
       // If no status filter but employee filter is selected, use searchTimesheetsByQuery
       if (nameParam) {
-        response = await apiClient.searchTimesheetsByQuery('', 1, 10, null, null, nameParam, null);
+        response = await apiClient.searchTimesheetsByQuery('', page, itemsPerPage, null, null, nameParam, null);
       } else {
+        // No page/limit support on this endpoint — paginate the full list locally.
+        isServerPaginated = false;
         response = await apiClient.getAllTimesheets();
       }
     }
@@ -515,7 +566,7 @@ const fetchTimesheetsByFilters = async () => {
       employee: item.employee || 'N/A',
       job: item.job || 'N/A',
       jobCode: item.job ? item.job.split('(')[1]?.replace(')', '') || 'N/A' : 'N/A',
-      week: period.week_range,
+      week: item.week || period.week_range,
       jobId: item.job_id?.toString() || '',
       laborId: item.labor_id?.toString() || '',
       lead_labor_id: item.lead_labor_id?.toString() || '',
@@ -534,9 +585,17 @@ const fetchTimesheetsByFilters = async () => {
       weekly_payment: item.weekly_payment || null,
     }));
 
-    setTimesheets(timesheetsData); 
-    setFilteredTimesheets(transformedTimesheets);
-    setTotalTimesheets(transformedTimesheets.length);
+    setTimesheets(timesheetsData);
+
+    if (isServerPaginated) {
+      setTotalTimesheets(timesheetsData?.pagination?.total_records ?? transformedTimesheets.length);
+      setFilteredTimesheets(transformedTimesheets);
+    } else {
+      // No server-side pagination on this endpoint — paginate the full list locally.
+      setTotalTimesheets(transformedTimesheets.length);
+      const start = (page - 1) * itemsPerPage;
+      setFilteredTimesheets(transformedTimesheets.slice(start, start + itemsPerPage));
+    }
   } catch (error) {
     console.error("Timesheet filter error:", error);
     setTimesheets({
@@ -555,7 +614,7 @@ const fetchTimesheetsByFilters = async () => {
 };
 
 // New function to fetch timesheets by date range
-const fetchTimesheetsByDateRange = async () => {
+const fetchTimesheetsByDateRange = async (page: number = currentPage) => {
   if (!dateRange.from || !dateRange.to) return;
 
   setIsLoadingTimesheets(true);
@@ -576,7 +635,7 @@ const fetchTimesheetsByDateRange = async () => {
 
     const nameParam = employeeFilter && employeeFilter !== 'all' ? employeeFilter : null;
     const statusParam = statusFilter && statusFilter !== 'all' ? statusFilter : null;
-    const response = await apiClient.searchTimesheetsByQuery('', 1, 10, startDate, endDate, nameParam, statusParam);
+    const response = await apiClient.searchTimesheetsByQuery('', page, itemsPerPage, startDate, endDate, nameParam, statusParam);
     console.log('Date range API Response:', response);
     
     const timesheetsData = response.data;
@@ -587,9 +646,10 @@ const fetchTimesheetsByDateRange = async () => {
       employee: item.employee || 'N/A',
       job: item.job || 'N/A',
       jobCode: item.job ? item.job.split('(')[1]?.replace(')', '') || 'N/A' : 'N/A',
-      week: period.week_range,
+      week: item.week || period.week_range,
       jobId: item.job_id?.toString() || '',
       laborId: item.labor_id?.toString() || '',
+      lead_labor_id: item.lead_labor_id?.toString() || '',
       mon: item.mon || '0h',
       tue: item.tue || '0h',
       wed: item.wed || '0h',
@@ -601,11 +661,13 @@ const fetchTimesheetsByDateRange = async () => {
       billable: item.billable || '0h',
       status: item.status || 'Unknown',
       actions: item.actions || [],
+      hourly_rate: item.hourly_rate || null,
+      weekly_payment: item.weekly_payment || null,
     }));
 
-    setTimesheets(timesheetsData); 
+    setTimesheets(timesheetsData);
     setFilteredTimesheets(transformedTimesheets);
-    setTotalTimesheets(transformedTimesheets.length);
+    setTotalTimesheets(timesheetsData?.pagination?.total_records ?? transformedTimesheets.length);
   } catch (error) {
     console.error('Error fetching timesheets by date range:', error);
     setTimesheets({

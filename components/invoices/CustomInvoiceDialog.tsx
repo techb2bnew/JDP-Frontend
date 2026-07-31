@@ -1393,6 +1393,9 @@ console.log(totalAmount,"amounttt");
             type: item.type || 'item',
             parentHeaderKey: item.parentHeaderKey || null,
             parentHeaderName: item.parentHeaderName || null,
+            // Backend groups custom headers off this snake_case key (confirmed
+            // working from the Job Details send flow) — camelCase alone is dropped.
+            parent_header_name: item.parentHeaderName || item.parent_header_name || null,
             description: item.description,
             rate: rateNum,
             total: roundMoney(qtyNum * rateNum),

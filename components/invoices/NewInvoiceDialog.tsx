@@ -1517,6 +1517,9 @@ export const NewInvoiceDialog = ({
               type: item.type,
               parentHeaderKey: item.parentHeaderKey || null,
               parentHeaderName: item.parentHeaderName || null,
+              // Backend groups custom headers off this snake_case key (confirmed
+              // working from the Job Details send flow) — camelCase alone is dropped.
+              parent_header_name: item.parentHeaderName || null,
               description: item.description,
               rate: rateNum,
               total: roundMoney(qtyNum * rateNum),

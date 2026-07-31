@@ -3552,7 +3552,9 @@ export function ContractorListingPage() {
               onToggleJob={toggleJob}
               onSelectParent={handleSelectParent}
               itemsPerPage={itemsPerPage}
-              totalItems={totalContractors}
+              totalItems={
+                searchTerm.trim() ? displayContractors.length : totalContractors
+              }
               onSelectJob={handleSelectJob}
               onSelectSubJob={handleSelectSubJob}
               onEditParent={(contractor) => handleEditContractor(contractor)}
