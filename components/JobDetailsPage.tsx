@@ -6162,6 +6162,10 @@ const handlePrintInvoice = async (invoice: any) => {
       setIsLoadingPreview(true);
 
       const subtotal = calculateInvoiceSubtotal();
+      const hasLaborCost = hasApiLaborCost(inlineInvoiceData.totalLaborCost);
+      const laborCost = hasLaborCost
+        ? resolveInvoiceLaborCost(inlineInvoiceData.totalLaborCost)
+        : 0;
 
       // Only map valid line items to custom products
       const customProducts = validLineItems.map((item) => {
@@ -6230,7 +6234,10 @@ const handlePrintInvoice = async (invoice: any) => {
         estimate_source_type: job?.estimatedCost
           ? "estimate_job"
           : "time_material_job",
-        total_amount: subtotal,
+        // Material total, plus labor cost when available (matches the
+        // material+labor breakdown shown in the invoice preview).
+        total_amount: subtotal + laborCost,
+        ...(hasLaborCost ? { total_labor_cost: laborCost } : {}),
       };
 
       if (editingInvoiceId) {
