@@ -24,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import ImportProductsDialog from "./invoices/ImportProductsDialog";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "./ui/checkbox";
@@ -399,6 +400,7 @@ export function JobDetailsPage({
   const [selectedBlueSheetForReview, setSelectedBlueSheetForReview] =
     useState<DialogBlueSheetItem | null>(null);
   const [isBlueSheetDialogOpen, setIsBlueSheetDialogOpen] = useState(false);
+  const [showImportProductsDialog, setShowImportProductsDialog] = useState(false);
   const [selectedBluesheetIds, setSelectedBluesheetIds] = useState<number[]>(
     [],
   );
@@ -8212,7 +8214,7 @@ const handlePrintInvoice = async (invoice: any) => {
                             </SelectItem>
                             {customInvoiceTypes.length > 0 && (
                               <>
-                                <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 border-b">
+                                <div className="px-2 py-2 text-xs font-semibold text-gray-500 border-b">
                                   Custom Types
                                 </div>
                                 {cleanCustomTypes(customInvoiceTypes).map(
@@ -8581,7 +8583,18 @@ const handlePrintInvoice = async (invoice: any) => {
                         />
                       </div>
                     </div>
-
+                    <div className="flex justify-end mb-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        disabled={!jobId}
+                        onClick={() => setShowImportProductsDialog(true)}
+                      >
+                        Import from Bluesheets / Estimates
+                      </Button>
+                    </div>
                     {/* Line Items Table */}
                     <InvoiceLineItemsManager
                       lineItems={inlineInvoiceData.lineItems}
@@ -8606,6 +8619,19 @@ const handlePrintInvoice = async (invoice: any) => {
                         // optional: agar existing autofill logic already hai
                         selectProduct(rowId, product);
                       }}
+                    />
+                    <ImportProductsDialog
+                      open={showImportProductsDialog}
+                      onOpenChange={setShowImportProductsDialog}
+                      jobId={jobId}
+                      selectedSupplierId={selectedSupplierId}
+                      existingLineItems={inlineInvoiceData.lineItems}
+                      onImport={(rows) =>
+                        setInlineInvoiceData((prev) => ({
+                          ...prev,
+                          lineItems: [...prev.lineItems, ...rows],
+                        }))
+                      }
                     />
 
                     {/* Notes (editable; synced to estimate notes/description on save/preview) */}

@@ -49,6 +49,7 @@ import { motion } from "framer-motion";
 import { Logo } from "../common/Logo";
 import Image from "next/image";
 import InvoiceLineItemsManager from "../common/invoice-line-items/InvoiceLineItemsManager";
+import ImportProductsDialog from "./ImportProductsDialog";
 import {
   buildInvoicePreviewRows,
   getFilledLineItemRows,
@@ -682,6 +683,7 @@ export const NewInvoiceDialog = ({
     Record<string, string>
   >({});
   const [estimateCost, setEstimateCost] = useState(null);
+  const [showImportProductsDialog, setShowImportProductsDialog] = useState(false);
 
   const currentJob = selectedJob || jobs?.find((j: any) => j.id === jobId);
   /** Avoid re-applying bill from job on re-renders after user edits (same job id). */
@@ -3854,29 +3856,56 @@ const validateLineItems = (lineItems: any[] = []) => {
                   </table>
                 </div>
               ) : (
-                <InvoiceLineItemsManager
-                  lineItems={inlineInvoiceData.lineItems}
-                  useRateForLineTotal
-                  invalidHeaderKeys={invalidHeaderKeys}
-                  setInvalidHeaderKeys={setInvalidHeaderKeys}
-                  setLineItems={(updater) =>
-                    setInlineInvoiceData((prev) => ({
-                      ...prev,
-                      lineItems:
-                        typeof updater === "function"
-                          ? updater(prev.lineItems)
-                          : updater,
-                    }))
-                  }
-                  invalidLineItemIds={invalidLineItemIds}
-                  setInvalidLineItemIds={setInvalidLineItemIds}
-                  selectedSupplierId={selectedSupplierId}
-                  fetchProducts={fetchProducts}
-                  getFilteredProducts={getFilteredProducts}
-                  onSelectProductData={(rowId, product) => {
-                    selectProduct(rowId, product);
-                  }}
-                />
+                <>
+                  <div className="flex justify-end mb-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      disabled={!(inlineInvoiceData.jobId || currentJob?.id)}
+                      onClick={() => setShowImportProductsDialog(true)}
+                    >
+                      Import from Bluesheets / Estimates
+                    </Button>
+                  </div>
+                  <InvoiceLineItemsManager
+                    lineItems={inlineInvoiceData.lineItems}
+                    useRateForLineTotal
+                    invalidHeaderKeys={invalidHeaderKeys}
+                    setInvalidHeaderKeys={setInvalidHeaderKeys}
+                    setLineItems={(updater) =>
+                      setInlineInvoiceData((prev) => ({
+                        ...prev,
+                        lineItems:
+                          typeof updater === "function"
+                            ? updater(prev.lineItems)
+                            : updater,
+                      }))
+                    }
+                    invalidLineItemIds={invalidLineItemIds}
+                    setInvalidLineItemIds={setInvalidLineItemIds}
+                    selectedSupplierId={selectedSupplierId}
+                    fetchProducts={fetchProducts}
+                    getFilteredProducts={getFilteredProducts}
+                    onSelectProductData={(rowId, product) => {
+                      selectProduct(rowId, product);
+                    }}
+                  />
+                  <ImportProductsDialog
+                    open={showImportProductsDialog}
+                    onOpenChange={setShowImportProductsDialog}
+                    jobId={inlineInvoiceData.jobId || currentJob?.id}
+                    selectedSupplierId={selectedSupplierId}
+                    existingLineItems={inlineInvoiceData.lineItems}
+                    onImport={(rows) =>
+                      setInlineInvoiceData((prev) => ({
+                        ...prev,
+                        lineItems: [...prev.lineItems, ...rows],
+                      }))
+                    }
+                  />
+                </>
               )}
 
               {isViewMode &&
