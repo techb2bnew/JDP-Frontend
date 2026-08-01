@@ -48,7 +48,6 @@ import {
   CommandList,
 } from './ui/command'
 import { cn } from './ui/utils'
-import { usePermissions } from '../contexts/PermissionContext'
 
 interface Permission {
   module: string;
@@ -195,7 +194,6 @@ const getTransitiveDeps = (
 };
 
 export default function RolePermission() {
-  const { hasPermission, permissions, isLoading: permissionsLoading } = usePermissions();
   const [roles, setRoles] = useState<Role[]>([]);
   const [isLoadingRoles, setIsLoadingRoles] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -665,12 +663,6 @@ const LABOUR_HIDDEN_PERMISSIONS: Record<string, string[]> = {
     const normalized = roleName.trim().toLowerCase().replace(/\s+/g, ' ');
     return normalized === 'admin' || normalized === 'super admin';
   };
-
-  // No permissions assigned at all (typical for admin/super-admin accounts) means unrestricted access.
-  const isPermissionBypass = currentUserIsSuperAdmin || (!permissionsLoading && permissions.length === 0);
-  const canViewRolePermission = isPermissionBypass || hasPermission('role_permission', 'view');
-  const canEditRolePermission = isPermissionBypass || hasPermission('role_permission', 'edit');
-  const canDeleteRolePermission = isPermissionBypass || hasPermission('role_permission', 'delete');
 
   const handleEditRole = (role: Role) => {
     if (!currentUserIsSuperAdmin && isProtectedRoleName(role.roleName)) return;
@@ -1150,7 +1142,6 @@ const handlePermissionChange = (modName: string, act: string, allowed: boolean) 
         const updateData = {
           roleId: parseInt(editingRole.id),
           roleName: apiRoleName,
-          description: formData.description,
           platform: platformValue,
           permissions: compiledPermissions.map(perm => ({
             module: perm.module,
@@ -1440,17 +1431,15 @@ const handlePermissionChange = (modName: string, act: string, allowed: boolean) 
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex space-x-2">
-                                {canViewRolePermission && (
-                                  <Button onClick={() => handleViewRole(role)} variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                    <Eye className="h-4 w-4" />
-                                  </Button>
-                                )}
-                                {(!isProtectedRole || currentUserIsSuperAdmin) && canEditRolePermission && (
+                                <Button onClick={() => handleViewRole(role)} variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                {(!isProtectedRole || currentUserIsSuperAdmin) && (
                                   <Button onClick={() => handleEditRole(role)} variant="ghost" size="sm" className="h-8 w-8 p-0">
                                     <Edit className="h-4 w-4" />
                                   </Button>
                                 )}
-                                {!isProtectedRole && canDeleteRolePermission && (
+                                {!isProtectedRole && (
                                   <Button
                                     onClick={() => handleDeleteRole(role)}
                                     variant="ghost"
