@@ -21,6 +21,7 @@ import { motion } from 'framer-motion'
 import { Logo } from '../common/Logo'
 import Image from 'next/image';
 import InvoiceLineItemsManager from '../common/invoice-line-items/InvoiceLineItemsManager'
+import ImportProductsDialog from './ImportProductsDialog'
 import {
   createDefaultEmptyLineItems,
   getFilledLineItemRows,
@@ -282,6 +283,7 @@ export const CustomInvoiceDialog = ({
 
   const [suppliersList, setSuppliersList] = useState<any[]>([])
   const [selectedSupplierId, setSelectedSupplierId] = useState<number>(1)
+  const [showImportProductsDialog, setShowImportProductsDialog] = useState(false)
   const [showInlineInvoiceForm, setShowInlineInvoiceForm] = useState(true)
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null)
   const [selectedEstimateId, setSelectedEstimateId] = useState<string | null>(null)
@@ -1998,6 +2000,20 @@ console.log(totalAmount,"amounttt");
 
           {/* Line Items */}
           <div className="mb-4">
+            {!isViewMode && (
+              <div className="flex justify-end mb-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  disabled={!blueSheet?.job_id}
+                  onClick={() => setShowImportProductsDialog(true)}
+                >
+                  Import from Bluesheets / Estimates
+                </Button>
+              </div>
+            )}
             <InvoiceLineItemsManager
               lineItems={inlineInvoiceData.lineItems}
               invalidHeaderKeys={invalidHeaderKeys}
@@ -2013,6 +2029,16 @@ console.log(totalAmount,"amounttt");
               }}
               useRateForLineTotal
               summaryLaborTotal={viewInvoiceData?.labor_total_cost}
+            />
+            <ImportProductsDialog
+              open={showImportProductsDialog}
+              onOpenChange={setShowImportProductsDialog}
+              jobId={blueSheet?.job_id}
+              selectedSupplierId={selectedSupplierId}
+              existingLineItems={inlineInvoiceData.lineItems}
+              onImport={(rows) =>
+                setManagedLineItems((prev) => [...prev, ...rows])
+              }
             />
           </div>
 
