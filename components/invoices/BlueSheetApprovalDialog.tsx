@@ -1158,6 +1158,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
       (finalBlueSheet as any).contractor_id ??
       null;
 
+      
     // job_type can be stale/incorrect on the BlueSheet's embedded job — trust which
     // id actually resolved over the flag so we never send an empty email/address
     // pulled from a party (contractor) that doesn't really exist on this job.
