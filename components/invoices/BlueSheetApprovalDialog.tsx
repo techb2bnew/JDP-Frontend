@@ -139,6 +139,12 @@ function formatLaborWorkedHours(totalHours: string): string {
   return `${h} hr ${min} min`;
 }
 
+function getMaterialEntryAmount(item: any): number {
+  if (item.total_cost) return Number(item.total_cost);
+  const qty = Number(item.material_used ?? item.total_ordered ?? 0);
+  return qty * Number(item.unit_cost ?? 0);
+}
+
 function formatLaborEntryLabel(entry: any): string {
   const name = String(entry?.employee_name || entry?.role || "Labor")
     .split(" ")
@@ -1158,7 +1164,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
       (finalBlueSheet as any).contractor_id ??
       null;
 
-      
+
     // job_type can be stale/incorrect on the BlueSheet's embedded job — trust which
     // id actually resolved over the flag so we never send an empty email/address
     // pulled from a party (contractor) that doesn't really exist on this job.
@@ -1301,7 +1307,7 @@ const syncCustomInvoiceLineItemsToBlueSheet = (lineItems: any[]) => {
   // Labour, material and overall totals
   const totalLaborLabel = currentBlueSheet.total_labor_hours || null
   const materialTotal = currentBlueSheet.material_entries.reduce(
-    (s: number, i: any) => s + (i.total_cost || i.material_used * i.jdp_price || 0),
+    (s: number, i: any) => s + getMaterialEntryAmount(i),
     0,
   )
   // Derive total labor cost from labor_entries so it reflects merged selections
